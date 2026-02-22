@@ -1,353 +1,252 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabaseClient";
 
 type Project = {
   id: string;
   name: string;
   description: string | null;
-  environment_type: string | null;
-  sap_version: string | null;
   status: string | null;
-  start_date: string | null;
-  client_id: string | null;
-  client_name: string | null;
-  created_at: string | null;
-  notes_count: number;
-  module_notes_count: number;
-  files_count: number;
-  scope_items_count: number;
-};
-
-type ProjectNote = {
-  id: string;
-  title: string;
-  body: string | null;
-  client: string | null;
-  module: string | null;
-  scope_item: string | null;
-  error_code: string | null;
   created_at: string;
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  planned: "Planificado",
-  in_progress: "En progreso",
-  on_hold: "En espera",
-  closed: "Cerrado",
-};
-
-export default function ProjectDetailPage() {
+export default function ProjectDetailPage({
+  params,
+}: {
+  params: { id: string };
+}) {
   const router = useRouter();
-  const params = useParams<{ id: string }>();
+  const projectId = params.id;
 
-  const projectId = params?.id;
-
-  const [project, setProject] = useState<Project | null>(null);
-  const [notes, setNotes] = useState<ProjectNote[]>([]);
-
+  // Hooks SIEMPRE en el mismo orden
+  const [checkingSession, setCheckingSession] = useState(true);
   const [loadingProject, setLoadingProject] = useState(true);
-  const [loadingNotes, setLoadingNotes] = useState(true);
-
+  const [saving, setSaving] = useState(false);
+  const [project, setProject] = useState<Project | null>(null);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [status, setStatus] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [notesError, setNotesError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!projectId) return;
+    const init = async () => {
+      // 1) Auth guard
+      const { data } = await supabase.auth.getSession();
 
-    const loadProject = async () => {
+      if (!data.session) {
+        router.replace("/");
+        return;
+      }
+
+      setCheckingSession(false);
+
+      // 2) Cargar proyecto
       setLoadingProject(true);
       setErrorMsg(null);
 
-      const { data, error } = await supabase
-        .from("project_dashboard")
+      const { data: projData, error } = await supabase
+        .from("projects")
         .select("*")
         .eq("id", projectId)
-        .maybeSingle();
+        .single();
 
       if (error) {
-        console.error("project_dashboard get error", error);
-        setErrorMsg("No se pudo cargar la información del proyecto.");
-      } else if (!data) {
-        setErrorMsg("No se ha encontrado el proyecto.");
-      } else {
-        setProject(data as Project);
+        console.error(error);
+        setErrorMsg("No se ha podido cargar el proyecto.");
+        setProject(null);
+      } else if (projData) {
+        const p = projData as Project;
+        setProject(p);
+        setName(p.name || "");
+        setDescription(p.description || "");
+        setStatus(p.status || "");
       }
 
       setLoadingProject(false);
     };
 
-    const loadNotes = async () => {
-      setLoadingNotes(true);
-      setNotesError(null);
+    if (projectId) {
+      init();
+    }
+  }, [router, projectId]);
 
-      const { data, error } = await supabase
-        .from("notes") // ajusta si tu tabla/vista de notas tiene otro nombre
-        .select("*")
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: false });
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/");
+  };
+
+  if (checkingSession) return null;
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (!project) return;
+
+    if (!name.trim()) {
+      setErrorMsg("El nombre del proyecto es obligatorio.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from("projects")
+        .update({
+          name: name.trim(),
+          description: description.trim() || null,
+          status: status.trim() || null,
+        })
+        .eq("id", project.id);
 
       if (error) {
-        console.error("notes by project error", error);
-        setNotesError("No se pudieron cargar las notas de este proyecto.");
-      } else if (data) {
-        setNotes(data as ProjectNote[]);
+        console.error(error);
+        setErrorMsg("No se pudo actualizar el proyecto. Inténtalo de nuevo.");
+        setSaving(false);
+        return;
       }
 
-      setLoadingNotes(false);
-    };
-
-    void loadProject();
-    void loadNotes();
-  }, [projectId]);
-
-  const formatDate = (value: string | null) => {
-    if (!value) return "Sin fecha";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return value;
-    return d.toLocaleDateString();
+      setSuccessMsg("Proyecto actualizado correctamente.");
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("Se ha producido un error inesperado.");
+    } finally {
+      setSaving(false);
+    }
   };
-
-  const formatStatus = (status: string | null) => {
-    if (!status) return "Sin estado";
-    return STATUS_LABELS[status] ?? status;
-  };
-
-  // ======================
-  // UI
-  // ======================
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="mx-auto max-w-6xl px-4 py-6 space-y-6">
-        {/* Header navegación */}
-        <header className="flex items-center justify-between gap-4">
-          <button
-            type="button"
-            onClick={() => router.push("/projects")}
-            className="text-[11px] text-slate-400 underline underline-offset-4 hover:text-slate-200"
-          >
-            ← Volver a proyectos
-          </button>
+    <main className="min-h-screen bg-slate-50">
+      {/* Navbar */}
+      <header className="bg-white border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
+              PH
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                Project Hub
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Detalle del proyecto
+              </p>
+            </div>
+          </div>
 
           <div className="flex items-center gap-2">
             <button
-              type="button"
-              onClick={() => router.push("/notes")}
-              className="text-[11px] text-slate-400 underline underline-offset-4 hover:text-slate-200"
+              onClick={() => router.push("/projects")}
+              className="text-xs border border-slate-300 px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100"
             >
-              Ir al panel de notas →
+              Volver a proyectos
+            </button>
+            <button
+              onClick={handleLogout}
+              className="text-xs border border-slate-300 px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100"
+            >
+              Cerrar sesión
             </button>
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* Estado carga / error proyecto */}
-        {loadingProject && (
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
-            Cargando proyecto…
+      {/* Contenido */}
+      <section className="max-w-4xl mx-auto px-6 py-7">
+        {loadingProject ? (
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+            <p className="text-sm text-slate-500">Cargando proyecto...</p>
           </div>
-        )}
-
-        {!loadingProject && errorMsg && (
-          <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-            {errorMsg}
+        ) : !project ? (
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+            <p className="text-sm text-red-500">
+              {errorMsg || "No se ha encontrado el proyecto indicado."}
+            </p>
           </div>
-        )}
+        ) : (
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-5">
+            <div>
+              <h1 className="text-xl font-semibold text-slate-900 mb-1">
+                {project.name || "Proyecto sin nombre"}
+              </h1>
+              <p className="text-xs text-slate-500">
+                Creado el{" "}
+                {new Date(project.created_at).toLocaleDateString()}
+              </p>
+            </div>
 
-        {/* Contenido del proyecto */}
-        {!loadingProject && !errorMsg && project && (
-          <>
-            {/* Cabecera principal del proyecto */}
-            <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="space-y-1">
-                <p className="text-[11px] uppercase tracking-[0.2em] text-sky-400">
-                  SAP Notes Hub
-                </p>
-                <h1 className="text-2xl font-semibold text-slate-50">
-                  {project.name}
-                </h1>
-                <p className="text-sm text-slate-400 max-w-xl">
-                  {project.description || "Sin descripción detallada."}
-                </p>
-
-                <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-300">
-                  {project.client_name && (
-                    <span className="rounded-full bg-slate-800/80 px-2 py-1">
-                      Cliente: {project.client_name}
-                    </span>
-                  )}
-                  {project.environment_type && (
-                    <span className="rounded-full bg-slate-800/80 px-2 py-1">
-                      Entorno: {project.environment_type}
-                    </span>
-                  )}
-                  {project.sap_version && (
-                    <span className="rounded-full bg-slate-800/80 px-2 py-1">
-                      SAP: {project.sap_version}
-                    </span>
-                  )}
-                  {project.status && (
-                    <span className="rounded-full bg-slate-800/80 px-2 py-1">
-                      Estado: {formatStatus(project.status)}
-                    </span>
-                  )}
-                </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-800">
+                  Nombre del proyecto *
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
 
-              <div className="flex flex-col items-start gap-2 text-[11px] text-slate-400 md:items-end">
-                <div>
-                  <p className="text-slate-500">Fecha de inicio</p>
-                  <p className="font-medium text-slate-200">
-                    {formatDate(project.start_date)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Creado en SAP Notes Hub</p>
-                  <p className="font-medium text-slate-200">
-                    {formatDate(project.created_at)}
-                  </p>
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-800">
+                  Descripción
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={5}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Añade un resumen del contexto, objetivos y decisiones clave relacionadas con este proyecto."
+                />
               </div>
-            </section>
 
-            {/* Métricas del proyecto */}
-            <section className="grid gap-3 md:grid-cols-4">
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">
-                  Notas totales
-                </p>
-                <p className="mt-1 text-xl font-semibold text-slate-50">
-                  {project.notes_count}
-                </p>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Incidencias, decisiones y configuraciones registradas.
-                </p>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-800">
+                  Estado
+                </label>
+                <input
+                  type="text"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  placeholder="Ejemplo: En análisis, En curso, Cerrado..."
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">
-                  Notas por módulo
-                </p>
-                <p className="mt-1 text-xl font-semibold text-slate-50">
-                  {project.module_notes_count}
-                </p>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Agrupadas por SD, MM, FI, etc.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">
-                  Scope items
-                </p>
-                <p className="mt-1 text-xl font-semibold text-slate-50">
-                  {project.scope_items_count}
-                </p>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Procesos estándar SAP vinculados.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">
-                  Ficheros
-                </p>
-                <p className="mt-1 text-xl font-semibold text-slate-50">
-                  {project.files_count}
-                </p>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Documentación adjunta del proyecto.
-                </p>
-              </div>
-            </section>
 
-            {/* Notas del proyecto */}
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-slate-200">
-                  Notas del proyecto ({notes.length})
-                </h2>
+              {errorMsg && (
+                <p className="text-xs text-red-500">{errorMsg}</p>
+              )}
+              {successMsg && (
+                <p className="text-xs text-emerald-600">{successMsg}</p>
+              )}
+
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {saving ? "Guardando cambios..." : "Guardar cambios"}
+                </button>
+
                 <button
                   type="button"
-                  onClick={() => router.push("/notes")}
-                  className="text-[11px] text-sky-400 hover:text-sky-300 underline underline-offset-4"
+                  onClick={() => router.push("/projects")}
+                  className="text-sm text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-100"
                 >
-                  Ver todas las notas →
+                  Volver sin guardar
                 </button>
               </div>
-
-              {loadingNotes && (
-                <div className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-6 text-center text-sm text-slate-400">
-                  Cargando notas del proyecto…
-                </div>
-              )}
-
-              {!loadingNotes && notesError && (
-                <div className="rounded-2xl border border-rose-500/40 bg-rose-950/40 px-4 py-3 text-sm text-rose-100">
-                  {notesError}
-                </div>
-              )}
-
-              {!loadingNotes && !notesError && (
-                <>
-                  {notes.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/60 px-6 py-8 text-center">
-                      <p className="text-sm text-slate-200">
-                        Este proyecto todavía no tiene notas registradas.
-                      </p>
-                      <p className="mt-1 text-[11px] text-slate-500">
-                        Añade notas desde el panel general para ir construyendo
-                        el historial de decisiones e incidencias.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {notes.map((note) => (
-                        <article
-                          key={note.id}
-                          className="flex h-full flex-col rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-left shadow-sm"
-                        >
-                          <header className="mb-1">
-                            <h3 className="text-sm font-semibold text-slate-50">
-                              {note.title}
-                            </h3>
-                          </header>
-
-                          <p className="mb-3 line-clamp-3 text-xs text-slate-400">
-                            {note.body || "Sin descripción detallada."}
-                          </p>
-
-                          <div className="mb-3 flex flex-wrap gap-2 text-[11px] text-slate-300">
-                            {note.module && (
-                              <span className="rounded-full bg-slate-800/80 px-2 py-1">
-                                Módulo: {note.module}
-                              </span>
-                            )}
-                            {note.scope_item && (
-                              <span className="rounded-full bg-slate-800/80 px-2 py-1">
-                                Scope: {note.scope_item}
-                              </span>
-                            )}
-                            {note.error_code && (
-                              <span className="rounded-full bg-slate-800/80 px-2 py-1">
-                                Error: {note.error_code}
-                              </span>
-                            )}
-                          </div>
-
-                          <footer className="mt-auto flex items-center justify-between text-[10px] text-slate-500">
-                            <span>Creada: {formatDate(note.created_at)}</span>
-                            {note.client && <span>{note.client}</span>}
-                          </footer>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </section>
-          </>
+            </form>
+          </div>
         )}
-      </div>
+      </section>
     </main>
   );
 }

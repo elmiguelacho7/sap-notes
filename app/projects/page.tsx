@@ -1,330 +1,211 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
-type DashboardProject = {
+type Project = {
   id: string;
   name: string;
   description: string | null;
-  environment_type: string | null;
-  sap_version: string | null;
   status: string | null;
-  start_date: string | null;
-  client_id: string | null;
-  client_name: string | null;
-  created_at: string | null;
-  notes_count: number;
-  module_notes_count: number;
-  files_count: number;
-  scope_items_count: number;
+  created_at: string;
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  planned: "Planificado",
-  in_progress: "En progreso",
-  on_hold: "En espera",
-  closed: "Cerrado",
-};
-
-export default function ProjectsDashboardPage() {
+export default function ProjectsPage() {
   const router = useRouter();
 
-  const [projects, setProjects] = useState<DashboardProject[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Hooks siempre en el mismo orden
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | string>("all");
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setErrorMsg(null);
+    const init = async () => {
+      // 1) Comprobar sesión
+      const { data } = await supabase.auth.getSession();
 
-      const { data, error } = await supabase
-        .from("project_dashboard")
-        .select("*")
-        .order("created_at", {
-          ascending: false,
-        });
-
-      if (error) {
-        console.error("project_dashboard select error", error);
-        setErrorMsg("No se pudieron cargar los proyectos.");
-      } else if (data) {
-        setProjects(data as DashboardProject[]);
+      if (!data.session) {
+        router.replace("/");
+        return;
       }
 
-      setLoading(false);
+      setCheckingSession(false);
+
+      // 2) Cargar proyectos
+      setLoadingProjects(true);
+      setErrorMsg(null);
+
+      const { data: projData, error } = await supabase
+        .from("projects")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error(error);
+        setErrorMsg("No se pudieron cargar los proyectos.");
+        setProjects([]);
+      } else {
+        setProjects(projData || []);
+      }
+
+      setLoadingProjects(false);
     };
 
-    void load();
-  }, []);
+    init();
+  }, [router]);
 
-  const formatDate = (value: string | null) => {
-    if (!value) return "Sin fecha";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return value;
-    return d.toLocaleDateString();
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/");
   };
 
-  const formatStatus = (status: string | null) => {
-    if (!status) return "Sin estado";
-    return STATUS_LABELS[status] ?? status;
-  };
+  if (checkingSession) return null;
 
-  const filteredProjects = useMemo(() => {
-    const term = search.trim().toLowerCase();
+  const filteredProjects = projects.filter((project) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
 
-    return projects.filter((p) => {
-      const matchesStatus =
-        statusFilter === "all" || (p.status ?? "").toLowerCase() === statusFilter;
+    const fields = [
+      project.name,
+      project.description ?? "",
+      project.status ?? "",
+    ].join(" ");
 
-      if (!matchesStatus) return false;
-
-      if (!term) return true;
-
-      const haystack = [
-        p.name,
-        p.description,
-        p.client_name,
-        p.environment_type,
-        p.sap_version,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(term);
-    });
-  }, [projects, search, statusFilter]);
-
-  const uniqueStatuses = useMemo(() => {
-    const set = new Set<string>();
-    projects.forEach((p) => {
-      if (p.status) set.add(p.status);
-    });
-    return Array.from(set);
-  }, [projects]);
+    return fields.toLowerCase().includes(q);
+  });
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="mx-auto max-w-6xl px-4 py-6 space-y-6">
-        {/* Header */}
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <main className="min-h-screen bg-slate-50">
+      {/* Navbar */}
+      <header className="bg-white border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
+              PH
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                Project Hub
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Área de proyectos
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="text-xs border border-slate-300 px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100"
+            >
+              Volver al panel
+            </button>
+            <button
+              onClick={handleLogout}
+              className="text-xs border border-slate-300 px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Contenido */}
+      <section className="max-w-6xl mx-auto px-6 py-7 space-y-5">
+        {/* Cabecera + botón nuevo proyecto */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.2em] text-sky-400">
-              SAP Notes Hub
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-50">
-              Proyectos y documentación
+            <h1 className="text-2xl font-semibold text-slate-900">
+              Proyectos
             </h1>
-            <p className="mt-1 text-sm text-slate-400">
-              Vista general de tus proyectos SAP y sus notas asociadas.
+            <p className="text-sm text-slate-600 max-w-xl">
+              Registra y organiza aquí tus proyectos internos. Cada proyecto
+              puede tener notas, decisiones y configuraciones asociadas.
             </p>
           </div>
 
-          <div className="flex flex-col items-stretch gap-2 sm:items-end">
-            <button
-              type="button"
-              onClick={() => router.push("/projects/new")}
-              className="inline-flex items-center justify-center rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 hover:bg-sky-600"
-            >
-              + Nuevo proyecto
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/notes")}
-              className="text-[11px] text-slate-400 underline underline-offset-4 hover:text-slate-200"
-            >
-              Ir al panel de notas →
-            </button>
+          <button
+            onClick={() => router.push("/projects/new")}
+            className="self-start bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Nuevo proyecto
+          </button>
+        </div>
+
+        {/* Buscador */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              Buscador de proyectos
+            </p>
+            <p className="text-xs text-slate-500">
+              Filtra por nombre, descripción o estado.
+            </p>
           </div>
-        </header>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Escribe para filtrar..."
+            className="w-full md:w-64 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
 
-        {/* Filtros / búsqueda */}
-        <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 space-y-3 md:flex md:items-end md:justify-between md:space-y-0 md:gap-4">
-          <div className="flex-1 space-y-2 md:flex md:space-y-0 md:space-x-3">
-            <div className="flex-1">
-              <label
-                htmlFor="search"
-                className="mb-1 block text-[11px] font-medium text-slate-400"
-              >
-                Buscar proyecto
-              </label>
-              <input
-                id="search"
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Cliente, entorno, versión SAP, descripción…"
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-              />
-            </div>
-
-            <div className="w-full md:w-52">
-              <label
-                htmlFor="statusFilter"
-                className="mb-1 block text-[11px] font-medium text-slate-400"
-              >
-                Estado
-              </label>
-              <select
-                id="statusFilter"
-                value={statusFilter}
-                onChange={(e) =>
-                  setStatusFilter(e.target.value as "all" | string)
-                }
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-              >
-                <option value="all">Todos</option>
-                {uniqueStatuses.map((st) => (
-                  <option key={st} value={st}>
-                    {formatStatus(st)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <p className="text-[11px] text-slate-500">
-            {filteredProjects.length} proyecto
-            {filteredProjects.length === 1 ? "" : "s"} visibles
-          </p>
-        </section>
-
-        {/* Estado de carga / error */}
-        {loading && (
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
-            Cargando proyectos…
-          </div>
-        )}
-
-        {!loading && errorMsg && (
-          <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-            {errorMsg}
-          </div>
-        )}
-
-        {/* Lista de proyectos */}
-        {!loading && !errorMsg && (
-          <>
-            {filteredProjects.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/60 px-6 py-10 text-center">
-                <p className="text-sm text-slate-300">
-                  Aún no tienes proyectos creados.
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Crea tu primer proyecto para empezar a registrar notas,
-                  decisiones y configuraciones.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => router.push("/projects/new")}
-                  className="mt-5 inline-flex items-center rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 hover:bg-sky-600"
+        {/* Listado de proyectos */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
+          {loadingProjects ? (
+            <p className="p-6 text-sm text-slate-500">
+              Cargando proyectos...
+            </p>
+          ) : errorMsg ? (
+            <p className="p-6 text-sm text-red-500">{errorMsg}</p>
+          ) : filteredProjects.length === 0 ? (
+            <p className="p-6 text-sm text-slate-500">
+              No se han encontrado proyectos con los filtros actuales.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {filteredProjects.map((project) => (
+                <li
+                  key={project.id}
+                  className="p-4 hover:bg-slate-50 cursor-pointer"
+                  onClick={() => router.push(`/projects/${project.id}`)}
                 >
-                  + Crear proyecto
-                </button>
-              </div>
-            ) : (
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-slate-200">
-                    Tus proyectos ({filteredProjects.length})
-                  </h2>
-                </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {project.name || "Proyecto sin nombre"}
+                      </p>
+                      {project.description && (
+                        <p className="mt-1 text-xs text-slate-600 line-clamp-2">
+                          {project.description}
+                        </p>
+                      )}
 
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredProjects.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => router.push(`/projects/${p.id}`)}
-                      className="group flex h-full flex-col rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-left shadow-sm transition hover:border-sky-500/60 hover:bg-slate-900"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="text-sm font-semibold text-slate-50 group-hover:text-sky-100">
-                            {p.name}
-                          </h3>
-                          <p className="mt-1 line-clamp-2 text-xs text-slate-400">
-                            {p.description || "Sin descripción"}
-                          </p>
-                        </div>
-                        <span className="rounded-full bg-slate-800 px-2 py-1 text-[10px] text-slate-300">
-                          {formatStatus(p.status)}
-                        </span>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-                        {p.client_name && (
-                          <span className="rounded-full bg-slate-800/80 px-2 py-1">
-                            Cliente: {p.client_name}
-                          </span>
-                        )}
-                        {p.environment_type && (
-                          <span className="rounded-full bg-slate-800/80 px-2 py-1">
-                            Entorno: {p.environment_type}
-                          </span>
-                        )}
-                        {p.sap_version && (
-                          <span className="rounded-full bg-slate-800/80 px-2 py-1">
-                            SAP: {p.sap_version}
+                      <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
+                        {project.status && (
+                          <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200">
+                            Estado: {project.status}
                           </span>
                         )}
                       </div>
+                    </div>
 
-                      <div className="mt-4 grid grid-cols-2 gap-2 text-[11px] text-slate-300">
-                        <div className="rounded-xl bg-slate-900/80 px-2 py-2">
-                          <p className="text-[10px] uppercase tracking-wide text-slate-500">
-                            Notas
-                          </p>
-                          <p className="text-sm font-semibold">
-                            {p.notes_count}
-                          </p>
-                        </div>
-                        <div className="rounded-xl bg-slate-900/80 px-2 py-2">
-                          <p className="text-[10px] uppercase tracking-wide text-slate-500">
-                            Scope items
-                          </p>
-                          <p className="text-sm font-semibold">
-                            {p.scope_items_count}
-                          </p>
-                        </div>
-                        <div className="rounded-xl bg-slate-900/80 px-2 py-2">
-                          <p className="text-[10px] uppercase tracking-wide text-slate-500">
-                            Notas módulo
-                          </p>
-                          <p className="text-sm font-semibold">
-                            {p.module_notes_count}
-                          </p>
-                        </div>
-                        <div className="rounded-xl bg-slate-900/80 px-2 py-2">
-                          <p className="text-[10px] uppercase tracking-wide text-slate-500">
-                            Ficheros
-                          </p>
-                          <p className="text-sm font-semibold">
-                            {p.files_count}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between text-[10px] text-slate-500">
-                        <span>Creado: {formatDate(p.created_at)}</span>
-                        <span className="opacity-0 transition group-hover:opacity-100">
-                          Ver detalle →
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
-        )}
-      </div>
+                    <div className="text-right">
+                      <p className="text-[11px] text-slate-400">
+                        {new Date(project.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
     </main>
   );
 }
