@@ -8,6 +8,13 @@ type Mode = "signin" | "signup";
 
 const MIN_PASSWORD_LENGTH = 6;
 
+// URL base del sitio: se inyecta desde NEXT_PUBLIC_SITE_URL
+// En local:  http://localhost:3000
+// En Vercel: https://tu-dominio.vercel.app
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+
 export default function HomePage() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("signin");
@@ -143,10 +150,8 @@ export default function HomePage() {
     try {
       setResetLoading(true);
 
-      const redirectTo =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/update-password`
-          : undefined;
+      // URL a la que redirigirá el enlace de Supabase
+      const redirectTo = `${SITE_URL}/update-password`;
 
       const { error } = await supabase.auth.resetPasswordForEmail(emailTrim, {
         redirectTo,
