@@ -1,244 +1,212 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
-type DashboardProject = {
-  id: string;
-  name: string;
-  description: string | null;
-  environment_type: string | null;
-  sap_version: string | null;
-  status: string | null;
-  start_date: string | null;
-  client_id: string | null;
-  client_name: string | null;
-  created_at: string | null;
-  notes_count: number;
-  module_notes_count: number;
-  files_count: number;
-  scope_items_count: number;
-};
-
-export default function ProjectsDashboardPage() {
+export default function UpdatePasswordPage() {
   const router = useRouter();
-  const [projects, setProjects] = useState<DashboardProject[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [hasRecoverySession, setHasRecoverySession] = useState(false);
+
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
+  // Comprobar que venimos de un enlace de recuperación válido
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setErrorMsg(null);
+    const check = async () => {
+      const { data, error } = await supabase.auth.getSession();
 
-      const {
-        data,
-        error,
-      } = await supabase.from("project_dashboard").select("*").order("created_at", {
-        ascending: false,
+      if (error) {
+        console.error("getSession error (update-password)", error);
+        setHasRecoverySession(false);
+      } else {
+        setHasRecoverySession(!!data.session);
+      }
+
+      setCheckingSession(false);
+    };
+
+    void check();
+  }, []);
+
+  const validate = () => {
+    if (!password || !passwordConfirm) {
+      setErrorMsg("Introduce y confirma tu nueva contraseña.");
+      return false;
+    }
+
+    if (password.length < 6) {
+      setErrorMsg("La contraseña debe tener al menos 6 caracteres.");
+      return false;
+    }
+
+    if (password !== passwordConfirm) {
+      setErrorMsg("Las contraseñas no coinciden.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setMessage(null);
+
+    if (!validate()) return;
+
+    setSubmitting(true);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password,
       });
 
       if (error) {
-        console.error("project_dashboard select error", error);
-        setErrorMsg("No se pudieron cargar los proyectos.");
-      } else if (data) {
-        setProjects(data as DashboardProject[]);
+        console.error("updateUser password error", error);
+        setErrorMsg(error.message || "No se pudo actualizar la contraseña.");
+        return;
       }
 
-      setLoading(false);
-    };
+      setMessage(
+        "Tu contraseña se ha actualizado correctamente. Ahora puedes iniciar sesión con la nueva contraseña."
+      );
 
-    load();
-  }, []);
-
-  const formatDate = (value: string | null) => {
-    if (!value) return "Sin fecha";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return value;
-    return d.toLocaleDateString();
-  };
-
-  const formatStatus = (status: string | null) => {
-    if (!status) return "Sin estado";
-    switch (status) {
-      case "planned":
-        return "Planificado";
-      case "in_progress":
-        return "En progreso";
-      case "on_hold":
-        return "En espera";
-      case "closed":
-        return "Cerrado";
-      default:
-        return status;
+      // Cerrar sesión de seguridad y volver al login
+      setTimeout(async () => {
+        await supabase.auth.signOut();
+        router.push("/");
+      }, 1800);
+    } catch (err) {
+      console.error("Unexpected error updating password", err);
+      setErrorMsg("Ha ocurrido un error inesperado. Inténtalo de nuevo.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  return (
-    <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="mx-auto max-w-6xl px-4 py-6 space-y-6">
-        {/* Header */}
-        <header className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-sky-400">
-              SAP Notes Hub
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-50">
-              Proyectos y documentación
-            </h1>
-            <p className="mt-1 text-sm text-slate-400">
-              Vista general de tus proyectos SAP y sus notas asociadas.
-            </p>
-          </div>
+  // ---------- UI ----------
 
-          <div className="flex flex-col items-end gap-2">
-            <button
-              type="button"
-              onClick={() => router.push("/projects/new")}
-              className="inline-flex items-center rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 hover:bg-sky-600"
-            >
-              + Nuevo proyecto
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/notes")}
-              className="text-[11px] text-slate-400 underline underline-offset-4 hover:text-slate-200"
-            >
-              Ir al panel de notas →
-            </button>
-          </div>
+  if (checkingSession) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
+        <p className="text-sm text-slate-300">
+          Verificando enlace de recuperación…
+        </p>
+      </main>
+    );
+  }
+
+  if (!hasRecoverySession) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/70 px-6 py-7 shadow-[0_18px_45px_rgba(15,23,42,0.7)]">
+          <h1 className="text-xl font-semibold text-slate-50 mb-2">
+            Enlace no válido o caducado
+          </h1>
+          <p className="text-sm text-slate-400 mb-4">
+            El enlace de recuperación ya no es válido o ha expirado. Solicita un
+            nuevo correo de restablecimiento desde la página de inicio de sesión.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="w-full rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-semibold text-white py-2.5"
+          >
+            Volver al inicio de sesión
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
+      <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/80 px-6 py-7 shadow-[0_18px_45px_rgba(15,23,42,0.7)]">
+        <header className="mb-5">
+          <p className="text-xs uppercase tracking-[0.2em] text-sky-400">
+            SAP Notes Hub
+          </p>
+          <h1 className="mt-1 text-xl font-semibold text-slate-50">
+            Actualiza tu contraseña
+          </h1>
+          <p className="mt-1 text-xs text-slate-400">
+            Has accedido desde un enlace de recuperación enviado por correo.
+            Elige una nueva contraseña para tu cuenta.
+          </p>
         </header>
 
-        {/* Estado de carga / error */}
-        {loading && (
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
-            Cargando proyectos…
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <div className="space-y-1.5 text-sm">
+            <label
+              htmlFor="password"
+              className="block text-xs font-medium text-slate-300"
+            >
+              Nueva contraseña
+            </label>
+            <input
+              id="password"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+              placeholder="Mínimo 6 caracteres"
+              required
+            />
           </div>
-        )}
 
-        {!loading && errorMsg && (
-          <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-            {errorMsg}
+          <div className="space-y-1.5 text-sm">
+            <label
+              htmlFor="passwordConfirm"
+              className="block text-xs font-medium text-slate-300"
+            >
+              Confirmar contraseña
+            </label>
+            <input
+              id="passwordConfirm"
+              type="password"
+              autoComplete="new-password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+              className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+              placeholder="Repítela para confirmar"
+              required
+            />
           </div>
-        )}
 
-        {/* Lista de proyectos */}
-        {!loading && !errorMsg && (
-          <>
-            {projects.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/60 px-6 py-10 text-center">
-                <p className="text-sm text-slate-300">
-                  Aún no tienes proyectos creados.
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Crea tu primer proyecto para empezar a registrar notas,
-                  decisiones y configuraciones.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => router.push("/projects/new")}
-                  className="mt-5 inline-flex items-center rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 hover:bg-sky-600"
-                >
-                  + Crear proyecto
-                </button>
-              </div>
-            ) : (
-              <section className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-slate-200">
-                    Tus proyectos ({projects.length})
-                  </h2>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {projects.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => router.push(`/projects/${p.id}`)}
-                      className="group flex h-full flex-col rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-left shadow-sm transition hover:border-sky-500/60 hover:bg-slate-900"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="text-sm font-semibold text-slate-50 group-hover:text-sky-100">
-                            {p.name}
-                          </h3>
-                          <p className="mt-1 line-clamp-2 text-xs text-slate-400">
-                            {p.description || "Sin descripción"}
-                          </p>
-                        </div>
-                        <span className="rounded-full bg-slate-800 px-2 py-1 text-[10px] text-slate-300">
-                          {formatStatus(p.status)}
-                        </span>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-                        {p.client_name && (
-                          <span className="rounded-full bg-slate-800/80 px-2 py-1">
-                            Cliente: {p.client_name}
-                          </span>
-                        )}
-                        {p.environment_type && (
-                          <span className="rounded-full bg-slate-800/80 px-2 py-1">
-                            Entorno: {p.environment_type}
-                          </span>
-                        )}
-                        {p.sap_version && (
-                          <span className="rounded-full bg-slate-800/80 px-2 py-1">
-                            Versión SAP: {p.sap_version}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-2 gap-2 text-[11px] text-slate-300">
-                        <div className="rounded-xl bg-slate-900/80 px-2 py-2">
-                          <p className="text-[10px] uppercase tracking-wide text-slate-500">
-                            Notas
-                          </p>
-                          <p className="text-sm font-semibold">
-                            {p.notes_count}
-                          </p>
-                        </div>
-                        <div className="rounded-xl bg-slate-900/80 px-2 py-2">
-                          <p className="text-[10px] uppercase tracking-wide text-slate-500">
-                            Scope items
-                          </p>
-                          <p className="text-sm font-semibold">
-                            {p.scope_items_count}
-                          </p>
-                        </div>
-                        <div className="rounded-xl bg-slate-900/80 px-2 py-2">
-                          <p className="text-[10px] uppercase tracking-wide text-slate-500">
-                            Notas módulo
-                          </p>
-                          <p className="text-sm font-semibold">
-                            {p.module_notes_count}
-                          </p>
-                        </div>
-                        <div className="rounded-xl bg-slate-900/80 px-2 py-2">
-                          <p className="text-[10px] uppercase tracking-wide text-slate-500">
-                            Ficheros
-                          </p>
-                          <p className="text-sm font-semibold">
-                            {p.files_count}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between text-[10px] text-slate-500">
-                        <span>Creado: {formatDate(p.created_at)}</span>
-                        <span className="opacity-0 transition group-hover:opacity-100">
-                          Ver detalle →
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </section>
+          <div className="min-h-[1.5rem] text-[11px]" aria-live="polite">
+            {errorMsg && (
+              <p className="text-rose-400 bg-rose-950/40 border border-rose-900/60 rounded-md px-2 py-1">
+                {errorMsg}
+              </p>
             )}
-          </>
-        )}
+            {!errorMsg && message && (
+              <p className="text-emerald-300 bg-emerald-950/40 border border-emerald-900/60 rounded-md px-2 py-1">
+                {message}
+              </p>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-lg bg-sky-600 hover:bg-sky-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-sm font-semibold text-white py-2.5 mt-1"
+          >
+            {submitting ? "Guardando…" : "Guardar nueva contraseña"}
+          </button>
+
+          <p className="mt-2 text-[11px] text-slate-500">
+            Por seguridad, después de actualizar la contraseña te volveremos a
+            pedir que inicies sesión.
+          </p>
+        </form>
       </div>
     </main>
   );

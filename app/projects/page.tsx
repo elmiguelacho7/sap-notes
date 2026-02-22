@@ -1,133 +1,329 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
-type Project = {
+type DashboardProject = {
   id: string;
   name: string;
   description: string | null;
-  environment_type: "on_premise" | "cloud_public";
+  environment_type: string | null;
+  sap_version: string | null;
+  status: string | null;
+  start_date: string | null;
+  client_id: string | null;
+  client_name: string | null;
   created_at: string | null;
+  notes_count: number;
+  module_notes_count: number;
+  files_count: number;
+  scope_items_count: number;
 };
 
-export default function ProjectsListPage() {
+const STATUS_LABELS: Record<string, string> = {
+  planned: "Planificado",
+  in_progress: "En progreso",
+  on_hold: "En espera",
+  closed: "Cerrado",
+};
+
+export default function ProjectsDashboardPage() {
   const router = useRouter();
-  const [projects, setProjects] = useState<Project[]>([]);
+
+  const [projects, setProjects] = useState<DashboardProject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | string>("all");
 
   useEffect(() => {
     const load = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
-        router.push("/");
-        return;
-      }
+      setLoading(true);
+      setErrorMsg(null);
 
       const { data, error } = await supabase
-        .from("projects")
-        .select("id, name, description, environment_type, created_at")
-        .eq("created_by", userData.user.id)
-        .order("created_at", { ascending: false });
+        .from("project_dashboard")
+        .select("*")
+        .order("created_at", {
+          ascending: false,
+        });
 
-      if (!error && data) {
-        setProjects(data as Project[]);
+      if (error) {
+        console.error("project_dashboard select error", error);
+        setErrorMsg("No se pudieron cargar los proyectos.");
+      } else if (data) {
+        setProjects(data as DashboardProject[]);
       }
+
       setLoading(false);
     };
 
     void load();
-  }, [router]);
+  }, []);
 
-  const envLabel = (env: Project["environment_type"]) =>
-    env === "cloud_public" ? "S/4HANA Cloud Public Edition" : "On Premise";
+  const formatDate = (value: string | null) => {
+    if (!value) return "Sin fecha";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleDateString();
+  };
 
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-8 w-8 rounded-full border-2 border-sky-500 border-t-transparent animate-spin" />
-          <p className="text-sm text-slate-500">
-            Cargando tus proyectos SAP…
-          </p>
-        </div>
-      </main>
-    );
-  }
+  const formatStatus = (status: string | null) => {
+    if (!status) return "Sin estado";
+    return STATUS_LABELS[status] ?? status;
+  };
+
+  const filteredProjects = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    return projects.filter((p) => {
+      const matchesStatus =
+        statusFilter === "all" || (p.status ?? "").toLowerCase() === statusFilter;
+
+      if (!matchesStatus) return false;
+
+      if (!term) return true;
+
+      const haystack = [
+        p.name,
+        p.description,
+        p.client_name,
+        p.environment_type,
+        p.sap_version,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(term);
+    });
+  }, [projects, search, statusFilter]);
+
+  const uniqueStatuses = useMemo(() => {
+    const set = new Set<string>();
+    projects.forEach((p) => {
+      if (p.status) set.add(p.status);
+    });
+    return Array.from(set);
+  }, [projects]);
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 md:px-8 py-6">
-      <div className="max-w-5xl mx-auto space-y-5">
-        <header className="flex items-center justify-between gap-3">
+    <main className="min-h-screen bg-slate-950 text-slate-50">
+      <div className="mx-auto max-w-6xl px-4 py-6 space-y-6">
+        {/* Header */}
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold text-sky-600 mb-1">
-              Proyectos SAP
+            <p className="text-[11px] uppercase tracking-[0.2em] text-sky-400">
+              SAP Notes Hub
             </p>
-            <h1 className="text-xl font-semibold text-slate-900">
-              Tus implementaciones registradas
+            <h1 className="mt-1 text-2xl font-semibold text-slate-50">
+              Proyectos y documentación
             </h1>
-            <p className="text-[11px] text-slate-500 mt-1">
-              Desde aquí podrás entrar al detalle de cada rollout o cliente.
+            <p className="mt-1 text-sm text-slate-400">
+              Vista general de tus proyectos SAP y sus notas asociadas.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => router.push("/projects/new")}
-            className="rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-semibold text-white px-4 py-2.5"
-          >
-            + Nuevo proyecto
-          </button>
+          <div className="flex flex-col items-stretch gap-2 sm:items-end">
+            <button
+              type="button"
+              onClick={() => router.push("/projects/new")}
+              className="inline-flex items-center justify-center rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 hover:bg-sky-600"
+            >
+              + Nuevo proyecto
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/notes")}
+              className="text-[11px] text-slate-400 underline underline-offset-4 hover:text-slate-200"
+            >
+              Ir al panel de notas →
+            </button>
+          </div>
         </header>
 
-        {projects.length === 0 ? (
-          <div className="bg-white border border-dashed border-slate-200 rounded-xl px-4 py-6 text-sm text-slate-600">
-            Aún no tienes proyectos creados. Empieza dando de alta tu primer
-            proyecto SAP desde el botón{" "}
-            <span className="font-semibold">“Nuevo proyecto”</span>.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {projects.map((p) => (
-              <article
-                key={p.id}
-                className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col gap-2 hover:border-sky-200 hover:shadow-sm cursor-pointer"
-                onClick={() => router.push(`/projects/${p.id}`)}
+        {/* Filtros / búsqueda */}
+        <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 space-y-3 md:flex md:items-end md:justify-between md:space-y-0 md:gap-4">
+          <div className="flex-1 space-y-2 md:flex md:space-y-0 md:space-x-3">
+            <div className="flex-1">
+              <label
+                htmlFor="search"
+                className="mb-1 block text-[11px] font-medium text-slate-400"
               >
-                <h2 className="text-sm font-semibold text-slate-900">
-                  {p.name}
-                </h2>
-                <p className="text-[11px] text-slate-500">
-                  {p.description || "Sin descripción todavía."}
-                </p>
-                <p className="text-[11px] text-sky-600 mt-1">
-                  {envLabel(p.environment_type)}
-                </p>
-                <p className="text-[10px] text-slate-400 mt-auto">
-                  Creado el{" "}
-                  {p.created_at
-                    ? new Date(p.created_at).toLocaleString("es-ES", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "2-digit",
-                      })
-                    : "-"}
-                </p>
-              </article>
-            ))}
+                Buscar proyecto
+              </label>
+              <input
+                id="search"
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Cliente, entorno, versión SAP, descripción…"
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+              />
+            </div>
+
+            <div className="w-full md:w-52">
+              <label
+                htmlFor="statusFilter"
+                className="mb-1 block text-[11px] font-medium text-slate-400"
+              >
+                Estado
+              </label>
+              <select
+                id="statusFilter"
+                value={statusFilter}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as "all" | string)
+                }
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+              >
+                <option value="all">Todos</option>
+                {uniqueStatuses.map((st) => (
+                  <option key={st} value={st}>
+                    {formatStatus(st)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-slate-500">
+            {filteredProjects.length} proyecto
+            {filteredProjects.length === 1 ? "" : "s"} visibles
+          </p>
+        </section>
+
+        {/* Estado de carga / error */}
+        {loading && (
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
+            Cargando proyectos…
           </div>
         )}
 
-        <div className="text-[11px] text-slate-400">
-          <button
-            type="button"
-            onClick={() => router.push("/notes")}
-            className="underline underline-offset-2 hover:text-slate-600"
-          >
-            ← Volver al panel de notas
-          </button>
-        </div>
+        {!loading && errorMsg && (
+          <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+            {errorMsg}
+          </div>
+        )}
+
+        {/* Lista de proyectos */}
+        {!loading && !errorMsg && (
+          <>
+            {filteredProjects.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/60 px-6 py-10 text-center">
+                <p className="text-sm text-slate-300">
+                  Aún no tienes proyectos creados.
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Crea tu primer proyecto para empezar a registrar notas,
+                  decisiones y configuraciones.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => router.push("/projects/new")}
+                  className="mt-5 inline-flex items-center rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 hover:bg-sky-600"
+                >
+                  + Crear proyecto
+                </button>
+              </div>
+            ) : (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-slate-200">
+                    Tus proyectos ({filteredProjects.length})
+                  </h2>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {filteredProjects.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => router.push(`/projects/${p.id}`)}
+                      className="group flex h-full flex-col rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-left shadow-sm transition hover:border-sky-500/60 hover:bg-slate-900"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="text-sm font-semibold text-slate-50 group-hover:text-sky-100">
+                            {p.name}
+                          </h3>
+                          <p className="mt-1 line-clamp-2 text-xs text-slate-400">
+                            {p.description || "Sin descripción"}
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-slate-800 px-2 py-1 text-[10px] text-slate-300">
+                          {formatStatus(p.status)}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                        {p.client_name && (
+                          <span className="rounded-full bg-slate-800/80 px-2 py-1">
+                            Cliente: {p.client_name}
+                          </span>
+                        )}
+                        {p.environment_type && (
+                          <span className="rounded-full bg-slate-800/80 px-2 py-1">
+                            Entorno: {p.environment_type}
+                          </span>
+                        )}
+                        {p.sap_version && (
+                          <span className="rounded-full bg-slate-800/80 px-2 py-1">
+                            SAP: {p.sap_version}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-[11px] text-slate-300">
+                        <div className="rounded-xl bg-slate-900/80 px-2 py-2">
+                          <p className="text-[10px] uppercase tracking-wide text-slate-500">
+                            Notas
+                          </p>
+                          <p className="text-sm font-semibold">
+                            {p.notes_count}
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-slate-900/80 px-2 py-2">
+                          <p className="text-[10px] uppercase tracking-wide text-slate-500">
+                            Scope items
+                          </p>
+                          <p className="text-sm font-semibold">
+                            {p.scope_items_count}
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-slate-900/80 px-2 py-2">
+                          <p className="text-[10px] uppercase tracking-wide text-slate-500">
+                            Notas módulo
+                          </p>
+                          <p className="text-sm font-semibold">
+                            {p.module_notes_count}
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-slate-900/80 px-2 py-2">
+                          <p className="text-[10px] uppercase tracking-wide text-slate-500">
+                            Ficheros
+                          </p>
+                          <p className="text-sm font-semibold">
+                            {p.files_count}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between text-[10px] text-slate-500">
+                        <span>Creado: {formatDate(p.created_at)}</span>
+                        <span className="opacity-0 transition group-hover:opacity-100">
+                          Ver detalle →
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
+        )}
       </div>
     </main>
   );

@@ -1,460 +1,363 @@
-'use client'
+"use client";
 
-import { useEffect, useMemo, useState, FormEvent } from 'react'
-import { supabase } from '@/lib/supabaseClient'
-import { useRouter } from 'next/navigation'
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "../../../lib/supabaseClient";
 
-type Module = {
-  id: string
-  code: string
-  name: string
-}
+type StatusOption = "planned" | "in_progress" | "on_hold" | "closed";
 
-type ScopeItem = {
-  id: string
-  code: string
-  name: string
-  module_id: string | null
-}
+const STATUS_LABELS: Record<StatusOption, string> = {
+  planned: "Planificado",
+  in_progress: "En progreso",
+  on_hold: "En espera",
+  closed: "Cerrado",
+};
+
+const ENV_OPTIONS = [
+  "Sandbox",
+  "Development",
+  "Quality",
+  "Production",
+  "On premise",
+  "Public Cloud",
+];
+
+const SAP_VERSIONS = [
+  "ECC",
+  "S/4HANA On Premise",
+  "S/4HANA Public Cloud",
+  "S/4HANA Private Cloud",
+];
 
 export default function NewProjectPage() {
-  const router = useRouter()
+  const router = useRouter();
 
-  const [loading, setLoading] = useState(false)
-  const [modules, setModules] = useState<Module[]>([])
-  const [scopeItems, setScopeItems] = useState<ScopeItem[]>([])
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [environmentType, setEnvironmentType] = useState("");
+  const [sapVersion, setSapVersion] = useState("");
+  const [status, setStatus] = useState<StatusOption>("planned");
+  const [startDate, setStartDate] = useState("");
 
-  // Campos formulario
-  const [clientName, setClientName] = useState('')
-  const [projectName, setProjectName] = useState('')
-  const [description, setDescription] = useState('')
-  const [environmentType, setEnvironmentType] =
-    useState<'on_premise' | 'cloud_public'>('on_premise')
-  const [sapVersion, setSapVersion] = useState('')
-  const [selectedModules, setSelectedModules] = useState<string[]>([])
-  const [selectedScopeItems, setSelectedScopeItems] = useState<string[]>([])
-
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-
-  // Cargar módulos + scope items
-  useEffect(() => {
-    const loadData = async () => {
-      const { data: modulesData, error: modulesError } = await supabase
-        .from('modules')
-        .select('*')
-        .order('code', { ascending: true })
-
-      if (!modulesError && modulesData) {
-        setModules(modulesData as Module[])
-      }
-
-      const { data: scopeData, error: scopeError } = await supabase
-        .from('scope_items')
-        .select('*')
-        .order('code', { ascending: true })
-
-      if (!scopeError && scopeData) {
-        setScopeItems(scopeData as ScopeItem[])
-      }
-    }
-
-    loadData()
-  }, [])
-
-  // Scope items filtrados por módulos seleccionados
-  const filteredScopeItems = useMemo(() => {
-    if (selectedModules.length === 0) return []
-    return scopeItems.filter(
-      (si) => si.module_id && selectedModules.includes(si.module_id)
-    )
-  }, [scopeItems, selectedModules])
-
-  const toggleModule = (moduleId: string) => {
-    setSelectedModules((prev) => {
-      const exists = prev.includes(moduleId)
-      const next = exists
-        ? prev.filter((id) => id !== moduleId)
-        : [...prev, moduleId]
-
-      // Limpiar scope items que ya no pertenecen a los módulos seleccionados
-      setSelectedScopeItems((prevScope) =>
-        prevScope.filter((scopeId) => {
-          const si = scopeItems.find((s) => s.id === scopeId)
-          return si?.module_id && next.includes(si.module_id)
-        })
-      )
-
-      return next
-    })
-  }
-
-  const toggleScopeItem = (scopeId: string) => {
-    setSelectedScopeItems((prev) =>
-      prev.includes(scopeId)
-        ? prev.filter((id) => id !== scopeId)
-        : [...prev, scopeId]
-    )
-  }
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setErrorMessage(null)
-    setSuccessMessage(null)
+    e.preventDefault();
+    setErrorMsg(null);
+    setMessage(null);
 
-    if (!clientName.trim() || !projectName.trim()) {
-      setErrorMessage('Cliente y nombre del proyecto son obligatorios.')
-      return
+    if (!name.trim()) {
+      setErrorMsg("El nombre del proyecto es obligatorio.");
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
 
     try {
-      // 🔐 Usuario autenticado (para created_by / RLS)
-      const { data: userData, error: userError } = await supabase.auth.getUser()
-      if (userError) throw new Error('No se pudo obtener el usuario.')
-      const userId = userData.user?.id
-      if (!userId) throw new Error('Usuario no autenticado.')
+      // Ajusta "projects" si tu tabla base tiene otro nombre
+      const { error } = await supabase.from("projects").insert([
+        {
+          name: name.trim(),
+          description: description.trim() || null,
+          client_name: clientName.trim() || null,
+          client_id: clientId.trim() || null,
+          environment_type: environmentType || null,
+          sap_version: sapVersion || null,
+          status,
+          start_date: startDate || null,
+        },
+      ]);
 
-      // 🧱 1) Crear cliente
-      const { data: client, error: clientError } = await supabase
-        .from('clients')
-        .insert([
-          {
-            name: clientName.trim(),
-            created_by: userId,
-          },
-        ])
-        .select()
-        .single()
-
-      if (clientError || !client) {
-        console.error(clientError)
-        throw new Error('No se pudo crear el cliente.')
+      if (error) {
+        console.error("insert project error", error);
+        throw error;
       }
 
-      // 🧱 2) Crear proyecto
-      const { data: project, error: projectError } = await supabase
-        .from('projects')
-        .insert([
-          {
-            client_id: client.id,
-            name: projectName.trim(),
-            description: description.trim() || null,
-            environment_type: environmentType,
-            sap_version: sapVersion.trim() || null,
-            created_by: userId,
-          },
-        ])
-        .select()
-        .single()
+      setMessage("Proyecto creado correctamente ✅");
 
-      if (projectError || !project) {
-        console.error(projectError)
-        throw new Error('No se pudo crear el proyecto.')
-      }
-
-      // 🧱 3) Módulos
-      if (selectedModules.length > 0) {
-        const modulesToInsert = selectedModules.map((moduleId) => ({
-          project_id: project.id,
-          module_id: moduleId,
-        }))
-
-        const { error: pmError } = await supabase
-          .from('project_modules')
-          .insert(modulesToInsert)
-
-        if (pmError) {
-          console.error(pmError)
-          throw new Error('No se pudieron guardar los módulos del proyecto.')
-        }
-      }
-
-      // 🧱 4) Scope items (solo Cloud)
-      if (
-        environmentType === 'cloud_public' &&
-        selectedScopeItems.length > 0
-      ) {
-        const scopeToInsert = selectedScopeItems.map((scopeId) => ({
-          project_id: project.id,
-          scope_item_id: scopeId,
-        }))
-
-        const { error: psiError } = await supabase
-          .from('project_scope_items')
-          .insert(scopeToInsert)
-
-        if (psiError) {
-          console.error(psiError)
-          throw new Error('No se pudieron guardar los scope items.')
-        }
-      }
-
-      setSuccessMessage('Proyecto creado correctamente ✅')
-
-      // 👉 Redirigir a la ficha del proyecto
-      router.push(`/projects/${project.id}`)
-    } catch (err: any) {
-      console.error(err)
-      setErrorMessage(err.message || 'Error al crear el proyecto.')
+      setTimeout(() => {
+        router.push("/projects");
+      }, 900);
+    } catch (err: unknown) {
+      const base = "No se pudo crear el proyecto. Intenta de nuevo.";
+      const msg =
+        err instanceof Error && err.message ? err.message : base;
+      setErrorMsg(msg);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+    <main className="min-h-screen bg-slate-950 text-slate-50">
+      <div className="mx-auto max-w-4xl px-4 py-6">
         {/* Header */}
-        <header className="flex flex-col gap-2 mb-2">
-          <h1 className="text-2xl font-semibold text-slate-900">
-            Nuevo proyecto SAP
-          </h1>
-          <p className="text-sm text-slate-500">
-            Registra el cliente, el entorno (On Prem / Cloud), los módulos y
-            los scope items que formarán parte de tu implementación.
-          </p>
+        <header className="mb-6 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-sky-400">
+              SAP Notes Hub
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold text-slate-50">
+              Nuevo proyecto SAP
+            </h1>
+            <p className="mt-1 text-sm text-slate-400">
+              Define los datos básicos del proyecto para empezar a vincular
+              notas, errores y decisiones.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => router.push("/projects")}
+            className="text-[11px] text-slate-400 underline underline-offset-4 hover:text-slate-200"
+          >
+            ← Volver a proyectos
+          </button>
         </header>
 
-        {/* Mensajes */}
-        {errorMessage && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
-            {errorMessage}
-          </div>
-        )}
-        {successMessage && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
-            {successMessage}
-          </div>
-        )}
-
-        {/* Card principal */}
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-8"
-        >
-          {/* Datos generales */}
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">
-                Datos generales del proyecto
-              </h2>
-              <span className="text-[11px] uppercase tracking-wide text-slate-400">
-                PASO 1 DE 3
-              </span>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Cliente
+        <div className="grid gap-5 md:grid-cols-[2fr,1.2fr]">
+          {/* Formulario principal */}
+          <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+              {/* Nombre */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="name"
+                  className="block text-xs font-medium text-slate-200"
+                >
+                  Nombre del proyecto *
                 </label>
                 <input
+                  id="name"
                   type="text"
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  placeholder="Ej. Sauleda, Lecta, Eurotronic..."
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                />
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Más adelante podrás seleccionar clientes existentes. Por
-                  ahora, se creará uno nuevo.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Nombre del proyecto
-                </label>
-                <input
-                  type="text"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  placeholder="Ej. Rollout motores Eurotronic en Sauleda"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Implementación S/4HANA Lecta – SD/MM"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                  required
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Descripción
-              </label>
-              <textarea
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                rows={3}
-                placeholder="Describe el alcance funcional, plantas, sociedades, flujos intercompany, etc."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Entorno
-                </label>
-                <div className="flex flex-wrap gap-3 text-sm">
-                  <button
-                    type="button"
-                    onClick={() => setEnvironmentType('on_premise')}
-                    className={`flex items-center gap-2 rounded-full border px-3 py-1 ${
-                      environmentType === 'on_premise'
-                        ? 'border-blue-600 bg-blue-50 text-blue-700'
-                        : 'border-slate-200 bg-white text-slate-700'
-                    }`}
+              {/* Cliente */}
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="clientName"
+                    className="block text-xs font-medium text-slate-200"
                   >
-                    <span
-                      className={`h-2 w-2 rounded-full ${
-                        environmentType === 'on_premise'
-                          ? 'bg-blue-600'
-                          : 'bg-slate-300'
-                      }`}
-                    />
-                    On Premise
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setEnvironmentType('cloud_public')}
-                    className={`flex items-center gap-2 rounded-full border px-3 py-1 ${
-                      environmentType === 'cloud_public'
-                        ? 'border-blue-600 bg-blue-50 text-blue-700'
-                        : 'border-slate-200 bg-white text-slate-700'
-                    }`}
-                  >
-                    <span
-                      className={`h-2 w-2 rounded-full ${
-                        environmentType === 'cloud_public'
-                          ? 'bg-blue-600'
-                          : 'bg-slate-300'
-                      }`}
-                    />
-                    S/4HANA Cloud Public Edition
-                  </button>
+                    Cliente
+                  </label>
+                  <input
+                    id="clientName"
+                    type="text"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    placeholder="Lecta, Sauleda, etc."
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                  />
                 </div>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Esto te permitirá guiar después por módulos y scope items
-                  específicos.
-                </p>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="clientId"
+                    className="block text-xs font-medium text-slate-200"
+                  >
+                    ID cliente (opcional)
+                  </label>
+                  <input
+                    id="clientId"
+                    type="text"
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    placeholder="Código interno / BP, etc."
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Versión SAP
+              {/* Entorno y versión SAP */}
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="environment"
+                    className="block text-xs font-medium text-slate-200"
+                  >
+                    Entorno
+                  </label>
+                  <select
+                    id="environment"
+                    value={environmentType}
+                    onChange={(e) => setEnvironmentType(e.target.value)}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                  >
+                    <option value="">Selecciona entorno…</option>
+                    {ENV_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="sapVersion"
+                    className="block text-xs font-medium text-slate-200"
+                  >
+                    Versión SAP
+                  </label>
+                  <select
+                    id="sapVersion"
+                    value={sapVersion}
+                    onChange={(e) => setSapVersion(e.target.value)}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                  >
+                    <option value="">Selecciona versión…</option>
+                    {SAP_VERSIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Estado y fecha */}
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="status"
+                    className="block text-xs font-medium text-slate-200"
+                  >
+                    Estado
+                  </label>
+                  <select
+                    id="status"
+                    value={status}
+                    onChange={(e) =>
+                      setStatus(e.target.value as StatusOption)
+                    }
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                  >
+                    {(Object.keys(STATUS_LABELS) as StatusOption[]).map(
+                      (key) => (
+                        <option key={key} value={key}>
+                          {STATUS_LABELS[key]}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="startDate"
+                    className="block text-xs font-medium text-slate-200"
+                  >
+                    Fecha de inicio (opcional)
+                  </label>
+                  <input
+                    id="startDate"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                  />
+                </div>
+              </div>
+
+              {/* Descripción */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="description"
+                  className="block text-xs font-medium text-slate-200"
+                >
+                  Descripción del proyecto
                 </label>
-                <input
-                  type="text"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  placeholder="Ej. S/4HANA 2023, Cloud 2402..."
-                  value={sapVersion}
-                  onChange={(e) => setSapVersion(e.target.value)}
+                <textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={4}
+                  placeholder="Ejemplo: Rollout SD/MM + Settlement Management (CCM) para grupo Lecta. Incluye intercompany 5D2, 3ZB, 7TZ, etc."
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                 />
               </div>
-            </div>
-          </section>
 
-          {/* Módulos */}
-          <section className="space-y-4 border-t border-slate-100 pt-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">
-                Módulos del proyecto
-              </h2>
-              <span className="text-[11px] uppercase tracking-wide text-slate-400">
-                PASO 2 DE 3
-              </span>
-            </div>
-
-            {modules.length === 0 ? (
-              <p className="text-sm text-slate-400">
-                No hay módulos configurados en la tabla{' '}
-                <code className="font-mono text-xs">modules</code>.
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {modules.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => toggleModule(m.id)}
-                    className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${
-                      selectedModules.includes(m.id)
-                        ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-400 hover:text-blue-700'
-                    }`}
-                  >
-                    <span className="font-semibold">{m.code}</span>
-                    <span className="hidden sm:inline">{m.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* Scope items (solo Cloud) */}
-          {environmentType === 'cloud_public' && (
-            <section className="space-y-4 border-t border-slate-100 pt-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-slate-900">
-                  Scope items (Cloud)
-                </h2>
-                <span className="text-[11px] uppercase tracking-wide text-slate-400">
-                  PASO 3 DE 3
-                </span>
-              </div>
-
-              {selectedModules.length === 0 && (
-                <p className="text-sm text-slate-400">
-                  Selecciona primero uno o más módulos para ver los scope items
-                  relacionados.
-                </p>
-              )}
-
-              {selectedModules.length > 0 &&
-                filteredScopeItems.length === 0 && (
-                  <p className="text-sm text-slate-400">
-                    No hay scope items configurados aún para los módulos
-                    seleccionados.
+              {/* Mensajes */}
+              <div className="min-h-[1.5rem] text-[11px]" aria-live="polite">
+                {errorMsg && (
+                  <p className="text-rose-400 bg-rose-950/40 border border-rose-900/60 rounded-md px-2 py-1">
+                    {errorMsg}
                   </p>
                 )}
+                {!errorMsg && message && (
+                  <p className="text-emerald-300 bg-emerald-950/40 border border-emerald-900/60 rounded-md px-2 py-1">
+                    {message}
+                  </p>
+                )}
+              </div>
 
-              {filteredScopeItems.length > 0 && (
-                <div className="max-h-64 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
-                  {filteredScopeItems.map((si) => (
-                    <label
-                      key={si.id}
-                      className="flex items-center gap-3 rounded-lg bg-white px-3 py-2 text-sm shadow-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedScopeItems.includes(si.id)}
-                        onChange={() => toggleScopeItem(si.id)}
-                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="font-mono text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                        {si.code}
-                      </span>
-                      <span className="text-slate-800">{si.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
+              {/* Botones */}
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => router.push("/projects")}
+                  className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="rounded-lg bg-sky-600 hover:bg-sky-500 disabled:bg-slate-600 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white"
+                >
+                  {loading ? "Guardando…" : "Crear proyecto"}
+                </button>
+              </div>
+            </form>
+          </section>
 
-          {/* Botón enviar */}
-          <div className="flex justify-end pt-4 border-t border-slate-100">
-            <button
-              type="submit"
-              disabled={loading}
-              className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60"
-            >
-              {loading ? 'Guardando proyecto…' : 'Crear proyecto'}
-            </button>
-          </div>
-        </form>
+          {/* Panel lateral de ayuda */}
+          <aside className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/80 p-4 text-[11px] text-slate-300">
+            <h2 className="text-sm font-semibold text-slate-50 mb-1">
+              Buenas prácticas para tus proyectos
+            </h2>
+            <ul className="space-y-2 list-disc pl-4">
+              <li>
+                Usa un <span className="font-semibold">nombre claro</span>:
+                cliente + módulo + tipo de proyecto (ej. “Lecta – SD – CCM
+                rebates”).
+              </li>
+              <li>
+                En <span className="font-semibold">descripción</span>, anota las
+                decisiones clave (intercompany, pricing, CCM, EWM, etc.).
+              </li>
+              <li>
+                El campo <span className="font-semibold">entorno</span> te
+                ayudará a separar pruebas de productivo.
+              </li>
+              <li>
+                La <span className="font-semibold">versión SAP</span> es
+                importante para recordar si el cliente está en ECC o S/4HANA
+                (y en qué modalidad).
+              </li>
+              <li>
+                Podrás ver todas las métricas (notas, scope items, ficheros) en
+                el dashboard del proyecto.
+              </li>
+            </ul>
+
+            <p className="mt-2 text-[10px] text-slate-500">
+              Esta ficha de proyecto no impacta directamente en SAP: es tu
+              “capa de documentación” para recordar qué hiciste en cada rollout.
+            </p>
+          </aside>
+        </div>
       </div>
-    </div>
-  )
+    </main>
+  );
 }
