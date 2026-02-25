@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../../lib/supabaseClient";
 
 export default function NewNotePage() {
   const router = useRouter();
 
-  // Hooks SIEMPRE en el mismo orden
-  const [checkingSession, setCheckingSession] = useState(true);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [moduleField, setModuleField] = useState("");
@@ -18,33 +16,18 @@ export default function NewNotePage() {
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-
-      if (!data.session) {
-        router.replace("/");
-        return;
-      }
-
-      setCheckingSession(false);
-    };
-
-    checkSession();
-  }, [router]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/");
-  };
-
-  if (checkingSession) return null;
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
-    if (!title.trim()) {
+    const trimmedTitle = title.trim();
+    const trimmedBody = body.trim();
+    const trimmedModule = moduleField.trim();
+    const trimmedClient = client.trim();
+    const trimmedScope = scopeItem.trim();
+    const trimmedError = errorCode.trim();
+
+    if (!trimmedTitle) {
       setErrorMsg("El título de la nota es obligatorio.");
       return;
     }
@@ -54,12 +37,13 @@ export default function NewNotePage() {
     try {
       const { error } = await supabase.from("notes").insert([
         {
-          title: title.trim(),
-          body: body.trim() || null,
-          module: moduleField.trim() || null,
-          client: client.trim() || null,
-          scope_item: scopeItem.trim() || null,
-          error_code: errorCode.trim() || null,
+          title: trimmedTitle,
+          body: trimmedBody || null,
+          client: trimmedClient || null,
+          module: trimmedModule || null,
+          scope_item: trimmedScope || null,
+          error_code: trimmedError || null,
+          // project_id: null, // cuando conectemos proyecto, lo rellenamos aquí
         },
       ]);
 
@@ -79,127 +63,95 @@ export default function NewNotePage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      {/* Navbar */}
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
-              PH
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-900">
-                Project Hub
-              </p>
-              <p className="text-[11px] text-slate-500">
-                Nueva nota
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => router.push("/notes")}
-              className="text-xs border border-slate-300 px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100"
-            >
-              Volver a notas
-            </button>
-            <button
-              onClick={handleLogout}
-              className="text-xs border border-slate-300 px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100"
-            >
-              Cerrar sesión
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Contenido */}
-      <section className="max-w-4xl mx-auto px-6 py-7">
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-          <h1 className="text-xl font-semibold text-slate-900 mb-1">
-            Crear nueva nota
+    <div className="w-full px-6 py-7">
+      <div className="max-w-3xl mx-auto">
+        <header className="mb-6">
+          <h1 className="text-2xl font-semibold text-slate-900">
+            Nueva nota
           </h1>
-          <p className="text-sm text-slate-600 mb-6">
-            Utiliza este espacio para documentar análisis de errores, decisiones
-            funcionales, configuraciones o cualquier detalle relevante de tus
-            proyectos.
+          <p className="mt-1 text-sm text-slate-600 max-w-xl">
+            Registra una nueva nota de implementación, incidencia o decisión
+            relacionada con tus proyectos SAP.
           </p>
+        </header>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Título */}
+        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+          {errorMsg && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+              {errorMsg}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-800">
-                Título de la nota *
+              <label className="text-sm font-medium text-slate-800">
+                Título *
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ejemplo: Análisis error de facturación SD"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Ejemplo: Error V1032 al crear entrega"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
               />
             </div>
 
-            {/* Texto principal */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-800">
-                Detalle / descripción
+              <label className="text-sm font-medium text-slate-800">
+                Descripción / detalle
               </label>
               <textarea
+                rows={5}
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                rows={6}
-                placeholder="Describe el contexto, los síntomas, el análisis realizado y la solución aplicada."
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Describe el problema, la decisión tomada o la configuración aplicada..."
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
               />
             </div>
 
-            {/* Campos de clasificación */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-800">
+                <label className="text-sm font-medium text-slate-800">
+                  Cliente (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={client}
+                  onChange={(e) => setClient(e.target.value)}
+                  placeholder="Nombre o código del cliente"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-800">
                   Módulo (opcional)
                 </label>
                 <input
                   type="text"
                   value={moduleField}
                   onChange={(e) => setModuleField(e.target.value)}
-                  placeholder="Ejemplo: SD, MM, FI, EWM..."
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="SD, MM, FI, CO..."
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-800">
-                  Cliente / contexto (opcional)
-                </label>
-                <input
-                  type="text"
-                  value={client}
-                  onChange={(e) => setClient(e.target.value)}
-                  placeholder="Ejemplo: Cliente interno, entorno de pruebas..."
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-800">
-                  Scope / proceso (opcional)
+                <label className="text-sm font-medium text-slate-800">
+                  Scope item / proceso (opcional)
                 </label>
                 <input
                   type="text"
                   value={scopeItem}
                   onChange={(e) => setScopeItem(e.target.value)}
-                  placeholder="Ejemplo: Pedido a factura, Intercompany..."
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Por ejemplo: 1MX, 7S7, Z-FREE-OF-CHARGE..."
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-800">
+                <label className="text-sm font-medium text-slate-800">
                   Código de error (opcional)
                 </label>
                 <input
@@ -207,22 +159,18 @@ export default function NewNotePage() {
                   value={errorCode}
                   onChange={(e) => setErrorCode(e.target.value)}
                   placeholder="Ejemplo: V1032, M3820..."
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
 
-            {errorMsg && (
-              <p className="text-xs text-red-500">{errorMsg}</p>
-            )}
-
-            <div className="pt-2 flex gap-3">
+            <div className="flex items-center gap-3 pt-2">
               <button
                 type="submit"
                 disabled={saving}
-                className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {saving ? "Guardando..." : "Crear nota"}
+                {saving ? "Guardando..." : "Guardar nota"}
               </button>
 
               <button
@@ -235,7 +183,7 @@ export default function NewNotePage() {
             </div>
           </form>
         </div>
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }
