@@ -1,33 +1,129 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../../../lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
+
+type Client = {
+  id: string;
+  name: string;
+  country: string | null;
+};
+
+type Module = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+type ScopeItem = {
+  id: string;
+  code: string;
+  name: string;
+  module_id: string | null;
+  scope_type: string;
+};
+
+const NOTE_TYPES = [
+  "Incidencia / Error",
+  "Configuración",
+  "Funcional",
+  "Técnico",
+  "Proceso",
+  "Idea / Pendiente",
+  "Otro",
+];
+
+const SYSTEM_TYPES = [
+  "SAP ECC",
+  "S/4HANA On-Premise",
+  "S/4HANA Public Cloud",
+  "S/4HANA Private Cloud",
+  "BW / Analytics",
+  "Otro sistema",
+];
 
 export default function NewNotePage() {
   const router = useRouter();
 
+  // Encabezado
   const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [moduleField, setModuleField] = useState("");
-  const [client, setClient] = useState("");
-  const [scopeItem, setScopeItem] = useState("");
+  const [noteType, setNoteType] = useState<string>("Incidencia / Error");
+
+  // Contexto SAP
+  const [systemType, setSystemType] = useState<string>("");
+
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientId, setClientId] = useState<string>("");
+
+  const [modules, setModules] = useState<Module[]>([]);
+  const [scopeItems, setScopeItems] = useState<ScopeItem[]>([]);
+  const [moduleId, setModuleId] = useState<string>("");
+  const [scopeItemId, setScopeItemId] = useState<string>("");
+
+  const [transactionCode, setTransactionCode] = useState("");
   const [errorCode, setErrorCode] = useState("");
+
+  // Contenido
+  const [body, setBody] = useState("");
+
+  // Enlaces / contexto adicional
+  const [webLink1, setWebLink1] = useState("");
+  const [webLink2, setWebLink2] = useState("");
+  const [extraInfo, setExtraInfo] = useState("");
+
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // ==========================
+  // CARGA DE CLIENTES / MÓDULOS / SCOPE ITEMS
+  // ==========================
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [{ data: clientData }, { data: moduleData }, { data: scopeData }] =
+          await Promise.all([
+            supabase
+              .from("clients")
+              .select("id, name, country")
+              .order("name", { ascending: true }),
+            supabase
+              .from("modules")
+              .select("id, code, name")
+              .order("code", { ascending: true }),
+            supabase
+              .from("scope_items")
+              .select("id, code, name, module_id, scope_type")
+              .order("code", { ascending: true }),
+          ]);
+
+        setClients(clientData || []);
+        setModules(moduleData || []);
+        setScopeItems(scopeData || []);
+      } catch (error) {
+        console.error("Error cargando datos base para notas", error);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  const filteredScopeItems = useMemo(
+    () =>
+      scopeItems.filter((s) =>
+        moduleId ? s.module_id === moduleId : true
+      ),
+    [scopeItems, moduleId]
+  );
+
+  // ==========================
+  // GUARDAR NOTA
+  // ==========================
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
-    const trimmedTitle = title.trim();
-    const trimmedBody = body.trim();
-    const trimmedModule = moduleField.trim();
-    const trimmedClient = client.trim();
-    const trimmedScope = scopeItem.trim();
-    const trimmedError = errorCode.trim();
-
-    if (!trimmedTitle) {
+    if (!title.trim()) {
       setErrorMsg("El título de la nota es obligatorio.");
       return;
     }
@@ -35,21 +131,51 @@ export default function NewNotePage() {
     setSaving(true);
 
     try {
-      const { error } = await supabase.from("notes").insert([
-        {
-          title: trimmedTitle,
-          body: trimmedBody || null,
-          client: trimmedClient || null,
-          module: trimmedModule || null,
-          scope_item: trimmedScope || null,
-          error_code: trimmedError || null,
-          // project_id: null, // cuando conectemos proyecto, lo rellenamos aquí
-        },
-      ]);
+      const selectedClient = clients.find((c) => c.id === clientId) || null;
+      const selectedModule = modules.find((m) => m.id === moduleId) || null;
+      const selectedScopeItem =
+        scopeItems.find((s) => s.id === scopeItemId) || null;
+
+      const payload = {
+        title: title.trim(),
+        body: body.trim() || null,
+
+        // Cliente
+        client: selectedClient ? selectedClient.name : null,
+        client_id: selectedClient ? selectedClient.id : null,
+
+        // Módulo
+        module: selectedModule
+          ? `${selectedModule.code} - ${selectedModule.name}`
+          : null,
+        module_id: selectedModule ? selectedModule.id : null,
+
+        // Scope item
+        scope_item: selectedScopeItem
+          ? `${selectedScopeItem.code} - ${selectedScopeItem.name}`
+          : null,
+        scope_item_id: selectedScopeItem ? selectedScopeItem.id : null,
+
+        // Contexto SAP
+        system_type: systemType || null,
+        transaction: transactionCode.trim() || null,
+        error_code: errorCode.trim() || null,
+        note_type: noteType || null,
+
+        // Enlaces / contexto
+        web_link_1: webLink1.trim() || null,
+        web_link_2: webLink2.trim() || null,
+        extra_info: extraInfo.trim() || null,
+
+        // Nota general: sin proyecto asociado
+        project_id: null,
+      };
+
+      const { error } = await supabase.from("notes").insert([payload]);
 
       if (error) {
         console.error(error);
-        setErrorMsg("No se pudo crear la nota. Inténtalo de nuevo.");
+        setErrorMsg(error.message || "No se pudo crear la nota.");
         setSaving(false);
         return;
       }
@@ -62,123 +188,249 @@ export default function NewNotePage() {
     }
   };
 
+  // ==========================
+  // RENDER (manteniendo estilo)
+  // ==========================
   return (
-    <div className="w-full px-6 py-7">
-      <div className="max-w-3xl mx-auto">
-        <header className="mb-6">
-          <h1 className="text-2xl font-semibold text-slate-900">
-            Nueva nota
-          </h1>
-          <p className="mt-1 text-sm text-slate-600 max-w-xl">
-            Registra una nueva nota de implementación, incidencia o decisión
-            relacionada con tus proyectos SAP.
-          </p>
-        </header>
+    <div className="min-h-screen bg-slate-50 px-4 py-8 flex justify-center">
+      <div className="w-full max-w-3xl">
+        {/* Título y descripción (igual estilo que tenías) */}
+        <h1 className="text-2xl font-semibold text-slate-900">
+          Nueva nota
+        </h1>
+        <p className="mt-1 text-sm text-slate-600 max-w-2xl">
+          Registra una nueva nota de implementación, incidencia o decisión.
+          Esta nota será general (no ligada a un proyecto concreto) para
+          que puedas reutilizarla en futuros clientes y proyectos.
+        </p>
 
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+        <div className="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-7">
           {errorMsg && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
               {errorMsg}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-800">
-                Título *
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* TÍTULO */}
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Título <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ejemplo: Error V1032 al crear entrega"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
+                placeholder="Ejemplo: Error KI100 al contabilizar en ES25"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-800">
+            {/* DESCRIPCIÓN / DETALLE */}
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
                 Descripción / detalle
               </label>
               <textarea
-                rows={5}
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                placeholder="Describe el problema, la decisión tomada o la configuración aplicada..."
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                rows={4}
+                placeholder="Describe el problema, el análisis (causa raíz) y la solución aplicada, incluyendo transacciones, customizing, condiciones, etc."
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500 resize-y"
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-800">
-                  Cliente (opcional)
+            {/* TIPO DE NOTA Y SISTEMA */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Tipo de nota
                 </label>
-                <input
-                  type="text"
-                  value={client}
-                  onChange={(e) => setClient(e.target.value)}
-                  placeholder="Nombre o código del cliente"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+                <select
+                  value={noteType}
+                  onChange={(e) => setNoteType(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
+                >
+                  {NOTE_TYPES.map((nt) => (
+                    <option key={nt} value={nt}>
+                      {nt}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-800">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Sistema / entorno (opcional)
+                </label>
+                <select
+                  value={systemType}
+                  onChange={(e) => setSystemType(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
+                >
+                  <option value="">No especificar</option>
+                  {SYSTEM_TYPES.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* CLIENTE */}
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Cliente (opcional)
+              </label>
+              <select
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
+              >
+                <option value="">Nota genérica (sin cliente)</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                    {client.country ? ` · ${client.country}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* MÓDULO Y SCOPE ITEM */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
                   Módulo (opcional)
                 </label>
-                <input
-                  type="text"
-                  value={moduleField}
-                  onChange={(e) => setModuleField(e.target.value)}
-                  placeholder="SD, MM, FI, CO..."
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+                <select
+                  value={moduleId}
+                  onChange={(e) => {
+                    setModuleId(e.target.value);
+                    setScopeItemId("");
+                  }}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
+                >
+                  <option value="">No especificar</option>
+                  {modules.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.code} · {m.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-800">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
                   Scope item / proceso (opcional)
+                </label>
+                <select
+                  value={scopeItemId}
+                  onChange={(e) => setScopeItemId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
+                >
+                  <option value="">No especificar</option>
+                  {filteredScopeItems.map((si) => (
+                    <option key={si.id} value={si.id}>
+                      {si.code} · {si.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* TRANSACCIÓN Y CÓDIGO DE ERROR */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Transacción / App (opcional)
                 </label>
                 <input
                   type="text"
-                  value={scopeItem}
-                  onChange={(e) => setScopeItem(e.target.value)}
-                  placeholder="Por ejemplo: 1MX, 7S7, Z-FREE-OF-CHARGE..."
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={transactionCode}
+                  onChange={(e) => setTransactionCode(e.target.value)}
+                  placeholder="Ejemplo: VA01, VK11, app Fiori..."
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-800">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
                   Código de error (opcional)
                 </label>
                 <input
                   type="text"
                   value={errorCode}
                   onChange={(e) => setErrorCode(e.target.value)}
-                  placeholder="Ejemplo: V1032, M3820..."
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ejemplo: KI100, CK701, M7064..."
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
                 />
               </div>
             </div>
 
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                type="submit"
-                disabled={saving}
-                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {saving ? "Guardando..." : "Guardar nota"}
-              </button>
+            {/* ENLACES Y CONTEXTO ADICIONAL */}
+            <div className="pt-2 border-t border-slate-100 mt-4 space-y-3">
+              <p className="text-xs font-medium text-slate-700">
+                Enlaces y contexto adicional (opcional)
+              </p>
 
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Enlace 1
+                  </label>
+                  <input
+                    type="url"
+                    value={webLink1}
+                    onChange={(e) => setWebLink1(e.target.value)}
+                    placeholder="https://... (SAP Note, Jira, Confluence...)"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Enlace 2
+                  </label>
+                  <input
+                    type="url"
+                    value={webLink2}
+                    onChange={(e) => setWebLink2(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Información adicional
+                </label>
+                <textarea
+                  value={extraInfo}
+                  onChange={(e) => setExtraInfo(e.target.value)}
+                  rows={3}
+                  placeholder="Notas internas, referencias a comités, dependencias con otros flujos, etc."
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500 resize-y"
+                />
+              </div>
+            </div>
+
+            {/* BOTONES */}
+            <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => router.push("/notes")}
                 className="text-sm text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-100"
               >
                 Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {saving ? "Guardando..." : "Guardar nota"}
               </button>
             </div>
           </form>
