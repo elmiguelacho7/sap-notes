@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { handleSupabaseError } from "@/lib/supabaseError";
+import { handleSupabaseError, hasLoggableSupabaseError } from "@/lib/supabaseError";
 
 // ==========================
 // Tipos
@@ -156,9 +156,9 @@ export default function ProjectDashboardPage() {
           .order("code", { ascending: true }),
       ]);
 
-      if (notesError) handleSupabaseError("notes_with_modules_and_scopeitems", notesError);
-      if (modulesError) handleSupabaseError("modules", modulesError);
-      if (scopeError) handleSupabaseError("scope_items", scopeError);
+      if (notesError && hasLoggableSupabaseError(notesError)) handleSupabaseError("notes_with_modules_and_scopeitems", notesError);
+      if (modulesError && hasLoggableSupabaseError(modulesError)) handleSupabaseError("modules", modulesError);
+      if (scopeError && hasLoggableSupabaseError(scopeError)) handleSupabaseError("scope_items", scopeError);
 
       setNotes((notesData ?? []) as ProjectNote[]);
       setModulesOptions((modulesData ?? []) as ModuleOption[]);
@@ -178,8 +178,10 @@ export default function ProjectDashboardPage() {
         .eq("project_id", projectId)
         .order("created_at", { ascending: false });
 
-      if (linksError) {
+      if (linksError && hasLoggableSupabaseError(linksError)) {
         handleSupabaseError("project_links", linksError);
+      }
+      if (linksError) {
         setLinks([]);
         setErrorMsg("Part of the project data could not be loaded. Please try again later.");
       } else {
