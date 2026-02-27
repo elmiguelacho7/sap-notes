@@ -63,6 +63,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </button>
 
           <button
+            onClick={() => router.push("/process-flows/demo")}
+            className={`w-full text-left px-3 py-2 rounded-lg transition ${
+              pathname.startsWith("/process-flows")
+                ? "bg-blue-50 text-blue-700 font-semibold"
+                : "text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            Flujos de proceso
+          </button>
+
+          <button
             onClick={() => router.push("/update-password")}
             className={`w-full text-left px-3 py-2 rounded-lg transition ${
               isActive("/update-password")

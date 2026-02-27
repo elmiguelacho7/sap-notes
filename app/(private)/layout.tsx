@@ -1,8 +1,8 @@
+// app/(private)/layout.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { usePathname, useRouter } from "next/navigation";
+import { supabase } from "../../lib/supabaseClient";
 
 export default function PrivateLayout({
   children,
@@ -11,48 +11,20 @@ export default function PrivateLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [checkingSession, setCheckingSession] = useState(true);
 
-  // 👉 Helper para marcar la opción activa del menú
-  const isActive = (path: string) =>
-    pathname === path || pathname.startsWith(path + "/");
-
-  // Comprobación de sesión
-  useEffect(() => {
-    const checkSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.replace("/");
-        return;
-      }
-
-      setCheckingSession(false);
-    };
-
-    checkSession();
-  }, [router]);
+  const isActive = (path: string) => {
+    if (path === "/process-flows") return pathname.startsWith("/process-flows");
+    return pathname === path;
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.replace("/");
+    router.push("/");
   };
-
-  if (checkingSession) {
-    return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-sm text-sm text-slate-600">
-          Verificando sesión…
-        </div>
-      </main>
-    );
-  }
 
   return (
     <main className="min-h-screen bg-slate-50 flex">
-      {/* SIDEBAR */}
+      {/* Sidebar */}
       <aside className="w-60 bg-white border-r border-slate-200 flex flex-col">
         <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
           <div className="h-8 w-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
@@ -109,6 +81,18 @@ export default function PrivateLayout({
             Proyectos
           </button>
 
+          {/* NUEVO MENÚ */}
+          <button
+            onClick={() => router.push("/process-flows/demo")}
+            className={`w-full text-left px-3 py-2 rounded-lg transition ${
+              isActive("/process-flows")
+                ? "bg-blue-50 text-blue-700 font-semibold"
+                : "text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            Flujos de proceso
+          </button>
+
           <button
             onClick={() => router.push("/update-password")}
             className={`w-full text-left px-3 py-2 rounded-lg transition ${
@@ -121,7 +105,7 @@ export default function PrivateLayout({
           </button>
         </nav>
 
-        <div className="px-4 py-4 border-t border-slate-200">
+        <div className="px-3 py-4 border-t border-slate-200">
           <button
             onClick={handleLogout}
             className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-600 hover:bg-slate-100"
@@ -134,7 +118,7 @@ export default function PrivateLayout({
         </div>
       </aside>
 
-      {/* CONTENIDO */}
+      {/* Contenido */}
       <section className="flex-1">{children}</section>
     </main>
   );

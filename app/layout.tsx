@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Project Hub",
-  description: "Gestión de proyectos internos SAP",
+  description: "Entorno interno para gestión de proyectos SAP",
 };
 
 export default function RootLayout({
@@ -14,9 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className="bg-slate-50 antialiased">
-        {children}
-      </body>
+      <body className="min-h-screen bg-slate-50">{children}</body>
     </html>
   );
 }
