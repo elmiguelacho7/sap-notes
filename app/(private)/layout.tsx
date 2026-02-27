@@ -1,6 +1,7 @@
 // app/(private)/layout.tsx
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -11,6 +12,27 @@ export default function PrivateLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.replace("/");
+        return;
+      }
+      setIsReady(true);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        router.replace("/");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   const isActive = (path: string) => {
     if (path === "/process-flows") return pathname.startsWith("/process-flows");
@@ -21,6 +43,10 @@ export default function PrivateLayout({
     await supabase.auth.signOut();
     router.push("/");
   };
+
+  if (!isReady) {
+    return <main className="min-h-screen bg-slate-50 flex" />;
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 flex">

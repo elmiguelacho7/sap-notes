@@ -52,58 +52,55 @@ export default function DashboardPage() {
   const [chatLoading, setChatLoading] = useState(false);
 
   // Carga de datos del dashboard
-  useEffect(() => {
-    const loadData = async () => {
-      setLoadingStats(true);
-      setErrorMsg(null);
-      try {
-        // Proyectos
-        const { data: projData, error: projError } = await supabase
+  const loadData = async () => {
+    setLoadingStats(true);
+    setErrorMsg(null);
+    try {
+      const [projResult, noteResult] = await Promise.all([
+        supabase
           .from("projects")
           .select("id, name, status, created_at")
-          .order("created_at", { ascending: false });
-
-        if (projError) throw projError;
-        const projects = (projData || []) as ProjectSummary[];
-
-        const openProjects = projects.filter((p) => {
-          if (!p.status) return true;
-          const s = p.status.toLowerCase();
-          return !s.includes("cerrado") && !s.includes("closed");
-        });
-
-        setRecentProjects(projects.slice(0, 3));
-
-        // Notas
-        const { data: noteData, error: noteError } = await supabase
+          .order("created_at", { ascending: false }),
+        supabase
           .from("notes")
           .select("id, title, client, module, created_at")
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false }),
+      ]);
 
-        if (noteError) throw noteError;
-        const notes = (noteData || []) as NoteSummary[];
+      if (projResult.error) throw projResult.error;
+      if (noteResult.error) throw noteResult.error;
 
-        const hoy = new Date().toDateString();
-        const todayNotes = notes.filter(
-          (n) => new Date(n.created_at).toDateString() === hoy
-        );
+      const projects = (projResult.data || []) as ProjectSummary[];
+      const notes = (noteResult.data || []) as NoteSummary[];
 
-        setRecentNotes(notes.slice(0, 3));
+      const openProjects = projects.filter((p) => {
+        if (!p.status) return true;
+        const s = p.status.toLowerCase();
+        return !s.includes("cerrado") && !s.includes("closed");
+      });
 
-        setStats({
-          totalProjects: projects.length,
-          openProjects: openProjects.length,
-          totalNotes: notes.length,
-          todayNotes: todayNotes.length,
-        });
-      } catch (e) {
-        console.error("Error cargando dashboard:", e);
-        setErrorMsg("No se pudieron cargar los datos del dashboard.");
-      } finally {
-        setLoadingStats(false);
-      }
-    };
+      const hoy = new Date().toDateString();
+      const todayNotes = notes.filter(
+        (n) => new Date(n.created_at).toDateString() === hoy
+      );
 
+      setRecentProjects(projects.slice(0, 3));
+      setRecentNotes(notes.slice(0, 3));
+      setStats({
+        totalProjects: projects.length,
+        openProjects: openProjects.length,
+        totalNotes: notes.length,
+        todayNotes: todayNotes.length,
+      });
+    } catch (e) {
+      console.error("Error cargando dashboard:", e);
+      setErrorMsg("No se pudieron cargar los datos del dashboard.");
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  useEffect(() => {
     void loadData();
   }, []);
 
@@ -169,6 +166,23 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      {/* Error del dashboard */}
+      {errorMsg && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <p className="text-red-600">{errorMsg}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setErrorMsg(null);
+              void loadData();
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+
       {/* KPIs */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
@@ -215,7 +229,11 @@ export default function DashboardPage() {
                 <p className="text-xs font-semibold text-slate-700 mb-1">
                   Proyectos recientes
                 </p>
-                {recentProjects.length === 0 ? (
+                {loadingStats ? (
+                  <p className="text-xs text-slate-400">
+                    Cargando proyectos…
+                  </p>
+                ) : recentProjects.length === 0 ? (
                   <p className="text-xs text-slate-400">
                     Aún no hay proyectos registrados.
                   </p>
@@ -253,7 +271,11 @@ export default function DashboardPage() {
                 <p className="text-xs font-semibold text-slate-700 mb-1">
                   Notas recientes
                 </p>
-                {recentNotes.length === 0 ? (
+                {loadingStats ? (
+                  <p className="text-xs text-slate-400">
+                    Cargando notas…
+                  </p>
+                ) : recentNotes.length === 0 ? (
                   <p className="text-xs text-slate-400">
                     Aún no hay notas registradas.
                   </p>
@@ -315,7 +337,7 @@ export default function DashboardPage() {
             />
           </div>
 
-          <div className="flex-1 flex flex-col min-height-[260px]">
+          <div className="flex-1 flex flex-col min-h-[260px]">
             <div className="flex-1 overflow-y-auto pr-1 mb-3 space-y-2 text-xs">
               {chatMessages.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-slate-500 text-[11px]">
