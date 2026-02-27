@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
+// ==========================
+// Tipos
+// ==========================
+
 type Project = {
   id: string;
   name: string;
@@ -15,16 +19,16 @@ type Project = {
 type ProjectNote = {
   id: string;
   title: string;
-  body: string | null;
-  client: string | null;
-  module: string | null;
-  scope_item: string | null;
+  description: string | null;
+  module_id: string | null;
+  module_code: string | null;
+  module_name: string | null;
+  scope_items: string[];
   error_code: string | null;
+  error_type: string | null;
+  priority: string | null;
+  status: string | null;
   created_at: string;
-  project_id: string | null;
-  web_link_1: string | null;
-  web_link_2: string | null;
-  extra_info: string | null;
 };
 
 type ModuleOption = {
@@ -33,7 +37,7 @@ type ModuleOption = {
   name: string;
 };
 
-type ScopeItemOption = {
+type ScopeItem = {
   id: string;
   code: string;
   name: string;
@@ -43,7 +47,7 @@ type ScopeItemOption = {
 type ProjectLink = {
   id: string;
   project_id: string;
-  name: string;
+  label: string;
   url: string;
   link_type: string | null;
   created_at: string;
@@ -58,58 +62,52 @@ type ChatMessage = {
 
 const N8N_WEBHOOK_URL = "/api/n8n";
 
+// ==========================
+// Página
+// ==========================
+
 export default function ProjectDashboardPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = (params?.id ?? "") as string;
 
-  // ===== Proyecto / notas / enlaces =====
   const [project, setProject] = useState<Project | null>(null);
   const [notes, setNotes] = useState<ProjectNote[]>([]);
-  const [projectLinks, setProjectLinks] = useState<ProjectLink[]>([]);
+  const [modulesOptions, setModulesOptions] = useState<ModuleOption[]>([]);
+  const [scopeItems, setScopeItems] = useState<ScopeItem[]>([]);
+  const [links, setLinks] = useState<ProjectLink[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // ===== Formulario nota rápida =====
+  // Formulario: nota rápida
   const [quickTitle, setQuickTitle] = useState("");
-  const [quickErrorCode, setQuickErrorCode] = useState("");
-  const [quickBody, setQuickBody] = useState("");
-  const [extraInfo, setExtraInfo] = useState("");
-  const [webLink1, setWebLink1] = useState("");
-  const [webLink2, setWebLink2] = useState("");
-  const [savingNote, setSavingNote] = useState(false);
-
-  // Módulos + scope items
-  const [modulesOptions, setModulesOptions] = useState<ModuleOption[]>([]);
-  const [scopeItemsOptions, setScopeItemsOptions] = useState<ScopeItemOption[]>(
-    []
-  );
-  const [selectedModuleId, setSelectedModuleId] = useState<string>("");
+  const [quickDescription, setQuickDescription] = useState("");
+  const [selectedModuleId, setSelectedModuleId] = useState("");
   const [selectedScopeItemIds, setSelectedScopeItemIds] = useState<string[]>(
     []
   );
+  const [errorCode, setErrorCode] = useState("");
+  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
+  const [creatingNote, setCreatingNote] = useState(false);
 
-  // ===== Enlaces de proyecto =====
-  const [newLinkName, setNewLinkName] = useState("");
+  // Formulario: enlaces del proyecto
+  const [newLinkLabel, setNewLinkLabel] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("");
-  const [newLinkType, setNewLinkType] = useState("Drive");
-  const [savingLink, setSavingLink] = useState(false);
+  const [newLinkType, setNewLinkType] = useState("");
+  const [creatingLink, setCreatingLink] = useState(false);
 
-  // ===== Chat IA =====
+  // Asistente IA
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-
-  const chatStorageKey = useMemo(
-    () => (projectId ? `project_chat_${projectId}` : "project_chat"),
-    [projectId]
-  );
+  const [chatCounter, setChatCounter] = useState(1);
 
   // ==========================
-  // Carga proyecto / notas / enlaces
+  // Carga inicial (robusta)
   // ==========================
+
   useEffect(() => {
     if (!projectId) return;
 
@@ -118,55 +116,86 @@ export default function ProjectDashboardPage() {
       setErrorMsg(null);
 
       try {
-        // Proyecto
-        const { data: projectData, error: projectError } = await supabase
+        // 1️⃣ Proyecto (CRÍTICO)
+        const {
+          data: projectData,
+          error: projectError,
+        } = await supabase
           .from("projects")
           .select("id, name, description, status, created_at")
           .eq("id", projectId)
           .single();
 
         if (projectError) {
-          console.error(projectError);
-          setErrorMsg("No se ha podido cargar la información del proyecto.");
-          setLoading(false);
-          return;
+          console.error("[projects] error", projectError);
+          throw projectError; // sin proyecto no tiene sentido el dashboard
         }
 
         setProject(projectData as Project);
 
-        // Notas
-        const { data: notesData, error: notesError } = await supabase
-          .from("notes")
-          .select(
-            "id, title, body, client, module, scope_item, error_code, created_at, project_id, web_link_1, web_link_2, extra_info"
-          )
-          .eq("project_id", projectId)
-          .order("created_at", { ascending: false });
+        // 2️⃣ Notas / módulos / scope items (si fallan, mostramos vacío pero no rompemos)
+        const [
+          { data: notesData, error: notesError },
+          { data: modulesData, error: modulesError },
+          { data: scopeData, error: scopeError },
+        ] = await Promise.all([
+          supabase
+            .from("notes_with_modules_and_scopeitems")
+            .select("*")
+            .eq("project_id", projectId)
+            .order("created_at", { ascending: false })
+            .limit(10),
+          supabase
+            .from("modules")
+            .select("id, code, name")
+            .order("code", { ascending: true }),
+          supabase
+            .from("scope_items")
+            .select("id, code, name, module_id")
+            .order("code", { ascending: true }),
+        ]);
 
         if (notesError) {
-          console.error(notesError);
-          setErrorMsg("No se ha podido cargar las notas del proyecto.");
-          setLoading(false);
-          return;
+          console.error("[notes_with_modules_and_scopeitems] error", notesError);
+        }
+        if (modulesError) {
+          console.error("[modules] error", modulesError);
+        }
+        if (scopeError) {
+          console.error("[scope_items] error", scopeError);
         }
 
-        setNotes((notesData as ProjectNote[]) || []);
+        setNotes((notesData ?? []) as ProjectNote[]);
+        setModulesOptions((modulesData ?? []) as ModuleOption[]);
+        setScopeItems((scopeData ?? []) as ScopeItem[]);
 
-        // Enlaces del proyecto
-        const { data: linksData, error: linksError } = await supabase
-          .from("project_links")
-          .select("id, project_id, name, url, link_type, created_at")
-          .eq("project_id", projectId)
-          .order("created_at", { ascending: false });
+        // 3️⃣ Enlaces del proyecto (si la tabla no existe, simplemente no mostramos enlaces)
+        try {
+          const {
+            data: linksData,
+            error: linksError,
+          } = await supabase
+            .from("project_links")
+            .select("*")
+            .eq("project_id", projectId)
+            .order("created_at", { ascending: false });
 
-        if (linksError) {
-          console.error(linksError);
-        } else {
-          setProjectLinks((linksData as ProjectLink[]) || []);
+          if (linksError) {
+            console.warn("[project_links] error (se ignora)", linksError);
+            setLinks([]);
+          } else {
+            setLinks((linksData ?? []) as ProjectLink[]);
+          }
+        } catch (err) {
+          console.warn(
+            "[project_links] excepción (posible tabla inexistente), se ignora",
+            err
+          );
+          setLinks([]);
         }
-      } catch (err) {
-        console.error(err);
-        setErrorMsg("Ha ocurrido un error al cargar el dashboard.");
+      } catch (e) {
+        console.error(e);
+        setErrorMsg("No se pudo cargar la información del proyecto.");
       } finally {
         setLoading(false);
       }
@@ -176,243 +205,153 @@ export default function ProjectDashboardPage() {
   }, [projectId]);
 
   // ==========================
-  // Carga metadatos: módulos / scope items
-  // ==========================
-  useEffect(() => {
-    const loadMetadata = async () => {
-      try {
-        const { data: modulesData, error: modulesError } = await supabase
-          .from("modules")
-          .select("id, code, name")
-          .order("code", { ascending: true });
-
-        if (modulesError) {
-          console.error("Error módulos:", modulesError);
-        } else {
-          setModulesOptions(((modulesData as ModuleOption[]) || []) ?? []);
-        }
-
-        const { data: scopeData, error: scopeError } = await supabase
-          .from("scope_items")
-          .select("id, code, name, module_id")
-          .order("code", { ascending: true });
-
-        if (scopeError) {
-          console.error("Error scope items:", scopeError);
-        } else {
-          setScopeItemsOptions(((scopeData as ScopeItemOption[]) || []) ?? []);
-        }
-      } catch (err) {
-        console.error("Error metadata:", err);
-      }
-    };
-
-    loadMetadata();
-  }, []);
-
-  // ==========================
   // KPIs
   // ==========================
-  const { totalNotes, totalErrorNotes, modulesCount, lastNoteDateLabel } =
-    useMemo(() => {
-      if (!notes || notes.length === 0) {
-        return {
-          totalNotes: 0,
-          totalErrorNotes: 0,
-          modulesCount: 0,
-          lastNoteDateLabel: "Sin notas todavía",
-        };
-      }
 
-      const total = notes.length;
-      const errorCount = notes.filter(
-        (n) => n.error_code && n.error_code.trim() !== ""
-      ).length;
+  const totalNotes = notes.length;
 
-      const modules = Array.from(
-        new Set(
-          notes
-            .map((n) => (n.module ?? "").trim())
-            .filter((m) => m && m.length > 0)
-        )
-      );
-      const last = notes[0];
-      const lastLabel = new Date(last.created_at).toLocaleString();
+  const notesWithError = useMemo(
+    () => notes.filter((n) => n.error_code || n.error_type),
+    [notes]
+  );
 
-      return {
-        totalNotes: total,
-        totalErrorNotes: errorCount,
-        modulesCount: modules.length,
-        lastNoteDateLabel: lastLabel,
-      };
-    }, [notes]);
-
-  // ==========================
-  // Chat: sessionId + mensajes
-  // ==========================
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    let storedSession = window.localStorage.getItem(
-      `${chatStorageKey}_sessionId`
+  const totalModulesImpacted = useMemo(() => {
+    const setMod = new Set(
+      notes
+        .map((n) => n.module_code)
+        .filter((x): x is string => !!x && x.trim() !== "")
     );
-    if (!storedSession) {
-      storedSession = `${projectId}-${Date.now()}`;
-      window.localStorage.setItem(
-        `${chatStorageKey}_sessionId`,
-        storedSession
-      );
-    }
-    setSessionId(storedSession);
+    return setMod.size;
+  }, [notes]);
 
-    const storedChat = window.localStorage.getItem(chatStorageKey);
-    if (storedChat) {
-      try {
-        const parsed: ChatMessage[] = JSON.parse(storedChat);
-        setChatMessages(parsed);
-      } catch {
-        // ignoramos si está corrupto
-      }
-    }
-  }, [chatStorageKey, projectId]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(chatStorageKey, JSON.stringify(chatMessages));
-  }, [chatMessages, chatStorageKey]);
+  const lastNoteDateLabel = useMemo(() => {
+    if (!notes.length) return "Sin notas todavía.";
+    const last = new Date(notes[0].created_at);
+    return last.toLocaleString("es-ES");
+  }, [notes]);
 
   // ==========================
-  // Scope items visibles
+  // Handlers: nota rápida
   // ==========================
-  const visibleScopeItems = useMemo(() => {
-    if (!selectedModuleId) return scopeItemsOptions;
-    return scopeItemsOptions.filter((si) => si.module_id === selectedModuleId);
-  }, [scopeItemsOptions, selectedModuleId]);
 
-  // ==========================
-  // Crear nota rápida
-  // ==========================
-  const handleCreateQuickNote = async () => {
-    if (!projectId) return;
-    if (!quickTitle.trim()) {
-      alert("El título de la nota es obligatorio.");
-      return;
-    }
-
-    const selectedModule = modulesOptions.find(
-      (m) => m.id === selectedModuleId
+  const handleToggleScopeItem = (id: string) => {
+    setSelectedScopeItemIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
-    const moduleText = selectedModule ? selectedModule.code : null;
+  };
 
-    const selectedScopeItems = scopeItemsOptions.filter((s) =>
-      selectedScopeItemIds.includes(s.id)
-    );
-    const scopeItemsText =
-      selectedScopeItems.length > 0
-        ? selectedScopeItems.map((s) => s.code).join(", ")
-        : null;
+  const handleCreateQuickNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickTitle.trim() || !projectId) return;
 
-    setSavingNote(true);
+    setCreatingNote(true);
+    setErrorMsg(null);
+
     try {
       const { data, error } = await supabase
         .from("notes")
         .insert({
-          title: quickTitle.trim(),
-          body: quickBody.trim() || null,
-          client: null, // el cliente viene dado por el proyecto
-          module: moduleText,
-          scope_item: scopeItemsText,
-          error_code: quickErrorCode.trim() || null,
           project_id: projectId,
-          web_link_1: webLink1.trim() || null,
-          web_link_2: webLink2.trim() || null,
-          extra_info: extraInfo.trim() || null,
+          title: quickTitle.trim(),
+          description: quickDescription.trim() || null,
+          module_id: selectedModuleId || null,
+          error_code: errorCode.trim() || null,
+          priority,
+          status: "open",
         })
-        .select(
-          "id, title, body, client, module, scope_item, error_code, created_at, project_id, web_link_1, web_link_2, extra_info"
-        )
+        .select("*")
         .single();
 
-      if (error) {
-        console.error(error);
-        alert("No se ha podido crear la nota. Revisa la consola.");
-        return;
+      if (error) throw error;
+
+      const noteId = data.id as string;
+
+      if (selectedScopeItemIds.length > 0) {
+        const rows = selectedScopeItemIds.map((scopeId) => ({
+          note_id: noteId,
+          scope_item_id: scopeId,
+        }));
+
+        const { error: scopeLinkError } = await supabase
+          .from("note_scope_items")
+          .insert(rows);
+
+        if (scopeLinkError) throw scopeLinkError;
       }
 
-      setNotes((prev) => [data as ProjectNote, ...(prev || [])]);
+      const { data: newNoteData } = await supabase
+        .from("notes_with_modules_and_scopeitems")
+        .select("*")
+        .eq("id", noteId)
+        .single();
 
-      // Reset formulario
+      if (newNoteData) {
+        setNotes((prev) => [newNoteData as ProjectNote, ...prev]);
+      }
+
       setQuickTitle("");
-      setQuickBody("");
-      setQuickErrorCode("");
+      setQuickDescription("");
       setSelectedModuleId("");
       setSelectedScopeItemIds([]);
-      setWebLink1("");
-      setWebLink2("");
-      setExtraInfo("");
-    } catch (err) {
-      console.error(err);
-      alert("Ha ocurrido un error al crear la nota.");
+      setErrorCode("");
+      setPriority("medium");
+    } catch (e) {
+      console.error(e);
+      setErrorMsg("No se pudo crear la nota rápida.");
     } finally {
-      setSavingNote(false);
+      setCreatingNote(false);
     }
   };
 
   // ==========================
-  // Crear enlace de proyecto
+  // Handlers: enlaces del proyecto
   // ==========================
-  const handleAddProjectLink = async () => {
-    if (!projectId) return;
-    if (!newLinkName.trim() || !newLinkUrl.trim()) {
-      alert("Nombre y URL del enlace son obligatorios.");
-      return;
-    }
 
-    const urlValue = newLinkUrl.trim();
-    if (!/^https?:\/\//i.test(urlValue)) {
-      alert("La URL debería empezar por http:// o https://");
-      return;
-    }
+  const handleCreateLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLinkLabel.trim() || !newLinkUrl.trim() || !projectId) return;
 
-    setSavingLink(true);
+    setCreatingLink(true);
+
     try {
       const { data, error } = await supabase
         .from("project_links")
         .insert({
           project_id: projectId,
-          name: newLinkName.trim(),
-          url: urlValue,
+          label: newLinkLabel.trim(),
+          url: newLinkUrl.trim(),
           link_type: newLinkType || null,
         })
-        .select("id, project_id, name, url, link_type, created_at")
+        .select("*")
         .single();
 
-      if (error) {
-        console.error(error);
-        alert("No se ha podido crear el enlace. Revisa la consola.");
-        return;
-      }
+      if (error) throw error;
 
-      setProjectLinks((prev) => [data as ProjectLink, ...(prev || [])]);
-      setNewLinkName("");
+      setLinks((prev) => [data as ProjectLink, ...prev]);
+      setNewLinkLabel("");
       setNewLinkUrl("");
-      setNewLinkType("Drive");
-    } catch (err) {
-      console.error(err);
-      alert("Ha ocurrido un error al crear el enlace.");
+      setNewLinkType("");
+    } catch (e) {
+      console.error(e);
+      setErrorMsg("No se pudo crear el enlace del proyecto.");
     } finally {
-      setSavingLink(false);
+      setCreatingLink(false);
     }
   };
 
   // ==========================
-  // Enviar mensaje al asistente IA
+  // Asistente IA (n8n)
   // ==========================
-  const handleSendMessage = async () => {
-    if (!chatInput.trim() || !sessionId || !projectId) return;
+
+  const handleSendToAssistant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || !projectId) return;
+
+    const msgId = chatCounter;
+    setChatCounter((c) => c + 1);
 
     const userMessage: ChatMessage = {
-      id: Date.now(),
+      id: msgId,
       from: "user",
       text: chatInput.trim(),
       createdAt: new Date().toISOString(),
@@ -424,53 +363,45 @@ export default function ProjectDashboardPage() {
     setChatError(null);
 
     try {
-      const res = await fetch(N8N_WEBHOOK_URL, {
+      const response = await fetch(N8N_WEBHOOK_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: userMessage.text,
-          projectId,
-          sessionId,
+          project_id: projectId,
+          question: userMessage.text,
         }),
       });
 
-      if (!res.ok) {
-        throw new Error(`Error HTTP ${res.status}`);
+      if (!response.ok) {
+        throw new Error("Error llamando al asistente de IA.");
       }
 
-      const data = await res.json();
+      const data = await response.json();
       const botText: string =
-        data.reply ||
-        data.answer ||
-        "No he recibido una respuesta clara desde el agente de IA.";
+        (data?.answer as string) ?? "No he podido obtener una respuesta.";
 
       const botMessage: ChatMessage = {
-        id: Date.now() + 1,
+        id: msgId + 100000,
         from: "bot",
         text: botText,
         createdAt: new Date().toISOString(),
       };
 
       setChatMessages((prev) => [...prev, botMessage]);
-    } catch (err) {
-      console.error(err);
-      setChatError("No se ha podido obtener respuesta del asistente.");
+    } catch (e) {
+      console.error(e);
+      setChatError(
+        "No se pudo contactar con el asistente de IA. Revisa la configuración de n8n."
+      );
     } finally {
       setChatLoading(false);
     }
   };
 
-  const toggleScopeItemSelection = (id: string) => {
-    setSelectedScopeItemIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
-
   // ==========================
   // Render
   // ==========================
+
   if (!projectId) {
     return (
       <div className="p-6 md:p-8">
@@ -485,6 +416,7 @@ export default function ProjectDashboardPage() {
     <div className="p-4 md:p-6 lg:p-8 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
+        {/* Lado izquierdo */}
         <div className="flex flex-col gap-1">
           <button
             onClick={() => router.push("/projects")}
@@ -498,22 +430,31 @@ export default function ProjectDashboardPage() {
           </h1>
 
           <p className="text-xs md:text-sm text-slate-500 max-w-2xl">
-            Dashboard centralizado con notas, documentación e IA del
-            proyecto.
+            Dashboard centralizado con notas, documentación e IA del proyecto.
           </p>
         </div>
 
+        {/* Lado derecho */}
         {project && (
-          <div className="flex flex-col items-end gap-1">
+          <div className="flex flex-col items-end gap-2">
             {project.status && (
               <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-700">
                 Estado: {project.status}
               </span>
             )}
+
             <p className="text-[11px] text-slate-400">
               Creado el{" "}
               {new Date(project.created_at).toLocaleDateString("es-ES")}
             </p>
+
+            {/* Botón hacia el tablero Kanban del proyecto */}
+            <button
+              onClick={() => router.push(`/projects/${projectId}/tasks`)}
+              className="inline-flex items-center rounded-full bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-slate-50 shadow-sm hover:bg-slate-800"
+            >
+              Abrir tablero de actividades
+            </button>
           </div>
         )}
       </div>
@@ -541,12 +482,12 @@ export default function ProjectDashboardPage() {
           />
           <KpiCard
             title="Notas con error / incidencia"
-            value={String(totalErrorNotes)}
+            value={String(notesWithError.length)}
             subtitle="Basado en notas con código de error informado."
           />
           <KpiCard
             title="Módulos impactados"
-            value={String(modulesCount)}
+            value={String(totalModulesImpacted)}
             subtitle="Número de módulos SAP diferentes en las notas."
           />
           <KpiCard
@@ -560,452 +501,390 @@ export default function ProjectDashboardPage() {
       {/* Contenido principal */}
       {!loading && !errorMsg && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-          {/* Columna izquierda: nota rápida + últimas notas */}
+          {/* Columna izquierda: nota rápida + notas */}
           <div className="lg:col-span-2 space-y-4">
             {/* Nota rápida */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3 mb-3">
+            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-2">
                 <div>
                   <h2 className="text-sm font-semibold text-slate-900">
                     Crear nota rápida del proyecto
                   </h2>
-                  <p className="text-xs text-slate-500">
-                    Registra decisiones, errores o configuraciones sin salir
-                    de este dashboard.
+                  <p className="text-[11px] text-slate-500">
+                    Registra decisiones, errores o configuraciones sin salir de
+                    este dashboard.
                   </p>
                 </div>
+
                 <button
-                  onClick={() => router.push("/notes/new")}
-                  className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+                  onClick={() =>
+                    router.push(`/projects/${projectId}/notes/new`)
+                  }
+                  className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
                 >
                   Ir a notas avanzadas
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                {/* Columna izquierda del formulario */}
-                <div className="space-y-2">
-                  <label className="text-[11px] text-slate-600">
+              <form
+                onSubmit={handleCreateQuickNote}
+                className="px-4 py-4 space-y-3"
+              >
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
                     Título de la nota *
                   </label>
                   <input
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
+                    type="text"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
+                    placeholder="Ej. Error KI100 en imputación de centros"
                     value={quickTitle}
                     onChange={(e) => setQuickTitle(e.target.value)}
-                    placeholder="Ej: Error KI100 en imputación de centros"
-                  />
-
-                  <label className="text-[11px] text-slate-600">
-                    Módulo SAP
-                  </label>
-                  <select
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0 bg-white"
-                    value={selectedModuleId}
-                    onChange={(e) => {
-                      setSelectedModuleId(e.target.value);
-                      setSelectedScopeItemIds([]);
-                    }}
-                  >
-                    <option value="">
-                      {modulesOptions.length === 0
-                        ? "No hay módulos definidos en la BD"
-                        : "Selecciona un módulo…"}
-                    </option>
-                    {modulesOptions.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.code} — {m.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <label className="text-[11px] text-slate-600">
-                    Enlace 1 (opcional)
-                  </label>
-                  <input
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
-                    value={webLink1}
-                    onChange={(e) => setWebLink1(e.target.value)}
-                    placeholder="https://... (Drive, SharePoint, SAP Note, etc.)"
-                  />
-
-                  <label className="text-[11px] text-slate-600">
-                    Enlace 2 (opcional)
-                  </label>
-                  <input
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
-                    value={webLink2}
-                    onChange={(e) => setWebLink2(e.target.value)}
-                    placeholder="https://... (otro documento o referencia)"
+                    required
                   />
                 </div>
 
-                {/* Columna derecha del formulario */}
-                <div className="space-y-2">
-                  <label className="text-[11px] text-slate-600">
-                    Código de error (opcional)
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Descripción (opcional)
                   </label>
-                  <input
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
-                    value={quickErrorCode}
-                    onChange={(e) => setQuickErrorCode(e.target.value)}
-                    placeholder="Ej: KI100, M7064..."
+                  <textarea
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
+                    rows={3}
+                    placeholder="Resumen del error, decisiones tomadas, etc."
+                    value={quickDescription}
+                    onChange={(e) => setQuickDescription(e.target.value)}
                   />
+                </div>
 
-                  <label className="text-[11px] text-slate-600">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Módulo SAP
+                    </label>
+                    <select
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0 bg-white"
+                      value={selectedModuleId}
+                      onChange={(e) => {
+                        setSelectedModuleId(e.target.value);
+                        setSelectedScopeItemIds([]);
+                      }}
+                    >
+                      <option value="">
+                        {modulesOptions.length === 0
+                          ? "No hay módulos definidos en la BD"
+                          : "Selecciona un módulo…"}
+                      </option>
+                      {modulesOptions.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.code} — {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Código de error (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
+                      placeholder="Ej: K100, M7064…"
+                      value={errorCode}
+                      onChange={(e) => setErrorCode(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Prioridad
+                    </label>
+                    <select
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0 bg-white"
+                      value={priority}
+                      onChange={(e) =>
+                        setPriority(e.target.value as "low" | "medium" | "high")
+                      }
+                    >
+                      <option value="high">Alta</option>
+                      <option value="medium">Media</option>
+                      <option value="low">Baja</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Scope items */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-2">
                     Scope items (multi-selección)
                   </label>
-                  <div className="rounded-xl border border-slate-200 px-3 py-2 text-xs max-h-32 overflow-y-auto bg-slate-50/40">
-                    {visibleScopeItems.length === 0 ? (
-                      <p className="text-[11px] text-slate-400 italic">
-                        No hay scope items para el módulo seleccionado (o aún
-                        no se han definido).
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    {scopeItems.length === 0 && (
+                      <p className="text-[11px] text-slate-500">
+                        No hay scope items definidos en la BD.
                       </p>
-                    ) : (
-                      <div className="flex flex-col gap-1.5">
-                        {visibleScopeItems.map((si) => (
+                    )}
+
+                    {scopeItems
+                      .filter(
+                        (s) =>
+                          !selectedModuleId || s.module_id === selectedModuleId
+                      )
+                      .map((s) => {
+                        const checked = selectedScopeItemIds.includes(s.id);
+                        return (
                           <label
-                            key={si.id}
+                            key={s.id}
                             className="inline-flex items-center gap-2 text-[11px] text-slate-700"
                           >
                             <input
                               type="checkbox"
-                              className="h-3 w-3 rounded border-slate-300 text-slate-900"
-                              checked={selectedScopeItemIds.includes(si.id)}
-                              onChange={() => toggleScopeItemSelection(si.id)}
+                              className="rounded border-slate-300 text-slate-700 focus:ring-slate-500"
+                              checked={checked}
+                              onChange={() => handleToggleScopeItem(s.id)}
                             />
                             <span>
-                              <span className="font-medium">{si.code}</span>{" "}
-                              — {si.name}
+                              <span className="font-medium">{s.code}</span> —{" "}
+                              {s.name}
                             </span>
                           </label>
-                        ))}
-                      </div>
-                    )}
+                        );
+                      })}
                   </div>
-
-                  <label className="text-[11px] text-slate-600">
-                    Descripción / solución (opcional)
-                  </label>
-                  <textarea
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0 min-h-[72px]"
-                    value={quickBody}
-                    onChange={(e) => setQuickBody(e.target.value)}
-                    placeholder="Escribe el análisis, causa raíz y solución aplicada…"
-                  />
-
-                  <label className="text-[11px] text-slate-600">
-                    Información adicional (opcional)
-                  </label>
-                  <textarea
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0 min-h-[60px]"
-                    value={extraInfo}
-                    onChange={(e) => setExtraInfo(e.target.value)}
-                    placeholder="Ej: qué contiene cada enlace, referencia interna, responsables, etc."
-                  />
                 </div>
-              </div>
 
-              <div className="flex justify-end">
-                <button
-                  onClick={handleCreateQuickNote}
-                  disabled={savingNote}
-                  className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-                >
-                  {savingNote ? "Guardando..." : "Guardar nota"}
-                </button>
-              </div>
-            </div>
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={creatingNote}
+                    className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-slate-50 shadow-sm hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {creatingNote ? "Creando nota…" : "Guardar nota rápida"}
+                  </button>
+                </div>
+              </form>
+            </section>
 
             {/* Últimas notas */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div>
-                  <h2 className="text-sm font-semibold text-slate-900">
-                    Últimas notas del proyecto
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Vista rápida de las notas más recientes vinculadas a este
-                    proyecto.
-                  </p>
-                </div>
-                <button
-                  onClick={() => router.push("/notes")}
-                  className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
-                >
-                  Ver todas las notas
-                </button>
+            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-4 py-3">
+                <h2 className="text-sm font-semibold text-slate-900">
+                  Últimas notas del proyecto
+                </h2>
+                <p className="text-[11px] text-slate-500">
+                  Vista rápida de notas recientes asociadas a este proyecto.
+                </p>
               </div>
 
-              {notes.length === 0 ? (
-                <p className="text-xs text-slate-500">
-                  Aún no hay notas asociadas a este proyecto. Crea la primera
-                  nota usando el formulario de arriba.
-                </p>
-              ) : (
-                <ul className="divide-y divide-slate-100">
-                  {notes.slice(0, 6).map((note) => (
-                    <li
-                      key={note.id}
-                      className="py-3 cursor-pointer hover:bg-slate-50/80 px-2 -mx-2 rounded-xl transition"
-                      onClick={() => router.push(`/notes/${note.id}`)}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <p className="text-[13px] font-semibold text-slate-900">
-                            {note.title || "Nota sin título"}
-                          </p>
-                          <div className="mt-1 flex flex-wrap gap-1.5">
-                            {note.module && (
-                              <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">
-                                Módulo: {note.module}
-                              </span>
-                            )}
-                            {note.scope_item && (
-                              <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-700">
-                                Scope: {note.scope_item}
-                              </span>
-                            )}
-                            {note.error_code && (
-                              <span className="inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[10px] text-red-700">
-                                Error: {note.error_code}
-                              </span>
-                            )}
-                            {note.web_link_1 && (
-                              <a
-                                href={note.web_link_1}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-700 underline decoration-dotted"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                Link 1
-                              </a>
-                            )}
-                            {note.web_link_2 && (
-                              <a
-                                href={note.web_link_2}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-700 underline decoration-dotted"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                Link 2
-                              </a>
-                            )}
-                          </div>
-                          {note.body && (
-                            <p className="mt-1 text-[11px] text-slate-500 line-clamp-2">
-                              {note.body}
-                            </p>
-                          )}
-                          {note.extra_info && (
-                            <p className="mt-1 text-[11px] text-slate-400 line-clamp-1 italic">
-                              {note.extra_info}
-                            </p>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] text-slate-400">
-                            {new Date(note.created_at).toLocaleDateString(
-                              "es-ES"
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-
-          {/* Columna derecha: IA + enlaces + doc */}
-          <div className="space-y-4">
-            {/* Asistente IA */}
-            <div className="rounded-2xl border border-slate-200 bg-slate-900 text-slate-50 p-4 md:p-5 shadow-sm flex flex-col h-[420px]">
-              <p className="text-[11px] font-semibold text-slate-200 mb-1">
-                Asistente IA del proyecto
-              </p>
-              <p className="text-xs text-slate-200/80 mb-3">
-                Haz preguntas sobre este proyecto. La conversación se
-                mantiene ligada mediante <code>projectId</code> y{" "}
-                <code>sessionId</code>.
-              </p>
-
-              <div className="flex-1 overflow-y-auto rounded-xl bg-slate-950/30 border border-slate-700/60 p-3 space-y-2 text-[11px]">
-                {chatMessages.length === 0 && (
-                  <p className="text-slate-400 italic">
-                    Aún no hay mensajes. Pregunta algo como: “Resume los
-                    errores más frecuentes de este proyecto”.
-                  </p>
+              <div className="divide-y divide-slate-100">
+                {notes.length === 0 && (
+                  <div className="px-4 py-4 text-sm text-slate-500">
+                    Aún no hay notas registradas para este proyecto.
+                  </div>
                 )}
 
-                {chatMessages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`max-w-[90%] rounded-xl px-3 py-2 ${
-                      m.from === "user"
-                        ? "ml-auto bg-emerald-500/80 text-slate-950"
-                        : "mr-auto bg-slate-800 text-slate-50"
-                    }`}
+                {notes.map((note) => (
+                  <button
+                    key={note.id}
+                    onClick={() => router.push(`/notes/${note.id}`)}
+                    className="w-full text-left px-4 py-3 hover:bg-slate-50 transition flex flex-col gap-1"
                   >
-                    <p className="whitespace-pre-line">{m.text}</p>
-                    <p className="mt-1 text-[9px] opacity-70 text-right">
-                      {new Date(m.createdAt).toLocaleTimeString("es-ES", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-slate-900 line-clamp-1">
+                        {note.title}
+                      </p>
+                      <span className="text-[11px] text-slate-400">
+                        {new Date(note.created_at).toLocaleDateString("es-ES")}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-500 line-clamp-2">
+                      {note.description ||
+                        "Nota sin descripción. Haz clic para ver el detalle."}
                     </p>
-                  </div>
-                ))}
-              </div>
 
-              {chatError && (
-                <p className="mt-2 text-[10px] text-red-300">{chatError}</p>
-              )}
-
-              <div className="mt-3 flex items-center gap-2">
-                <input
-                  className="flex-1 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-[11px] text-slate-50 outline-none focus:border-slate-300"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  placeholder="Escribe tu pregunta sobre este proyecto…"
-                />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={chatLoading || !chatInput.trim()}
-                  className="inline-flex items-center rounded-xl bg-slate-50 px-3 py-2 text-[11px] font-medium text-slate-900 hover:bg-slate-200 disabled:opacity-60"
-                >
-                  {chatLoading ? "Enviando..." : "Enviar"}
-                </button>
-              </div>
-            </div>
-
-            {/* Enlaces del proyecto */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900 mb-1">
-                Enlaces del proyecto
-              </h2>
-              <p className="text-xs text-slate-500 mb-3">
-                Guarda aquí enlaces fijos como la carpeta de Drive, tablero
-                de Jira, documentación en Confluence, etc.
-              </p>
-
-              {projectLinks.length === 0 ? (
-                <p className="text-[11px] text-slate-400 mb-2">
-                  Todavía no hay enlaces guardados para este proyecto.
-                </p>
-              ) : (
-                <ul className="space-y-1.5 mb-3">
-                  {projectLinks.map((link) => (
-                    <li
-                      key={link.id}
-                      className="flex items-start justify-between gap-2 text-[11px]"
-                    >
-                      <div className="flex flex-col">
-                        <a
-                          href={link.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-medium text-slate-800 hover:text-slate-900 underline decoration-dotted"
-                        >
-                          {link.name}
-                        </a>
-                        <span className="text-[10px] text-slate-400">
-                          {new Date(link.created_at).toLocaleDateString(
-                            "es-ES"
-                          )}
-                        </span>
-                      </div>
-                      {link.link_type && (
-                        <span className="ml-2 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
-                          {link.link_type}
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      {note.module_code && (
+                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+                          {note.module_code} · {note.module_name}
                         </span>
                       )}
-                    </li>
-                  ))}
-                </ul>
-              )}
 
-              <div className="border-t border-slate-100 pt-3 mt-2">
-                <p className="text-[11px] text-slate-500 mb-2">
-                  Añadir nuevo enlace
+                      {note.error_code && (
+                        <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700">
+                          Error: {note.error_code}
+                        </span>
+                      )}
+
+                      {note.scope_items && note.scope_items.length > 0 && (
+                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                          {note.scope_items.length} scope items
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
+
+          {/* Columna derecha: enlaces + asistente IA */}
+          <div className="space-y-4">
+            {/* Enlaces del proyecto */}
+            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-4 py-3">
+                <h2 className="text-sm font-semibold text-slate-900">
+                  Enlaces rápidos del proyecto
+                </h2>
+                <p className="text-[11px] text-slate-500">
+                  Documentación, JIRA, carpetas compartidas u otros recursos
+                  clave.
                 </p>
-                <div className="space-y-2">
-                  <input
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[11px] outline-none focus:border-slate-400 focus:ring-0"
-                    value={newLinkName}
-                    onChange={(e) => setNewLinkName(e.target.value)}
-                    placeholder="Nombre del enlace (ej: Carpeta principal Drive)"
-                  />
-                  <input
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[11px] outline-none focus:border-slate-400 focus:ring-0"
-                    value={newLinkUrl}
-                    onChange={(e) => setNewLinkUrl(e.target.value)}
-                    placeholder="https://..."
-                  />
-                  <select
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[11px] outline-none focus:border-slate-400 focus:ring-0 bg-white"
-                    value={newLinkType}
-                    onChange={(e) => setNewLinkType(e.target.value)}
-                  >
-                    <option value="Drive">Drive</option>
-                    <option value="SharePoint">SharePoint</option>
-                    <option value="Jira">Jira</option>
-                    <option value="Confluence">Confluence</option>
-                    <option value="SAP">SAP</option>
-                    <option value="Otro">Otro</option>
-                  </select>
+              </div>
 
-                  <div className="flex justify-end">
+              <div className="px-4 py-3 space-y-3">
+                <form className="space-y-2" onSubmit={handleCreateLink}>
+                  <div className="grid grid-cols-1 gap-2">
+                    <input
+                      type="text"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-0"
+                      placeholder="Etiqueta del enlace (ej. JIRA, SharePoint, SAP Note, etc.)"
+                      value={newLinkLabel}
+                      onChange={(e) => setNewLinkLabel(e.target.value)}
+                    />
+                    <input
+                      type="url"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-0"
+                      placeholder="https://… (Drive, SharePoint, SAP Note, etc.)"
+                      value={newLinkUrl}
+                      onChange={(e) => setNewLinkUrl(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-0"
+                      placeholder="Tipo (ej. Documentación, Error, Procesos…)"
+                      value={newLinkType}
+                      onChange={(e) => setNewLinkType(e.target.value)}
+                    />
                     <button
-                      onClick={handleAddProjectLink}
-                      disabled={savingLink}
-                      className="inline-flex items-center rounded-xl bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                      type="submit"
+                      disabled={creatingLink}
+                      className="inline-flex items-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-slate-50 shadow-sm hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      {savingLink ? "Guardando..." : "Guardar enlace"}
+                      {creatingLink ? "Guardando…" : "Guardar"}
                     </button>
                   </div>
+                </form>
+
+                <div className="pt-2 space-y-2 max-h-52 overflow-y-auto">
+                  {links.length === 0 && (
+                    <p className="text-[11px] text-slate-500">
+                      Aún no hay enlaces definidos para este proyecto.
+                    </p>
+                  )}
+
+                  {links.map((link) => (
+                    <a
+                      key={link.id}
+                      href={link.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block rounded-lg border border-slate-200 px-3 py-2 text-xs hover:bg-slate-50"
+                    >
+                      <p className="font-medium text-slate-800">
+                        {link.label}
+                      </p>
+                      <p className="text-[10px] text-slate-500 truncate">
+                        {link.url}
+                      </p>
+                      {link.link_type && (
+                        <p className="mt-1 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+                          {link.link_type}
+                        </p>
+                      )}
+                    </a>
+                  ))}
                 </div>
               </div>
-            </div>
+            </section>
 
-            {/* Documentación (placeholder) */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900 mb-1">
-                Documentación del proyecto
-              </h2>
-              <p className="text-xs text-slate-500 mb-3">
-                Aquí podrás centralizar enlaces a manuales, decisiones de
-                diseño, actas y archivos relevantes del proyecto.
-              </p>
+            {/* Asistente IA */}
+            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col h-full max-h-[480px]">
+              <div className="border-b border-slate-200 px-4 py-3">
+                <h2 className="text-sm font-semibold text-slate-900">
+                  Asistente de implementación
+                </h2>
+                <p className="text-[11px] text-slate-500">
+                  Chat conectado a n8n para ayudarte con errores,
+                  configuraciones y procesos SAP.
+                </p>
+              </div>
 
-              <ul className="space-y-1.5 text-[11px] text-slate-600">
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  Manuales funcionales (Drive, Confluence, etc.).
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                  Decisiones de diseño y soluciones clave.
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                  Actas de reuniones y acuerdos con el cliente.
-                </li>
-              </ul>
+              <div className="flex-1 flex flex-col px-4 py-3 gap-3 overflow-hidden">
+                <div className="flex-1 overflow-y-auto space-y-2 border border-slate-100 rounded-lg bg-slate-50 px-3 py-2">
+                  {chatMessages.length === 0 && (
+                    <p className="text-[11px] text-slate-500">
+                      Indica el proyecto, el error (por ejemplo CK701, NR751,
+                      VK715…), o el proceso que quieres revisar y el asistente
+                      propondrá posibles causas y pasos.
+                    </p>
+                  )}
 
-              <p className="mt-3 text-[11px] text-slate-400 italic">
-                (Más adelante podemos conectar esto con tablas específicas
-                de actas, decisiones, etc.).
-              </p>
-            </div>
+                  {chatMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${
+                        msg.from === "user" ? "justify-end" : "justify-start"
+                      }`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-3 py-2 text-[11px] ${
+                          msg.from === "user"
+                            ? "bg-slate-900 text-slate-50 rounded-br-sm"
+                            : "bg-white text-slate-800 border border-slate-200 rounded-bl-sm"
+                        }`}
+                      >
+                        <p className="whitespace-pre-line">{msg.text}</p>
+                        <p className="mt-1 text-[9px] opacity-60">
+                          {new Date(msg.createdAt).toLocaleTimeString("es-ES", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {chatError && (
+                  <p className="text-[11px] text-red-600">{chatError}</p>
+                )}
+
+                <form
+                  onSubmit={handleSendToAssistant}
+                  className="flex items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-0"
+                    placeholder="Escribe tu mensaje para la IA…"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    disabled={chatLoading}
+                    className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-xs font-medium text-slate-50 shadow-sm hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {chatLoading ? "Enviando..." : "Enviar"}
+                  </button>
+                </form>
+              </div>
+            </section>
           </div>
         </div>
       )}
@@ -1013,7 +892,10 @@ export default function ProjectDashboardPage() {
   );
 }
 
-// === KPI Card ===
+// ==========================
+// KPI Card auxiliar
+// ==========================
+
 function KpiCard({
   title,
   value,
