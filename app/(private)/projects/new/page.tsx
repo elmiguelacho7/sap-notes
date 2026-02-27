@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { handleSupabaseError } from "@/lib/supabaseError";
 
 type Client = {
   id: string;
@@ -77,18 +78,20 @@ export default function NewProjectPage() {
           ]);
 
         if (clientError) {
-          console.error("Error cargando clientes", clientError);
+          handleSupabaseError("clients", clientError);
+          setClients([]);
         } else {
-          setClients(clientData || []);
+          setClients(clientData ?? []);
         }
 
         if (moduleError) {
-          console.error("Error cargando módulos", moduleError);
+          handleSupabaseError("modules", moduleError);
+          setModules([]);
         } else {
-          setModules(moduleData || []);
+          setModules(moduleData ?? []);
         }
-      } catch (error) {
-        console.error("Error cargando datos base para proyectos", error);
+      } catch (err) {
+        handleSupabaseError("projects/new loadData", err);
       }
     };
 
@@ -147,9 +150,9 @@ export default function NewProjectPage() {
         .single();
 
       if (projectError || !project) {
-        console.error(projectError);
+        handleSupabaseError("projects insert", projectError);
         setErrorMsg(
-          projectError?.message || "No se pudo crear el proyecto."
+          (projectError as { message?: string })?.message || "No se pudo crear el proyecto."
         );
         setSaving(false);
         return;
@@ -169,18 +172,14 @@ export default function NewProjectPage() {
           .insert(projectModulesPayload);
 
         if (projectModulesError) {
-          console.error(
-            "El proyecto se creó, pero falló la asignación de módulos",
-            projectModulesError
-          );
-          // No hacemos return: el proyecto existe igualmente
+          handleSupabaseError("project_modules insert", projectModulesError);
         }
       }
 
       // 3) Redirigir al listado o al dashboard (como prefieras)
       router.push("/projects");
     } catch (err) {
-      console.error(err);
+      handleSupabaseError("projects new submit", err);
       setErrorMsg("Se ha producido un error inesperado.");
       setSaving(false);
     }

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { handleSupabaseError } from "@/lib/supabaseError";
 
 type Client = {
   id: string;
@@ -80,28 +81,45 @@ export default function NewNotePage() {
   // ==========================
   useEffect(() => {
     const loadData = async () => {
-      try {
-        const [{ data: clientData }, { data: moduleData }, { data: scopeData }] =
-          await Promise.all([
-            supabase
-              .from("clients")
-              .select("id, name, country")
-              .order("name", { ascending: true }),
-            supabase
-              .from("modules")
-              .select("id, code, name")
-              .order("code", { ascending: true }),
-            supabase
-              .from("scope_items")
-              .select("id, code, name, module_id, scope_type")
-              .order("code", { ascending: true }),
-          ]);
+      setErrorMsg(null);
+      const [{ data: clientData, error: clientError }, { data: moduleData, error: moduleError }, { data: scopeData, error: scopeError }] =
+        await Promise.all([
+          supabase
+            .from("clients")
+            .select("id, name, country")
+            .order("name", { ascending: true }),
+          supabase
+            .from("modules")
+            .select("id, code, name")
+            .order("code", { ascending: true }),
+          supabase
+            .from("scope_items")
+            .select("id, code, name, module_id, scope_type")
+            .order("code", { ascending: true }),
+        ]);
 
-        setClients(clientData || []);
-        setModules(moduleData || []);
-        setScopeItems(scopeData || []);
-      } catch (error) {
-        console.error("Error cargando datos base para notas", error);
+      if (clientError) {
+        handleSupabaseError("clients", clientError);
+        setClients([]);
+        setErrorMsg("Part of the project data could not be loaded. Please try again later.");
+      } else {
+        setClients(clientData ?? []);
+      }
+
+      if (moduleError) {
+        handleSupabaseError("modules", moduleError);
+        setModules([]);
+        setErrorMsg("Part of the project data could not be loaded. Please try again later.");
+      } else {
+        setModules(moduleData ?? []);
+      }
+
+      if (scopeError) {
+        handleSupabaseError("scope_items", scopeError);
+        setScopeItems([]);
+        setErrorMsg("Part of the project data could not be loaded. Please try again later.");
+      } else {
+        setScopeItems((scopeData ?? []) as ScopeItem[]);
       }
     };
 
@@ -174,15 +192,15 @@ export default function NewNotePage() {
       const { error } = await supabase.from("notes").insert([payload]);
 
       if (error) {
-        console.error(error);
-        setErrorMsg(error.message || "No se pudo crear la nota.");
+        handleSupabaseError("notes insert", error);
+        setErrorMsg((error as { message?: string })?.message || "No se pudo crear la nota.");
         setSaving(false);
         return;
       }
 
       router.push("/notes");
     } catch (err) {
-      console.error(err);
+      handleSupabaseError("notes new submit", err);
       setErrorMsg("Se ha producido un error inesperado.");
       setSaving(false);
     }

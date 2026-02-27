@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";;
+import { supabase } from "@/lib/supabaseClient";
+import { handleSupabaseError } from "@/lib/supabaseError";
 
 type Project = {
   id: string;
@@ -31,11 +32,11 @@ export default function ProjectsPage() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error(error);
+        handleSupabaseError("projects", error);
         setErrorMsg("No se pudieron cargar los proyectos.");
         setProjects([]);
       } else {
-        setProjects((projData || []) as Project[]);
+        setProjects((projData ?? []) as Project[]);
       }
 
       setLoadingProjects(false);

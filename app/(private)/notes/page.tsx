@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { handleSupabaseError } from "@/lib/supabaseError";
 
 type Note = {
   id: string;
@@ -73,13 +74,13 @@ export default function NotesPage() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error(error);
+        handleSupabaseError("notes", error);
         setErrorMsg("No se pudieron cargar las notas.");
-        setLoadingNotes(false);
-        return;
+        setNotes([]);
+      } else {
+        setNotes((data ?? []) as Note[]);
       }
 
-      setNotes((data || []) as Note[]);
       setLoadingNotes(false);
     };
 
@@ -136,7 +137,7 @@ export default function NotesPage() {
 
       setChatMessages((prev) => [...prev, newBotMessage]);
     } catch (error) {
-      console.error(error);
+      handleSupabaseError("notes chat n8n", error);
       const errorBotMessage: ChatMessage = {
         id: Date.now() + 2,
         from: "bot",

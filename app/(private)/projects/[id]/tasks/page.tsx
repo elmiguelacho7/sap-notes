@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { handleSupabaseError } from "@/lib/supabaseError";
 import TasksBoard from "../../../../components/TasksBoard"; // ✅ ruta correcta
 
 type Project = {
@@ -22,12 +23,14 @@ export default function ProjectTasksPage() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!projectId) return;
 
     const loadProject = async () => {
       setLoading(true);
+      setErrorMsg(null);
 
       const { data, error } = await supabase
         .from("projects")
@@ -36,7 +39,8 @@ export default function ProjectTasksPage() {
         .single();
 
       if (error) {
-        console.error("[projects] load error:", error);
+        handleSupabaseError("projects", error);
+        setErrorMsg("Part of the project data could not be loaded. Please try again later.");
         setProject(null);
       } else {
         setProject(data as Project);
@@ -64,6 +68,9 @@ export default function ProjectTasksPage() {
     <main className="min-h-screen bg-slate-100 px-4 py-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <header className="flex flex-col gap-1">
+          {errorMsg && (
+            <p className="text-sm text-red-600">{errorMsg}</p>
+          )}
           <p className="text-xs uppercase tracking-wide text-slate-500">
             Proyecto
           </p>

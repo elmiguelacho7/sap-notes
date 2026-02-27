@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { handleSupabaseError } from "@/lib/supabaseError";
 
 // ==========================
 // Tipos
@@ -115,90 +116,77 @@ export default function ProjectDashboardPage() {
       setLoading(true);
       setErrorMsg(null);
 
-      try {
-        // 1️⃣ Proyecto (CRÍTICO)
-        const {
-          data: projectData,
-          error: projectError,
-        } = await supabase
-          .from("projects")
-          .select("id, name, description, status, created_at")
-          .eq("id", projectId)
-          .single();
+      // 1️⃣ Proyecto
+      const {
+        data: projectData,
+        error: projectError,
+      } = await supabase
+        .from("projects")
+        .select("id, name, description, status, created_at")
+        .eq("id", projectId)
+        .single();
 
-        if (projectError) {
-          console.error("[projects] error", projectError);
-          throw projectError; // sin proyecto no tiene sentido el dashboard
-        }
-
+      if (projectError) {
+        handleSupabaseError("projects", projectError);
+        setErrorMsg("Part of the project data could not be loaded. Please try again later.");
+        setProject(null);
+      } else {
         setProject(projectData as Project);
-
-        // 2️⃣ Notas / módulos / scope items (si fallan, mostramos vacío pero no rompemos)
-        const [
-          { data: notesData, error: notesError },
-          { data: modulesData, error: modulesError },
-          { data: scopeData, error: scopeError },
-        ] = await Promise.all([
-          supabase
-            .from("notes_with_modules_and_scopeitems")
-            .select("*")
-            .eq("project_id", projectId)
-            .order("created_at", { ascending: false })
-            .limit(10),
-          supabase
-            .from("modules")
-            .select("id, code, name")
-            .order("code", { ascending: true }),
-          supabase
-            .from("scope_items")
-            .select("id, code, name, module_id")
-            .order("code", { ascending: true }),
-        ]);
-
-        if (notesError) {
-          console.error("[notes_with_modules_and_scopeitems] error", notesError);
-        }
-        if (modulesError) {
-          console.error("[modules] error", modulesError);
-        }
-        if (scopeError) {
-          console.error("[scope_items] error", scopeError);
-        }
-
-        setNotes((notesData ?? []) as ProjectNote[]);
-        setModulesOptions((modulesData ?? []) as ModuleOption[]);
-        setScopeItems((scopeData ?? []) as ScopeItem[]);
-
-        // 3️⃣ Enlaces del proyecto (si la tabla no existe, simplemente no mostramos enlaces)
-        try {
-          const {
-            data: linksData,
-            error: linksError,
-          } = await supabase
-            .from("project_links")
-            .select("*")
-            .eq("project_id", projectId)
-            .order("created_at", { ascending: false });
-
-          if (linksError) {
-            console.warn("[project_links] error (se ignora)", linksError);
-            setLinks([]);
-          } else {
-            setLinks((linksData ?? []) as ProjectLink[]);
-          }
-        } catch (err) {
-          console.warn(
-            "[project_links] excepción (posible tabla inexistente), se ignora",
-            err
-          );
-          setLinks([]);
-        }
-      } catch (e) {
-        console.error(e);
-        setErrorMsg("No se pudo cargar la información del proyecto.");
-      } finally {
-        setLoading(false);
       }
+
+      // 2️⃣ Notas / módulos / scope items en paralelo (fallbacks seguros)
+      const [
+        { data: notesData, error: notesError },
+        { data: modulesData, error: modulesError },
+        { data: scopeData, error: scopeError },
+      ] = await Promise.all([
+        supabase
+          .from("notes_with_modules_and_scopeitems")
+          .select("*")
+          .eq("project_id", projectId)
+          .order("created_at", { ascending: false })
+          .limit(10),
+        supabase
+          .from("modules")
+          .select("id, code, name")
+          .order("code", { ascending: true }),
+        supabase
+          .from("scope_items")
+          .select("id, code, name, module_id")
+          .order("code", { ascending: true }),
+      ]);
+
+      if (notesError) handleSupabaseError("notes_with_modules_and_scopeitems", notesError);
+      if (modulesError) handleSupabaseError("modules", modulesError);
+      if (scopeError) handleSupabaseError("scope_items", scopeError);
+
+      setNotes((notesData ?? []) as ProjectNote[]);
+      setModulesOptions((modulesData ?? []) as ModuleOption[]);
+      setScopeItems((scopeData ?? []) as ScopeItem[]);
+
+      if (notesError || modulesError || scopeError) {
+        setErrorMsg("Part of the project data could not be loaded. Please try again later.");
+      }
+
+      // 3️⃣ Enlaces del proyecto
+      const {
+        data: linksData,
+        error: linksError,
+      } = await supabase
+        .from("project_links")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false });
+
+      if (linksError) {
+        handleSupabaseError("project_links", linksError);
+        setLinks([]);
+        setErrorMsg("Part of the project data could not be loaded. Please try again later.");
+      } else {
+        setLinks((linksData ?? []) as ProjectLink[]);
+      }
+
+      setLoading(false);
     };
 
     loadData();
@@ -247,60 +235,64 @@ export default function ProjectDashboardPage() {
     setCreatingNote(true);
     setErrorMsg(null);
 
-    try {
-      const { data, error } = await supabase
-        .from("notes")
-        .insert({
-          project_id: projectId,
-          title: quickTitle.trim(),
-          description: quickDescription.trim() || null,
-          module_id: selectedModuleId || null,
-          error_code: errorCode.trim() || null,
-          priority,
-          status: "open",
-        })
-        .select("*")
-        .single();
+    const { data, error } = await supabase
+      .from("notes")
+      .insert({
+        project_id: projectId,
+        title: quickTitle.trim(),
+        description: quickDescription.trim() || null,
+        module_id: selectedModuleId || null,
+        error_code: errorCode.trim() || null,
+        priority,
+        status: "open",
+      })
+      .select("*")
+      .single();
 
-      if (error) throw error;
-
-      const noteId = data.id as string;
-
-      if (selectedScopeItemIds.length > 0) {
-        const rows = selectedScopeItemIds.map((scopeId) => ({
-          note_id: noteId,
-          scope_item_id: scopeId,
-        }));
-
-        const { error: scopeLinkError } = await supabase
-          .from("note_scope_items")
-          .insert(rows);
-
-        if (scopeLinkError) throw scopeLinkError;
-      }
-
-      const { data: newNoteData } = await supabase
-        .from("notes_with_modules_and_scopeitems")
-        .select("*")
-        .eq("id", noteId)
-        .single();
-
-      if (newNoteData) {
-        setNotes((prev) => [newNoteData as ProjectNote, ...prev]);
-      }
-
-      setQuickTitle("");
-      setQuickDescription("");
-      setSelectedModuleId("");
-      setSelectedScopeItemIds([]);
-      setErrorCode("");
-      setPriority("medium");
-    } catch (e) {
-      console.error(e);
+    if (error) {
+      handleSupabaseError("notes insert", error);
       setErrorMsg("No se pudo crear la nota rápida.");
-    } finally {
       setCreatingNote(false);
+      return;
     }
+
+    const noteId = data.id as string;
+
+    if (selectedScopeItemIds.length > 0) {
+      const rows = selectedScopeItemIds.map((scopeId) => ({
+        note_id: noteId,
+        scope_item_id: scopeId,
+      }));
+
+      const { error: scopeLinkError } = await supabase
+        .from("note_scope_items")
+        .insert(rows);
+
+      if (scopeLinkError) {
+        handleSupabaseError("note_scope_items insert", scopeLinkError);
+        setErrorMsg("No se pudo crear la nota rápida.");
+        setCreatingNote(false);
+        return;
+      }
+    }
+
+    const { data: newNoteData, error: fetchNoteError } = await supabase
+      .from("notes_with_modules_and_scopeitems")
+      .select("*")
+      .eq("id", noteId)
+      .single();
+
+    if (!fetchNoteError && newNoteData) {
+      setNotes((prev) => [newNoteData as ProjectNote, ...prev]);
+    }
+
+    setQuickTitle("");
+    setQuickDescription("");
+    setSelectedModuleId("");
+    setSelectedScopeItemIds([]);
+    setErrorCode("");
+    setPriority("medium");
+    setCreatingNote(false);
   };
 
   // ==========================
@@ -313,30 +305,28 @@ export default function ProjectDashboardPage() {
 
     setCreatingLink(true);
 
-    try {
-      const { data, error } = await supabase
-        .from("project_links")
-        .insert({
-          project_id: projectId,
-          label: newLinkLabel.trim(),
-          url: newLinkUrl.trim(),
-          link_type: newLinkType || null,
-        })
-        .select("*")
-        .single();
+    const { data, error } = await supabase
+      .from("project_links")
+      .insert({
+        project_id: projectId,
+        label: newLinkLabel.trim(),
+        url: newLinkUrl.trim(),
+        link_type: newLinkType || null,
+      })
+      .select("*")
+      .single();
 
-      if (error) throw error;
-
+    if (error) {
+      handleSupabaseError("project_links insert", error);
+      setErrorMsg("No se pudo crear el enlace del proyecto.");
+    } else if (data) {
       setLinks((prev) => [data as ProjectLink, ...prev]);
       setNewLinkLabel("");
       setNewLinkUrl("");
       setNewLinkType("");
-    } catch (e) {
-      console.error(e);
-      setErrorMsg("No se pudo crear el enlace del proyecto.");
-    } finally {
-      setCreatingLink(false);
     }
+
+    setCreatingLink(false);
   };
 
   // ==========================
@@ -389,7 +379,7 @@ export default function ProjectDashboardPage() {
 
       setChatMessages((prev) => [...prev, botMessage]);
     } catch (e) {
-      console.error(e);
+      handleSupabaseError("project dashboard n8n", e);
       setChatError(
         "No se pudo contactar con el asistente de IA. Revisa la configuración de n8n."
       );
@@ -473,7 +463,7 @@ export default function ProjectDashboardPage() {
       )}
 
       {/* KPIs */}
-      {!loading && !errorMsg && (
+      {!loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <KpiCard
             title="Notas del proyecto"
@@ -499,7 +489,7 @@ export default function ProjectDashboardPage() {
       )}
 
       {/* Contenido principal */}
-      {!loading && !errorMsg && (
+      {!loading && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Columna izquierda: nota rápida + notas */}
           <div className="lg:col-span-2 space-y-4">

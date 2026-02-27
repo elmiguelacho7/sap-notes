@@ -3,6 +3,7 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { handleSupabaseError } from "@/lib/supabaseError";
 
 type ProjectSummary = {
   id: string;
@@ -67,11 +68,22 @@ export default function DashboardPage() {
           .order("created_at", { ascending: false }),
       ]);
 
-      if (projResult.error) throw projResult.error;
-      if (noteResult.error) throw noteResult.error;
+      let projects: ProjectSummary[] = [];
+      let notes: NoteSummary[] = [];
 
-      const projects = (projResult.data || []) as ProjectSummary[];
-      const notes = (noteResult.data || []) as NoteSummary[];
+      if (projResult.error) {
+        handleSupabaseError("dashboard projects", projResult.error);
+        setErrorMsg("No se pudieron cargar los datos del dashboard.");
+      } else {
+        projects = (projResult.data ?? []) as ProjectSummary[];
+      }
+
+      if (noteResult.error) {
+        handleSupabaseError("dashboard notes", noteResult.error);
+        setErrorMsg("No se pudieron cargar los datos del dashboard.");
+      } else {
+        notes = (noteResult.data ?? []) as NoteSummary[];
+      }
 
       const openProjects = projects.filter((p) => {
         if (!p.status) return true;
@@ -93,7 +105,7 @@ export default function DashboardPage() {
         todayNotes: todayNotes.length,
       });
     } catch (e) {
-      console.error("Error cargando dashboard:", e);
+      handleSupabaseError("dashboard loadData", e);
       setErrorMsg("No se pudieron cargar los datos del dashboard.");
     } finally {
       setLoadingStats(false);
@@ -138,7 +150,7 @@ export default function DashboardPage() {
       };
       setChatMessages((prev) => [...prev, botMsg]);
     } catch (error) {
-      console.error("Error llamando a n8n:", error);
+      handleSupabaseError("dashboard n8n", error);
       const botMsg: ChatMessage = {
         id: Date.now() + 1,
         from: "bot",

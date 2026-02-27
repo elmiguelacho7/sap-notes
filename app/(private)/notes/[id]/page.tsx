@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { handleSupabaseError } from "@/lib/supabaseError";
 
 type Note = {
   id: string;
@@ -34,7 +35,7 @@ export default function NoteDetailPage() {
           .single();
 
         if (error) {
-          console.error(error);
+          handleSupabaseError("notes", error);
           setErrorMsg("No se pudo cargar la nota.");
           setNote(null);
         } else {
@@ -42,7 +43,7 @@ export default function NoteDetailPage() {
           setErrorMsg(null);
         }
       } catch (err) {
-        console.error(err);
+        handleSupabaseError("notes fetch", err);
         setErrorMsg("Se ha producido un error inesperado.");
         setNote(null);
       } finally {

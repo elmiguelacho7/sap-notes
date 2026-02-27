@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, FormEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { handleSupabaseError } from "@/lib/supabaseError";
 import {
   DragDropContext,
   Droppable,
@@ -95,9 +96,13 @@ export default function TasksBoard({
           })(),
         ]);
 
+      if (statusError) handleSupabaseError("task_statuses", statusError);
+      if (taskError) handleSupabaseError("tasks", taskError);
+
       if (statusError || taskError) {
-        console.error(statusError || taskError);
         setError("No se pudieron cargar las actividades. Inténtalo de nuevo.");
+        setStatuses([]);
+        setTasks([]);
       } else {
         setStatuses(statusData ?? []);
         setTasks((taskData ?? []) as Task[]);
@@ -165,7 +170,7 @@ export default function TasksBoard({
       .single();
 
     if (insertError) {
-      console.error(insertError);
+      handleSupabaseError("tasks insert", insertError);
       setError("No se pudo crear la actividad.");
     } else if (data) {
       setTasks((prev) => [...prev, data as Task]);
@@ -194,7 +199,7 @@ export default function TasksBoard({
       .eq("id", taskId);
 
     if (updateError) {
-      console.error(updateError);
+      handleSupabaseError("tasks update status", updateError);
       setError("No se pudo actualizar el estado.");
       // en caso extremo podrías recargar desde BD
     }
@@ -237,7 +242,7 @@ export default function TasksBoard({
       .eq("id", taskId);
 
     if (updateError) {
-      console.error(updateError);
+      handleSupabaseError("tasks update drag", updateError);
       setError("No se pudo actualizar el estado al mover la tarjeta.");
       // si quisieras, aquí podrías recargar las tareas desde BD
     }
