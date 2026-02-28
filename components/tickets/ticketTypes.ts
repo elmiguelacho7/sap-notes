@@ -28,6 +28,36 @@ export type Ticket = {
   created_at: string;
 };
 
+/** Full ticket row for detail view (includes description, updated_at, closed_at, scope_items). */
+export type TicketDetailRow = Ticket & {
+  description?: string | null;
+  updated_at?: string | null;
+  closed_at?: string | null;
+  scope_items?: string[] | null;
+};
+
+export type TicketDetail = TicketDetailRow & {
+  client_name: string | null;
+  project_name: string | null;
+  created_by_name: string | null;
+  assigned_to_name: string | null;
+};
+
+export type TicketCommentDetail = {
+  id: string;
+  body: string;
+  is_internal: boolean;
+  created_at: string;
+  created_by_name: string | null;
+};
+
+export type TicketAttachmentDetail = {
+  id: string;
+  file_name: string;
+  file_url: string;
+  created_at: string;
+};
+
 export type TicketWithRelations = Ticket & {
   client_name: string | null;
   project_name: string | null;
@@ -67,6 +97,10 @@ export const TICKET_STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "closed", label: "Cerrado" },
 ];
 
+/** Status options for detail page (no "Todos"). */
+export const TICKET_STATUS_OPTIONS_EDIT: { value: string; label: string }[] =
+  TICKET_STATUS_OPTIONS.filter((o) => o.value !== "");
+
 export const TICKET_PRIORITY_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "Todas" },
   { value: "low", label: "Baja" },
@@ -74,3 +108,7 @@ export const TICKET_PRIORITY_OPTIONS: { value: string; label: string }[] = [
   { value: "high", label: "Alta" },
   { value: "urgent", label: "Urgente" },
 ];
+
+/** Priority options for detail page (no "Todas"). */
+export const TICKET_PRIORITY_OPTIONS_EDIT: { value: string; label: string }[] =
+  TICKET_PRIORITY_OPTIONS.filter((o) => o.value !== "");
