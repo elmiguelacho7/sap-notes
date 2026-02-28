@@ -36,6 +36,7 @@ export default function PrivateLayout({
 
   const isActive = (path: string) => {
     if (path === "/process-flows") return pathname.startsWith("/process-flows");
+    if (path === "/tickets") return pathname.startsWith("/tickets");
     return pathname === path;
   };
 
@@ -105,6 +106,17 @@ export default function PrivateLayout({
             }`}
           >
             Proyectos
+          </button>
+
+          <button
+            onClick={() => router.push("/tickets")}
+            className={`w-full text-left px-3 py-2 rounded-lg transition ${
+              isActive("/tickets")
+                ? "bg-blue-50 text-blue-700 font-semibold"
+                : "text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            Tickets
           </button>
 
           {/* NUEVO MENÚ */}
