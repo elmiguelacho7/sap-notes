@@ -1,5 +1,18 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## SAP Notes Hub — Project overview
+
+This app is the **SAP Notes Hub** (Project Hub): an internal environment for notes, projects, tickets, and an AI assistant.
+
+### Supabase — Row Level Security (development)
+
+For development, the Supabase table `public.tickets` uses a very permissive RLS setup:
+
+- **RLS is enabled** on `public.tickets`.
+- Policy **"Tickets full access (dev)"** allows all operations (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) for role `public`, with `USING (true)` and `WITH CHECK (true)`.
+
+This was done to avoid error code **42501** (row-level security violation) when inserting tickets from the frontend (anon key). **This configuration must be restricted for production** (e.g. scope policies by user/session or service role).
+
 ## Getting Started
 
 First, run the development server:

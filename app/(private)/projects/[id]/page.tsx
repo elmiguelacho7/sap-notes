@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError, hasLoggableSupabaseError } from "@/lib/supabaseError";
 
@@ -31,6 +32,36 @@ type ProjectNote = {
   status: string | null;
   created_at: string;
 };
+
+/** Raw note row as returned from the "notes" table (no view joins). */
+type NoteRow = {
+  id: string;
+  title: string;
+  description?: string | null;
+  module_id?: string | null;
+  error_code?: string | null;
+  priority?: string | null;
+  status?: string | null;
+  created_at: string;
+};
+
+/** Map a raw note row (from "notes" table) to ProjectNote. View-only fields are left null/empty. */
+function mapNoteToProjectNote(row: NoteRow): ProjectNote {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? null,
+    module_id: row.module_id ?? null,
+    module_code: null,
+    module_name: null,
+    scope_items: [],
+    error_code: row.error_code ?? null,
+    error_type: null,
+    priority: row.priority ?? null,
+    status: row.status ?? null,
+    created_at: row.created_at,
+  };
+}
 
 type ModuleOption = {
   id: string;
@@ -134,15 +165,15 @@ export default function ProjectDashboardPage() {
         setProject(projectData as Project);
       }
 
-      // 2️⃣ Notas / módulos / scope items en paralelo (fallbacks seguros)
+      // 2️⃣ Notas desde tabla "notes" (sin depender de la vista notes_with_modules_and_scopeitems)
       const [
         { data: notesData, error: notesError },
         { data: modulesData, error: modulesError },
         { data: scopeData, error: scopeError },
       ] = await Promise.all([
         supabase
-          .from("notes_with_modules_and_scopeitems")
-          .select("*")
+          .from("notes")
+          .select("id, title, description, module_id, error_code, priority, status, created_at")
           .eq("project_id", projectId)
           .order("created_at", { ascending: false })
           .limit(10),
@@ -156,11 +187,14 @@ export default function ProjectDashboardPage() {
           .order("code", { ascending: true }),
       ]);
 
-      if (notesError && hasLoggableSupabaseError(notesError)) handleSupabaseError("notes_with_modules_and_scopeitems", notesError);
+      if (notesError && hasLoggableSupabaseError(notesError)) handleSupabaseError("notes", notesError);
       if (modulesError && hasLoggableSupabaseError(modulesError)) handleSupabaseError("modules", modulesError);
       if (scopeError && hasLoggableSupabaseError(scopeError)) handleSupabaseError("scope_items", scopeError);
 
-      setNotes((notesData ?? []) as ProjectNote[]);
+      const loadedNotes: ProjectNote[] = notesError
+        ? []
+        : ((notesData ?? []) as NoteRow[]).map(mapNoteToProjectNote);
+      setNotes(loadedNotes);
       setModulesOptions((modulesData ?? []) as ModuleOption[]);
       setScopeItems((scopeData ?? []) as ScopeItem[]);
 
@@ -279,13 +313,13 @@ export default function ProjectDashboardPage() {
     }
 
     const { data: newNoteData, error: fetchNoteError } = await supabase
-      .from("notes_with_modules_and_scopeitems")
-      .select("*")
+      .from("notes")
+      .select("id, title, description, module_id, error_code, priority, status, created_at")
       .eq("id", noteId)
       .single();
 
     if (!fetchNoteError && newNoteData) {
-      setNotes((prev) => [newNoteData as ProjectNote, ...prev]);
+      setNotes((prev) => [mapNoteToProjectNote(newNoteData as NoteRow), ...prev]);
     }
 
     setQuickTitle("");
@@ -441,12 +475,26 @@ export default function ProjectDashboardPage() {
             </p>
 
             {/* Botón hacia el tablero Kanban del proyecto */}
-            <button
-              onClick={() => router.push(`/projects/${projectId}/tasks`)}
-              className="inline-flex items-center rounded-full bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-slate-50 shadow-sm hover:bg-slate-800"
-            >
-              Abrir tablero de actividades
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => router.push(`/projects/${projectId}/tasks`)}
+                className="inline-flex items-center rounded-full bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-slate-50 shadow-sm hover:bg-slate-800"
+              >
+                Abrir tablero de actividades
+              </button>
+              <Link
+                href={`/tickets?projectId=${projectId}`}
+                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+              >
+                Ver tickets
+              </Link>
+              <Link
+                href={`/tickets/new?projectId=${projectId}`}
+                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+              >
+                + Nuevo ticket
+              </Link>
+            </div>
           </div>
         )}
       </div>

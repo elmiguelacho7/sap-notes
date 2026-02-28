@@ -1,61 +1,67 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError, hasLoggableSupabaseError } from "@/lib/supabaseError";
-import TicketsFilters from "@/components/tickets/TicketsFilters";
-import TicketsTable from "@/components/tickets/TicketsTable";
-import type {
-  Ticket,
-  TicketWithRelations,
-  TicketsFilterState,
-  ClientOption,
-  ProjectOption,
-  ProfileOption,
-} from "@/components/tickets/ticketTypes";
+import type { Ticket, TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
 
-const DEFAULT_FILTERS: TicketsFilterState = {
-  status: "",
-  priority: "",
-  clientId: "",
-  projectId: "",
-  assigneeId: "",
-  searchText: "",
+const PRIORITY_LABELS: Record<TicketPriority, string> = {
+  low: "Baja",
+  medium: "Media",
+  high: "Alta",
+  urgent: "Urgente",
 };
 
+const STATUS_LABELS: Record<TicketStatus, string> = {
+  open: "Abierto",
+  in_progress: "En progreso",
+  resolved: "Resuelto",
+  closed: "Cerrado",
+  cancelled: "Cancelado",
+};
+
+function PriorityBadge({ priority }: { priority: TicketPriority }) {
+  const colors: Record<TicketPriority, string> = {
+    low: "bg-slate-100 text-slate-700",
+    medium: "bg-blue-50 text-blue-700",
+    high: "bg-amber-50 text-amber-700",
+    urgent: "bg-red-50 text-red-700",
+  };
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${colors[priority]}`}
+    >
+      {PRIORITY_LABELS[priority]}
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: TicketStatus }) {
+  const colors: Record<TicketStatus, string> = {
+    open: "bg-slate-100 text-slate-700",
+    in_progress: "bg-blue-50 text-blue-700",
+    resolved: "bg-emerald-50 text-emerald-700",
+    closed: "bg-slate-200 text-slate-600",
+    cancelled: "bg-red-50 text-red-600",
+  };
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${colors[status]}`}
+    >
+      {STATUS_LABELS[status]}
+    </span>
+  );
+}
+
 export default function TicketsPage() {
-  const router = useRouter();
-  const [filters, setFilters] = useState<TicketsFilterState>(DEFAULT_FILTERS);
-  const [tickets, setTickets] = useState<TicketWithRelations[]>([]);
+  const searchParams = useSearchParams();
+  const projectId = searchParams.get("projectId") ?? "";
+
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const [clients, setClients] = useState<ClientOption[]>([]);
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
-  const [profiles, setProfiles] = useState<ProfileOption[]>([]);
-
-  const loadFilterOptions = useCallback(async () => {
-    const [clientsRes, projectsRes, profilesRes] = await Promise.all([
-      supabase.from("clients").select("id, name").order("name", { ascending: true }),
-      supabase.from("projects").select("id, name").order("name", { ascending: true }),
-      supabase.from("profiles").select("id, full_name").order("full_name", { ascending: true }),
-    ]);
-
-    if (clientsRes.error && hasLoggableSupabaseError(clientsRes.error)) {
-      handleSupabaseError("tickets clients", clientsRes.error);
-    }
-    if (projectsRes.error && hasLoggableSupabaseError(projectsRes.error)) {
-      handleSupabaseError("tickets projects", projectsRes.error);
-    }
-    if (profilesRes.error && hasLoggableSupabaseError(profilesRes.error)) {
-      handleSupabaseError("tickets profiles", profilesRes.error);
-    }
-
-    setClients((clientsRes.data ?? []) as ClientOption[]);
-    setProjects((projectsRes.data ?? []) as ProjectOption[]);
-    setProfiles((profilesRes.data ?? []) as ProfileOption[]);
-  }, []);
 
   const loadTickets = useCallback(async () => {
     setLoading(true);
@@ -63,105 +69,115 @@ export default function TicketsPage() {
 
     let query = supabase
       .from("tickets")
-      .select("*")
+      .select("id, title, description, priority, status, project_id, due_date, created_at, updated_at")
       .order("created_at", { ascending: false });
 
-    if (filters.status) query = query.eq("status", filters.status);
-    if (filters.priority) query = query.eq("priority", filters.priority);
-    if (filters.clientId) query = query.eq("client_id", filters.clientId);
-    if (filters.projectId) query = query.eq("project_id", filters.projectId);
-    if (filters.assigneeId) query = query.eq("assigned_to", filters.assigneeId);
-
-    const searchTrim = filters.searchText.trim();
-    if (searchTrim) {
-      query = query.or(
-        `title.ilike.%${searchTrim}%,error_code.ilike.%${searchTrim}%`
-      );
+    if (projectId) {
+      query = query.eq("project_id", projectId);
     }
 
-    const { data: ticketsData, error } = await query;
+    const { data, error } = await query;
 
     if (error) {
       handleSupabaseError("tickets", error);
-      setErrorMsg("Part of the project data could not be loaded. Please try again later.");
+      if (hasLoggableSupabaseError(error)) {
+        setErrorMsg("No se pudieron cargar los tickets. Inténtalo de nuevo más tarde.");
+      }
       setTickets([]);
     } else {
-      const list = (ticketsData ?? []) as Ticket[];
-      const withRelations: TicketWithRelations[] = list.map((t) => ({
-        ...t,
-        client_name: null,
-        project_name: null,
-        assignee_name: null,
-      }));
-      setTickets(withRelations);
+      setTickets((data ?? []) as Ticket[]);
     }
 
     setLoading(false);
-  }, [filters]);
-
-  useEffect(() => {
-    void loadFilterOptions();
-  }, [loadFilterOptions]);
+  }, [projectId]);
 
   useEffect(() => {
     void loadTickets();
   }, [loadTickets]);
 
-  const resolveNames = useCallback(
-    (list: TicketWithRelations[]): TicketWithRelations[] => {
-      return list.map((t) => ({
-        ...t,
-        client_name: t.client_id
-          ? clients.find((c) => c.id === t.client_id)?.name ?? null
-          : null,
-        project_name: t.project_id
-          ? projects.find((p) => p.id === t.project_id)?.name ?? null
-          : null,
-        assignee_name: t.assigned_to
-          ? profiles.find((p) => p.id === t.assigned_to)?.full_name ?? null
-          : null,
-      }));
-    },
-    [clients, projects, profiles]
-  );
-
-  const ticketsWithNames = resolveNames(tickets);
-
   return (
-    <div className="max-w-6xl mx-auto px-6 py-7 space-y-5">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Tickets</h1>
-          <p className="text-sm text-slate-600 max-w-xl">
-            Centralized tracking of incidents and requests.
+      <div className="flex flex-col gap-1">
+        <h1 className="text-xl md:text-2xl font-semibold text-slate-900">
+          Tickets
+        </h1>
+        <p className="text-xs md:text-sm text-slate-500 max-w-2xl">
+          Seguimiento de incidencias y solicitudes. Crea y gestiona tickets por proyecto.
+        </p>
+        {projectId && (
+          <p className="text-xs text-slate-600 mt-1">
+            Mostrando tickets del proyecto seleccionado.
           </p>
-        </div>
-        <button
-          onClick={() => router.push("/tickets/new")}
-          className="self-start bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700"
-        >
-          Nuevo ticket
-        </button>
+        )}
       </div>
 
       {errorMsg && (
-        <p className="text-sm text-red-600">{errorMsg}</p>
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {errorMsg}
+        </div>
       )}
 
-      <TicketsFilters
-        filters={filters}
-        onFiltersChange={setFilters}
-        clients={clients}
-        projects={projects}
-        profiles={profiles}
-      />
-
-      <TicketsTable
-        tickets={ticketsWithNames}
-        loading={loading}
-        onRowClick={(id) => router.push(`/tickets/${id}`)}
-      />
+      {/* Tabla de tickets */}
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="px-4 py-6 text-sm text-slate-500">
+            Cargando tickets…
+          </div>
+        ) : tickets.length === 0 ? (
+          <div className="px-4 py-6 text-sm text-slate-500">
+            No hay tickets. Crea uno desde la página de nuevo ticket o desde un proyecto.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50/80">
+                  <th className="px-4 py-3 font-semibold text-slate-700">
+                    Título
+                  </th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">
+                    Prioridad
+                  </th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">
+                    Estado
+                  </th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">
+                    Fecha de creación
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {tickets.map((t) => (
+                  <tr key={t.id} className="hover:bg-slate-50/50 transition">
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/tickets/${t.id}`}
+                        className="font-medium text-slate-900 hover:text-blue-600"
+                      >
+                        {t.title}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      <PriorityBadge priority={t.priority} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={t.status} />
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {new Date(t.created_at).toLocaleDateString("es-ES", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                      })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
