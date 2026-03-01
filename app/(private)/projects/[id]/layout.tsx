@@ -12,7 +12,9 @@ import {
   Link as LinkIcon,
   BookOpen,
   CalendarDays,
+  CalendarClock,
   ClipboardList,
+  ChevronDown,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { ProjectAssistantDock } from "@/components/ai/ProjectAssistantDock";
@@ -36,7 +38,7 @@ type NavGroup = {
   type: "group";
   label: string;
   Icon: React.ComponentType<{ className?: string }>;
-  children: { key: string; label: string; path: string }[];
+  children: { key: string; label: string; path: string; Icon: React.ComponentType<{ className?: string }> }[];
 };
 
 function getProjectNavItems(projectId: string): (NavLink | NavGroup)[] {
@@ -48,9 +50,9 @@ function getProjectNavItems(projectId: string): (NavLink | NavGroup)[] {
       label: "Planificación",
       Icon: CalendarDays,
       children: [
-        { key: "planning-phases", label: "Fases del proyecto", path: "planning" },
-        { key: "planning-activities", label: "Actividades por fase", path: "activities" },
-        { key: "planning-calendar", label: "Calendario", path: "planning/calendar" },
+        { key: "planning-phases", label: "Fases del proyecto", path: "planning", Icon: ListChecks },
+        { key: "planning-activities", label: "Actividades por fase", path: "activities", Icon: ListChecks },
+        { key: "planning-calendar", label: "Calendario", path: "planning/calendar", Icon: CalendarClock },
       ],
     },
     { type: "link", path: "tickets", label: "Tickets", Icon: Ticket },
@@ -149,6 +151,14 @@ export default function ProjectLayout({
   const base = projectId ? `/projects/${projectId}` : "";
   const router = useRouter();
 
+  const [planningOpen, setPlanningOpen] = useState(true);
+
+  useEffect(() => {
+    const inPlanningSection =
+      (pathname ?? "").includes("/planning") || (pathname ?? "").includes("/activities");
+    setPlanningOpen(inPlanningSection);
+  }, [pathname]);
+
   return (
     <div className="flex h-full">
       {/* Sidebar contextual del proyecto */}
@@ -194,41 +204,56 @@ export default function ProjectLayout({
           <nav className="flex-1 px-3 py-4 space-y-1 text-sm">
             {navItems.map((item) => {
               if (item.type === "group" && item.children.length > 0) {
-                const someChildActive = item.children.some((child) =>
-                  isActiveHref(base, child.path, pathname ?? "")
-                );
+                const someChildActive = item.children.some((child) => {
+                  const href = child.path ? `${base}/${child.path}` : base;
+                  return pathname === href || (child.path !== "" && (pathname ?? "").startsWith(href + "/"));
+                });
+
                 return (
                   <div key={item.label} className="mt-3 first:mt-0">
-                    <div
+                    <button
+                      type="button"
+                      onClick={() => setPlanningOpen((prev) => !prev)}
                       className={
-                        someChildActive
-                          ? "px-3 text-[11px] font-semibold uppercase tracking-wide text-indigo-600"
-                          : "px-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500"
+                        "flex w-full items-center justify-between rounded-xl px-3 py-2 text-[11px] font-semibold uppercase tracking-wide transition " +
+                        (someChildActive ? "text-indigo-600" : "text-slate-500 hover:text-slate-700")
                       }
                     >
-                      {item.label}
-                    </div>
-                    <div className="mt-1 space-y-0.5">
-                      {item.children.map((child) => {
-                        const href = child.path ? `${base}/${child.path}` : base;
-                        const active = pathname === href;
-                        return (
-                          <button
-                            key={child.key}
-                            type="button"
-                            onClick={() => router.push(href)}
-                            className={
-                              "w-full text-left flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition " +
-                              (active
-                                ? "bg-indigo-600 text-white shadow-sm"
-                                : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900")
-                            }
-                          >
-                            {child.label}
-                          </button>
-                        );
-                      })}
-                    </div>
+                      <span>{item.label}</span>
+                      <ChevronDown
+                        className={
+                          "h-3.5 w-3.5 shrink-0 transition-transform " +
+                          (planningOpen ? "rotate-180" : "rotate-0") +
+                          (someChildActive ? " text-indigo-600" : " text-slate-400")
+                        }
+                      />
+                    </button>
+
+                    {planningOpen && (
+                      <div className="mt-1 space-y-0.5">
+                        {item.children.map((child) => {
+                          const href = child.path ? `${base}/${child.path}` : base;
+                          const active = pathname === href;
+                          const ChildIcon = child.Icon;
+                          return (
+                            <button
+                              key={child.key}
+                              type="button"
+                              onClick={() => router.push(href)}
+                              className={
+                                "w-full text-left flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition " +
+                                (active
+                                  ? "bg-indigo-600 text-white shadow-sm"
+                                  : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900")
+                              }
+                            >
+                              <ChildIcon className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{child.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               }

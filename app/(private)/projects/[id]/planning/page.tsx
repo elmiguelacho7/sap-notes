@@ -11,7 +11,7 @@ import {
   updateProjectPhase,
   type ProjectPhase,
 } from "@/lib/services/projectPhaseService";
-import { ChevronLeft, ChevronDown, ChevronUp, ListChecks } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronUp } from "lucide-react";
 
 type Project = {
   id: string;
@@ -373,7 +373,6 @@ export default function ProjectPlanningPage() {
                   <PhaseRow
                     key={phase.id}
                     phase={phase}
-                    projectId={projectId}
                     index={index}
                     total={phases.length}
                     onMove={movePhase}
@@ -394,7 +393,6 @@ export default function ProjectPlanningPage() {
 
 function PhaseRow({
   phase,
-  projectId,
   index,
   total,
   onMove,
@@ -404,7 +402,6 @@ function PhaseRow({
   saving,
 }: {
   phase: ProjectPhase;
-  projectId: string;
   index: number;
   total: number;
   onMove: (index: number, direction: "up" | "down") => void;
@@ -478,23 +475,14 @@ function PhaseRow({
         />
       </td>
       <td className="px-4 py-2">
-        <div className="flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed w-fit"
-          >
-            {saving ? "Guardando…" : "Guardar"}
-          </button>
-          <Link
-            href={`/projects/${projectId}/activities?phaseId=${phase.id}`}
-            className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
-          >
-            <ListChecks className="h-3.5 w-3.5" />
-            Ver actividades
-          </Link>
-        </div>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed w-fit"
+        >
+          {saving ? "Guardando…" : "Guardar"}
+        </button>
       </td>
     </tr>
   );
