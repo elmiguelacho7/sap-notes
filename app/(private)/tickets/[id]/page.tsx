@@ -6,6 +6,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError, hasLoggableSupabaseError } from "@/lib/supabaseError";
 import type { Ticket, TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
+import { ObjectActions } from "@/components/ObjectActions";
 
 const PRIORITY_LABELS: Record<TicketPriority, string> = {
   low: "Baja",
@@ -62,6 +63,8 @@ export default function TicketDetailPage() {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [appRole, setAppRole] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
 
   const loadTicket = useCallback(async () => {
     if (!id) return;
@@ -88,8 +91,51 @@ export default function TicketDetailPage() {
     void loadTicket();
   }, [loadTicket]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRole() {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+      const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
+      if (cancelled) return;
+      const data = await res.json().catch(() => ({ appRole: null }));
+      const role = (data as { appRole?: string | null }).appRole ?? null;
+      setAppRole(role);
+    }
+    loadRole();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleCloseTicket = useCallback(async () => {
+    if (!id || closing) return;
+    setClosing(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(`/api/tickets/${id}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ status: "closed" }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setErrorMsg(json?.error ?? "No se pudo cerrar el ticket.");
+        setClosing(false);
+        return;
+      }
+      await loadTicket();
+    } catch {
+      setErrorMsg("No se pudo cerrar el ticket.");
+    } finally {
+      setClosing(false);
+    }
+  }, [id, closing, loadTicket]);
+
   const backHref = ticket?.project_id
-    ? `/tickets?projectId=${ticket.project_id}`
+    ? `/projects/${ticket.project_id}/tickets`
     : "/tickets";
 
   if (!id) {
@@ -155,13 +201,45 @@ export default function TicketDetailPage() {
 
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-slate-200 px-4 py-4">
-          <h1 className="text-xl font-semibold text-slate-900">{ticket.title}</h1>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <PriorityBadge priority={ticket.priority} />
-            <StatusBadge status={ticket.status} />
-            <span className="text-[11px] text-slate-500">
-              Creado el {new Date(ticket.created_at).toLocaleDateString("es-ES")}
-            </span>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h1 className="text-xl font-semibold text-slate-900">{ticket.title}</h1>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <PriorityBadge priority={ticket.priority} />
+                <StatusBadge status={ticket.status} />
+                {ticket.project_id && (
+                  <Link
+                    href={`/projects/${ticket.project_id}`}
+                    className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
+                  >
+                    Vinculado al proyecto · Ver proyecto
+                  </Link>
+                )}
+                <span className="text-[11px] text-slate-500">
+                  Creado el {new Date(ticket.created_at).toLocaleDateString("es-ES")}
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {ticket.status !== "closed" && (
+                <button
+                  type="button"
+                  onClick={handleCloseTicket}
+                  disabled={closing}
+                  className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 h-8 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  {closing ? "Cerrando…" : "Cerrar ticket"}
+                </button>
+              )}
+              <ObjectActions
+                entity="ticket"
+                id={ticket.id}
+                canEdit={false}
+                canArchive={false}
+                canDelete={appRole === "superadmin"}
+                deleteEndpoint={appRole === "superadmin" ? `/api/tickets/${ticket.id}` : undefined}
+              />
+            </div>
           </div>
         </div>
 
@@ -181,13 +259,6 @@ export default function TicketDetailPage() {
               <p className="text-sm text-slate-600">
                 {new Date(ticket.due_date).toLocaleDateString("es-ES")}
               </p>
-            </div>
-          )}
-
-          {ticket.project_id && (
-            <div>
-              <h2 className="text-xs font-semibold text-slate-700 mb-1">Proyecto</h2>
-              <p className="text-sm text-slate-600">{ticket.project_id}</p>
             </div>
           )}
 

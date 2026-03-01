@@ -959,7 +959,7 @@ export default function ProjectDashboardPage() {
               </div>
               <button
                 type="button"
-                onClick={() => router.push(`/projects/${projectId}/activities`)}
+                onClick={() => router.push(`/projects/${projectId}/planning/activities`)}
                 className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
               >
                 Ver todas
@@ -1078,7 +1078,7 @@ export default function ProjectDashboardPage() {
               </div>
               <button
                 type="button"
-                onClick={() => router.push(`/projects/${projectId}/activities`)}
+                onClick={() => router.push(`/projects/${projectId}/planning/activities`)}
                 className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
               >
                 Ver todas

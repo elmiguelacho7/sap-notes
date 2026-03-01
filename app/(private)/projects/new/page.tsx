@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
+import { createDefaultPhasesForProject } from "@/lib/services/projectPhaseService";
 
 type Client = {
   id: string;
@@ -45,6 +46,7 @@ export default function NewProjectPage() {
   const [environmentType, setEnvironmentType] = useState("");
   const [sapVersion, setSapVersion] = useState("");
   const [startDate, setStartDate] = useState("");
+  const [plannedEndDate, setPlannedEndDate] = useState("");
   const [status, setStatus] = useState("Planeado");
 
   // Cliente
@@ -58,6 +60,7 @@ export default function NewProjectPage() {
   // Control UI
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [planWarning, setPlanWarning] = useState<string | null>(null);
 
   // ==========================
   // CARGA DE CLIENTES Y MÓDULOS
@@ -130,6 +133,7 @@ export default function NewProjectPage() {
     }
 
     setSaving(true);
+    setPlanWarning(null);
 
     try {
       const payload = {
@@ -138,6 +142,7 @@ export default function NewProjectPage() {
         environment_type: environmentType,
         sap_version: sapVersion.trim() || null,
         start_date: startDate || null,
+        planned_end_date: plannedEndDate || null,
         status,
         client_id: clientId || null,
       };
@@ -160,7 +165,38 @@ export default function NewProjectPage() {
 
       const projectId = project.id as string;
 
-      // 2) Insertar módulos relacionados (si hay)
+      // 2) Create default project phases (Discover, Prepare, Explore, etc.)
+      await createDefaultPhasesForProject(projectId);
+
+      let planFailed = false;
+      // 3) Generate SAP Activate plan if we have start and end dates
+      if (startDate && plannedEndDate) {
+        try {
+          const { data: session } = await supabase.auth.getSession();
+          const token = session?.session?.access_token;
+          const headers: Record<string, string> = token
+            ? { Authorization: `Bearer ${token}` }
+            : {};
+          const planRes = await fetch(`/api/projects/${projectId}/generate-plan`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...headers },
+          });
+          const planJson = await planRes.json().catch(() => ({}));
+          if (!planRes.ok) {
+            console.warn("Plan generation failed", planJson);
+            planFailed = true;
+            setPlanWarning(
+              (planJson as { error?: string })?.error ?? "No se pudo generar el plan de actividades."
+            );
+          }
+        } catch (planErr) {
+          console.warn("Plan generation error", planErr);
+          planFailed = true;
+          setPlanWarning("No se pudo generar el plan de actividades.");
+        }
+      }
+
+      // 4) Insertar módulos relacionados (si hay)
       if (selectedModuleIds.length > 0) {
         const projectModulesPayload = selectedModuleIds.map((moduleId) => ({
           project_id: projectId,
@@ -176,8 +212,12 @@ export default function NewProjectPage() {
         }
       }
 
-      // 3) Redirigir al listado o al dashboard (como prefieras)
-      router.push("/projects");
+      // 5) Redirigir: al proyecto si hay fechas (para ver plan), o al listado
+      if (startDate && plannedEndDate) {
+        router.push(planFailed ? `/projects/${projectId}?planGenerated=false` : `/projects/${projectId}`);
+      } else {
+        router.push("/projects");
+      }
     } catch (err) {
       handleSupabaseError("projects new submit", err);
       setErrorMsg("Se ha producido un error inesperado.");
@@ -208,6 +248,11 @@ export default function NewProjectPage() {
           {errorMsg && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-2">
               {errorMsg}
+            </div>
+          )}
+          {planWarning && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 mb-2">
+              {planWarning}
             </div>
           )}
 
@@ -326,6 +371,21 @@ export default function NewProjectPage() {
                     onChange={(e) => setStartDate(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-700">
+                    Fecha de fin planificada
+                  </label>
+                  <input
+                    type="date"
+                    value={plannedEndDate}
+                    onChange={(e) => setPlannedEndDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                  />
+                  <p className="text-[11px] text-slate-400">
+                    Si indicas inicio y fin, se generará un plan inicial de actividades según SAP Activate.
+                  </p>
                 </div>
 
                 <div className="space-y-1.5">

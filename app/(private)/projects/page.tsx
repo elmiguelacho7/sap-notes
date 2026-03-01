@@ -4,12 +4,16 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
+import { ProjectCard, type ProjectCardProject } from "@/components/projects/ProjectCard";
 
-type Project = {
+type ProjectRow = {
   id: string;
   name: string;
   description: string | null;
   status: string | null;
+  start_date: string | null;
+  planned_end_date: string | null;
+  current_phase_key: string | null;
   created_at: string;
 };
 
@@ -17,7 +21,7 @@ export default function ProjectsPage() {
   const router = useRouter();
 
   const [loadingProjects, setLoadingProjects] = useState(true);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectCardProject[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -28,17 +32,72 @@ export default function ProjectsPage() {
 
       const { data: projData, error } = await supabase
         .from("projects")
-        .select("*")
+        .select("id, name, description, status, start_date, planned_end_date, current_phase_key, created_at")
         .order("created_at", { ascending: false });
 
       if (error) {
         handleSupabaseError("projects", error);
         setErrorMsg("No se pudieron cargar los proyectos.");
         setProjects([]);
-      } else {
-        setProjects((projData ?? []) as Project[]);
+        setLoadingProjects(false);
+        return;
       }
 
+      const rows = (projData ?? []) as ProjectRow[];
+
+      const { data: doneStatusRows } = await supabase
+        .from("task_statuses")
+        .select("id")
+        .eq("code", "DONE")
+        .eq("is_active", true)
+        .limit(1);
+      const doneStatusId = (doneStatusRows?.[0] as { id: string } | undefined)?.id ?? null;
+
+      const projectsWithCounts = await Promise.all(
+        rows.map(async (p) => {
+          const [notesRes, ticketsRes, tasksRes] = await Promise.all([
+            supabase
+              .from("notes")
+              .select("id", { count: "exact", head: true })
+              .eq("project_id", p.id)
+              .is("deleted_at", null),
+            supabase
+              .from("tickets")
+              .select("id", { count: "exact", head: true })
+              .eq("project_id", p.id)
+              .neq("status", "closed"),
+            doneStatusId
+              ? supabase
+                  .from("tasks")
+                  .select("id", { count: "exact", head: true })
+                  .eq("project_id", p.id)
+                  .neq("status_id", doneStatusId)
+              : supabase
+                  .from("tasks")
+                  .select("id", { count: "exact", head: true })
+                  .eq("project_id", p.id),
+          ]);
+
+          const notes_count = notesRes.count ?? 0;
+          const open_tickets_count = ticketsRes.count ?? 0;
+          const open_tasks_count = tasksRes.count ?? 0;
+
+          return {
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            status: p.status,
+            start_date: p.start_date,
+            planned_end_date: p.planned_end_date,
+            current_phase_key: p.current_phase_key,
+            notes_count,
+            open_tickets_count,
+            open_tasks_count,
+          } satisfies ProjectCardProject;
+        })
+      );
+
+      setProjects(projectsWithCounts);
       setLoadingProjects(false);
     };
 
@@ -53,6 +112,7 @@ export default function ProjectsPage() {
       project.name,
       project.description ?? "",
       project.status ?? "",
+      project.current_phase_key ?? "",
     ].join(" ");
 
     return fields.toLowerCase().includes(q);
@@ -96,8 +156,8 @@ export default function ProjectsPage() {
         />
       </div>
 
-      {/* LISTA */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
+      {/* GRID OF CARDS */}
+      <div>
         {loadingProjects ? (
           <p className="p-6 text-sm text-slate-500">Cargando proyectos...</p>
         ) : errorMsg ? (
@@ -107,43 +167,11 @@ export default function ProjectsPage() {
             No se han encontrado proyectos con los filtros actuales.
           </p>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredProjects.map((project) => (
-              <li
-                key={project.id}
-                className="p-4 hover:bg-slate-50 cursor-pointer"
-                onClick={() => router.push(`/projects/${project.id}`)}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-900">
-                      {project.name || "Proyecto sin nombre"}
-                    </p>
-
-                    {project.description && (
-                      <p className="mt-1 text-xs text-slate-600 line-clamp-2">
-                        {project.description}
-                      </p>
-                    )}
-
-                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
-                      {project.status && (
-                        <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200">
-                          Estado: {project.status}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="text-[11px] text-slate-400">
-                      {new Date(project.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </li>
+              <ProjectCard key={project.id} project={project} />
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </div>
