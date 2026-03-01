@@ -45,6 +45,12 @@ const PRIORITY_OPTIONS: { value: string; label: string }[] = [
   { value: "high", label: "Alta" },
 ];
 
+type Profile = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+};
+
 export default function ProjectActivitiesPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -61,12 +67,16 @@ export default function ProjectActivitiesPage() {
   const [editingActivity, setEditingActivity] = useState<ProjectActivity | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
 
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [profilesLoading, setProfilesLoading] = useState(false);
+
   const loadData = useCallback(async () => {
     if (!projectId) return;
     setLoading(true);
     setErrorMsg(null);
+    setProfilesLoading(true);
     try {
-      const [projectRes, phasesList, activitiesRes] = await Promise.all([
+      const [projectRes, phasesList, activitiesRes, profilesRes] = await Promise.all([
         supabase
           .from("projects")
           .select("id, name, description")
@@ -78,6 +88,7 @@ export default function ProjectActivitiesPage() {
           .select("*")
           .eq("project_id", projectId)
           .order("created_at", { ascending: true }),
+        supabase.from("profiles").select("id, full_name, email"),
       ]);
 
       if (projectRes.error) {
@@ -94,10 +105,18 @@ export default function ProjectActivitiesPage() {
       } else {
         setActivities((activitiesRes.data ?? []) as ProjectActivity[]);
       }
+
+      if (profilesRes.error) {
+        console.error("Error loading profiles", profilesRes.error);
+        setProfiles([]);
+      } else {
+        setProfiles((profilesRes.data ?? []) as Profile[]);
+      }
     } catch {
       setErrorMsg("No se pudieron cargar los datos.");
     } finally {
       setLoading(false);
+      setProfilesLoading(false);
     }
   }, [projectId]);
 
@@ -119,6 +138,12 @@ export default function ProjectActivitiesPage() {
   }, [activities, selectedPhaseId]);
 
   const getPhaseName = (phaseId: string) => phases.find((p) => p.id === phaseId)?.name ?? "—";
+
+  const getProfileName = (id: string | null) => {
+    if (!id) return "Sin asignar";
+    const p = profiles.find((prof) => prof.id === id);
+    return p?.full_name || p?.email || "Sin asignar";
+  };
 
   const updateActivity = async (activityId: string, payload: Partial<ProjectActivity>) => {
     setSavingId(activityId);
@@ -229,6 +254,7 @@ export default function ProjectActivitiesPage() {
                       key={activity.id}
                       activity={activity}
                       phaseName={getPhaseName(activity.phase_id)}
+                      profiles={profiles}
                       onUpdate={updateActivity}
                       saving={savingId === activity.id}
                       onEdit={() => setEditingActivity(activity)}
@@ -245,6 +271,7 @@ export default function ProjectActivitiesPage() {
         <ActivityFormModal
           projectId={projectId}
           phases={phases}
+          profiles={profiles}
           activity={editingActivity}
           initialPhaseId={selectedPhaseId !== "all" ? selectedPhaseId : undefined}
           onClose={() => {
@@ -265,29 +292,33 @@ export default function ProjectActivitiesPage() {
 type ActivityRowProps = {
   activity: ProjectActivity;
   phaseName: string;
+  profiles: Profile[];
   onUpdate: (id: string, payload: Partial<ProjectActivity>) => Promise<void>;
   saving: boolean;
   onEdit: () => void;
 };
 
-function ActivityRow({ activity, phaseName, onUpdate, saving, onEdit }: ActivityRowProps) {
+function ActivityRow({ activity, phaseName, profiles, onUpdate, saving, onEdit }: ActivityRowProps) {
   const [status, setStatus] = useState(activity.status ?? "planned");
+  const [ownerProfileId, setOwnerProfileId] = useState<string | null>(activity.owner_profile_id);
   const [startDate, setStartDate] = useState(activity.start_date ?? "");
   const [dueDate, setDueDate] = useState(activity.due_date ?? "");
   const [progressPct, setProgressPct] = useState(String(activity.progress_pct ?? 0));
 
   useEffect(() => {
     setStatus(activity.status ?? "planned");
+    setOwnerProfileId(activity.owner_profile_id);
     setStartDate(activity.start_date ?? "");
     setDueDate(activity.due_date ?? "");
     setProgressPct(String(activity.progress_pct ?? 0));
-  }, [activity.id, activity.status, activity.start_date, activity.due_date, activity.progress_pct]);
+  }, [activity.id, activity.status, activity.owner_profile_id, activity.start_date, activity.due_date, activity.progress_pct]);
 
   const handleSave = () => {
     const pct = parseInt(progressPct, 10);
     const numPct = Number.isNaN(pct) ? null : Math.min(100, Math.max(0, pct));
     onUpdate(activity.id, {
       status: status || null,
+      owner_profile_id: ownerProfileId || null,
       start_date: startDate.trim() || null,
       due_date: dueDate.trim() || null,
       progress_pct: numPct,
@@ -298,7 +329,20 @@ function ActivityRow({ activity, phaseName, onUpdate, saving, onEdit }: Activity
     <tr className="border-b border-slate-100 hover:bg-slate-50/50">
       <td className="py-3 pr-4 text-slate-700">{phaseName}</td>
       <td className="py-3 pr-4 font-medium text-slate-900">{activity.name}</td>
-      <td className="py-3 pr-4 text-slate-500">{activity.owner_profile_id ? "—" : "—"}</td>
+      <td className="py-3 pr-4">
+        <select
+          className="w-full min-w-0 max-w-[140px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          value={ownerProfileId ?? ""}
+          onChange={(e) => setOwnerProfileId(e.target.value || null)}
+        >
+          <option value="">Sin asignar</option>
+          {profiles.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.full_name || p.email || p.id}
+            </option>
+          ))}
+        </select>
+      </td>
       <td className="py-3 pr-4">
         <select
           value={status}
@@ -366,6 +410,7 @@ function ActivityRow({ activity, phaseName, onUpdate, saving, onEdit }: Activity
 type ActivityFormModalProps = {
   projectId: string;
   phases: ProjectPhase[];
+  profiles: Profile[];
   activity: ProjectActivity | null;
   initialPhaseId?: string;
   onClose: () => void;
@@ -375,6 +420,7 @@ type ActivityFormModalProps = {
 function ActivityFormModal({
   projectId,
   phases,
+  profiles,
   activity,
   initialPhaseId,
   onClose,
@@ -384,6 +430,7 @@ function ActivityFormModal({
   const [phaseId, setPhaseId] = useState(activity?.phase_id ?? initialPhaseId ?? "");
   const [title, setTitle] = useState(activity?.name ?? "");
   const [description, setDescription] = useState(activity?.description ?? "");
+  const [ownerProfileId, setOwnerProfileId] = useState<string | null>(activity?.owner_profile_id ?? null);
   const [status, setStatus] = useState(activity?.status ?? "planned");
   const [priority, setPriority] = useState(activity?.priority ?? "medium");
   const [startDate, setStartDate] = useState(activity?.start_date ?? "");
@@ -402,11 +449,21 @@ function ActivityFormModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phaseId || !title.trim()) {
-      setError("Fase y título son obligatorios.");
+    setError(null);
+
+    if (!projectId) {
+      setError("Falta el identificador del proyecto.");
       return;
     }
-    setError(null);
+    if (!phaseId || !phaseId.trim()) {
+      setError("Selecciona una fase.");
+      return;
+    }
+    if (!title.trim()) {
+      setError("El título es obligatorio.");
+      return;
+    }
+
     setSaving(true);
     const pct = parseInt(progressPct, 10);
     const numPct = Number.isNaN(pct) ? null : Math.min(100, Math.max(0, pct));
@@ -418,6 +475,7 @@ function ActivityFormModal({
           phase_id: phaseId,
           name: title.trim(),
           description: description.trim() || null,
+          owner_profile_id: ownerProfileId || null,
           status,
           priority,
           start_date: startDate.trim() || null,
@@ -430,23 +488,33 @@ function ActivityFormModal({
         setError(err.message);
         return;
       }
-    } else {
-      const { error: err } = await supabase.from("project_activities").insert({
-        project_id: projectId,
-        phase_id: phaseId,
-        name: title.trim(),
-        description: description.trim() || null,
-        status,
-        priority,
-        start_date: startDate.trim() || null,
-        due_date: endDate.trim() || null,
-        progress_pct: numPct,
-      });
-      setSaving(false);
-      if (err) {
-        setError(err.message);
-        return;
-      }
+      onSaved();
+      return;
+    }
+
+    const payload = {
+      project_id: projectId,
+      phase_id: phaseId,
+      name: title.trim(),
+      description: description.trim() || null,
+      owner_profile_id: ownerProfileId || null,
+      status: status || "planned",
+      priority: priority || "medium",
+      start_date: startDate.trim() || null,
+      due_date: endDate.trim() || null,
+      progress_pct:
+        typeof numPct === "number" ? Math.min(100, Math.max(0, numPct)) : 0,
+    };
+
+    const { error: insertError } = await supabase
+      .from("project_activities")
+      .insert([payload]);
+    setSaving(false);
+
+    if (insertError) {
+      console.error("Error creating activity", insertError);
+      setError("No se pudo crear la actividad. Revisa los datos e inténtalo de nuevo.");
+      return;
     }
     onSaved();
   };
@@ -501,6 +569,21 @@ function ActivityFormModal({
               rows={2}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700">Responsable</label>
+            <select
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              value={ownerProfileId ?? ""}
+              onChange={(e) => setOwnerProfileId(e.target.value || null)}
+            >
+              <option value="">Sin asignar</option>
+              {profiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.full_name || p.email || p.id}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
