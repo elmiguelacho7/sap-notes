@@ -95,6 +95,19 @@ type ProjectPhaseRow = {
   end_date: string | null;
 };
 
+/** For dashboard activity KPIs; DB has name + due_date */
+type DashboardProjectActivity = {
+  id: string;
+  project_id: string;
+  phase_id: string | null;
+  name: string;
+  status: string | null;
+  priority: string | null;
+  start_date: string | null;
+  due_date: string | null;
+  progress_pct: number | null;
+};
+
 // ==========================
 // Componente principal
 // ==========================
@@ -159,6 +172,10 @@ export default function ProjectDashboardPage() {
   // Project phases (from project_phases table, for planning summary)
   const [projectPhases, setProjectPhases] = useState<ProjectPhaseRow[]>([]);
   const [loadingProjectPhases, setLoadingProjectPhases] = useState(false);
+
+  // Project activities (from project_activities, for "Estado de actividades" card)
+  const [dashboardActivities, setDashboardActivities] = useState<DashboardProjectActivity[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
 
   // Permisos del proyecto (Edit / Archive / Delete)
   const [permissions, setPermissions] = useState<{
@@ -495,6 +512,30 @@ export default function ProjectDashboardPage() {
     return () => { cancelled = true; };
   }, [projectId, projectLoadFailed]);
 
+  // Fetch project_activities for "Estado de actividades" card
+  useEffect(() => {
+    if (!projectId || projectLoadFailed) return;
+    let cancelled = false;
+    setActivitiesLoading(true);
+    supabase
+      .from("project_activities")
+      .select("id, project_id, phase_id, name, status, priority, start_date, due_date, progress_pct")
+      .eq("project_id", projectId)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          console.error("Error loading project activities", error);
+          setDashboardActivities([]);
+        } else {
+          setDashboardActivities((data ?? []) as DashboardProjectActivity[]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setActivitiesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [projectId, projectLoadFailed]);
+
   // ==========================
   // KPIs (datos desde API; placeholders mientras loading)
   // ==========================
@@ -597,6 +638,77 @@ export default function ProjectDashboardPage() {
 
     return { currentPhase, projectTimeProgress, nextPhaseStart };
   }, [projectPhases, project?.start_date, project?.planned_end_date]);
+
+  // Activity KPIs from project_activities (total, in progress, blocked, done, delayed, avg progress)
+  const projectActivityStats = useMemo(() => {
+    const activities = dashboardActivities;
+    if (!activities || activities.length === 0) {
+      return {
+        total: 0,
+        inProgress: 0,
+        blocked: 0,
+        done: 0,
+        delayed: 0,
+        avgProgress: null as number | null,
+        blockedList: [] as DashboardProjectActivity[],
+        delayedList: [] as DashboardProjectActivity[],
+      };
+    }
+
+    const today = new Date();
+    const parse = (d: string | null) => (d ? new Date(d) : null);
+
+    let total = activities.length;
+    let inProgress = 0;
+    let blocked = 0;
+    let done = 0;
+    let delayed = 0;
+    const progressValues: number[] = [];
+    const blockedList: DashboardProjectActivity[] = [];
+    const delayedList: DashboardProjectActivity[] = [];
+
+    for (const act of activities) {
+      const status = act.status ?? "planned";
+
+      if (status === "in_progress") inProgress++;
+      if (status === "blocked") {
+        blocked++;
+        blockedList.push(act);
+      }
+      if (status === "done") done++;
+
+      const end = parse(act.due_date);
+      if (end && end < today && status !== "done") {
+        delayed++;
+        delayedList.push(act);
+      }
+
+      if (typeof act.progress_pct === "number") {
+        progressValues.push(Math.min(100, Math.max(0, act.progress_pct)));
+      }
+    }
+
+    const avgProgress =
+      progressValues.length > 0
+        ? Math.round(
+            progressValues.reduce((sum, v) => sum + v, 0) / progressValues.length
+          )
+        : null;
+
+    blockedList.sort((a, b) => ((a.due_date || "") > (b.due_date || "") ? 1 : -1));
+    delayedList.sort((a, b) => ((a.due_date || "") > (b.due_date || "") ? 1 : -1));
+
+    return {
+      total,
+      inProgress,
+      blocked,
+      done,
+      delayed,
+      avgProgress,
+      blockedList: blockedList.slice(0, 3),
+      delayedList: delayedList.slice(0, 3),
+    };
+  }, [dashboardActivities]);
 
   // Recent activity: notes + tickets merged by created_at
   const recentActivity = useMemo(() => {
@@ -760,82 +872,313 @@ export default function ProjectDashboardPage() {
 
         {/* Resumen de planificación */}
         <section>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Resumen de planificación</h2>
+          {/* Debug: confirm phases are loaded (remove once verified) */}
+          {loadingProjectPhases ? (
+            <p className="text-xs text-slate-500 mt-4">Cargando fases de planificación…</p>
+          ) : (
+            <p className="text-xs text-slate-500 mt-4">Fases cargadas: {projectPhases.length}</p>
+          )}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mt-6">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">
+                  Resumen de planificación
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Vista rápida de las fases SAP Activate de este proyecto.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push(`/projects/${projectId}/planning`)}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+              >
+                Ver planificación
+              </button>
+            </div>
+
             {loadingProjectPhases ? (
-              <p className="mt-3 text-[11px] text-slate-500">Cargando…</p>
+              <p className="text-xs text-slate-500">Cargando fases…</p>
             ) : projectPhases.length === 0 ? (
-              <>
-                <p className="mt-3 text-[11px] text-slate-500">
-                  Este proyecto aún no tiene fases configuradas. Configúralas en la pestaña Planificación.
-                </p>
-                <Link
-                  href={`/projects/${projectId}/planning`}
-                  className="mt-2 inline-block text-[11px] font-medium text-indigo-600 hover:text-indigo-800"
-                >
-                  Ir a Planificación →
-                </Link>
-              </>
+              <p className="text-xs text-slate-500">
+                Este proyecto aún no tiene fases configuradas. Configúralas en la pestaña de Planificación.
+              </p>
             ) : (
-              <>
-                <p className="mt-3 text-[11px] text-slate-500">Fase actual:</p>
-                <p className="text-base font-semibold text-slate-900">
-                  {planningSummary.currentPhase?.name ?? "Sin definir"}
-                </p>
+              <div className="space-y-3">
+                <div>
+                  <span className="text-xs text-slate-500">Fase actual</span>
+                  <div className="text-sm font-semibold text-slate-900">
+                    {planningSummary.currentPhase?.name ?? "Sin definir"}
+                  </div>
+                </div>
+
                 {planningSummary.projectTimeProgress != null && (
-                  <>
-                    <p className="mt-3 text-[11px] text-slate-500">Progreso temporal del proyecto</p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className="h-full rounded-full bg-indigo-500 transition-all"
-                          style={{ width: `${planningSummary.projectTimeProgress}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-medium text-slate-600 tabular-nums">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-slate-500">
+                        Progreso temporal del proyecto
+                      </span>
+                      <span className="text-xs font-medium text-slate-700">
                         {planningSummary.projectTimeProgress}%
                       </span>
                     </div>
-                  </>
+                    <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className="h-full bg-indigo-500 rounded-full transition-all"
+                        style={{ width: `${planningSummary.projectTimeProgress}%` }}
+                      />
+                    </div>
+                  </div>
                 )}
+
                 {planningSummary.nextPhaseStart && (
-                  <>
-                    <p className="mt-3 text-[11px] text-slate-500">Próxima fase:</p>
-                    <p className="text-sm font-medium text-slate-800">
-                      {planningSummary.nextPhaseStart.name} –{" "}
-                      {new Date(planningSummary.nextPhaseStart.start_date).toLocaleDateString("es-ES", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </>
+                  <div className="text-xs text-slate-500">
+                    Próxima fase:{" "}
+                    <span className="font-medium text-slate-800">
+                      {planningSummary.nextPhaseStart.name}
+                    </span>{" "}
+                    (inicio previsto {new Date(planningSummary.nextPhaseStart.start_date).toLocaleDateString("es-ES", { dateStyle: "short" })})
+                  </div>
                 )}
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  {projectPhases.map((phase) => {
-                    const isCurrent = planningSummary.currentPhase?.id === phase.id;
-                    return (
-                      <span
-                        key={phase.id}
-                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-                          isCurrent ? "bg-indigo-500 text-white" : "bg-slate-100 text-slate-700"
-                        }`}
-                      >
-                        <span className={`h-1.5 w-1.5 rounded-full ${isCurrent ? "bg-white/80" : "bg-slate-400"}`} />
-                        {phase.name}
-                      </span>
-                    );
-                  })}
-                </div>
-              </>
+              </div>
             )}
-            {!loadingProjectPhases && projectPhases.length > 0 && (
-              <Link
-                href={`/projects/${projectId}/planning`}
-                className="mt-3 inline-block text-[11px] font-medium text-indigo-600 hover:text-indigo-800"
+          </div>
+        </section>
+
+        {/* Estado de actividades */}
+        <section>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mt-6">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">
+                  Estado de actividades
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Resumen del plan de trabajo del proyecto.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push(`/projects/${projectId}/activities`)}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
               >
-                Editar fases en Planificación →
-              </Link>
+                Ver todas
+              </button>
+            </div>
+
+            {activitiesLoading ? (
+              <p className="text-xs text-slate-500">Cargando actividades…</p>
+            ) : projectActivityStats.total === 0 ? (
+              <p className="text-xs text-slate-500">
+                Este proyecto aún no tiene actividades definidas.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div className="bg-slate-50 rounded-xl p-3">
+                    <div className="text-[11px] text-slate-500">Total</div>
+                    <div className="text-lg font-semibold text-slate-900">
+                      {projectActivityStats.total}
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-3">
+                    <div className="text-[11px] text-slate-500">En progreso</div>
+                    <div className="text-lg font-semibold text-slate-900">
+                      {projectActivityStats.inProgress}
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-3">
+                    <div className="text-[11px] text-slate-500">Bloqueadas</div>
+                    <div className="text-lg font-semibold text-slate-900">
+                      {projectActivityStats.blocked}
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-3">
+                    <div className="text-[11px] text-slate-500">Retrasadas</div>
+                    <div className="text-lg font-semibold text-slate-900">
+                      {projectActivityStats.delayed}
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-3">
+                    <div className="text-[11px] text-slate-500">% avance medio</div>
+                    <div className="text-lg font-semibold text-slate-900">
+                      {projectActivityStats.avgProgress !== null
+                        ? `${projectActivityStats.avgProgress}%`
+                        : "—"}
+                    </div>
+                  </div>
+                </div>
+
+                {(projectActivityStats.blockedList.length > 0 ||
+                  projectActivityStats.delayedList.length > 0) && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {projectActivityStats.blockedList.length > 0 && (
+                      <div>
+                        <div className="text-xs font-semibold text-slate-800 mb-1">
+                          Actividades bloqueadas
+                        </div>
+                        <ul className="space-y-1">
+                          {projectActivityStats.blockedList.map((act) => (
+                            <li
+                              key={act.id}
+                              className="text-xs text-slate-700 flex justify-between gap-3"
+                            >
+                              <span className="truncate">{act.name}</span>
+                              {act.due_date && (
+                                <span className="shrink-0 text-slate-500">
+                                  Fin {act.due_date}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {projectActivityStats.delayedList.length > 0 && (
+                      <div>
+                        <div className="text-xs font-semibold text-slate-800 mb-1">
+                          Actividades retrasadas
+                        </div>
+                        <ul className="space-y-1">
+                          {projectActivityStats.delayedList.map((act) => (
+                            <li
+                              key={act.id}
+                              className="text-xs text-slate-700 flex justify-between gap-3"
+                            >
+                              <span className="truncate">{act.name}</span>
+                              {act.due_date && (
+                                <span className="shrink-0 text-slate-500">
+                                  Fin {act.due_date}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Estado de actividades */}
+        <section>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mt-6">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">
+                  Estado de actividades
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Resumen del plan de trabajo del proyecto.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push(`/projects/${projectId}/activities`)}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+              >
+                Ver todas
+              </button>
+            </div>
+
+            {activitiesLoading ? (
+              <p className="text-xs text-slate-500">Cargando actividades…</p>
+            ) : projectActivityStats.total === 0 ? (
+              <p className="text-xs text-slate-500">
+                Este proyecto aún no tiene actividades definidas.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div className="bg-slate-50 rounded-xl p-3">
+                    <div className="text-[11px] text-slate-500">Total</div>
+                    <div className="text-lg font-semibold text-slate-900">
+                      {projectActivityStats.total}
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-3">
+                    <div className="text-[11px] text-slate-500">En progreso</div>
+                    <div className="text-lg font-semibold text-slate-900">
+                      {projectActivityStats.inProgress}
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-3">
+                    <div className="text-[11px] text-slate-500">Bloqueadas</div>
+                    <div className="text-lg font-semibold text-slate-900">
+                      {projectActivityStats.blocked}
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-3">
+                    <div className="text-[11px] text-slate-500">Retrasadas</div>
+                    <div className="text-lg font-semibold text-slate-900">
+                      {projectActivityStats.delayed}
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-3">
+                    <div className="text-[11px] text-slate-500">% avance medio</div>
+                    <div className="text-lg font-semibold text-slate-900">
+                      {projectActivityStats.avgProgress !== null
+                        ? `${projectActivityStats.avgProgress}%`
+                        : "—"}
+                    </div>
+                  </div>
+                </div>
+
+                {(projectActivityStats.blockedList.length > 0 ||
+                  projectActivityStats.delayedList.length > 0) && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {projectActivityStats.blockedList.length > 0 && (
+                      <div>
+                        <div className="text-xs font-semibold text-slate-800 mb-1">
+                          Actividades bloqueadas
+                        </div>
+                        <ul className="space-y-1">
+                          {projectActivityStats.blockedList.map((act) => (
+                            <li
+                              key={act.id}
+                              className="text-xs text-slate-700 flex justify-between gap-3"
+                            >
+                              <span className="truncate">{act.name}</span>
+                              {act.due_date && (
+                                <span className="shrink-0 text-slate-500">
+                                  Fin {act.due_date}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {projectActivityStats.delayedList.length > 0 && (
+                      <div>
+                        <div className="text-xs font-semibold text-slate-800 mb-1">
+                          Actividades retrasadas
+                        </div>
+                        <ul className="space-y-1">
+                          {projectActivityStats.delayedList.map((act) => (
+                            <li
+                              key={act.id}
+                              className="text-xs text-slate-700 flex justify-between gap-3"
+                            >
+                              <span className="truncate">{act.name}</span>
+                              {act.due_date && (
+                                <span className="shrink-0 text-slate-500">
+                                  Fin {act.due_date}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </section>
