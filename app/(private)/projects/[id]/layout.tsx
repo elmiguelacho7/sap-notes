@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   LayoutDashboard,
@@ -25,24 +25,46 @@ type ProjectSummary = {
   status: string | null;
 };
 
-const NAV_ITEMS: { path: string; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
-  { path: "", label: "Dashboard", Icon: LayoutDashboard },
-  { path: "planning", label: "Planificación", Icon: CalendarDays },
-  { path: "tickets", label: "Tickets", Icon: Ticket },
-  { path: "notes", label: "Notas", Icon: FileText },
-  { path: "activities", label: "Actividades", Icon: ListChecks },
-  { path: "tasks", label: "Tareas", Icon: ClipboardList },
-  { path: "links", label: "Enlaces del proyecto", Icon: LinkIcon },
-  { path: "knowledge", label: "Base de conocimiento", Icon: BookOpen },
-];
+type NavLink = {
+  type: "link";
+  path: string;
+  label: string;
+  Icon: React.ComponentType<{ className?: string }>;
+};
 
-function getProjectNavItems(projectId: string) {
+type NavGroup = {
+  type: "group";
+  label: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  children: { key: string; label: string; path: string }[];
+};
+
+function getProjectNavItems(projectId: string): (NavLink | NavGroup)[] {
   const base = `/projects/${projectId}`;
-  return NAV_ITEMS.map(({ path, label, Icon }) => ({
-    href: path ? `${base}/${path}` : base,
-    label,
-    Icon,
-  }));
+  return [
+    { type: "link", path: "", label: "Dashboard", Icon: LayoutDashboard },
+    {
+      type: "group",
+      label: "Planificación",
+      Icon: CalendarDays,
+      children: [
+        { key: "planning-phases", label: "Fases del proyecto", path: "planning" },
+        { key: "planning-activities", label: "Actividades por fase", path: "activities" },
+        { key: "planning-calendar", label: "Calendario", path: "planning/calendar" },
+      ],
+    },
+    { type: "link", path: "tickets", label: "Tickets", Icon: Ticket },
+    { type: "link", path: "notes", label: "Notas", Icon: FileText },
+    { type: "link", path: "activities", label: "Actividades", Icon: ListChecks },
+    { type: "link", path: "tasks", label: "Tareas", Icon: ClipboardList },
+    { type: "link", path: "links", label: "Enlaces del proyecto", Icon: LinkIcon },
+    { type: "link", path: "knowledge", label: "Base de conocimiento", Icon: BookOpen },
+  ];
+}
+
+function isActiveHref(base: string, path: string, pathname: string) {
+  const href = path ? `${base}/${path}` : base;
+  return pathname === href || (path !== "" && pathname.startsWith(href));
 }
 
 const SIDEBAR_STATUS_LABELS: Record<string, string> = {
@@ -124,29 +146,8 @@ export default function ProjectLayout({
   }, [projectId]);
 
   const navItems = projectId ? getProjectNavItems(projectId) : [];
-
   const base = projectId ? `/projects/${projectId}` : "";
-  const isDashboardActive = pathname === base;
-  const isPlanningActive = base ? pathname.startsWith(`${base}/planning`) : false;
-  const isTicketsActive = base ? pathname.startsWith(`${base}/tickets`) : false;
-  const isNotesActive = base ? pathname.startsWith(`${base}/notes`) : false;
-  const isActivitiesActive = base ? pathname.startsWith(`${base}/activities`) : false;
-  const isTasksActive = base ? pathname.startsWith(`${base}/tasks`) : false;
-  const isLinksActive = base ? pathname.startsWith(`${base}/links`) : false;
-  const isKnowledgeActive = base ? pathname.startsWith(`${base}/knowledge`) : false;
-
-  const isActiveMap: Record<string, boolean> = {};
-  if (navItems.length) {
-    const [dash, planning, tickets, notes, activities, tasks, links, knowledge] = navItems;
-    isActiveMap[dash.href] = isDashboardActive;
-    isActiveMap[planning.href] = isPlanningActive;
-    isActiveMap[tickets.href] = isTicketsActive;
-    isActiveMap[notes.href] = isNotesActive;
-    isActiveMap[activities.href] = isActivitiesActive;
-    isActiveMap[tasks.href] = isTasksActive;
-    isActiveMap[links.href] = isLinksActive;
-    isActiveMap[knowledge.href] = isKnowledgeActive;
-  }
+  const router = useRouter();
 
   return (
     <div className="flex h-full">
@@ -192,23 +193,67 @@ export default function ProjectLayout({
           {/* Navegación interna del proyecto */}
           <nav className="flex-1 px-3 py-4 space-y-1 text-sm">
             {navItems.map((item) => {
-              const isActive = isActiveMap[item.href] ?? false;
+              if (item.type === "group" && item.children.length > 0) {
+                const someChildActive = item.children.some((child) =>
+                  isActiveHref(base, child.path, pathname ?? "")
+                );
+                return (
+                  <div key={item.label} className="mt-3 first:mt-0">
+                    <div
+                      className={
+                        someChildActive
+                          ? "px-3 text-[11px] font-semibold uppercase tracking-wide text-indigo-600"
+                          : "px-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500"
+                      }
+                    >
+                      {item.label}
+                    </div>
+                    <div className="mt-1 space-y-0.5">
+                      {item.children.map((child) => {
+                        const href = child.path ? `${base}/${child.path}` : base;
+                        const active = pathname === href;
+                        return (
+                          <button
+                            key={child.key}
+                            type="button"
+                            onClick={() => router.push(href)}
+                            className={
+                              "w-full text-left flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition " +
+                              (active
+                                ? "bg-indigo-600 text-white shadow-sm"
+                                : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900")
+                            }
+                          >
+                            {child.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={[
-                    "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition",
-                    isActive
-                      ? "bg-indigo-600 text-white shadow-sm"
-                      : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-                  ].join(" ")}
-                >
-                  <item.Icon className="h-4 w-4 shrink-0" />
-                  <span>{item.label}</span>
-                </Link>
-              );
+              if (item.type === "link") {
+                const href = item.path ? `${base}/${item.path}` : base;
+                const active = isActiveHref(base, item.path, pathname ?? "");
+                return (
+                  <Link
+                    key={item.path || "dashboard"}
+                    href={href}
+                    className={
+                      "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition " +
+                      (active
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900")
+                    }
+                  >
+                    <item.Icon className="h-4 w-4 shrink-0" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              }
+
+              return null;
             })}
           </nav>
         </div>

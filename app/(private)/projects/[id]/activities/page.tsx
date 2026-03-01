@@ -452,15 +452,15 @@ function ActivityFormModal({
     setError(null);
 
     if (!projectId) {
-      setError("Falta el identificador del proyecto.");
+      setError("No se pudo identificar el proyecto.");
       return;
     }
-    if (!phaseId || !phaseId.trim()) {
-      setError("Selecciona una fase.");
+    if (!phaseId || !String(phaseId).trim()) {
+      setError("Selecciona una fase para la actividad.");
       return;
     }
-    if (!title.trim()) {
-      setError("El título es obligatorio.");
+    if (!title || !title.trim()) {
+      setError("La actividad necesita un título.");
       return;
     }
 
@@ -468,55 +468,63 @@ function ActivityFormModal({
     const pct = parseInt(progressPct, 10);
     const numPct = Number.isNaN(pct) ? null : Math.min(100, Math.max(0, pct));
 
-    if (isEdit && activity) {
-      const { error: err } = await supabase
+    try {
+      if (isEdit && activity) {
+        const { error: err } = await supabase
+          .from("project_activities")
+          .update({
+            phase_id: phaseId,
+            name: title.trim(),
+            description: description.trim() || null,
+            owner_profile_id: ownerProfileId || null,
+            status,
+            priority,
+            start_date: startDate.trim() || null,
+            due_date: endDate.trim() || null,
+            progress_pct: numPct,
+          })
+          .eq("id", activity.id);
+        if (err) {
+          console.error("Error updating activity (Supabase)", err);
+          setError(err.message || "No se pudo actualizar la actividad.");
+          return;
+        }
+        onSaved();
+        return;
+      }
+
+      const payload = {
+        project_id: projectId,
+        phase_id: phaseId,
+        name: title.trim(),
+        description: description.trim() || null,
+        owner_profile_id: ownerProfileId || null,
+        status: status || "planned",
+        priority: priority || "medium",
+        start_date: startDate.trim() || null,
+        due_date: endDate.trim() || null,
+        progress_pct:
+          typeof numPct === "number" ? Math.min(100, Math.max(0, numPct)) : 0,
+      };
+
+      const { error: insertError } = await supabase
         .from("project_activities")
-        .update({
-          phase_id: phaseId,
-          name: title.trim(),
-          description: description.trim() || null,
-          owner_profile_id: ownerProfileId || null,
-          status,
-          priority,
-          start_date: startDate.trim() || null,
-          due_date: endDate.trim() || null,
-          progress_pct: numPct,
-        })
-        .eq("id", activity.id);
-      setSaving(false);
-      if (err) {
-        setError(err.message);
+        .insert([payload])
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error("Error creating activity (Supabase)", insertError);
+        setError(insertError.message || "No se pudo crear la actividad.");
         return;
       }
       onSaved();
-      return;
+    } catch (err) {
+      console.error("Error creating activity (JS)", err);
+      setError("Ocurrió un error inesperado al crear la actividad.");
+    } finally {
+      setSaving(false);
     }
-
-    const payload = {
-      project_id: projectId,
-      phase_id: phaseId,
-      name: title.trim(),
-      description: description.trim() || null,
-      owner_profile_id: ownerProfileId || null,
-      status: status || "planned",
-      priority: priority || "medium",
-      start_date: startDate.trim() || null,
-      due_date: endDate.trim() || null,
-      progress_pct:
-        typeof numPct === "number" ? Math.min(100, Math.max(0, numPct)) : 0,
-    };
-
-    const { error: insertError } = await supabase
-      .from("project_activities")
-      .insert([payload]);
-    setSaving(false);
-
-    if (insertError) {
-      console.error("Error creating activity", insertError);
-      setError("No se pudo crear la actividad. Revisa los datos e inténtalo de nuevo.");
-      return;
-    }
-    onSaved();
   };
 
   return (
@@ -533,7 +541,7 @@ function ActivityFormModal({
         </h2>
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+            <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
           )}
           <div>
             <label className="block text-xs font-medium text-slate-500">Fase *</label>
@@ -659,7 +667,7 @@ function ActivityFormModal({
               disabled={saving}
               className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
             >
-              {saving ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear actividad"}
+              {saving ? (isEdit ? "Guardando…" : "Creando…") : isEdit ? "Guardar cambios" : "Crear actividad"}
             </button>
           </div>
         </form>

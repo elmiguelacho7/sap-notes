@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, usePathname, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
@@ -42,8 +42,6 @@ function getMinMaxDates(phases: ProjectPhase[]): {
 
 export default function ProjectPlanningPage() {
   const params = useParams();
-  const pathname = usePathname();
-  const router = useRouter();
   const projectId =
     typeof params?.id === "string"
       ? params.id
@@ -294,43 +292,6 @@ export default function ProjectPlanningPage() {
           title={loading ? "Cargando…" : (project?.name ?? "Proyecto") + " · Planificación"}
           subtitle="Fases SAP Activate: edita nombres, orden y fechas."
         />
-
-        <div className="mt-2 mb-4 border-b border-slate-200">
-          <nav className="flex gap-4 text-xs">
-            {[
-              { key: "phases", label: "Fases del proyecto", href: `/projects/${projectId}/planning` },
-              { key: "activities", label: "Actividades por fase", href: `/projects/${projectId}/activities` },
-              { key: "calendar", label: "Calendario", href: null as string | null },
-            ].map((tab) => {
-              const isActive = tab.href != null && pathname != null && pathname.startsWith(tab.href);
-              const baseClasses = "pb-2 border-b-2 -mb-px transition-colors";
-              const activeClasses = "border-indigo-500 text-indigo-600 font-semibold";
-              const inactiveClasses = "border-transparent text-slate-500 hover:text-slate-700";
-
-              if (tab.href == null) {
-                return (
-                  <span
-                    key={tab.key}
-                    className={`${baseClasses} ${inactiveClasses} opacity-40 cursor-not-allowed`}
-                  >
-                    {tab.label}
-                  </span>
-                );
-              }
-
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => router.push(tab.href)}
-                  className={`${baseClasses} ${isActive ? activeClasses : inactiveClasses}`}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
 
         {loading ? (
           <p className="text-sm text-slate-500">Cargando fases…</p>
