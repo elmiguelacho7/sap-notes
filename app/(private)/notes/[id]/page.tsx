@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
+import { ObjectActions } from "@/components/ObjectActions";
 
 type Note = {
   id: string;
@@ -24,6 +25,7 @@ export default function NoteDetailPage() {
   const [note, setNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [appRole, setAppRole] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchNote = async () => {
@@ -56,6 +58,22 @@ export default function NoteDetailPage() {
     }
   }, [noteId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRole() {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+      const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
+      if (cancelled) return;
+      const data = await res.json().catch(() => ({ appRole: null }));
+      const role = (data as { appRole?: string | null }).appRole ?? null;
+      setAppRole(role);
+    }
+    loadRole();
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div className="w-full px-6 py-7">
       <div className="max-w-4xl mx-auto">
@@ -86,17 +104,29 @@ export default function NoteDetailPage() {
           ) : (
             <div className="space-y-5">
               {/* HEADER */}
-              <header>
-                <p className="text-[11px] text-slate-500 mb-1">
-                  Nota de implementación
-                </p>
-                <h1 className="text-base sm:text-lg font-semibold text-slate-900">
-                  {note.title}
-                </h1>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Creada el{" "}
-                  {new Date(note.created_at).toLocaleDateString("es-ES")}
-                </p>
+              <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] text-slate-500 mb-1">
+                    Nota de implementación
+                  </p>
+                  <h1 className="text-base sm:text-lg font-semibold text-slate-900">
+                    {note.title}
+                  </h1>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Creada el{" "}
+                    {new Date(note.created_at).toLocaleDateString("es-ES")}
+                  </p>
+                </div>
+                <div className="shrink-0">
+                  <ObjectActions
+                    entity="note"
+                    id={note.id}
+                    canEdit={false}
+                    canArchive={false}
+                    canDelete={appRole === "superadmin"}
+                    deleteEndpoint={appRole === "superadmin" ? `/api/notes/${note.id}` : undefined}
+                  />
+                </div>
               </header>
 
               {/* META */}

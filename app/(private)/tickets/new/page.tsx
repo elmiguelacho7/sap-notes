@@ -58,7 +58,7 @@ export default function NewTicketPage() {
       description: description.trim() || null,
       priority,
       status,
-      project_id: projectId.trim() || null,
+      project_id: (projectIdFromQuery?.trim() || projectId.trim()) || null,
       due_date: dueDate.trim() || null,
     };
 

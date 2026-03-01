@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
+import { RowActions } from "@/components/RowActions";
 
 type Note = {
   id: string;
@@ -51,6 +52,7 @@ export default function NotesPage() {
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(true);
+  const [appRole, setAppRole] = useState<string | null>(null);
 
   // Chat
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -62,29 +64,47 @@ export default function NotesPage() {
   // ==========================
   // CARGAR NOTAS GENERALES
   // ==========================
+  const fetchNotes = useCallback(async () => {
+    setLoadingNotes(true);
+    setErrorMsg(null);
+
+    const { data, error } = await supabase
+      .from("notes")
+      .select("*")
+      .is("project_id", null) // Solo notas NO vinculadas a proyecto
+      .is("deleted_at", null) // Excluir notas eliminadas (soft delete)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      handleSupabaseError("notes", error);
+      setErrorMsg("No se pudieron cargar las notas.");
+      setNotes([]);
+    } else {
+      setNotes((data ?? []) as Note[]);
+    }
+
+    setLoadingNotes(false);
+  }, []);
+
   useEffect(() => {
-    const fetchNotes = async () => {
-      setLoadingNotes(true);
-      setErrorMsg(null);
-
-      const { data, error } = await supabase
-        .from("notes")
-        .select("*")
-        .is("project_id", null) // Solo notas NO vinculadas a proyecto
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        handleSupabaseError("notes", error);
-        setErrorMsg("No se pudieron cargar las notas.");
-        setNotes([]);
-      } else {
-        setNotes((data ?? []) as Note[]);
-      }
-
-      setLoadingNotes(false);
-    };
-
     fetchNotes();
+  }, [fetchNotes]);
+
+  // Rol del usuario para acciones (View siempre; Edit/Delete solo superadmin)
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRole() {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+      const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
+      if (cancelled) return;
+      const data = await res.json().catch(() => ({ appRole: null }));
+      const role = (data as { appRole?: string | null }).appRole ?? null;
+      setAppRole(role);
+    }
+    loadRole();
+    return () => { cancelled = true; };
   }, []);
 
   const hasNotes = useMemo(() => notes.length > 0, [notes]);
@@ -238,7 +258,6 @@ export default function NotesPage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        {/* TÍTULO */}
                         <h2 className="text-sm font-semibold text-slate-900 truncate">
                           {note.title}
                         </h2>
@@ -318,11 +337,20 @@ export default function NotesPage() {
                         )}
                       </div>
 
-                      {/* FECHA */}
-                      <div className="flex flex-col items-end gap-1">
+                      {/* Fecha y acciones de fila */}
+                      <div className="flex flex-col items-end gap-2 shrink-0">
                         <span className="text-[11px] text-slate-500 whitespace-nowrap">
                           {formatDate(note.created_at)}
                         </span>
+                        <RowActions
+                          entity="note"
+                          id={note.id}
+                          viewHref={`/notes/${note.id}`}
+                          canEdit={appRole === "superadmin"}
+                          canDelete={appRole === "superadmin"}
+                          deleteEndpoint={appRole === "superadmin" ? `/api/notes/${note.id}` : undefined}
+                          onDeleted={fetchNotes}
+                        />
                       </div>
                     </div>
                   </article>

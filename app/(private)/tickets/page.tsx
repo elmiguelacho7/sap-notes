@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError, hasLoggableSupabaseError } from "@/lib/supabaseError";
 import type { Ticket, TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
+import { RowActions } from "@/components/RowActions";
 
 const PRIORITY_LABELS: Record<TicketPriority, string> = {
   low: "Baja",
@@ -56,27 +57,20 @@ function StatusBadge({ status }: { status: TicketStatus }) {
 }
 
 export default function TicketsPage() {
-  const searchParams = useSearchParams();
-  const projectId = searchParams.get("projectId") ?? "";
-
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [appRole, setAppRole] = useState<string | null>(null);
 
   const loadTickets = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
 
-    let query = supabase
+    const { data, error } = await supabase
       .from("tickets")
       .select("id, title, description, priority, status, project_id, due_date, created_at, updated_at")
+      .is("project_id", null)
       .order("created_at", { ascending: false });
-
-    if (projectId) {
-      query = query.eq("project_id", projectId);
-    }
-
-    const { data, error } = await query;
 
     if (error) {
       handleSupabaseError("tickets", error);
@@ -89,27 +83,47 @@ export default function TicketsPage() {
     }
 
     setLoading(false);
-  }, [projectId]);
+  }, []);
 
   useEffect(() => {
     void loadTickets();
   }, [loadTickets]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRole() {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+      const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
+      if (cancelled) return;
+      const data = await res.json().catch(() => ({ appRole: null }));
+      const role = (data as { appRole?: string | null }).appRole ?? null;
+      setAppRole(role);
+    }
+    loadRole();
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl md:text-2xl font-semibold text-slate-900">
-          Tickets
-        </h1>
-        <p className="text-xs md:text-sm text-slate-500 max-w-2xl">
-          Seguimiento de incidencias y solicitudes. Crea y gestiona tickets por proyecto.
-        </p>
-        {projectId && (
-          <p className="text-xs text-slate-600 mt-1">
-            Mostrando tickets del proyecto seleccionado.
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">
+            Tickets
+          </h1>
+          <p className="mt-1 text-sm text-slate-500 max-w-2xl">
+            Seguimiento de incidencias y solicitudes sin asignar a un proyecto.
           </p>
-        )}
+        </div>
+        <Link
+          href="/tickets/new"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition shrink-0"
+        >
+          <Plus className="h-4 w-4" />
+          Nuevo ticket
+        </Link>
       </div>
 
       {errorMsg && (
@@ -145,6 +159,9 @@ export default function TicketsPage() {
                   <th className="px-4 py-3 font-semibold text-slate-700">
                     Fecha de creación
                   </th>
+                  <th className="px-4 py-3 font-semibold text-slate-700 text-right w-[120px]">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -170,6 +187,17 @@ export default function TicketsPage() {
                         month: "2-digit",
                         year: "numeric",
                       })}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <RowActions
+                        entity="ticket"
+                        id={t.id}
+                        viewHref={`/tickets/${t.id}`}
+                        canEdit={appRole === "superadmin"}
+                        canDelete={appRole === "superadmin"}
+                        deleteEndpoint={appRole === "superadmin" ? `/api/tickets/${t.id}` : undefined}
+                        onDeleted={loadTickets}
+                      />
                     </td>
                   </tr>
                 ))}
