@@ -86,11 +86,18 @@ export default function ProjectLinksPage() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const headers: Record<string, string> = {};
+
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+        
         const [permRes, meRes] = await Promise.all([
           fetch(`/api/projects/${projectId}/permissions`, { headers }),
           fetch("/api/me", { headers }),
         ]);
+
+
         if (cancelled) return;
         const permData = await permRes.json().catch(() => ({}));
         const meData = await meRes.json().catch(() => ({ appRole: null }));
