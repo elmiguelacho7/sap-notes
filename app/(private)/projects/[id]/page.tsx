@@ -236,7 +236,10 @@ export default function ProjectDashboardPage() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
         const [permRes, meRes] = await Promise.all([
           fetch(`/api/projects/${projectId}/permissions`, { headers }),
           fetch("/api/me", { headers }),
@@ -274,8 +277,9 @@ export default function ProjectDashboardPage() {
     setLoadingStats(true);
     setErrorStats(null);
 
-    fetch(`/api/projects/${projectId}/stats`)
-      .then(async (res) => {
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/stats`);
         if (cancelled) return;
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -285,17 +289,17 @@ export default function ProjectDashboardPage() {
         }
         const data = (await res.json()) as ProjectStats;
         setStats(data);
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) {
           setErrorStats("Error al cargar estadísticas");
           setStats(null);
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoadingStats(false);
-      });
+      }
+    };
 
+    void load();
     return () => {
       cancelled = true;
     };
@@ -312,8 +316,9 @@ export default function ProjectDashboardPage() {
     setLoadingNotes(true);
     setErrorNotes(null);
 
-    fetch(`/api/projects/${projectId}/notes?limit=10`)
-      .then(async (res) => {
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/notes?limit=10`);
         if (cancelled) return;
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -323,17 +328,17 @@ export default function ProjectDashboardPage() {
         }
         const data = (await res.json()) as { projectId: string; notes: ProjectNoteSummary[] };
         setNotes(data.notes ?? []);
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) {
           setErrorNotes("Error al cargar las notas.");
           setNotes([]);
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoadingNotes(false);
-      });
+      }
+    };
 
+    void load();
     return () => {
       cancelled = true;
     };
@@ -386,8 +391,9 @@ export default function ProjectDashboardPage() {
     setLoadingLinks(true);
     setErrorLinks(null);
 
-    fetch(`/api/projects/${projectId}/links?limit=10`)
-      .then(async (res) => {
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/links?limit=10`);
         if (cancelled) return;
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -400,17 +406,17 @@ export default function ProjectDashboardPage() {
         const payload = data as { projectId: string; links: ProjectLinkRow[] };
         setLinks(payload.links ?? []);
         setErrorLinks(null);
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) {
           setErrorLinks("Error al cargar los enlaces.");
           setLinks([]);
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoadingLinks(false);
-      });
+      }
+    };
 
+    void load();
     return () => {
       cancelled = true;
     };
@@ -423,8 +429,9 @@ export default function ProjectDashboardPage() {
     let cancelled = false;
     setLoadingActivityStats(true);
 
-    fetch(`/api/projects/${projectId}/activity-stats`)
-      .then(async (res) => {
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/activity-stats`);
         if (cancelled) return;
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -441,17 +448,17 @@ export default function ProjectDashboardPage() {
           completionRate: number;
         };
         setActivityStats(data);
-      })
-      .catch((err) => {
+      } catch (err) {
         if (!cancelled) {
           console.error("Activity stats fetch failed", err);
           setActivityStats(null);
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoadingActivityStats(false);
-      });
+      }
+    };
 
+    void load();
     return () => {
       cancelled = true;
     };
@@ -464,8 +471,9 @@ export default function ProjectDashboardPage() {
     let cancelled = false;
     setLoadingActivatePlan(true);
 
-    fetch(`/api/projects/${projectId}/activate-plan`)
-      .then(async (res) => {
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/activate-plan`);
         if (cancelled) return;
         if (!res.ok) {
           setActivatePlan(null);
@@ -477,14 +485,14 @@ export default function ProjectDashboardPage() {
           projectStart: data.projectStart,
           projectEnd: data.projectEnd,
         });
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setActivatePlan(null);
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoadingActivatePlan(false);
-      });
+      }
+    };
 
+    void load();
     return () => { cancelled = true; };
   }, [projectId, projectLoadFailed]);
 
@@ -492,23 +500,29 @@ export default function ProjectDashboardPage() {
   useEffect(() => {
     if (!projectId || projectLoadFailed) return;
     let cancelled = false;
-    setLoadingProjectPhases(true);
-    supabase
-      .from("project_phases")
-      .select("id, name, sort_order, start_date, end_date")
-      .eq("project_id", projectId)
-      .order("sort_order", { ascending: true })
-      .then(({ data, error }) => {
+
+    const load = async () => {
+      if (!cancelled) setLoadingProjectPhases(true);
+      try {
+        const { data, error } = await supabase
+          .from("project_phases")
+          .select("id, name, sort_order, start_date, end_date")
+          .eq("project_id", projectId)
+          .order("sort_order", { ascending: true });
         if (cancelled) return;
         if (error) {
           setProjectPhases([]);
           return;
         }
         setProjectPhases((data ?? []) as ProjectPhaseRow[]);
-      })
-      .finally(() => {
+      } catch {
+        if (!cancelled) setProjectPhases([]);
+      } finally {
         if (!cancelled) setLoadingProjectPhases(false);
-      });
+      }
+    };
+
+    void load();
     return () => { cancelled = true; };
   }, [projectId, projectLoadFailed]);
 
@@ -516,12 +530,14 @@ export default function ProjectDashboardPage() {
   useEffect(() => {
     if (!projectId || projectLoadFailed) return;
     let cancelled = false;
-    setActivitiesLoading(true);
-    supabase
-      .from("project_activities")
-      .select("id, project_id, phase_id, name, status, priority, start_date, due_date, progress_pct")
-      .eq("project_id", projectId)
-      .then(({ data, error }) => {
+
+    const load = async () => {
+      if (!cancelled) setActivitiesLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("project_activities")
+          .select("id, project_id, phase_id, name, status, priority, start_date, due_date, progress_pct")
+          .eq("project_id", projectId);
         if (cancelled) return;
         if (error) {
           console.error("Error loading project activities", error);
@@ -529,10 +545,15 @@ export default function ProjectDashboardPage() {
         } else {
           setDashboardActivities((data ?? []) as DashboardProjectActivity[]);
         }
-      })
-      .finally(() => {
+      } catch (err) {
+        console.error("Error loading project activities", err);
+        if (!cancelled) setDashboardActivities([]);
+      } finally {
         if (!cancelled) setActivitiesLoading(false);
-      });
+      }
+    };
+
+    void load();
     return () => { cancelled = true; };
   }, [projectId, projectLoadFailed]);
 
@@ -1195,7 +1216,7 @@ export default function ProjectDashboardPage() {
                 <p className="mt-3 text-[11px] text-slate-500">Cargando…</p>
               ) : (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {activatePlan.phases.map((phase) => {
+                  {activatePlan?.phases?.map((phase) => {
                     const pct = phase.completionPercent;
                     const traffic = pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-slate-300";
                     return (
@@ -1214,7 +1235,7 @@ export default function ProjectDashboardPage() {
                         </span>
                       </div>
                     );
-                  })}
+                  }) ?? null}
                 </div>
               )}
               <Link href={`/projects/${projectId}/planning`} className="mt-2 inline-block text-[11px] font-medium text-indigo-600 hover:text-indigo-800">

@@ -79,9 +79,13 @@ export default function ProjectKnowledgePage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
       const res = await fetch(`/api/projects/${projectId}/notes`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers,
         body: JSON.stringify({
           title,
           body: formBody.trim() || null,

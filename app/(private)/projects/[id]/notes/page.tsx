@@ -81,9 +81,13 @@ export default function ProjectNotesPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
       const res = await fetch(`/api/notes/${note.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers,
         body: JSON.stringify({ is_knowledge_base: next }),
       });
       if (!res.ok) return;

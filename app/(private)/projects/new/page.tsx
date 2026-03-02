@@ -174,9 +174,10 @@ export default function NewProjectPage() {
         try {
           const { data: session } = await supabase.auth.getSession();
           const token = session?.session?.access_token;
-          const headers: Record<string, string> = token
-            ? { Authorization: `Bearer ${token}` }
-            : {};
+          const headers: Record<string, string> = {};
+          if (token) {
+            headers.Authorization = `Bearer ${token}`;
+          }
           const planRes = await fetch(`/api/projects/${projectId}/generate-plan`, {
             method: "POST",
             headers: { "Content-Type": "application/json", ...headers },
