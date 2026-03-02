@@ -236,7 +236,10 @@ export default function ProjectDashboardPage() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const headers: HeadersInit = {};
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
         const [permRes, meRes] = await Promise.all([
           fetch(`/api/projects/${projectId}/permissions`, { headers }),
           fetch("/api/me", { headers }),
@@ -492,36 +495,58 @@ export default function ProjectDashboardPage() {
   useEffect(() => {
     if (!projectId || projectLoadFailed) return;
     let cancelled = false;
-    setLoadingProjectPhases(true);
-    supabase
-      .from("project_phases")
-      .select("id, name, sort_order, start_date, end_date")
-      .eq("project_id", projectId)
-      .order("sort_order", { ascending: true })
-      .then(({ data, error }) => {
+
+    const loadProjectPhases = async () => {
+      if (!cancelled) {
+        setLoadingProjectPhases(true);
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("project_phases")
+          .select("id, name, sort_order, start_date, end_date")
+          .eq("project_id", projectId)
+          .order("sort_order", { ascending: true });
+
         if (cancelled) return;
         if (error) {
           setProjectPhases([]);
           return;
         }
         setProjectPhases((data ?? []) as ProjectPhaseRow[]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingProjectPhases(false);
-      });
-    return () => { cancelled = true; };
+      } catch (err) {
+        console.error("Error loading project phases", err);
+        if (!cancelled) setProjectPhases([]);
+      } finally {
+        if (!cancelled) {
+          setLoadingProjectPhases(false);
+        }
+      }
+    };
+
+    loadProjectPhases();
+
+    return () => {
+      cancelled = true;
+    };
   }, [projectId, projectLoadFailed]);
 
   // Fetch project_activities for "Estado de actividades" card
   useEffect(() => {
     if (!projectId || projectLoadFailed) return;
     let cancelled = false;
-    setActivitiesLoading(true);
-    supabase
-      .from("project_activities")
-      .select("id, project_id, phase_id, name, status, priority, start_date, due_date, progress_pct")
-      .eq("project_id", projectId)
-      .then(({ data, error }) => {
+
+    const loadActivities = async () => {
+      if (!cancelled) {
+        setActivitiesLoading(true);
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("project_activities")
+          .select("id, project_id, phase_id, name, status, priority, start_date, due_date, progress_pct")
+          .eq("project_id", projectId);
+
         if (cancelled) return;
         if (error) {
           console.error("Error loading project activities", error);
@@ -529,10 +554,18 @@ export default function ProjectDashboardPage() {
         } else {
           setDashboardActivities((data ?? []) as DashboardProjectActivity[]);
         }
-      })
-      .finally(() => {
-        if (!cancelled) setActivitiesLoading(false);
-      });
+      } catch (err) {
+        console.error("Error loading project activities", err);
+        if (!cancelled) setDashboardActivities([]);
+      } finally {
+        if (!cancelled) {
+          setActivitiesLoading(false);
+        }
+      }
+    };
+
+    loadActivities();
+
     return () => { cancelled = true; };
   }, [projectId, projectLoadFailed]);
 
@@ -1195,7 +1228,7 @@ export default function ProjectDashboardPage() {
                 <p className="mt-3 text-[11px] text-slate-500">Cargando…</p>
               ) : (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {activatePlan.phases.map((phase) => {
+                  {activatePlan?.phases?.map((phase) => {
                     const pct = phase.completionPercent;
                     const traffic = pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-slate-300";
                     return (
@@ -1214,7 +1247,7 @@ export default function ProjectDashboardPage() {
                         </span>
                       </div>
                     );
-                  })}
+                  }) ?? null}
                 </div>
               )}
               <Link href={`/projects/${projectId}/planning`} className="mt-2 inline-block text-[11px] font-medium text-indigo-600 hover:text-indigo-800">

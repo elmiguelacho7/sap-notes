@@ -25,10 +25,10 @@ const LINK_TYPE_OPTIONS = [
   { value: "Otro", label: "Otro" },
 ];
 
-async function getAuthHeaders(): Promise<Record<string, string>> {
+async function getAuthHeaders(): Promise<HeadersInit | undefined> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return token ? { Authorization: `Bearer ${token}` } : undefined;
 }
 
 export default function ProjectLinksPage() {
@@ -86,7 +86,10 @@ export default function ProjectLinksPage() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const headers: HeadersInit = {};
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
         const [permRes, meRes] = await Promise.all([
           fetch(`/api/projects/${projectId}/permissions`, { headers }),
           fetch("/api/me", { headers }),
