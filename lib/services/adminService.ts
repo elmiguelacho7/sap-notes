@@ -15,14 +15,18 @@ export type UserWithRole = {
   app_role: string;
 };
 
-export type ProjectMemberWithProfile = {
+export type ProjectMemberRow = {
   id: string;
   user_id: string;
   project_id: string;
   role: ProjectMemberRole;
-  user_full_name?: string | null;
-  user_app_role?: string;
+  /** Name from profiles.full_name; can be null. */
+  user_full_name: string | null;
+  /** app_role from profiles join; can be null or undefined. */
+  user_app_role: string | null | undefined;
 };
+
+export type ProjectMemberWithProfile = ProjectMemberRow;
 
 // ==========================
 // getAllUsersWithRoles
@@ -94,6 +98,18 @@ export async function updateUserAppRole(
 // getProjectMembers
 // ==========================
 
+/** Raw shape from Supabase project_members + profiles join. */
+type SupabaseProjectMemberRow = {
+  id: string;
+  user_id: string;
+  project_id: string;
+  role: string;
+  profiles: {
+    full_name: string | null;
+    app_role: string | null;
+  } | null;
+};
+
 export async function getProjectMembers(
   projectId: string
 ): Promise<ProjectMemberWithProfile[]> {
@@ -119,23 +135,18 @@ export async function getProjectMembers(
       `Failed to load project members: ${error.message}`
     );
   }
+  const rows = (data ?? []) as unknown as SupabaseProjectMemberRow[];
 
-  const rows = (data ?? []) as Array<{
-    id: string;
-    user_id: string;
-    project_id: string;
-    role: string;
-    profiles: { full_name: string | null; app_role: string } | null;
-  }>;
-
-  return rows.map((row) => ({
+  const members: ProjectMemberWithProfile[] = rows.map((row) => ({
     id: row.id,
     user_id: row.user_id,
     project_id: row.project_id,
     role: row.role as ProjectMemberRole,
     user_full_name: row.profiles?.full_name ?? null,
-    user_app_role: row.profiles?.app_role,
+    user_app_role: row.profiles?.app_role ?? null,
   }));
+
+  return members;
 }
 
 // ==========================
@@ -172,14 +183,7 @@ export async function setProjectMember(
       `Failed to set project member: ${error.message}`
     );
   }
-
-  const row = data as {
-    id: string;
-    user_id: string;
-    project_id: string;
-    role: string;
-    profiles: { full_name: string | null; app_role: string } | null;
-  };
+  const row = data as unknown as SupabaseProjectMemberRow;
 
   return {
     id: row.id,
@@ -187,7 +191,7 @@ export async function setProjectMember(
     project_id: row.project_id,
     role: row.role as ProjectMemberRole,
     user_full_name: row.profiles?.full_name ?? null,
-    user_app_role: row.profiles?.app_role,
+    user_app_role: row.profiles?.app_role ?? null,
   };
 }
 
