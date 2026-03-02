@@ -4,10 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 /** Returns headers with Bearer token for admin API calls (session is in localStorage). */
-async function getAdminAuthHeaders(): Promise<Record<string, string>> {
+async function getAdminAuthHeaders(): Promise<HeadersInit | undefined> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return token ? { Authorization: `Bearer ${token}` } : undefined;
 }
 
 type TabId = "users" | "projects";

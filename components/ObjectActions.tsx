@@ -32,10 +32,10 @@ const LIST_PATHS: Record<ObjectActionsEntity, string> = {
   ticket: "/tickets",
 };
 
-async function getAuthHeaders(): Promise<Record<string, string>> {
+async function getAuthHeaders(): Promise<HeadersInit | undefined> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return token ? { Authorization: `Bearer ${token}` } : undefined;
 }
 
 export function ObjectActions({
