@@ -27,7 +27,7 @@ Run the script **Supabase Dashboard → SQL Editor**:
 
 ### Step 3 – membership for test project (replace placeholder uuid in SQL first)
 ```
-(paste result: id, project_id, user_id, profile_id, role, my_auth_uid, membership_check_passes)
+(paste result: id, project_id, user_id, role, my_auth_uid, membership_check_passes)
 ```
 
 ### Step 4 – policies on project_tasks
@@ -37,7 +37,7 @@ Run the script **Supabase Dashboard → SQL Editor**:
 
 ### Step 5 – projects I am a member of
 ```
-(paste result: project_id, name, user_id, profile_id, role, i_am_member)
+(paste result: project_id, name, user_id, role, i_am_member)
 ```
 
 ## 3. Report (fill in after running)
@@ -69,10 +69,10 @@ List the policy names and commands from Section 4:
 (paste exact error message here)
 ```
 
-If it’s a constraint (NOT NULL, FK, etc.), check the `[createTask] payload` in the browser console and confirm all required fields are set.
+If it's a constraint (NOT NULL, FK, etc.), check the `[createTask] payload` in the browser console and confirm all required fields are set.
 
 ## 4. If still failing
 
-- **42501** → RLS: confirm membership (Section 3) and that policies use `project_tasks_is_project_member` (Section 4).
+- **42501** → RLS: confirm membership (Section 3) and that policies use `pm.user_id = auth.uid()` only (Section 4).
 - **NOT NULL / FK** → Fix payload in app (e.g. `activity_id`, `title`) or schema.
 - **Other table** → Repeat policy check for that table (e.g. `project_activities` if the error points there).

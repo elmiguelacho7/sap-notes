@@ -13,8 +13,11 @@ import {
   BookOpen,
   CalendarDays,
   CalendarClock,
-  ClipboardList,
   ChevronDown,
+  PanelLeftClose,
+  PanelLeft,
+  CheckSquare,
+  Users,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { ProjectAssistantDock } from "@/components/ai/ProjectAssistantDock";
@@ -37,9 +40,54 @@ type NavLink = {
 type NavGroup = {
   type: "group";
   label: string;
+  key: string;
   Icon: React.ComponentType<{ className?: string }>;
   children: { key: string; label: string; path: string; Icon: React.ComponentType<{ className?: string }> }[];
 };
+
+type SidebarSectionKey = "planificacion" | "conocimiento";
+
+/** Normalize path for comparison: strip trailing slash (keep root). */
+function normalizePath(p: string): string {
+  const s = (p ?? "").trim();
+  if (s === "" || s === "/") return s;
+  return s.endsWith("/") ? s.slice(0, -1) : s;
+}
+
+/** True when pathname equals href or is a strict subpath (pathname.startsWith(href + "/")). */
+function hrefMatchesPath(pathname: string, href: string): boolean {
+  const normPath = normalizePath(pathname);
+  const normHref = normalizePath(href);
+  if (normPath === normHref) return true;
+  if (!normHref || normHref === "/") return false;
+  return normPath.startsWith(normHref + "/");
+}
+
+/** Collect all sidebar link hrefs from nav items (dashboard + group children). */
+function getAllNavHrefs(navItems: (NavLink | NavGroup)[], base: string): string[] {
+  const hrefs: string[] = [];
+  for (const item of navItems) {
+    if (item.type === "link") {
+      hrefs.push(item.path ? `${base}/${item.path}` : base);
+    } else if (item.type === "group") {
+      for (const child of item.children) {
+        hrefs.push(child.path ? `${base}/${child.path}` : base);
+      }
+    }
+  }
+  return hrefs;
+}
+
+/** Active href is the longest matching one so only a single nav item is active (no sibling matches). */
+function getActiveNavHref(pathname: string, navItems: (NavLink | NavGroup)[], base: string): string | null {
+  const hrefs = getAllNavHrefs(navItems, base);
+  let best: string | null = null;
+  for (const href of hrefs) {
+    if (!hrefMatchesPath(pathname, href)) continue;
+    if (best === null || href.length > best.length) best = href;
+  }
+  return best;
+}
 
 function getProjectNavItems(projectId: string): (NavLink | NavGroup)[] {
   const base = `/projects/${projectId}`;
@@ -48,24 +96,29 @@ function getProjectNavItems(projectId: string): (NavLink | NavGroup)[] {
     {
       type: "group",
       label: "Planificación",
+      key: "planificacion",
       Icon: CalendarDays,
       children: [
         { key: "planning-phases", label: "Fases del proyecto", path: "planning", Icon: ListChecks },
         { key: "planning-activities", label: "Actividades por fase", path: "planning/activities", Icon: ListChecks },
         { key: "planning-calendar", label: "Calendario", path: "planning/calendar", Icon: CalendarClock },
+        { key: "members", label: "Miembros", path: "members", Icon: Users },
+        { key: "tickets", label: "Tickets", path: "tickets", Icon: Ticket },
+        { key: "notes", label: "Notas", path: "notes", Icon: FileText },
+        { key: "tasks", label: "Tareas", path: "tasks", Icon: CheckSquare },
+        { key: "links", label: "Enlaces del proyecto", path: "links", Icon: LinkIcon },
       ],
     },
-    { type: "link", path: "tickets", label: "Tickets", Icon: Ticket },
-    { type: "link", path: "notes", label: "Notas", Icon: FileText },
-    { type: "link", path: "tasks", label: "Tareas", Icon: ClipboardList },
-    { type: "link", path: "links", label: "Enlaces del proyecto", Icon: LinkIcon },
-    { type: "link", path: "knowledge", label: "Base de conocimiento", Icon: BookOpen },
+    {
+      type: "group",
+      label: "Conocimiento",
+      key: "conocimiento",
+      Icon: BookOpen,
+      children: [
+        { key: "knowledge", label: "Base de conocimiento", path: "knowledge", Icon: BookOpen },
+      ],
+    },
   ];
-}
-
-function isActiveHref(base: string, path: string, pathname: string) {
-  const href = path ? `${base}/${path}` : base;
-  return pathname === href || (path !== "" && pathname.startsWith(href));
 }
 
 const SIDEBAR_STATUS_LABELS: Record<string, string> = {
@@ -149,90 +202,157 @@ export default function ProjectLayout({
   const navItems = projectId ? getProjectNavItems(projectId) : [];
   const base = projectId ? `/projects/${projectId}` : "";
   const router = useRouter();
+  const activeNavHref = base && navItems.length ? getActiveNavHref(pathname ?? "", navItems, base) : null;
 
-  const [planningOpen, setPlanningOpen] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Record<SidebarSectionKey, boolean>>({
+    planificacion: true,
+    conocimiento: true,
+  });
 
   useEffect(() => {
-    const inPlanningSection =
-      (pathname ?? "").includes("/planning") || (pathname ?? "").includes("/activities");
-    setPlanningOpen(inPlanningSection);
+    const path = pathname ?? "";
+    const inPlanning =
+      path.includes("/planning") || path.includes("/activities") ||
+      path.includes("/tickets") || path.includes("/notes") ||
+      path.includes("/tasks") || path.includes("/links") || path.includes("/members");
+    const inKnowledge = path.includes("/knowledge");
+    if (inPlanning) {
+      setExpandedSections((prev) => ({ ...prev, planificacion: true }));
+    }
+    if (inKnowledge) {
+      setExpandedSections((prev) => ({ ...prev, conocimiento: true }));
+    }
   }, [pathname]);
+
+  const toggleSection = (key: SidebarSectionKey) => {
+    setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   return (
     <div className="flex h-full">
       {/* Sidebar contextual del proyecto */}
-      <aside className="w-64 shrink-0 border-r border-slate-200 bg-slate-50">
+      <aside
+        className={
+          "shrink-0 border-r border-slate-200 bg-slate-50 flex flex-col transition-all duration-200 " +
+          (collapsed ? "w-16" : "w-64")
+        }
+      >
         <div className="flex flex-col h-full">
-          {/* Volver a proyectos */}
-          <div className="px-4 py-3 border-b border-slate-200">
+          {/* Toggle + Volver a proyectos */}
+          <div className="flex items-center gap-1 border-b border-slate-200 px-2 py-3">
+            <button
+              type="button"
+              onClick={() => setCollapsed((c) => !c)}
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all duration-200"
+              title={collapsed ? "Expandir barra" : "Contraer barra"}
+            >
+              {collapsed ? (
+                <PanelLeft className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
+            </button>
+            {!collapsed && (
+              <Link
+                href="/projects"
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-all duration-200"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Volver a proyectos
+              </Link>
+            )}
+          </div>
+          {collapsed && (
             <Link
               href="/projects"
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition"
+              className="flex items-center justify-center border-b border-slate-200 py-3 text-slate-600 hover:bg-slate-100 transition-all duration-200"
+              title="Volver a proyectos"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Volver a proyectos
+              <ArrowLeft className="h-4 w-4" />
             </Link>
-          </div>
+          )}
 
           {/* Info básica del proyecto */}
-          <div className="px-4 py-3 space-y-1 border-b border-slate-200">
+          <div className={"border-b border-slate-200 space-y-1 " + (collapsed ? "px-2 py-3" : "px-4 py-3")}>
             {loading ? (
-              <div className="h-8 w-36 rounded bg-slate-200 animate-pulse" />
+              <div className={collapsed ? "h-8 w-8 rounded bg-slate-200 animate-pulse" : "h-8 w-36 rounded bg-slate-200 animate-pulse"} />
             ) : project ? (
               <>
-                <p className="text-sm font-semibold text-slate-900">
-                  {project.name}
-                </p>
-                {(project.client_name ?? project.code) && (
-                  <p className="text-xs text-slate-500">
-                    {[project.client_name, project.code].filter(Boolean).join(" · ")}
-                  </p>
-                )}
-                {project.status && (
-                  <SidebarStatusBadge status={project.status} />
+                {collapsed ? (
+                  <div className="h-8 w-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                    <span className="text-xs font-bold text-indigo-700">
+                      {(project.name || "P").charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-slate-900 truncate">
+                      {project.name}
+                    </p>
+                    {(project.client_name ?? project.code) && (
+                      <p className="text-xs text-slate-500 truncate">
+                        {[project.client_name, project.code].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                    {project.status && (
+                      <SidebarStatusBadge status={project.status} />
+                    )}
+                  </>
                 )}
               </>
             ) : (
-              <p className="text-xs text-red-500">
-                Proyecto no encontrado o sin acceso.
-              </p>
+              !collapsed && (
+                <p className="text-xs text-red-500">
+                  Proyecto no encontrado o sin acceso.
+                </p>
+              )
             )}
           </div>
 
           {/* Navegación interna del proyecto */}
-          <nav className="flex-1 px-3 py-4 space-y-1 text-sm">
+          <nav className={"flex-1 py-4 space-y-1 text-sm overflow-hidden " + (collapsed ? "px-2" : "px-3")}>
             {navItems.map((item) => {
               if (item.type === "group" && item.children.length > 0) {
+                const sectionKey: SidebarSectionKey = item.key === "conocimiento" ? "conocimiento" : "planificacion";
+                const isExpanded = expandedSections[sectionKey] ?? true;
                 const someChildActive = item.children.some((child) => {
                   const href = child.path ? `${base}/${child.path}` : base;
-                  return pathname === href || (child.path !== "" && (pathname ?? "").startsWith(href + "/"));
+                  return href === activeNavHref;
                 });
 
                 return (
-                  <div key={item.label} className="mt-3 first:mt-0">
+                  <div key={sectionKey} className="mt-3 first:mt-0">
                     <button
                       type="button"
-                      onClick={() => setPlanningOpen((prev) => !prev)}
+                      onClick={() => toggleSection(sectionKey)}
                       className={
-                        "flex w-full items-center justify-between rounded-xl px-3 py-2 text-[11px] font-semibold uppercase tracking-wide transition " +
-                        (someChildActive ? "text-indigo-600" : "text-slate-500 hover:text-slate-700")
+                        "flex w-full items-center rounded-xl px-3 py-2 text-[11px] font-semibold uppercase tracking-wide transition-all duration-200 " +
+                        (collapsed ? "justify-center" : "justify-between gap-2") +
+                        (someChildActive ? " text-indigo-600" : " text-slate-500 hover:text-slate-700")
                       }
+                      title={collapsed ? item.label : undefined}
                     >
-                      <span>{item.label}</span>
-                      <ChevronDown
-                        className={
-                          "h-3.5 w-3.5 shrink-0 transition-transform " +
-                          (planningOpen ? "rotate-180" : "rotate-0") +
-                          (someChildActive ? " text-indigo-600" : " text-slate-400")
-                        }
-                      />
+                      <span className="flex items-center gap-2 min-w-0">
+                        <item.Icon className="h-3.5 w-3.5 shrink-0" />
+                        {!collapsed && <span className="truncate">{item.label}</span>}
+                      </span>
+                      {!collapsed && (
+                        <ChevronDown
+                          className={
+                            "h-3.5 w-3.5 shrink-0 transition-transform duration-200 " +
+                            (isExpanded ? "rotate-180" : "rotate-0") +
+                            (someChildActive ? " text-indigo-600" : " text-slate-400")
+                          }
+                        />
+                      )}
                     </button>
 
-                    {planningOpen && (
+                    {isExpanded && !collapsed && (
                       <div className="mt-1 space-y-0.5">
                         {item.children.map((child) => {
                           const href = child.path ? `${base}/${child.path}` : base;
-                          const active = pathname === href;
+                          const active = href === activeNavHref;
                           const ChildIcon = child.Icon;
                           return (
                             <button
@@ -240,7 +360,7 @@ export default function ProjectLayout({
                               type="button"
                               onClick={() => router.push(href)}
                               className={
-                                "w-full text-left flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition " +
+                                "w-full text-left flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200 " +
                                 (active
                                   ? "bg-indigo-600 text-white shadow-sm"
                                   : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900")
@@ -253,26 +373,69 @@ export default function ProjectLayout({
                         })}
                       </div>
                     )}
+                    {isExpanded && collapsed && (
+                      <div className="mt-1 space-y-0.5">
+                        {item.children.map((child) => {
+                          const href = child.path ? `${base}/${child.path}` : base;
+                          const active = href === activeNavHref;
+                          const ChildIcon = child.Icon;
+                          return (
+                            <button
+                              key={child.key}
+                              type="button"
+                              onClick={() => router.push(href)}
+                              title={child.label}
+                              className={
+                                "w-full flex items-center justify-center rounded-xl px-2 py-2 text-xs font-medium transition-all duration-200 " +
+                                (active
+                                  ? "bg-indigo-600 text-white shadow-sm"
+                                  : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900")
+                              }
+                            >
+                              <ChildIcon className="h-3.5 w-3.5 shrink-0" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               }
 
               if (item.type === "link") {
                 const href = item.path ? `${base}/${item.path}` : base;
-                const active = isActiveHref(base, item.path, pathname ?? "");
+                const active = href === activeNavHref;
+                const Icon = item.Icon;
+                if (collapsed) {
+                  return (
+                    <Link
+                      key={item.path || "dashboard"}
+                      href={href}
+                      title={item.label}
+                      className={
+                        "flex items-center justify-center rounded-xl px-2 py-2 text-xs font-medium transition-all duration-200 " +
+                        (active
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900")
+                      }
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                    </Link>
+                  );
+                }
                 return (
                   <Link
                     key={item.path || "dashboard"}
                     href={href}
                     className={
-                      "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition " +
+                      "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200 " +
                       (active
                         ? "bg-indigo-600 text-white shadow-sm"
                         : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900")
                     }
                   >
-                    <item.Icon className="h-4 w-4 shrink-0" />
-                    <span>{item.label}</span>
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
                   </Link>
                 );
               }

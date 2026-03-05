@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, FormEvent, useCallback } from "react";
+import React, { useEffect, useMemo, useState, FormEvent, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import {
@@ -17,10 +17,13 @@ import {
   PointerSensor,
   KeyboardSensor,
   type DragEndEvent,
+  type DragStartEvent,
   useDroppable,
+  DragOverlay,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { TaskCard } from "@/app/components/TaskCard";
+import { TaskSummary } from "@/app/components/TaskSummary";
 
 type TaskStatus = {
   id: string;
@@ -61,13 +64,15 @@ type TasksBoardProps = {
   columns?: { id: string; label: string }[];
   getStatusKey?: (task: BoardTask) => string;
   onCreateTask?: (payload: CreateTaskPayload) => Promise<void>;
-  onStatusChange?: (taskId: string, newStatusKey: string) => Promise<void>;
+  onStatusChange?: (taskId: string, newStatusKey: string) => void | Promise<void>;
   showActivityField?: boolean;
   activityOptions?: { value: string; label: string }[];
   /** Status key that counts as "done" for metrics (e.g. "DONE" or "done"). */
   doneStatusKey?: string;
   loading?: boolean;
   error?: string | null;
+  /** When true, focus the create-task input on mount (e.g. when opened via ?new=1). */
+  openCreateInitially?: boolean;
 };
 
 export type BoardTask = {
@@ -91,6 +96,25 @@ export type CreateTaskPayload = {
   due_date: string | null;
   activity_id?: string;
 };
+
+function serializeUnknownError(e: unknown): Record<string, unknown> {
+  if (e instanceof Error) {
+    return { name: e.name, message: e.message, stack: e.stack };
+  }
+  if (typeof e === "object" && e !== null) {
+    const anyE = e as Record<string, unknown>;
+    return {
+      message: anyE.message,
+      code: anyE.code,
+      details: anyE.details,
+      hint: anyE.hint,
+      status: anyE.status,
+      statusCode: anyE.statusCode,
+      ...anyE,
+    };
+  }
+  return { value: e };
+}
 
 /** Status code (uppercase from DB) → Tailwind background class for column dot and task left bar */
 const COLUMN_COLOR_MAP: Record<string, string> = {
@@ -149,6 +173,79 @@ function ColumnDroppable({
   );
 }
 
+type ProjectBoardColumnProps = {
+  id: string;
+  label: string;
+  tasks: BoardTask[];
+  columns: { id: string; label: string }[];
+  getStatusKey: (task: BoardTask) => string;
+  onStatusChange: (taskId: string, newStatusKey: string) => void | Promise<void>;
+  showActivityField: boolean;
+  activityOptions: { value: string; label: string }[];
+};
+
+const ProjectBoardColumn = React.memo(function ProjectBoardColumn({
+  id,
+  label,
+  tasks: colTasks,
+  columns,
+  getStatusKey,
+  onStatusChange,
+  showActivityField,
+  activityOptions,
+}: ProjectBoardColumnProps) {
+  const accentBorder = COLUMN_BORDER_MAP[id] ?? "border-t-slate-400";
+  const dotClass = COLUMN_COLOR_MAP[id] ?? "bg-slate-400";
+  return (
+    <ColumnDroppable
+      id={id}
+      className={`flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm p-4 min-h-[240px] transition-colors border-t-4 ${accentBorder} bg-slate-100/80`}
+    >
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2">
+          <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotClass}`} />
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+            {label}
+          </span>
+        </div>
+        <span className="rounded-full bg-slate-200/90 px-2 py-0.5 text-xs font-medium text-slate-700">
+          {colTasks.length}
+        </span>
+      </div>
+      <div className="space-y-2 min-h-[200px]">
+        {colTasks.length === 0 && (
+          <p className="text-xs text-slate-400 px-1 py-2">Sin tareas.</p>
+        )}
+        <SortableContext
+          items={colTasks.map((t) => t.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {colTasks.map((task) => {
+            const activityLabel =
+              showActivityField && task.activity_id
+                ? activityOptions.find((a) => a.value === task.activity_id)?.label ?? null
+                : null;
+            const leftBarClass = COLUMN_COLOR_MAP[getStatusKey(task)] ?? "bg-slate-400";
+            const currentStatusKey = getStatusKey(task);
+            return (
+              <div key={task.id} className="select-none touch-none">
+                <TaskCard
+                  task={task}
+                  activityLabel={activityLabel}
+                  leftBarClass={leftBarClass}
+                  columns={columns}
+                  currentStatusKey={currentStatusKey}
+                  onStatusChange={onStatusChange}
+                />
+              </div>
+            );
+          })}
+        </SortableContext>
+      </div>
+    </ColumnDroppable>
+  );
+});
+
 export default function TasksBoard({
   projectId = null,
   title = "Tablero de tareas",
@@ -163,6 +260,7 @@ export default function TasksBoard({
   doneStatusKey = "DONE",
   loading: controlledLoading = false,
   error: controlledError,
+  openCreateInitially = false,
 }: TasksBoardProps) {
   const isControlled =
     controlledTasks !== undefined &&
@@ -188,6 +286,34 @@ export default function TasksBoard({
   const [newPriority, setNewPriority] = useState<TaskPriority>("medium");
   const [newDueDate, setNewDueDate] = useState<string | null>(null);
   const [newExternalRef, setNewExternalRef] = useState<string>("");
+
+  /** Active task id during drag (controlled mode only); used for DragOverlay. */
+  const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null);
+
+  /** Ref to latest controlled tasks so handleControlledDragEnd can stay stable (no controlledTasks in deps). */
+  const controlledTasksRef = useRef<BoardTask[] | undefined>(undefined);
+  const newTitleInputRef = useRef<HTMLInputElement>(null);
+  if (isControlled && controlledTasks !== undefined) {
+    controlledTasksRef.current = controlledTasks;
+  }
+
+  useEffect(() => {
+    if (openCreateInitially && newTitleInputRef.current) {
+      newTitleInputRef.current.focus();
+      newTitleInputRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [openCreateInitially]);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (newTitleInputRef.current && document.activeElement === newTitleInputRef.current) {
+        newTitleInputRef.current.blur();
+      }
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, []);
 
   // Status TODO por defecto
   const defaultStatusId = useMemo(() => {
@@ -404,7 +530,8 @@ export default function TasksBoard({
         setNewExternalRef("");
         setNewActivityId("");
       } catch (err) {
-        setError("No se pudo crear la tarea.");
+        console.error("createTask caught", serializeUnknownError(err));
+        setError(err instanceof Error ? err.message : "No se pudo crear la tarea. Revisa consola para más detalles.");
       }
       setCreating(false);
       return;
@@ -430,8 +557,16 @@ export default function TasksBoard({
       .single();
 
     if (insertError) {
-      handleSupabaseError("tasks insert", insertError);
-      setError("No se pudo crear la tarea.");
+      console.error("Error creating task (tasks table)", serializeUnknownError(insertError));
+      const meta = {
+        message: insertError.message,
+        code: (insertError as { code?: string }).code,
+        details: (insertError as { details?: string }).details,
+        hint: (insertError as { hint?: string }).hint,
+      };
+      setError(
+        `No se pudo crear la tarea: ${meta.message}${meta.code ? ` (${meta.code})` : ""}`
+      );
     } else if (data) {
       setTasks((prev) => [...prev, data as Task]);
       setNewTitle("");
@@ -519,35 +654,48 @@ export default function TasksBoard({
   const displayMetrics = isControlled ? controlledMetrics : activityMetrics;
 
   const dndSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 6,
+      },
+    }),
     useSensor(KeyboardSensor)
   );
 
+  /**
+   * Controlled (project) board: compute new status from drop target and call parent once.
+   * Parent is responsible for immutable update: setTasks((prev) => prev.map(...)) with
+   * a new array and only the moved task object replaced. We read latest tasks from a ref
+   * so this handler stays stable and does not depend on controlledTasks.
+   */
   const handleControlledDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
-      if (!over || !controlledOnStatusChange || !controlledColumns || !controlledGetStatusKey || !controlledTasks)
-        return;
+      setActiveDragTaskId(null);
+      if (!over || !controlledOnStatusChange || !controlledColumns || !controlledGetStatusKey) return;
+
       const taskId = String(active.id);
-      const columnIds = controlledColumns.map((c) => c.id);
-      const newStatus =
-        columnIds.includes(String(over.id))
-          ? String(over.id)
-          : (() => {
-              const task = controlledTasks.find((t) => t.id === over.id);
-              return task ? controlledGetStatusKey(task) : null;
-            })();
+      const overId = String(over.id);
+      const columnIdsSet = new Set(controlledColumns.map((c) => c.id));
+      const newStatus: string | null = columnIdsSet.has(overId)
+        ? overId
+        : (() => {
+            const tasks = controlledTasksRef.current;
+            if (!tasks) return null;
+            const task = tasks.find((t) => t.id === overId);
+            return task ? controlledGetStatusKey(task) : null;
+          })();
+
       if (newStatus) {
         controlledOnStatusChange(taskId, newStatus);
       }
     },
-    [
-      controlledOnStatusChange,
-      controlledColumns,
-      controlledGetStatusKey,
-      controlledTasks,
-    ]
+    [controlledOnStatusChange, controlledColumns, controlledGetStatusKey]
   );
+
+  const handleControlledDragStart = useCallback((event: DragStartEvent) => {
+    setActiveDragTaskId(String(event.active.id));
+  }, []);
 
   return (
     <div className="flex flex-col gap-6">
@@ -612,6 +760,7 @@ export default function TasksBoard({
               Nueva tarea
             </label>
             <input
+              ref={newTitleInputRef}
               type="text"
               required
               value={newTitle}
@@ -671,119 +820,87 @@ export default function TasksBoard({
 
       {/* Executive activity KPI row */}
       {!effectiveLoading && displayMetrics && (
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center flex-wrap gap-6">
-              <span className="text-sm text-slate-600">
-                Total: <span className="font-semibold text-slate-900">{displayMetrics.totalActivities}</span>
-              </span>
-              <span className="text-sm text-slate-600">
-                Activas: <span className="font-semibold text-slate-900">{displayMetrics.activeActivities}</span>
-              </span>
-              <span className={`text-sm ${displayMetrics.blockedActivities > 0 ? "text-rose-600" : "text-slate-600"}`}>
-                Bloqueadas: <span className="font-semibold">{displayMetrics.blockedActivities}</span>
-              </span>
-              {!isControlled && (
-              <span className="text-sm text-slate-600">
-                En revisión: <span className="font-semibold text-slate-900">{displayMetrics.reviewActivities}</span>
-              </span>
-              )}
-              <span className={`text-sm ${displayMetrics.overdueActivities > 0 ? "text-amber-600" : "text-slate-600"}`}>
-                Vencidas: <span className="font-semibold">{displayMetrics.overdueActivities}</span>
-              </span>
-              <span className="text-sm text-slate-600">
-                Completado: <span className="font-semibold text-slate-900">{displayMetrics.completionRate}%</span>
-              </span>
-            </div>
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                displayMetrics.riskLevel === "Alto"
-                  ? "bg-rose-100 text-rose-600"
-                  : displayMetrics.riskLevel === "Medio"
-                    ? "bg-amber-100 text-amber-600"
-                    : "bg-emerald-100 text-emerald-600"
-              }`}
-            >
-              Riesgo {displayMetrics.riskLevel}
-            </span>
-          </div>
-          <div className="mt-3 h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-indigo-600 transition-all duration-300"
-              style={{ width: `${displayMetrics.completionRate}%` }}
-            />
-          </div>
-        </div>
+        <TaskSummary
+          total={displayMetrics.totalActivities}
+          active={displayMetrics.activeActivities}
+          blocked={displayMetrics.blockedActivities}
+          overdue={displayMetrics.overdueActivities}
+          completedPercent={displayMetrics.completionRate}
+          riskLevel={displayMetrics.riskLevel}
+          review={!isControlled ? displayMetrics.reviewActivities : undefined}
+        />
       )}
 
       {/* Board: controlled mode (project tasks) */}
       {isControlled && (
-        <div className="relative">
+        <div className="relative overflow-visible">
           {effectiveLoading ? (
             <div className="flex items-center justify-center py-16 text-sm text-slate-500">
               Cargando tablero de tareas...
             </div>
           ) : (
             <DndContext
-              collisionDetection={closestCorners}
-              onDragEnd={handleControlledDragEnd}
               sensors={dndSensors}
+              collisionDetection={closestCorners}
+              onDragStart={handleControlledDragStart}
+              onDragEnd={handleControlledDragEnd}
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {controlledGrouped.map(({ id, label, tasks: colTasks }) => {
-                  const accentBorder = COLUMN_BORDER_MAP[id] ?? "border-t-slate-400";
-                  const dotClass = COLUMN_COLOR_MAP[id] ?? "bg-slate-400";
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                {controlledGrouped.map(({ id, label, tasks: colTasks }) => (
+                  <ProjectBoardColumn
+                    key={id}
+                    id={id}
+                    label={label}
+                    tasks={colTasks}
+                    columns={controlledColumns!}
+                    getStatusKey={controlledGetStatusKey!}
+                    onStatusChange={controlledOnStatusChange!}
+                    showActivityField={showActivityField}
+                    activityOptions={activityOptions}
+                  />
+                ))}
+              </div>
+              <DragOverlay>
+                {activeDragTaskId && controlledTasks ? (() => {
+                  const task = controlledTasks.find((t) => t.id === activeDragTaskId);
+                  if (!task) return null;
+                  const leftBarClass =
+                    COLUMN_COLOR_MAP[controlledGetStatusKey?.(task) ?? "pending"] ?? "bg-slate-400";
+                  const activityLabel =
+                    showActivityField && task.activity_id
+                      ? activityOptions.find((a) => a.value === task.activity_id)?.label ?? null
+                      : null;
                   return (
-                    <ColumnDroppable
-                      key={id}
-                      id={id}
-                      className={`flex flex-col rounded-2xl p-3 max-h-[70vh] border-t-4 ${accentBorder} bg-slate-200/60`}
+                    <div
+                      className="relative rounded-xl bg-white border border-slate-200 shadow-lg flex flex-col overflow-hidden cursor-grabbing ring-2 ring-indigo-500 opacity-95 select-none touch-none"
+                      style={{ minWidth: 280 }}
                     >
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotClass}`} />
-                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
-                            {label}
+                      <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl ${leftBarClass}`} />
+                      <div className="pl-4">
+                        <div className="px-3 py-2.5">
+                          <p className="text-sm font-semibold text-slate-900">{task.title}</p>
+                          {activityLabel && (
+                            <p className="text-xs text-slate-500 mt-0.5">Actividad: {activityLabel}</p>
+                          )}
+                          {task.due_date && (
+                            <p className="text-xs text-slate-500">
+                              Límite: {new Date(task.due_date).toLocaleDateString()}
+                            </p>
+                          )}
+                          {task.description && (
+                            <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{task.description}</p>
+                          )}
+                        </div>
+                        <div className="px-3 py-2 border-t border-slate-100 bg-slate-50/60 rounded-b-xl">
+                          <span className="text-[11px] text-slate-400">
+                            {controlledGetStatusKey?.(task) ?? "—"}
                           </span>
                         </div>
-                        <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
-                          {colTasks.length}
-                        </span>
                       </div>
-                      <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
-                        {colTasks.length === 0 && (
-                          <p className="text-xs text-slate-400 px-1 py-2">Sin tareas.</p>
-                        )}
-                        <SortableContext
-                          items={colTasks.map((t) => t.id)}
-                          strategy={verticalListSortingStrategy}
-                        >
-                          {colTasks.map((task) => {
-                            const activityLabel =
-                              showActivityField && task.activity_id
-                                ? activityOptions.find((a) => a.value === task.activity_id)?.label ?? null
-                                : null;
-                            const leftBarClass =
-                              COLUMN_COLOR_MAP[controlledGetStatusKey!(task)] ?? "bg-slate-400";
-                            const currentStatusKey = controlledGetStatusKey!(task);
-                            return (
-                              <TaskCard
-                                key={task.id}
-                                task={task}
-                                activityLabel={activityLabel}
-                                leftBarClass={leftBarClass}
-                                columns={controlledColumns!}
-                                currentStatusKey={currentStatusKey}
-                                onStatusChange={controlledOnStatusChange!}
-                              />
-                            );
-                          })}
-                        </SortableContext>
-                      </div>
-                    </ColumnDroppable>
+                    </div>
                   );
-                })}
-              </div>
+                })() : null}
+              </DragOverlay>
             </DndContext>
           )}
         </div>
@@ -791,7 +908,7 @@ export default function TasksBoard({
 
       {/* Board con drag & drop (global mode) */}
       {!isControlled && (
-      <div className="relative">
+      <div className="relative overflow-visible">
         {loading ? (
           <div className="flex items-center justify-center py-16 text-sm text-slate-500">
             Cargando tablero de tareas...
@@ -811,7 +928,7 @@ export default function TasksBoard({
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`flex flex-col rounded-2xl p-3 max-h-[70vh] transition-colors border-t-4 ${accentBorder} ${columnBg} ${
+                      className={`flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm p-4 min-h-[240px] transition-colors border-t-4 ${accentBorder} ${columnBg} ${
                         snapshot.isDraggingOver
                           ? "bg-indigo-50/60 ring-1 ring-indigo-200"
                           : ""
@@ -832,8 +949,8 @@ export default function TasksBoard({
                         </span>
                       </div>
 
-                      {/* Tasks list */}
-                      <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
+                      {/* Tasks list - no overflow so DnD stays smooth */}
+                      <div className="space-y-2 min-h-[200px]">
                         {tasks.length === 0 && (
                           <p className="text-xs text-slate-400 px-1 py-2">
                             Sin tareas.

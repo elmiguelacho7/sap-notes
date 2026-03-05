@@ -1,107 +1,116 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { Plus, FolderOpen, FileText } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  listSpaces,
+  createSpace,
+  listPages,
+  createPage,
+} from "@/lib/knowledgeService";
+import type { KnowledgeSpace, KnowledgePage } from "@/lib/types/knowledge";
 import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
-
-type KnowledgeNote = {
-  id: string;
-  title: string | null;
-  body: string | null;
-  module: string | null;
-  scope_item: string | null;
-  error_code: string | null;
-  web_link_1: string | null;
-  web_link_2: string | null;
-  extra_info: string | null;
-  created_at: string;
-  is_knowledge_base?: boolean;
-};
 
 export default function ProjectKnowledgePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const projectId = params?.id ?? "";
 
-  const [notes, setNotes] = useState<KnowledgeNote[]>([]);
+  const [spaces, setSpaces] = useState<KnowledgeSpace[]>([]);
+  const [pages, setPages] = useState<KnowledgePage[]>([]);
+  const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [formTitle, setFormTitle] = useState("");
-  const [formBody, setFormBody] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [modalSpace, setModalSpace] = useState(false);
+  const [modalPage, setModalPage] = useState(false);
+  const [newSpaceName, setNewSpaceName] = useState("");
+  const [newSpaceDesc, setNewSpaceDesc] = useState("");
+  const [newPageTitle, setNewPageTitle] = useState("");
   const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const loadNotes = useCallback(async () => {
+  const loadSpaces = useCallback(async () => {
     if (!projectId) return;
     setLoading(true);
-    setErrorMsg(null);
+    setError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/knowledge?limit=50`);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setErrorMsg((data as { error?: string }).error ?? "Error al cargar la base de conocimiento.");
-        setNotes([]);
-        return;
+      const list = await listSpaces(supabase, { projectId });
+      setSpaces(list);
+      if (list.length > 0 && !selectedSpaceId) {
+        setSelectedSpaceId(list[0].id);
+      } else if (list.length === 0) {
+        setSelectedSpaceId(null);
       }
-      const payload = data as { notes?: KnowledgeNote[] };
-      setNotes(payload.notes ?? []);
-    } catch {
-      setErrorMsg("Error de conexión.");
-      setNotes([]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar espacios.");
+      setSpaces([]);
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, selectedSpaceId]);
 
-  useEffect(() => {
-    void loadNotes();
-  }, [loadNotes]);
-
-  const openCreateModal = () => {
-    setFormTitle("");
-    setFormBody("");
-    setFormError(null);
-    setModalOpen(true);
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const title = formTitle.trim();
-    if (!title) {
-      setFormError("El título es obligatorio.");
+  const loadPages = useCallback(async () => {
+    if (!selectedSpaceId) {
+      setPages([]);
       return;
     }
-    setFormError(null);
-    setSaving(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-      const res = await fetch(`/api/projects/${projectId}/notes`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          title,
-          body: formBody.trim() || null,
-          is_knowledge_base: true,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setFormError((data as { error?: string }).error ?? "Error al crear la nota.");
-        return;
-      }
-      const created = (data as { note?: KnowledgeNote }).note;
-      if (created) setNotes((prev) => [created, ...prev]);
-      setModalOpen(false);
+      const list = await listPages(supabase, selectedSpaceId);
+      setPages(list);
     } catch {
-      setFormError("Error de conexión.");
+      setPages([]);
+    }
+  }, [selectedSpaceId]);
+
+  useEffect(() => {
+    loadSpaces();
+  }, [loadSpaces]);
+
+  useEffect(() => {
+    loadPages();
+  }, [loadPages]);
+
+  const handleCreateSpace = async (e: FormEvent) => {
+    e.preventDefault();
+    const name = newSpaceName.trim();
+    if (!name || !projectId) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const space = await createSpace(supabase, {
+        projectId,
+        name,
+        description: newSpaceDesc.trim() || null,
+      });
+      setSpaces((prev) => [...prev, space]);
+      setSelectedSpaceId(space.id);
+      setNewSpaceName("");
+      setNewSpaceDesc("");
+      setModalSpace(false);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Error al crear espacio.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreatePage = async (e: FormEvent) => {
+    e.preventDefault();
+    const title = newPageTitle.trim();
+    if (!title || !selectedSpaceId) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const page = await createPage(supabase, selectedSpaceId, title);
+      setPages((prev) => [page, ...prev]);
+      setNewPageTitle("");
+      setModalPage(false);
+      router.push(`/knowledge/${page.id}`);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Error al crear página.");
     } finally {
       setSaving(false);
     }
@@ -118,115 +127,192 @@ export default function ProjectKnowledgePage() {
   return (
     <div className="space-y-6">
       <ProjectPageHeader
-        title="Base de conocimiento"
-        subtitle="Notas y artículos seleccionados como conocimiento del proyecto."
-        primaryActionLabel="Nueva nota de conocimiento"
-        primaryActionOnClick={openCreateModal}
+        title="Knowledge"
+        subtitle="Espacios y páginas de conocimiento vinculados a este proyecto."
+        primaryActionLabel="Nuevo espacio"
+        primaryActionOnClick={() => { setSaveError(null); setModalSpace(true); }}
       />
 
-      {errorMsg && (
+      {error && (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {errorMsg}
+          {error}
         </div>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="px-4 py-6 text-sm text-slate-500">
-            Cargando…
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="border-b border-slate-200 px-4 py-3 bg-slate-50/50">
+            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Espacios
+            </h2>
           </div>
-        ) : notes.length === 0 ? (
-          <div className="px-4 py-12 text-center text-sm text-slate-500">
-            No hay notas en la base de conocimiento. Añade una con «Nueva nota de conocimiento» o marca notas existentes desde la lista de notas del proyecto.
+          <div className="p-2">
+            {loading ? (
+              <p className="text-sm text-slate-500 px-2 py-4">Cargando…</p>
+            ) : spaces.length === 0 ? (
+              <p className="text-sm text-slate-500 px-2 py-4">
+                No hay espacios. Crea uno con «Nuevo espacio».
+              </p>
+            ) : (
+              <ul className="space-y-0.5">
+                {spaces.map((space) => (
+                  <li key={space.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSpaceId(space.id)}
+                      className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
+                        selectedSpaceId === space.id
+                          ? "bg-indigo-600 text-white"
+                          : "text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      <FolderOpen className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{space.name}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {notes.map((note) => (
-              <li
-                key={note.id}
-                className="px-4 py-3 hover:bg-slate-50/50 transition cursor-pointer"
-                onClick={() => router.push(`/notes/${note.id}`)}
-              >
-                <p className="font-medium text-slate-900">
-                  {note.title ?? "Sin título"}
-                </p>
-                {(note.module ?? note.scope_item) && (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {note.module && (
-                      <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-700">
-                        {note.module}
-                      </span>
-                    )}
-                    {note.scope_item && (
-                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">
-                        {note.scope_item}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {note.body && (
-                  <p className="mt-1 line-clamp-2 text-xs text-slate-600">
-                    {note.body}
-                  </p>
-                )}
-                <p className="mt-1 text-[10px] text-slate-400">
-                  {new Date(note.created_at).toLocaleString("es-ES")}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        </div>
 
-      {modalOpen && (
+        <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="border-b border-slate-200 px-4 py-3 bg-slate-50/50 flex items-center justify-between">
+            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Páginas
+            </h2>
+            <button
+              type="button"
+              onClick={() => { setSaveError(null); setModalPage(true); }}
+              disabled={!selectedSpaceId}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Nueva página
+            </button>
+          </div>
+          <div className="p-4">
+            {!selectedSpaceId ? (
+              <p className="text-sm text-slate-500">
+                Selecciona un espacio para ver sus páginas.
+              </p>
+            ) : pages.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                No hay páginas en este espacio. Crea una con «Nueva página».
+              </p>
+            ) : (
+              <ul className="space-y-1">
+                {pages.map((page) => (
+                  <li key={page.id}>
+                    <Link
+                      href={`/knowledge/${page.id}`}
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <FileText className="h-4 w-4 shrink-0 text-slate-400" />
+                      <span className="font-medium">{page.title}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {modalSpace && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          onClick={() => !saving && setModalOpen(false)}
+          onClick={() => !saving && setModalSpace(false)}
         >
           <div
             className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg max-w-md w-full"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-slate-900">Nueva nota de conocimiento</h2>
-            <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+            <h2 className="text-lg font-semibold text-slate-900">Nuevo espacio</h2>
+            <form onSubmit={handleCreateSpace} className="mt-4 space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Título *</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Nombre *</label>
                 <input
                   type="text"
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  placeholder="Ej: Parámetros de variante de valoración"
+                  value={newSpaceName}
+                  onChange={(e) => setNewSpaceName(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Ej: Configuración SAP"
+                  disabled={saving}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Contenido (opcional)</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Descripción (opcional)</label>
                 <textarea
-                  value={formBody}
-                  onChange={(e) => setFormBody(e.target.value)}
-                  rows={3}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  placeholder="Describe el conocimiento o procedimiento..."
+                  value={newSpaceDesc}
+                  onChange={(e) => setNewSpaceDesc(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Breve descripción"
+                  disabled={saving}
                 />
               </div>
-              {formError && (
-                <p className="text-xs text-red-600">{formError}</p>
-              )}
+              {saveError && <p className="text-sm text-red-600">{saveError}</p>}
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setModalOpen(false)}
+                  onClick={() => setModalSpace(false)}
                   disabled={saving}
-                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
-                  className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                  disabled={saving || !newSpaceName.trim()}
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {saving ? "Guardando…" : "Crear"}
+                  {saving ? "Creando…" : "Crear"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {modalPage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => !saving && setModalPage(false)}
+        >
+          <div
+            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-slate-900">Nueva página</h2>
+            <form onSubmit={handleCreatePage} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Título *</label>
+                <input
+                  type="text"
+                  value={newPageTitle}
+                  onChange={(e) => setNewPageTitle(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Ej: Cómo configurar variante de valoración"
+                  disabled={saving}
+                />
+              </div>
+              {saveError && <p className="text-sm text-red-600">{saveError}</p>}
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalPage(false)}
+                  disabled={saving}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving || !newPageTitle.trim()}
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {saving ? "Creando…" : "Crear"}
                 </button>
               </div>
             </form>

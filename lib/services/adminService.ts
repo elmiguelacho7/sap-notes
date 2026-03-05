@@ -29,6 +29,94 @@ export type ProjectMemberRow = {
 export type ProjectMemberWithProfile = ProjectMemberRow;
 
 // ==========================
+// findUserIdByEmail
+// ==========================
+
+/**
+ * Resolves auth user id from email: profiles.email first (case-insensitive), then auth.users.
+ * Returns null if not found.
+ */
+export async function findUserIdByEmail(email: string): Promise<string | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .ilike("email", normalized)
+    .maybeSingle();
+
+  if (profile?.id) return (profile as { id: string }).id;
+
+  const { data: authData } = await supabaseAdmin.auth.admin.listUsers({
+    perPage: 1000,
+  });
+  const user = (authData?.users ?? []).find(
+    (u) => u.email?.toLowerCase() === normalized
+  );
+  return user?.id ?? null;
+}
+
+// ==========================
+// createAdminUser
+// ==========================
+
+export type CreateAdminUserInput = {
+  email: string;
+  full_name?: string | null;
+  app_role?: AppRole;
+};
+
+/**
+ * Creates an auth user (email_confirm: true) and ensures a profiles row exists.
+ * Returns { id, email }. Throws on duplicate email or other error.
+ */
+export async function createAdminUser(
+  input: CreateAdminUserInput
+): Promise<{ id: string; email: string }> {
+  const email = input.email.trim();
+  if (!email) throw new Error("Email is required");
+
+  const appRole: AppRole =
+    input.app_role === "superadmin" || input.app_role === "consultant"
+      ? input.app_role
+      : "consultant";
+  const fullName = input.full_name?.trim() ?? null;
+
+  const { data: authUser, error: authError } =
+    await supabaseAdmin.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      user_metadata: { full_name: fullName },
+    });
+
+  if (authError) {
+    if (authError.message?.toLowerCase().includes("already been registered")) {
+      throw new Error("Ya existe un usuario con ese email.");
+    }
+    throw new Error(authError.message || "Error al crear el usuario.");
+  }
+
+  if (!authUser?.user?.id) {
+    throw new Error("Error al crear el usuario.");
+  }
+
+  const userId = authUser.user.id;
+
+  await supabaseAdmin.from("profiles").upsert(
+    {
+      id: userId,
+      email,
+      full_name: fullName,
+      app_role: appRole,
+    },
+    { onConflict: "id" }
+  );
+
+  return { id: userId, email: authUser.user.email ?? email };
+}
+
+// ==========================
 // getAllUsersWithRoles
 // ==========================
 
@@ -48,7 +136,12 @@ export async function getAllUsersWithRoles(): Promise<UserWithRole[]> {
     );
   }
 
-  const list = (profiles ?? []) as { id: string; full_name: string | null; email: string | null; app_role: string }[];
+  const list = (profiles ?? []) as {
+    id: string;
+    full_name: string | null;
+    email: string | null;
+    app_role: string;
+  }[];
 
   // Prefer email from profiles; optionally enrich from Auth when available
   try {
@@ -212,4 +305,140 @@ export async function removeProjectMember(
       `Failed to remove project member: ${error.message}`
     );
   }
+}
+
+// ==========================
+// project_invitations (invite by email)
+// ==========================
+
+/**
+ * Upsert a pending project invitation. Uses service role.
+ * ON CONFLICT (project_id, email) updates role, status, invited_by, invited_at.
+ */
+export async function upsertProjectInvitation(
+  projectId: string,
+  email: string,
+  role: ProjectMemberRole,
+  invitedBy: string | null
+): Promise<void> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) throw new Error("Email requerido.");
+
+  const { error } = await supabaseAdmin
+    .from("project_invitations")
+    .upsert(
+      {
+        project_id: projectId,
+        email: normalized,
+        role,
+        status: "pending",
+        invited_by: invitedBy,
+        invited_at: new Date().toISOString(),
+      },
+      { onConflict: "project_id,email" }
+    );
+
+  if (error) {
+    throw new Error(
+      error.message || "Error al guardar la invitación."
+    );
+  }
+}
+
+/**
+ * Send Supabase invite email. Uses auth.admin.inviteUserByEmail.
+ * redirectTo should be the app URL where the user lands after accepting (e.g. /auth/callback).
+ */
+export async function sendInviteEmail(
+  email: string,
+  options?: { redirectTo?: string }
+): Promise<void> {
+  const result = await inviteUserByEmailWithResult(
+    email,
+    options?.redirectTo
+  );
+  if (result.error) {
+    if (result.error.message?.toLowerCase().includes("already been registered")) {
+      throw new Error("Ya existe un usuario con ese email.");
+    }
+    throw new Error(result.error.message || "Error al enviar la invitación.");
+  }
+}
+
+/**
+ * Call inviteUserByEmail and return raw result for logging/debugging.
+ */
+export async function inviteUserByEmailWithResult(
+  email: string,
+  redirectTo?: string
+): Promise<{
+  data: unknown;
+  error: { message: string; status?: number; code?: string } | null;
+}> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) {
+    return { data: null, error: { message: "Email requerido." } };
+  }
+
+  const baseUrl =
+    redirectTo ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (typeof process.env.VERCEL_URL === "string"
+      ? `https://${process.env.VERCEL_URL}`
+      : undefined);
+
+  const redirectToFinal = baseUrl
+    ? `${baseUrl.replace(/\/$/, "")}/auth/callback`
+    : undefined;
+
+  const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+    normalized,
+    redirectToFinal ? { redirectTo: redirectToFinal } : {}
+  );
+
+  return {
+    data,
+    error: error
+      ? {
+          message: error.message,
+          status: (error as { status?: number }).status,
+          code: (error as { code?: string }).code,
+        }
+      : null,
+  };
+}
+
+/**
+ * Generate a magic link for signup (fallback when invite email fails).
+ * Returns the action_link so it can be sent manually.
+ */
+export async function generateMagicLinkForInvite(
+  email: string,
+  redirectTo: string
+): Promise<string> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) throw new Error("Email requerido.");
+
+  const redirectToFinal = `${redirectTo.replace(/\/$/, "")}/auth/callback`;
+
+  const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+    type: "magiclink",
+    email: normalized,
+    options: { redirectTo: redirectToFinal },
+  });
+
+  if (error) {
+    throw new Error(error.message || "Error al generar el enlace.");
+  }
+
+  const link =
+    (data as { properties?: { action_link?: string } })?.properties
+      ?.action_link ?? (data as { action_link?: string })?.action_link ?? "";
+
+  if (!link) {
+    throw new Error("No se pudo generar el enlace de invitación.");
+  }
+
+  return link;
 }

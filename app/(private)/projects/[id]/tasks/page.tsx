@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import type { ProjectTask } from "@/lib/types/projectTasks";
@@ -10,6 +10,25 @@ import TasksBoard, {
   type CreateTaskPayload,
 } from "@/app/components/TasksBoard";
 import { ChevronLeft } from "lucide-react";
+
+function serializeUnknownError(e: unknown): Record<string, unknown> {
+  if (e instanceof Error) {
+    return { name: e.name, message: e.message, stack: e.stack };
+  }
+  if (typeof e === "object" && e !== null) {
+    const anyE = e as Record<string, unknown>;
+    return {
+      message: anyE.message,
+      code: anyE.code,
+      details: anyE.details,
+      hint: anyE.hint,
+      status: anyE.status,
+      statusCode: anyE.statusCode,
+      ...anyE,
+    };
+  }
+  return { value: e };
+}
 
 const KANBAN_COLUMNS: { id: string; label: string }[] = [
   { id: "pending", label: "Por hacer" },
@@ -21,8 +40,21 @@ const KANBAN_COLUMNS: { id: string; label: string }[] = [
 export default function ProjectTasksPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const projectId = (params?.id ?? "") as string;
   const activityFilter = searchParams?.get("activity") || null;
+  const openCreateFromQuery = searchParams?.get("new") === "1";
+
+  const [showCreandoBanner, setShowCreandoBanner] = useState(false);
+  useEffect(() => {
+    if (openCreateFromQuery && pathname) {
+      setShowCreandoBanner(true);
+      router.replace(pathname);
+      const t = setTimeout(() => setShowCreandoBanner(false), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [openCreateFromQuery, pathname, router]);
 
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [activities, setActivities] = useState<{ id: string; name: string }[]>([]);
@@ -106,7 +138,8 @@ export default function ProjectTasksPage() {
         throw new Error("Selecciona una actividad.");
       }
 
-      const { error } = await supabase.from("project_tasks").insert({
+      console.debug("[createTask] start");
+      const insertPayload = {
         project_id: projectId,
         activity_id: payload.activity_id,
         title: payload.title,
@@ -114,33 +147,63 @@ export default function ProjectTasksPage() {
         priority: payload.priority ?? "medium",
         due_date: payload.due_date ?? null,
         status: "pending",
-      });
+      };
+      console.debug("[createTask] payload", insertPayload);
+
+      const { data: createdRow, error } = await supabase
+        .from("project_tasks")
+        .insert(insertPayload)
+        .select("*")
+        .single();
 
       if (error) {
-        console.error("Error creating task", error);
-        throw new Error(error.message || "No se pudo crear la tarea.");
+        const meta = {
+          message: error.message,
+          code: (error as { code?: string }).code,
+          details: (error as { details?: string }).details,
+          hint: (error as { hint?: string }).hint,
+        };
+        console.error("Error creating task", serializeUnknownError(error));
+        console.debug("[createTask] failure", serializeUnknownError(error));
+        throw new Error(
+          `Supabase task insert failed: ${meta.message} | code=${meta.code ?? "?"} | details=${meta.details ?? ""} | hint=${meta.hint ?? ""}`
+        );
       }
+
+      console.debug("[createTask] success", createdRow);
       await loadData();
     },
     [projectId, loadData]
   );
 
   const handleUpdateStatus = useCallback(
-    async (taskId: string, newStatusKey: string) => {
-      const { error } = await supabase
+    (taskId: string, newStatusKey: string) => {
+      let previousStatus: ProjectTask["status"] | null = null;
+      // Optimistic update first so drag-end is not blocked by Supabase
+      setTasks((prev) =>
+        prev.map((t) => {
+          if (t.id !== taskId) return t;
+          previousStatus = t.status;
+          return { ...t, status: newStatusKey as ProjectTask["status"] };
+        })
+      );
+      // Persist in background; revert on failure
+      supabase
         .from("project_tasks")
         .update({ status: newStatusKey })
-        .eq("id", taskId);
-
-      if (error) {
-        console.error("Error updating task status", error);
-        return;
-      }
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskId ? { ...t, status: newStatusKey as ProjectTask["status"] } : t
-        )
-      );
+        .eq("id", taskId)
+        .then(({ error }) => {
+          if (error) {
+            console.error("Error updating task status", error);
+            if (previousStatus !== null) {
+              setTasks((prev) =>
+                prev.map((t) =>
+                  t.id === taskId ? { ...t, status: previousStatus! } : t
+                )
+              );
+            }
+          }
+        });
     },
     []
   );
@@ -160,6 +223,11 @@ export default function ProjectTasksPage() {
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {showCreandoBanner && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 transition-opacity duration-300">
+            Creando...
+          </div>
+        )}
         <Link
           href={`/projects/${projectId}`}
           className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-indigo-600"
@@ -205,6 +273,7 @@ export default function ProjectTasksPage() {
             doneStatusKey="done"
             loading={loading}
             error={errorMsg}
+            openCreateInitially={openCreateFromQuery}
           />
         )}
       </div>

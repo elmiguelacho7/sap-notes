@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { BoardTask } from "@/app/components/TasksBoard";
@@ -13,7 +14,7 @@ type TaskCardProps = {
   onStatusChange: (taskId: string, newStatusKey: string) => void | Promise<void>;
 };
 
-export function TaskCard({
+function TaskCardComponent({
   task,
   activityLabel,
   leftBarClass,
@@ -41,13 +42,13 @@ export function TaskCard({
       style={style}
       {...attributes}
       {...listeners}
-      className={`relative rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition flex flex-col overflow-hidden ${
-        isDragging ? "ring-2 ring-indigo-500 shadow-lg opacity-90 z-10" : ""
+      className={`relative rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow transition-all flex flex-col overflow-hidden ${
+        isDragging ? "ring-2 ring-indigo-500 shadow-lg opacity-90 z-10" : "hover:border-slate-300"
       }`}
     >
-      <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${leftBarClass}`} />
+      <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl ${leftBarClass}`} />
       <div className="pl-4">
-        <div className="px-3 py-2">
+        <div className="px-3 py-2.5">
           <p className="text-sm font-semibold text-slate-900">{task.title}</p>
           {activityLabel && (
             <p className="text-xs text-slate-500 mt-0.5">Actividad: {activityLabel}</p>
@@ -61,7 +62,7 @@ export function TaskCard({
             <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{task.description}</p>
           )}
         </div>
-        <div className="px-3 py-2 border-t border-slate-100 flex items-center justify-between gap-2 bg-slate-50/50">
+        <div className="px-3 py-2 border-t border-slate-100 flex items-center justify-between gap-2 bg-slate-50/60 rounded-b-xl">
           <select
             value={currentStatusKey}
             onChange={(e) => onStatusChange(task.id, e.target.value)}
@@ -84,3 +85,5 @@ export function TaskCard({
     </div>
   );
 }
+
+export const TaskCard = React.memo(TaskCardComponent);

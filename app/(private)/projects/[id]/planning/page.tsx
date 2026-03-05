@@ -1,22 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
-import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
 import {
   getProjectPhases,
   updateProjectPhase,
   type ProjectPhase,
 } from "@/lib/services/projectPhaseService";
 import { ChevronLeft, ChevronDown, ChevronUp } from "lucide-react";
+import ProjectGanttPro from "@/app/components/ProjectGanttPro";
 
 type Project = {
   id: string;
   name: string;
   description: string | null;
+  start_date?: string | null;
+  planned_end_date?: string | null;
 };
 
 function getMinMaxDates(phases: ProjectPhase[]): {
@@ -55,6 +57,7 @@ export default function ProjectPlanningPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [generatingPhases, setGeneratingPhases] = useState(false);
+  const [generatingPlan, setGeneratingPlan] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
   const [saveAllMessage, setSaveAllMessage] = useState<string | null>(null);
 
@@ -62,7 +65,7 @@ export default function ProjectPlanningPage() {
     if (!projectId) return;
     const { data, error } = await supabase
       .from("projects")
-      .select("id, name, description")
+      .select("id, name, description, start_date, planned_end_date")
       .eq("id", projectId)
       .single();
     if (error) {
@@ -261,56 +264,120 @@ export default function ProjectPlanningPage() {
     }
   };
 
+  const generateActivatePlanFromTemplate = async () => {
+    if (!projectId || !project?.start_date || !project?.planned_end_date) return;
+    setGeneratingPlan(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(`/api/projects/${projectId}/generate-activate-plan`, { method: "POST", headers });
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; skipped?: boolean };
+      if (json.ok && !json.skipped) {
+        await loadPhases();
+      } else if (json.error) {
+        setErrorMsg(json.error === "missing_dates" ? "Indica fechas de inicio y fin en el proyecto." : json.error);
+      }
+    } catch (err) {
+      console.error("Generate activate plan error", err);
+      setErrorMsg("No se pudo generar el plan.");
+    } finally {
+      setGeneratingPlan(false);
+    }
+  };
+
   if (!projectId) {
     return (
-      <main className="min-h-screen bg-slate-50 px-4 py-6">
-        <div className="max-w-4xl mx-auto">
+      <main className="min-h-screen bg-slate-50">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6 lg:py-8">
           <p className="text-sm text-slate-600">No se ha encontrado el identificador del proyecto.</p>
         </div>
       </main>
     );
   }
 
+  const { minStartDate, maxEndDate } = getMinMaxDates(phases);
+  const projectDateRange =
+    minStartDate && maxEndDate
+      ? `${new Date(minStartDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })} – ${new Date(maxEndDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}`
+      : null;
+
+  const ganttProjectStart = minStartDate ?? project?.start_date ?? new Date().toISOString().slice(0, 10);
+  const ganttProjectEnd = maxEndDate ?? project?.planned_end_date ?? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-6">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <main className="min-h-screen bg-slate-50">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6 lg:py-8 space-y-6">
         <Link
           href={`/projects/${projectId}`}
-          className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-indigo-600"
+          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
         >
           <ChevronLeft className="h-4 w-4" />
           Volver al proyecto
         </Link>
 
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900">
+              {loading ? "Cargando…" : (project?.name ?? "Proyecto")} · Planificación
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Define el orden y las fechas de las fases SAP Activate de este proyecto.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {phases.length > 0 ? (
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-emerald-700">
+                Plan generado
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                Plan pendiente
+              </span>
+            )}
+            {projectDateRange && (
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                {projectDateRange}
+              </span>
+            )}
+          </div>
+        </header>
+
         {errorMsg && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
             {errorMsg}
           </div>
         )}
-
-        <ProjectPageHeader
-          title={loading ? "Cargando…" : (project?.name ?? "Proyecto") + " · Planificación"}
-          subtitle="Fases SAP Activate: edita nombres, orden y fechas."
-        />
 
         {loading ? (
           <p className="text-sm text-slate-500">Cargando fases…</p>
         ) : phases.length === 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-900">
+            <h2 className="text-lg font-semibold text-slate-900">
               Este proyecto no tiene fases de planificación
             </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Puedes generar automáticamente las fases SAP Activate.
+            <p className="mt-2 text-sm text-slate-500">
+              Puedes generar solo las fases o el plan completo (fases, actividades y tareas) si el proyecto tiene fechas.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
+              {project?.start_date && project?.planned_end_date && (
+                <button
+                  type="button"
+                  onClick={generateActivatePlanFromTemplate}
+                  disabled={generatingPlan}
+                  className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {generatingPlan ? "Generando…" : "Generar plan desde plantilla"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={generateDefaultPhases}
                 disabled={generatingPhases}
-                className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {generatingPhases ? "Generando…" : "Generar fases SAP Activate"}
+                {generatingPhases ? "Generando…" : "Generar solo fases"}
               </button>
               <Link
                 href={`/projects/${projectId}`}
@@ -321,12 +388,42 @@ export default function ProjectPlanningPage() {
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-b border-slate-200 bg-slate-50/80">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Fases del proyecto
-              </p>
-              <div className="flex items-center gap-3">
+          <>
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
+                <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Plan visual
+                </h2>
+                <p className="mt-0.5 text-sm text-slate-600">
+                  Vista rápida por fases
+                </p>
+              </div>
+              <div className="p-5">
+                <ProjectGanttPro
+                  phases={phases.map((p) => ({
+                    id: p.id,
+                    name: p.name,
+                    start_date: p.start_date,
+                    end_date: p.end_date,
+                    sort_order: p.sort_order ?? 0,
+                    phase_key: p.phase_key ?? null,
+                  }))}
+                  projectStart={ganttProjectStart}
+                  projectEnd={ganttProjectEnd}
+                  title="Vista rápida por fases"
+                  showLegend={false}
+                  height={280}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Fases del proyecto
+                </p>
+                <div className="flex items-center gap-3">
                 {saveAllMessage && (
                   <span
                     className={
@@ -342,32 +439,34 @@ export default function ProjectPlanningPage() {
                   type="button"
                   onClick={handleSaveAll}
                   disabled={savingAll}
-                  className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {savingAll ? "Guardando…" : "Guardar planificación"}
                 </button>
               </div>
+              </div>
             </div>
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/80">
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 w-20">
-                    Orden
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Nombre
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 w-40">
-                    Inicio
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 w-40">
-                    Fin
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 w-28">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
+            <div className="overflow-x-auto -mx-1">
+              <table className="w-full text-left min-w-[520px]">
+                <thead className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200 shadow-sm">
+                  <tr>
+                    <th className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 w-20 whitespace-nowrap">
+                      Orden
+                    </th>
+                    <th className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 min-w-[180px]">
+                      Nombre
+                    </th>
+                    <th className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 w-36">
+                      Inicio
+                    </th>
+                    <th className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 w-36">
+                      Fin
+                    </th>
+                    <th className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 w-24 text-right">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
               <tbody>
                 {phases.map((phase, index) => (
                   <PhaseRow
@@ -385,6 +484,8 @@ export default function ProjectPlanningPage() {
               </tbody>
             </table>
           </div>
+        </div>
+        </>
         )}
       </div>
     </main>
@@ -426,60 +527,62 @@ function PhaseRow({
   };
 
   return (
-    <tr className="border-b border-slate-100 hover:bg-slate-50/50">
-      <td className="px-4 py-2">
-        <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            onClick={() => onMove(index, "up")}
-            disabled={index === 0}
-            className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 disabled:opacity-40 disabled:pointer-events-none"
-            aria-label="Subir"
-          >
-            <ChevronUp className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onMove(index, "down")}
-            disabled={index === total - 1}
-            className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 disabled:opacity-40 disabled:pointer-events-none"
-            aria-label="Bajar"
-          >
-            <ChevronDown className="h-4 w-4" />
-          </button>
-          <span className="ml-1 text-sm font-medium text-slate-500">{phase.sort_order}</span>
+    <tr className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
+      <td className="px-4 py-2 align-middle">
+        <div className="flex items-center gap-1">
+          <div className="inline-flex flex-col rounded-lg border border-slate-200 bg-slate-50/80 p-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => onMove(index, "up")}
+              disabled={index === 0}
+              className="rounded-md p-1 text-slate-500 hover:bg-slate-200 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+              aria-label="Subir"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onMove(index, "down")}
+              disabled={index === total - 1}
+              className="rounded-md p-1 text-slate-500 hover:bg-slate-200 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+              aria-label="Bajar"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <span className="text-xs font-medium text-slate-600 tabular-nums">{phase.sort_order}</span>
         </div>
       </td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-2 align-middle">
         <input
           type="text"
           value={name}
           onChange={(e) => onPhaseNameChange(phase.id, e.target.value)}
-          className="w-full max-w-xs rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className="w-full max-w-xs rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
         />
       </td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-2 align-middle">
         <input
           type="date"
           value={startDate}
           onChange={(e) => onPhaseDateChange(phase.id, "start_date", e.target.value)}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
         />
       </td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-2 align-middle">
         <input
           type="date"
           value={endDate}
           onChange={(e) => onPhaseDateChange(phase.id, "end_date", e.target.value)}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
         />
       </td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-2 align-middle text-right">
         <button
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed w-fit"
+          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {saving ? "Guardando…" : "Guardar"}
         </button>

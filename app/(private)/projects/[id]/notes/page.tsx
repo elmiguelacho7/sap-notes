@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
@@ -23,7 +23,14 @@ type ProjectNoteSummary = {
 export default function ProjectNotesPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const projectId = params?.id ?? "";
+
+  useEffect(() => {
+    if (searchParams?.get("new") === "1" && projectId) {
+      router.replace(`/notes/new?projectId=${projectId}&from=quick`);
+    }
+  }, [searchParams, projectId, router]);
 
   const [notes, setNotes] = useState<ProjectNoteSummary[]>([]);
   const [loading, setLoading] = useState(true);

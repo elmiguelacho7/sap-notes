@@ -146,3 +146,20 @@ export async function isProjectOwner(
   if (error || !data) return false;
   return (data as { role: string }).role === "owner";
 }
+
+/**
+ * Returns true if the user is any member of the project (any role in project_members).
+ */
+export async function isProjectMember(
+  userId: string,
+  projectId: string
+): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from("project_members")
+    .select("id")
+    .eq("project_id", projectId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  return !error && !!data;
+}

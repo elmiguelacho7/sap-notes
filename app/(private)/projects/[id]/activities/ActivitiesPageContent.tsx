@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
@@ -57,6 +57,7 @@ export default function ProjectActivitiesPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const projectId = (params?.id ?? "") as string;
 
   const [project, setProject] = useState<Project | null>(null);
@@ -74,6 +75,31 @@ export default function ProjectActivitiesPageContent() {
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [profilesLoading, setProfilesLoading] = useState(false);
+
+  /** activity_id -> risk_level (LOW | MEDIUM | HIGH) from activity_risk_metrics view */
+  const [riskByActivity, setRiskByActivity] = useState<Record<string, string>>({});
+
+  /** Banner "Creando..." when opened via ?new=1 */
+  const [showCreandoBanner, setShowCreandoBanner] = useState(false);
+
+  useEffect(() => {
+    if (searchParams?.get("new") === "1" && pathname) {
+      setIsCreating(true);
+      setShowCreandoBanner(true);
+      router.replace(pathname);
+      const t = setTimeout(() => setShowCreandoBanner(false), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [searchParams, pathname, router]);
+
+  useEffect(() => {
+    if (!isCreating) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsCreating(false);
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isCreating]);
 
   const loadData = useCallback(async () => {
     if (!projectId) return;
@@ -117,6 +143,7 @@ export default function ProjectActivitiesPageContent() {
 
       if (activitiesRes.error) {
         setActivities([]);
+        setRiskByActivity({});
       } else {
         const activitiesList = (activitiesRes.data ?? []) as ProjectActivity[];
         const tasks = (tasksRes.data ?? []) as {
@@ -150,6 +177,25 @@ export default function ProjectActivitiesPageContent() {
           derived_progress_pct: progressByActivity[a.id] ?? 0,
         }));
         setActivities(activitiesWithProgress);
+
+        const activityIds = activitiesList.map((a) => a.id);
+        if (activityIds.length > 0) {
+          const riskRes = await supabase
+            .from("activity_risk_metrics")
+            .select("activity_id, risk_level")
+            .in("activity_id", activityIds);
+          if (!riskRes.error && riskRes.data?.length) {
+            const byId: Record<string, string> = {};
+            for (const row of riskRes.data as { activity_id: string; risk_level: string }[]) {
+              byId[row.activity_id] = row.risk_level;
+            }
+            setRiskByActivity(byId);
+          } else {
+            setRiskByActivity({});
+          }
+        } else {
+          setRiskByActivity({});
+        }
       }
 
       if (profilesRes.error) {
@@ -228,7 +274,7 @@ export default function ProjectActivitiesPageContent() {
   if (!projectId) {
     return (
       <main className="min-h-screen bg-slate-50">
-        <div className="max-w-5xl mx-auto px-4 py-6">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6 lg:py-8">
           <p className="text-sm text-slate-600">No se ha encontrado el identificador del proyecto.</p>
         </div>
       </main>
@@ -237,31 +283,36 @@ export default function ProjectActivitiesPageContent() {
 
   return (
     <main className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6 lg:py-8 space-y-6">
+        {showCreandoBanner && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 transition-opacity duration-300">
+            Creando...
+          </div>
+        )}
         <Link
           href={`/projects/${projectId}`}
-          className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-indigo-600"
+          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
         >
           <ChevronLeft className="h-4 w-4" />
           Volver al proyecto
         </Link>
 
         {errorMsg && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
             {errorMsg}
           </div>
         )}
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900 md:text-2xl">
+            <h1 className="text-2xl font-semibold text-slate-900">
               Actividades del proyecto
             </h1>
             <p className="mt-1 text-sm text-slate-500">
               Plan de trabajo estructurado por fases SAP Activate.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <select
               value={selectedPhaseId}
               onChange={(e) => setSelectedPhaseId(e.target.value as string | "all")}
@@ -278,59 +329,68 @@ export default function ProjectActivitiesPageContent() {
               type="button"
               onClick={() => setIsCreating(true)}
               disabled={phases.length === 0}
-              className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="h-4 w-4" />
               Nueva actividad
             </button>
           </div>
-        </div>
+        </header>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
-          {loading ? (
-            <p className="text-sm text-slate-500">Cargando actividades…</p>
-          ) : activities.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              Este proyecto aún no tiene actividades. Crea la primera actividad para empezar el plan de trabajo.
-            </p>
-          ) : filteredActivities.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              No hay actividades en la fase seleccionada.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <th className="pb-3 pr-4">Fase</th>
-                    <th className="pb-3 pr-4">Actividad</th>
-                    <th className="pb-3 pr-4 w-28">Responsable</th>
-                    <th className="pb-3 pr-4 w-36">Estado</th>
-                    <th className="pb-3 pr-4 w-32">Inicio</th>
-                    <th className="pb-3 pr-4 w-32">Fin</th>
-                    <th className="pb-3 pr-4 w-24">% avance</th>
-                    <th className="pb-3 w-28">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredActivities.map((activity) => (
-                    <ActivityRow
-                      key={activity.id}
-                      activity={activity}
-                      phaseName={getPhaseName(activity.phase_id)}
-                      profiles={profiles}
-                      onUpdate={updateActivity}
-                      saving={savingId === activity.id}
-                      onEdit={() => setEditingActivity(activity)}
-                      onDelete={() => setDeleteConfirmId(activity.id)}
-                      onViewTasks={handleViewTasks}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
+            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Listado de actividades
+            </h2>
+          </div>
+          <div className="p-5">
+            {loading ? (
+              <p className="text-sm text-slate-500">Cargando actividades…</p>
+            ) : activities.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                Este proyecto aún no tiene actividades. Crea la primera actividad para empezar el plan de trabajo.
+              </p>
+            ) : filteredActivities.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                No hay actividades en la fase seleccionada.
+              </p>
+            ) : (
+              <div className="overflow-x-auto -mx-5 px-5">
+                <table className="w-full text-left text-sm">
+                  <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
+                    <tr className="border-b border-slate-200">
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-32 align-middle">Fase</th>
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 min-w-[180px] align-middle">Actividad</th>
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-36 align-middle">Responsable</th>
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-32 align-middle">Estado</th>
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-32 align-middle">Inicio</th>
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-32 align-middle">Fin</th>
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-20 align-middle">%</th>
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-20 align-middle">Riesgo</th>
+                      <th className="px-4 py-3 pl-4 pr-5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-40 text-right align-middle">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredActivities.map((activity) => (
+                      <ActivityRow
+                        key={activity.id}
+                        activity={activity}
+                        phaseName={getPhaseName(activity.phase_id)}
+                        profiles={profiles}
+                        riskLevel={riskByActivity[activity.id]}
+                        onUpdate={updateActivity}
+                        saving={savingId === activity.id}
+                        onEdit={() => setEditingActivity(activity)}
+                        onDelete={() => setDeleteConfirmId(activity.id)}
+                        onViewTasks={handleViewTasks}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
       {(isCreating || editingActivity) && (
@@ -396,6 +456,7 @@ type ActivityRowProps = {
   activity: ProjectActivity;
   phaseName: string;
   profiles: Profile[];
+  riskLevel?: string | null;
   onUpdate: (id: string, payload: Partial<ProjectActivity>) => Promise<void>;
   saving: boolean;
   onEdit: () => void;
@@ -407,6 +468,7 @@ function ActivityRow({
   activity,
   phaseName,
   profiles,
+  riskLevel,
   onUpdate,
   saving,
   onEdit,
@@ -437,12 +499,12 @@ function ActivityRow({
   };
 
   return (
-    <tr className="border-b border-slate-100 hover:bg-slate-50/50">
-      <td className="py-3 pr-4 text-slate-700">{phaseName}</td>
-      <td className="py-3 pr-4 font-medium text-slate-900">{activity.name}</td>
-      <td className="py-3 pr-4">
+    <tr className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+      <td className="px-4 py-3 text-slate-700 align-middle">{phaseName}</td>
+      <td className="px-4 py-3 font-medium text-slate-900 align-middle">{activity.name}</td>
+      <td className="px-4 py-3 align-middle">
         <select
-          className="w-full min-w-0 max-w-[140px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full min-w-0 max-w-[140px] rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           value={ownerProfileId ?? ""}
           onChange={(e) => setOwnerProfileId(e.target.value || null)}
         >
@@ -454,11 +516,11 @@ function ActivityRow({
           ))}
         </select>
       </td>
-      <td className="py-3 pr-4">
+      <td className="px-4 py-3 align-middle">
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
           {STATUS_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
@@ -467,34 +529,52 @@ function ActivityRow({
           ))}
         </select>
       </td>
-      <td className="py-3 pr-4">
+      <td className="px-4 py-3 align-middle">
         <input
           type="date"
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
       </td>
-      <td className="py-3 pr-4">
+      <td className="px-4 py-3 align-middle">
         <input
           type="date"
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
       </td>
-      <td className="py-3 pr-4">
-        <span className="text-slate-700" title="Progreso derivado de tareas (hechas / total)">
+      <td className="px-4 py-3 align-middle">
+        <span className="text-slate-700 tabular-nums" title="Progreso derivado de tareas (hechas / total)">
           {displayProgress}%
         </span>
       </td>
-      <td className="py-3">
-        <div className="flex flex-wrap items-center gap-1">
+      <td className="px-4 py-3 align-middle">
+        {riskLevel == null || riskLevel === "" ? (
+          <span className="text-slate-400 text-[11px]">—</span>
+        ) : (
+          <span
+            className={
+              riskLevel === "HIGH"
+                ? "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium bg-red-100 text-red-700"
+                : riskLevel === "MEDIUM"
+                  ? "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium bg-amber-100 text-amber-700"
+                  : "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium bg-emerald-100 text-emerald-700"
+            }
+          >
+            {riskLevel === "HIGH" ? "Alto" : riskLevel === "MEDIUM" ? "Medio" : "Bajo"}
+          </span>
+        )}
+      </td>
+      <td className="px-4 py-3 align-middle text-right">
+        <div className="flex items-center justify-end gap-1 flex-wrap">
           <button
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            title="Guardar"
           >
             <Save className="h-3.5 w-3.5" />
             {saving ? "…" : "Guardar"}
@@ -502,24 +582,26 @@ function ActivityRow({
           <button
             type="button"
             onClick={onEdit}
-            className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white w-8 h-8 text-slate-600 hover:bg-slate-50 shrink-0"
             aria-label="Editar"
+            title="Editar"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={onViewTasks.bind(null, activity.id)}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white w-8 h-8 text-slate-600 hover:bg-slate-50 shrink-0"
+            title="Ver tareas"
           >
             <ListTodo className="h-3.5 w-3.5" />
-            Ver tareas
           </button>
           <button
             type="button"
             onClick={onDelete}
-            className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+            className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white w-8 h-8 text-red-600 hover:bg-red-50 shrink-0"
             aria-label="Eliminar"
+            title="Eliminar"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -549,6 +631,18 @@ function ActivityFormModal({
   onSaved,
 }: ActivityFormModalProps) {
   const isEdit = !!activity;
+  const formContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isEdit) return;
+    const el = formContainerRef.current?.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+      "input, select, textarea"
+    );
+    if (el) {
+      const t = setTimeout(() => el.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [isEdit]);
   const [phaseId, setPhaseId] = useState(activity?.phase_id ?? initialPhaseId ?? "");
   const [title, setTitle] = useState(activity?.name ?? "");
   const [description, setDescription] = useState(activity?.description ?? "");
@@ -654,6 +748,7 @@ function ActivityFormModal({
       onClick={onClose}
     >
       <div
+        ref={formContainerRef}
         className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >

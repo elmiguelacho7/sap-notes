@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
@@ -19,20 +19,16 @@ type Module = {
   name: string;
 };
 
-const ENVIRONMENT_TYPES = [
-  "SAP ECC",
-  "S/4HANA On-Premise",
-  "S/4HANA Private Cloud",
-  "S/4HANA Public Cloud",
-  "Otro / Mixto",
+const ENVIRONMENT_OPTIONS = [
+  { label: "S/4HANA Public Cloud", value: "cloud_public" },
+  { label: "S/4HANA On-Premise", value: "on_premise" },
 ];
 
 const STATUS_OPTIONS = [
-  "Planeado",
-  "En curso",
-  "En UAT",
-  "Productivo",
-  "Cerrado",
+  { label: "Planeado", value: "planned" },
+  { label: "En progreso", value: "in_progress" },
+  { label: "Completado", value: "completed" },
+  { label: "Archivado", value: "archived" },
 ];
 
 export default function NewProjectPage() {
@@ -43,11 +39,11 @@ export default function NewProjectPage() {
   const [description, setDescription] = useState("");
 
   // Contexto SAP
-  const [environmentType, setEnvironmentType] = useState("");
+  const [environmentType, setEnvironmentType] = useState("cloud_public");
   const [sapVersion, setSapVersion] = useState("");
   const [startDate, setStartDate] = useState("");
   const [plannedEndDate, setPlannedEndDate] = useState("");
-  const [status, setStatus] = useState("Planeado");
+  const [status, setStatus] = useState("planned");
 
   // Cliente
   const [clients, setClients] = useState<Client[]>([]);
@@ -62,9 +58,32 @@ export default function NewProjectPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [planWarning, setPlanWarning] = useState<string | null>(null);
 
+  // Modal crear cliente
+  const [createClientModalOpen, setCreateClientModalOpen] = useState(false);
+  const [newClientName, setNewClientName] = useState("");
+  const [creatingClient, setCreatingClient] = useState(false);
+  const [createClientError, setCreateClientError] = useState<string | null>(null);
+
   // ==========================
   // CARGA DE CLIENTES Y MÓDULOS
   // ==========================
+  const loadClients = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name, country, industry")
+        .order("name", { ascending: true });
+      if (error) {
+        handleSupabaseError("clients", error);
+        setClients([]);
+      } else {
+        setClients((data ?? []) as Client[]);
+      }
+    } catch (err) {
+      handleSupabaseError("projects/new loadClients", err);
+    }
+  }, []);
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -84,7 +103,7 @@ export default function NewProjectPage() {
           handleSupabaseError("clients", clientError);
           setClients([]);
         } else {
-          setClients(clientData ?? []);
+          setClients((clientData ?? []) as Client[]);
         }
 
         if (moduleError) {
@@ -112,6 +131,39 @@ export default function NewProjectPage() {
     );
   };
 
+  const handleCreateClient = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newClientName.trim() || creatingClient) return;
+    setCreatingClient(true);
+    setCreateClientError(null);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch("/api/admin/clients", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ name: newClientName.trim() }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; client?: { id: string; name: string } };
+      if (!res.ok) {
+        setCreateClientError(data.error ?? "Error al crear el cliente.");
+        return;
+      }
+      if (data.client) {
+        setNewClientName("");
+        setCreateClientModalOpen(false);
+        await loadClients();
+        setClientId(data.client.id);
+      }
+    } catch {
+      setCreateClientError("Error de conexión.");
+    } finally {
+      setCreatingClient(false);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -127,24 +179,21 @@ export default function NewProjectPage() {
       return;
     }
 
-    if (!status) {
-      setErrorMsg("Debes indicar el estado del proyecto.");
-      return;
-    }
-
     setSaving(true);
     setPlanWarning(null);
+
+    const safeStatus = status || "planned";
+    const safeEnvironmentType = environmentType || "cloud_public";
 
     try {
       const payload = {
         name: name.trim(),
         description: description.trim() || null,
-        environment_type: environmentType,
-        sap_version: sapVersion.trim() || null,
+        client_id: clientId || null,
+        environment_type: safeEnvironmentType,
+        status: safeStatus,
         start_date: startDate || null,
         planned_end_date: plannedEndDate || null,
-        status,
-        client_id: clientId || null,
       };
 
       // 1) Crear proyecto y recuperar su id
@@ -155,9 +204,9 @@ export default function NewProjectPage() {
         .single();
 
       if (projectError || !project) {
-        handleSupabaseError("projects insert", projectError);
+        console.error("Project creation error:", projectError);
         setErrorMsg(
-          (projectError as { message?: string })?.message || "No se pudo crear el proyecto."
+          "Error creando el proyecto. Revisa los datos del formulario o contacta soporte."
         );
         setSaving(false);
         return;
@@ -165,39 +214,38 @@ export default function NewProjectPage() {
 
       const projectId = project.id as string;
 
-      // 2) Create default project phases (Discover, Prepare, Explore, etc.)
-      await createDefaultPhasesForProject(projectId);
-
+      // 2) Phases + activities + tasks: if project has dates, use SAP Activate plan generator; otherwise create phases only
       let planFailed = false;
-      // 3) Generate SAP Activate plan if we have start and end dates
       if (startDate && plannedEndDate) {
         try {
           const { data: session } = await supabase.auth.getSession();
           const token = session?.session?.access_token;
-          const headers: Record<string, string> = {};
-          if (token) {
-            headers.Authorization = `Bearer ${token}`;
-          }
-          const planRes = await fetch(`/api/projects/${projectId}/generate-plan`, {
+          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          if (token) headers.Authorization = `Bearer ${token}`;
+          const planRes = await fetch(`/api/projects/${projectId}/generate-activate-plan`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", ...headers },
+            headers,
           });
-          const planJson = await planRes.json().catch(() => ({}));
-          if (!planRes.ok) {
-            console.warn("Plan generation failed", planJson);
+          const planJson = (await planRes.json().catch(() => ({}))) as {
+            ok?: boolean;
+            skipped?: boolean;
+            error?: string;
+            message?: string;
+          };
+          if (!planRes.ok || planJson.error) {
             planFailed = true;
-            setPlanWarning(
-              (planJson as { error?: string })?.error ?? "No se pudo generar el plan de actividades."
-            );
+            setPlanWarning(planJson.message ?? planJson.error ?? "No se pudo generar el plan de actividades.");
           }
         } catch (planErr) {
           console.warn("Plan generation error", planErr);
           planFailed = true;
           setPlanWarning("No se pudo generar el plan de actividades.");
         }
+      } else {
+        await createDefaultPhasesForProject(projectId);
       }
 
-      // 4) Insertar módulos relacionados (si hay)
+      // 3) Insertar módulos relacionados (si hay)
       if (selectedModuleIds.length > 0) {
         const projectModulesPayload = selectedModuleIds.map((moduleId) => ({
           project_id: projectId,
@@ -285,19 +333,32 @@ export default function NewProjectPage() {
                   <label className="text-xs font-medium text-slate-700">
                     Cliente
                   </label>
-                  <select
-                    value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
-                  >
-                    <option value="">Sin cliente asignado todavía</option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.name}
-                        {client.country ? ` · ${client.country}` : ""}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      value={clientId}
+                      onChange={(e) => setClientId(e.target.value)}
+                      className="flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    >
+                      <option value="">Sin cliente asignado todavía</option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {client.name}
+                          {client.country ? ` · ${client.country}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreateClientError(null);
+                        setNewClientName("");
+                        setCreateClientModalOpen(true);
+                      }}
+                      className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    >
+                      Crear cliente
+                    </button>
+                  </div>
                   <p className="text-[11px] text-slate-400">
                     Si es un proyecto interno o aún no está definido, puedes dejarlo vacío.
                   </p>
@@ -337,10 +398,9 @@ export default function NewProjectPage() {
                     onChange={(e) => setEnvironmentType(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
                   >
-                    <option value="">Selecciona una opción</option>
-                    {ENVIRONMENT_TYPES.map((env) => (
-                      <option key={env} value={env}>
-                        {env}
+                    {ENVIRONMENT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
                       </option>
                     ))}
                   </select>
@@ -398,9 +458,9 @@ export default function NewProjectPage() {
                     onChange={(e) => setStatus(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
                   >
-                    {STATUS_OPTIONS.map((st) => (
-                      <option key={st} value={st}>
-                        {st}
+                    {STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
                       </option>
                     ))}
                   </select>
@@ -477,6 +537,58 @@ export default function NewProjectPage() {
             </div>
           </form>
         </div>
+
+        {/* Modal Crear cliente */}
+        {createClientModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+            onClick={() => !creatingClient && setCreateClientModalOpen(false)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                Crear cliente
+              </h3>
+              <form onSubmit={handleCreateClient} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Nombre del cliente
+                  </label>
+                  <input
+                    type="text"
+                    value={newClientName}
+                    onChange={(e) => setNewClientName(e.target.value)}
+                    placeholder="Ej: Acme Corp"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    disabled={creatingClient}
+                    autoFocus
+                  />
+                </div>
+                {createClientError && (
+                  <p className="text-sm text-red-600">{createClientError}</p>
+                )}
+                <div className="flex gap-2 justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={() => !creatingClient && setCreateClientModalOpen(false)}
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!newClientName.trim() || creatingClient}
+                    className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {creatingClient ? "Creando…" : "Crear"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

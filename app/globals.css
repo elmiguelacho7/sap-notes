@@ -27,3 +27,44 @@ body {
 
 
 @import 'reactflow/dist/style.css';
+
+/* Vis timeline polish */
+.vis-timeline {
+  border: none;
+}
+.vis-panel.vis-bottom,
+.vis-panel.vis-center {
+  border-color: rgba(226, 232, 240, 0.9);
+}
+.vis-time-axis .vis-text {
+  font-size: 11px;
+  color: rgb(100, 116, 139);
+}
+
+/* Rounded items */
+.vis-item {
+  border-radius: 10px;
+}
+
+/* Phase bars */
+.phase-bar.vis-item {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.35);
+}
+.phase-bar .vis-item-content {
+  font-weight: 600;
+}
+
+/* Risk colors */
+.risk-high.vis-item {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+.risk-med.vis-item {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+.risk-low.vis-item {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
+}

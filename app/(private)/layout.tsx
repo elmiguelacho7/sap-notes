@@ -10,6 +10,7 @@ import {
   FolderKanban,
   Ticket,
   GitBranch,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -25,6 +26,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/notes": "Notas",
   "/tasks": "Tareas",
   "/projects": "Proyectos",
+  "/knowledge": "Knowledge",
   "/tickets": "Tickets",
   "/process-flows": "Flujos de proceso",
   "/account": "Cuenta",
@@ -35,6 +37,7 @@ function getPageTitle(pathname: string): string {
   if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
   if (pathname.startsWith("/projects/") && pathname !== "/projects") return "Proyecto";
   if (pathname.startsWith("/notes/")) return "Nota";
+  if (pathname.startsWith("/knowledge/")) return "Knowledge";
   if (pathname.startsWith("/tickets")) return "Tickets";
   return "Project Hub";
 }
@@ -53,6 +56,7 @@ const mainNavItems: NavItemConfig[] = [
   { label: "Notas", href: "/notes", icon: FileText },
   { label: "Tareas", href: "/tasks", icon: ListChecks },
   { label: "Proyectos", href: "/projects", icon: FolderKanban },
+  { label: "Knowledge", href: "/knowledge", icon: BookOpen },
   { label: "Tickets", href: "/tickets", icon: Ticket },
   { label: "Flujos de proceso", href: "/process-flows/demo", icon: GitBranch },
 ];
@@ -169,6 +173,7 @@ export default function PrivateLayout({
   const isActive = (path: string) => {
     if (path === "/admin") return pathname === "/admin";
     if (path === "/account") return pathname === "/account";
+    if (path === "/knowledge") return pathname === "/knowledge" || pathname.startsWith("/knowledge/");
     if (path === "/process-flows" || path === "/process-flows/demo")
       return pathname.startsWith("/process-flows");
     if (path === "/tickets") return pathname.startsWith("/tickets");

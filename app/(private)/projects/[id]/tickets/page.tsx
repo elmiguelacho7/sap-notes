@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
@@ -68,7 +68,15 @@ function StatusBadge({ status }: { status: TicketStatus }) {
 
 export default function ProjectTicketsPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const projectId = (params?.id ?? "") as string;
+
+  useEffect(() => {
+    if (searchParams?.get("new") === "1" && projectId) {
+      router.replace(`/projects/${projectId}/tickets/new?from=quick`);
+    }
+  }, [searchParams, projectId, router]);
 
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,7 +141,7 @@ export default function ProjectTicketsPage() {
         title="Tickets del proyecto"
         subtitle="Incidencias y solicitudes vinculadas a este proyecto."
         primaryActionLabel="Nuevo ticket"
-        primaryActionHref={`/tickets/new?projectId=${projectId}`}
+        primaryActionHref={`/projects/${projectId}/tickets/new`}
       />
 
       {errorMsg && (

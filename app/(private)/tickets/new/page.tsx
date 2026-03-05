@@ -62,6 +62,8 @@ export default function NewTicketPage() {
       due_date: dueDate.trim() || null,
     };
 
+    const effectiveProjectId = (projectIdFromQuery?.trim() || projectId.trim()) || null;
+
     const { data, error } = await supabase
       .from("tickets")
       .insert(payload)
@@ -78,7 +80,11 @@ export default function NewTicketPage() {
 
     const createdId = data?.id as string | undefined;
     if (createdId) {
-      router.push(`/tickets/${createdId}`);
+      if (effectiveProjectId) {
+        router.push(`/projects/${effectiveProjectId}/tickets`);
+      } else {
+        router.push(`/tickets/${createdId}`);
+      }
     } else {
       setErrorMsg("El ticket se creó pero no se pudo redirigir. Ve a la lista de tickets.");
       setSubmitting(false);

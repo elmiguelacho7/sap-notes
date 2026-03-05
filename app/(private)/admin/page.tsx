@@ -14,7 +14,7 @@ async function getAdminAuthHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-type TabId = "users" | "projects";
+type TabId = "users" | "projects" | "clients";
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -116,10 +116,28 @@ function AdminPanel() {
           >
             Acceso a proyectos
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("clients")}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+              activeTab === "clients"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            Clientes
+          </button>
+          <a
+            href="/admin/roles"
+            className="px-3 py-1.5 rounded-lg font-medium text-slate-500 hover:text-slate-900 transition-colors"
+          >
+            Roles y permisos
+          </a>
         </div>
 
         {activeTab === "users" && <UsersRolesPanel />}
         {activeTab === "projects" && <ProjectAccessPanel />}
+        {activeTab === "clients" && <ClientsPanel />}
       </div>
     </div>
   );
@@ -129,17 +147,26 @@ type AdminUser = {
   id: string;
   full_name?: string | null;
   email?: string | null;
-  app_role: "superadmin" | "consultant";
+  app_role: string;
+};
+
+type AppRoleOption = {
+  id: string;
+  key: string;
+  name: string;
+  scope?: "app";
+  is_active?: boolean;
 };
 
 function UsersRolesPanel() {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [appRoles, setAppRoles] = useState<AppRoleOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rolesError, setRolesError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
-  const [pendingRoles, setPendingRoles] = useState<
-    Record<string, "superadmin" | "consultant">
-  >({});
+  const [pendingRoles, setPendingRoles] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -176,18 +203,48 @@ function UsersRolesPanel() {
     };
   }, []);
 
-  const handleRoleChange = (
-    userId: string,
-    newRole: "superadmin" | "consultant"
-  ) => {
-    setPendingRoles((prev) => ({ ...prev, [userId]: newRole }));
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchAppRoles() {
+      setRolesError(null);
+      try {
+        const headers = await getAdminAuthHeaders();
+        const res = await fetch("/api/admin/app-roles", { headers });
+        if (cancelled) return;
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          setRolesError(data.error ?? "No se pudieron cargar los roles de aplicación.");
+          setAppRoles([]);
+          return;
+        }
+        const data = (await res.json()) as { roles?: AppRoleOption[] };
+        if (cancelled) return;
+        setAppRoles(data.roles ?? []);
+      } catch {
+        if (!cancelled) {
+          setRolesError("No se pudieron cargar los roles de aplicación.");
+          setAppRoles([]);
+        }
+      }
+    }
+
+    void fetchAppRoles();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleRoleChange = (userId: string, newRoleKey: string) => {
+    setSaveMessage(null);
+    setPendingRoles((prev) => ({ ...prev, [userId]: newRoleKey }));
   };
 
   const handleSaveRole = async (userId: string) => {
     const user = users.find((u) => u.id === userId);
     if (!user) return;
-    const newRole = pendingRoles[userId] ?? user.app_role;
-    if (newRole === user.app_role) {
+    const newRoleKey = pendingRoles[userId] ?? user.app_role;
+    if (newRoleKey === user.app_role) {
       setPendingRoles((prev) => {
         const next = { ...prev };
         delete next[userId];
@@ -198,25 +255,28 @@ function UsersRolesPanel() {
 
     setSavingUserId(userId);
     setError(null);
+    setSaveMessage(null);
     try {
       const headers = await getAdminAuthHeaders();
-      const res = await fetch("/api/admin/users", {
+      const res = await fetch(`/api/admin/users/${userId}/app-role`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ userId, appRole: newRole }),
+        body: JSON.stringify({ appRoleKey: newRoleKey }),
       });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setError("No se pudo actualizar el rol.");
+        setSaveMessage({ type: "error", text: data.error ?? "No se pudo actualizar el rol." });
         return;
       }
       setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, app_role: newRole } : u))
+        prev.map((u) => (u.id === userId ? { ...u, app_role: newRoleKey } : u))
       );
       setPendingRoles((prev) => {
         const next = { ...prev };
         delete next[userId];
         return next;
       });
+      setSaveMessage({ type: "success", text: "Rol actualizado correctamente." });
     } finally {
       setSavingUserId(null);
     }
@@ -225,13 +285,39 @@ function UsersRolesPanel() {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-900">
-          Usuarios y roles
-        </h2>
-        <p className="text-xs text-slate-500">
-          Define el rol global de cada usuario en la plataforma.
-        </p>
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">
+            Usuarios y roles
+          </h2>
+          <p className="text-xs text-slate-500">
+            Define el rol global de cada usuario en la plataforma.
+          </p>
+        </div>
+        <a
+          href="/admin/users"
+          className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700"
+        >
+          Crear usuario
+        </a>
       </div>
+
+      {rolesError && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+          {rolesError}
+        </div>
+      )}
+
+      {saveMessage && (
+        <div
+          className={`rounded-xl border px-4 py-2 text-sm ${
+            saveMessage.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-red-200 bg-red-50 text-red-800"
+          }`}
+        >
+          {saveMessage.text}
+        </div>
+      )}
 
       {loading ? (
         <p className="text-sm text-slate-500">Cargando usuarios...</p>
@@ -253,6 +339,12 @@ function UsersRolesPanel() {
                   user.full_name || user.email || "Sin nombre";
                 const currentRole =
                   pendingRoles[user.id] ?? user.app_role;
+                const roleOptions = appRoles.length > 0
+                  ? appRoles
+                  : [
+                      { id: "consultant", key: "consultant", name: "Consultor" },
+                      { id: "superadmin", key: "superadmin", name: "Superadmin" },
+                    ];
                 return (
                   <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-4 text-slate-900">
@@ -262,13 +354,21 @@ function UsersRolesPanel() {
                       <select
                         value={currentRole}
                         onChange={(e) =>
-                          handleRoleChange(user.id, e.target.value as "superadmin" | "consultant")
+                          handleRoleChange(user.id, e.target.value)
                         }
                         className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                         disabled={savingUserId === user.id}
                       >
-                        <option value="consultant">Consultor</option>
-                        <option value="superadmin">Superadmin</option>
+                        {roleOptions.map((role) => (
+                          <option key={role.id} value={role.key}>
+                            {role.name}
+                          </option>
+                        ))}
+                        {roleOptions.every((r) => r.key !== currentRole) && currentRole && (
+                          <option value={currentRole}>
+                            {currentRole}
+                          </option>
+                        )}
                       </select>
                     </td>
                     <td className="py-3 px-4 text-right">
@@ -629,6 +729,151 @@ function ProjectAccessPanel() {
             </>
           )}
         </div>
+      </div>
+    </section>
+  );
+}
+
+type ClientRow = {
+  id: string;
+  name: string;
+  created_at?: string;
+  created_by?: string | null;
+};
+
+function ClientsPanel() {
+  const [clients, setClients] = useState<ClientRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [newName, setNewName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const loadClients = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const headers = await getAdminAuthHeaders();
+      const res = await fetch("/api/admin/clients", { headers });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(data.error ?? "Error al cargar los clientes.");
+        setClients([]);
+        return;
+      }
+      const data = (await res.json()) as { clients?: ClientRow[] };
+      setClients(data.clients ?? []);
+    } catch {
+      setError("Error de conexión.");
+      setClients([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadClients();
+  }, [loadClients]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim() || saving) return;
+    setSaving(true);
+    setCreateError(null);
+    try {
+      const headers = await getAdminAuthHeaders();
+      headers["Content-Type"] = "application/json";
+      const res = await fetch("/api/admin/clients", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; client?: ClientRow };
+      if (!res.ok) {
+        setCreateError(data.error ?? "Error al crear el cliente.");
+        return;
+      }
+      setNewName("");
+      if (data.client) setClients((prev) => [...prev, data.client!].sort((a, b) => a.name.localeCompare(b.name)));
+    } catch {
+      setCreateError("Error de conexión.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-900">
+          Clientes
+        </h2>
+        <p className="text-xs text-slate-500">
+          Crear y listar clientes para asignar a proyectos.
+        </p>
+      </div>
+
+      {error && (
+        <p className="text-sm text-red-600">{error}</p>
+      )}
+
+      <form onSubmit={handleCreate} className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+        <p className="text-xs font-medium text-slate-700 uppercase tracking-wide">
+          Crear cliente
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[200px] flex-1">
+            <label className="block text-xs text-slate-600 mb-1">
+              Nombre
+            </label>
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Nombre del cliente"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              disabled={saving}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={!newName.trim() || saving}
+            className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          >
+            {saving ? "Creando…" : "Crear cliente"}
+          </button>
+        </div>
+        {createError && (
+          <p className="text-sm text-red-600">{createError}</p>
+        )}
+      </form>
+
+      <div>
+        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
+          Listado de clientes
+        </p>
+        {loading ? (
+          <p className="text-sm text-slate-500">Cargando clientes…</p>
+        ) : clients.length === 0 ? (
+          <p className="text-sm text-slate-500">Aún no hay clientes. Crea uno arriba.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="py-3 px-4">Nombre</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {clients.map((c) => (
+                  <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3 px-4 text-slate-900">{c.name}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </section>
   );

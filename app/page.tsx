@@ -1,26 +1,28 @@
 "use client";
 
-import { useState, type FormEvent, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, type FormEvent, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get("next");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Si ya hay sesión, mandamos directo al dashboard
+  // Si ya hay sesión, mandamos directo al dashboard o a la URL solicitada
   useEffect(() => {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        router.replace("/dashboard");
+        router.replace(nextUrl && nextUrl.startsWith("/") ? nextUrl : "/dashboard");
       }
     };
     checkSession();
-  }, [router]);
+  }, [router, nextUrl]);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -38,7 +40,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push(nextUrl && nextUrl.startsWith("/") ? nextUrl : "/dashboard");
   };
 
   return (
@@ -140,5 +142,13 @@ export default function LoginPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-slate-50 flex items-center justify-center"><p className="text-sm text-slate-500">Cargando…</p></main>}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

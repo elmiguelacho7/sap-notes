@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, useRef, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 
@@ -46,6 +46,33 @@ const SYSTEM_TYPES = [
 
 export default function NewNotePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromQuick = searchParams?.get("from") === "quick";
+  const projectIdFromQuery = searchParams?.get("projectId") ?? "";
+
+  const [showCreandoBanner, setShowCreandoBanner] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (fromQuick) {
+      setShowCreandoBanner(true);
+      const t = setTimeout(() => setShowCreandoBanner(false), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [fromQuick]);
+
+  useEffect(() => {
+    if (fromQuick && titleInputRef.current) {
+      const t = setTimeout(() => titleInputRef.current?.focus(), 100);
+      return () => clearTimeout(t);
+    }
+  }, [fromQuick]);
+
+  useEffect(() => {
+    if (fromQuick && projectIdFromQuery) {
+      router.replace(`/notes/new?projectId=${projectIdFromQuery}`);
+    }
+  }, [fromQuick, projectIdFromQuery, router]);
 
   // Encabezado
   const [title, setTitle] = useState("");
@@ -212,6 +239,11 @@ export default function NewNotePage() {
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-8 flex justify-center">
       <div className="w-full max-w-3xl">
+        {showCreandoBanner && (
+          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 transition-opacity duration-300">
+            Creando...
+          </div>
+        )}
         {/* Título y descripción (igual estilo que tenías) */}
         <h1 className="text-2xl font-semibold text-slate-900">
           Nueva nota
@@ -236,6 +268,7 @@ export default function NewNotePage() {
                 Título <span className="text-red-500">*</span>
               </label>
               <input
+                ref={titleInputRef}
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
