@@ -18,6 +18,8 @@ import type { TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
 import { FileText, BookOpen, Link as LinkIcon, Ticket, CalendarDays, AlertTriangle, CalendarClock, User, Ban, Plus, CheckSquare, ListTodo } from "lucide-react";
 import { getSuggestedKnowledgeForProject } from "@/lib/knowledgeService";
 import type { KnowledgePage } from "@/lib/types/knowledge";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 import {
   BarChart,
   Bar,
@@ -1054,47 +1056,49 @@ export default function ProjectDashboardPage() {
 
   if (loading) {
     return (
-      <div className="p-6">
+      <PageShell>
         <p className="text-sm text-slate-500">Cargando proyecto…</p>
-      </div>
+      </PageShell>
     );
   }
 
   if (projectLoadFailed || !project) {
     return (
-      <div className="p-6 flex items-center justify-center">
-        <div className="max-w-md w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm text-center">
-          <h1 className="text-lg font-semibold text-slate-900 mb-2">
-            Proyecto no encontrado
-          </h1>
-          <p className="text-sm text-slate-500 mb-4">
-            No hemos podido cargar la información de este proyecto. Es
-            posible que haya sido eliminado o que la URL no sea correcta.
-          </p>
-          <button
-            type="button"
-            onClick={() => router.push("/projects")}
-            className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-          >
-            Volver a proyectos
-          </button>
+      <PageShell>
+        <div className="flex items-center justify-center min-h-[40vh]">
+          <div className="max-w-md w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm text-center">
+            <h1 className="text-lg font-semibold text-slate-900 mb-2">
+              Proyecto no encontrado
+            </h1>
+            <p className="text-sm text-slate-600 mb-4">
+              No hemos podido cargar la información de este proyecto. Es
+              posible que haya sido eliminado o que la URL no sea correcta.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/projects")}
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              Volver a proyectos
+            </button>
+          </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="w-full">
-      <div className="max-w-7xl w-full mx-auto px-4 md:px-6 lg:px-8 py-6 space-y-6">
+    <PageShell>
+      <div className="space-y-6">
         {/* 1) Header */}
         <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold text-slate-900">{project.name}</h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{project.name}</h1>
+            <p className="mt-1 text-sm text-slate-600">
               Proyecto SAP · Creado el {new Date(project.created_at).toLocaleDateString("es-ES")}
             </p>
             {project.description && (
-              <p className="mt-1 text-sm text-slate-500">{project.description}</p>
+              <p className="mt-1 text-sm text-slate-600">{project.description}</p>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3 shrink-0">
@@ -1447,29 +1451,29 @@ export default function ProjectDashboardPage() {
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm h-full flex flex-col">
                   <h3 className="text-xs font-semibold text-slate-800 mb-0.5">Hoy</h3>
                   <p className="text-[11px] text-slate-500 mb-2">Alertas y enlaces rápidos.</p>
-                  <ul className="space-y-1.5 text-sm flex-1">
-                    <Link href={`/projects/${projectId}/planning/activities`} className="flex items-center gap-2 py-1 rounded hover:bg-slate-50">
+                  <ul className="space-y-0.5 text-sm flex-1">
+                    <Link href={`/projects/${projectId}/planning/activities`} className="flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 transition-colors">
                       <span className="text-red-500 shrink-0"><AlertTriangle className="h-3.5 w-3.5" /></span>
-                      <span className="text-slate-700">Actividades riesgo alto</span>
+                      <span>Actividades riesgo alto</span>
                       <span className="ml-auto font-semibold text-slate-900">{healthMetrics.highRiskActivitiesCount}</span>
                     </Link>
-                    <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2 py-1 rounded hover:bg-slate-50">
+                    <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 transition-colors">
                       <span className="text-amber-500 shrink-0"><CalendarClock className="h-3.5 w-3.5" /></span>
-                      <span className="text-slate-700">Tareas vencidas</span>
+                      <span>Tareas vencidas</span>
                       <span className="ml-auto font-semibold text-slate-900">{healthMetrics.overdueTasks}</span>
                     </Link>
-                    <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2 py-1 rounded hover:bg-slate-50">
+                    <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 transition-colors">
                       <span className="text-amber-500 shrink-0"><User className="h-3.5 w-3.5" /></span>
-                      <span className="text-slate-700">Tareas sin asignar</span>
+                      <span>Tareas sin asignar</span>
                       <span className="ml-auto font-semibold text-slate-900">{healthMetrics.unassignedTasks}</span>
                     </Link>
-                    <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2 py-1 rounded hover:bg-slate-50">
+                    <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 transition-colors">
                       <span
                         className={`shrink-0 ${
                           healthMetrics.blockedTasks > 0 ? "text-red-500" : "text-emerald-500"
                         }`}
                       ><Ban className="h-3.5 w-3.5" /></span>
-                      <span className="text-slate-700">Tareas bloqueadas</span>
+                      <span>Tareas bloqueadas</span>
                       <span className="ml-auto font-semibold text-slate-900">{healthMetrics.blockedTasks}</span>
                     </Link>
                   </ul>
@@ -1560,7 +1564,7 @@ export default function ProjectDashboardPage() {
                       {healthMetrics.upcomingTasks.map((t) => (
                         <li
                           key={t.id}
-                          className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2 text-xs"
+                          className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs hover:bg-slate-50 transition-colors"
                         >
                           <span className="font-medium text-slate-800 truncate">
                             {t.title}
@@ -1678,14 +1682,14 @@ export default function ProjectDashboardPage() {
                   {suggestedKnowledge.length === 0 ? (
                     <p className="text-xs text-slate-500">Ninguna página vinculada aún.</p>
                   ) : (
-                    <ul className="space-y-1.5">
+                    <ul className="space-y-0.5">
                       {suggestedKnowledge.map((page) => (
                         <li key={page.id}>
                           <Link
                             href={`/knowledge/${page.id}`}
-                            className="flex items-center gap-2 py-1 rounded hover:bg-slate-50 text-sm text-slate-700 hover:text-indigo-600"
+                            className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                           >
-                            <BookOpen className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                            <BookOpen className="h-[18px] w-[18px] shrink-0 text-slate-400" />
                             <span className="truncate">{page.title}</span>
                           </Link>
                         </li>
@@ -1974,12 +1978,12 @@ export default function ProjectDashboardPage() {
               ) : recentActivity.length === 0 ? (
                 <p className="mt-3 text-[11px] text-slate-500">Sin actividad reciente.</p>
               ) : (
-                <ul className="mt-3 space-y-2">
+                <ul className="mt-3 space-y-0.5">
                   {recentActivity.map((item) => (
                     <li key={`${item.type}-${item.id}`}>
                       <Link
                         href={item.href}
-                        className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 px-3 py-2 text-[11px] hover:bg-slate-50 transition"
+                        className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                       >
                         <span className="font-medium text-slate-900 truncate">{item.title}</span>
                         <span className="shrink-0 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
@@ -2045,7 +2049,7 @@ export default function ProjectDashboardPage() {
           </div>
         </section>
       </div>
-    </div>
+    </PageShell>
   );
 }
 

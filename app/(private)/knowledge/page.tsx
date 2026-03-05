@@ -168,15 +168,15 @@ export default function KnowledgePage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="overflow-hidden">
           <CardHeader className="border-b border-slate-200 bg-slate-50/50">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               Spaces
             </CardTitle>
           </CardHeader>
           <CardContent className="p-2">
             {loading ? (
-              <p className="text-sm text-slate-500 px-2 py-4">Cargando…</p>
+              <p className="text-sm text-slate-500 px-3 py-4">Cargando…</p>
             ) : spaces.length === 0 ? (
-              <p className="text-sm text-slate-500 px-2 py-4">
+              <p className="text-sm text-slate-500 px-3 py-4">
                 No hay espacios. Crea uno con «New Space».
               </p>
             ) : (
@@ -192,7 +192,7 @@ export default function KnowledgePage() {
                           : "text-slate-700 hover:bg-slate-50"
                       }`}
                     >
-                      <FolderOpen className="h-4 w-4 shrink-0" />
+                      <FolderOpen className="h-[18px] w-[18px] shrink-0" />
                       <span className="truncate">{space.name}</span>
                     </button>
                   </li>
@@ -204,11 +204,11 @@ export default function KnowledgePage() {
 
         <Card className="md:col-span-2 overflow-hidden">
           <CardHeader className="border-b border-slate-200 bg-slate-50/50">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               Pages
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-5">
+          <CardContent>
             {!selectedSpaceId ? (
               <p className="text-sm text-slate-500">
                 Selecciona un espacio para ver sus páginas.
@@ -218,14 +218,14 @@ export default function KnowledgePage() {
                 No hay páginas en este espacio. Crea una con «New Page».
               </p>
             ) : (
-              <ul className="space-y-1">
+              <ul className="space-y-0.5">
                 {pages.map((page) => (
                   <li key={page.id}>
                     <Link
                       href={`/knowledge/${page.id}`}
                       className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                     >
-                      <FileText className="h-4 w-4 shrink-0 text-slate-400" />
+                      <FileText className="h-[18px] w-[18px] shrink-0 text-slate-400" />
                       <span className="font-medium">{page.title}</span>
                     </Link>
                   </li>

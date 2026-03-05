@@ -345,7 +345,7 @@ export default function KnowledgePageDetail() {
     <PageShell>
       <Link
         href="/knowledge"
-        className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-indigo-600 mb-4"
+        className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-indigo-600 mb-2"
       >
         <ChevronLeft className="h-4 w-4" />
         Volver a Knowledge
@@ -413,17 +413,17 @@ export default function KnowledgePageDetail() {
       </div>
 
       {/* Related Knowledge */}
-      <Card className="mt-8 overflow-hidden">
+      <Card className="overflow-hidden">
         <CardHeader className="border-b border-slate-200 bg-slate-50/50">
-          <CardTitle className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <CardTitle className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Related Knowledge
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-5">
+        <CardContent>
           {graph.edges.length === 0 ? (
             <p className="text-sm text-slate-500">No links to other pages yet.</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-0.5">
               {graph.edges.map((edge, i) => {
                 const otherId = edge.from_page_id === pageId ? edge.to_page_id : edge.from_page_id;
                 const title = graph.nodes.find((n) => n.id === otherId)?.title ?? otherId;
@@ -431,9 +431,9 @@ export default function KnowledgePageDetail() {
                   <li key={`${edge.from_page_id}-${edge.to_page_id}-${edge.link_type}-${i}`}>
                     <Link
                       href={`/knowledge/${otherId}`}
-                      className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-2 text-sm text-slate-700 hover:border-slate-200 hover:bg-slate-50 transition"
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                     >
-                      <span className="font-medium truncate">{title}</span>
+                      <span className="font-medium truncate flex-1 min-w-0">{title}</span>
                       <Badge variant="brand">{edge.link_type.replace(/_/g, " ")}</Badge>
                     </Link>
                   </li>

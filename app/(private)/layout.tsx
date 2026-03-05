@@ -85,13 +85,13 @@ function NavItem({
         type="button"
         title={itemTitle}
         onClick={() => onNavigate(item.href)}
-        className={`group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors w-full ${
+        className={`group flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors w-full ${
           collapsed ? "justify-center" : "justify-start"
         } ${
-          isActive ? "bg-indigo-50 text-indigo-700" : "text-slate-700 hover:bg-slate-100"
+          isActive ? "bg-indigo-50 text-indigo-700" : "text-slate-700 hover:bg-slate-100/70"
         }`}
       >
-        <Icon className="h-4 w-4 shrink-0" aria-hidden />
+        <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
         <span className={collapsed ? "hidden" : "truncate"}>{item.label}</span>
       </button>
     </div>

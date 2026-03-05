@@ -12,6 +12,10 @@ import {
 } from "@/lib/services/projectPhaseService";
 import { ChevronLeft, ChevronDown, ChevronUp } from "lucide-react";
 import ProjectGanttPro from "@/app/components/ProjectGanttPro";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 
 type Project = {
   id: string;
@@ -289,11 +293,9 @@ export default function ProjectPlanningPage() {
 
   if (!projectId) {
     return (
-      <main className="min-h-screen bg-slate-50">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6 lg:py-8">
-          <p className="text-sm text-slate-600">No se ha encontrado el identificador del proyecto.</p>
-        </div>
-      </main>
+      <PageShell>
+        <p className="text-sm text-slate-600">No se ha encontrado el identificador del proyecto.</p>
+      </PageShell>
     );
   }
 
@@ -307,26 +309,20 @@ export default function ProjectPlanningPage() {
   const ganttProjectEnd = maxEndDate ?? project?.planned_end_date ?? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6 lg:py-8 space-y-6">
-        <Link
-          href={`/projects/${projectId}`}
-          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Volver al proyecto
-        </Link>
+    <PageShell>
+      <Link
+        href={`/projects/${projectId}`}
+        className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-indigo-600"
+      >
+        <ChevronLeft className="h-4 w-4" />
+        Volver al proyecto
+      </Link>
 
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">
-              {loading ? "Cargando…" : (project?.name ?? "Proyecto")} · Planificación
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Define el orden y las fechas de las fases SAP Activate de este proyecto.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+      <PageHeader
+        title={loading ? "Cargando…" : `${project?.name ?? "Proyecto"} · Planificación`}
+        description="Define el orden y las fechas de las fases SAP Activate de este proyecto."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
             {phases.length > 0 ? (
               <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-emerald-700">
                 Plan generado
@@ -342,111 +338,105 @@ export default function ProjectPlanningPage() {
               </span>
             )}
           </div>
-        </header>
+        }
+      />
 
-        {errorMsg && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
-            {errorMsg}
-          </div>
-        )}
+      {errorMsg && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+          {errorMsg}
+        </div>
+      )}
 
-        {loading ? (
-          <p className="text-sm text-slate-500">Cargando fases…</p>
-        ) : phases.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">
-              Este proyecto no tiene fases de planificación
-            </h2>
-            <p className="mt-2 text-sm text-slate-500">
+      {loading ? (
+        <p className="text-sm text-slate-500">Cargando fases…</p>
+      ) : phases.length === 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Este proyecto no tiene fases de planificación</CardTitle>
+            <p className="text-sm text-slate-600 mt-0.5">
               Puedes generar solo las fases o el plan completo (fases, actividades y tareas) si el proyecto tiene fechas.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3">
               {project?.start_date && project?.planned_end_date && (
-                <button
-                  type="button"
+                <Button
                   onClick={generateActivatePlanFromTemplate}
                   disabled={generatingPlan}
-                  className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {generatingPlan ? "Generando…" : "Generar plan desde plantilla"}
-                </button>
+                </Button>
               )}
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={generateDefaultPhases}
                 disabled={generatingPhases}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {generatingPhases ? "Generando…" : "Generar solo fases"}
-              </button>
-              <Link
-                href={`/projects/${projectId}`}
-                className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2"
-              >
-                Ir al dashboard del proyecto
+              </Button>
+              <Link href={`/projects/${projectId}`}>
+                <Button variant="secondary">Ir al dashboard del proyecto</Button>
               </Link>
             </div>
-          </div>
-        ) : (
-          <>
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
-                <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Plan visual
-                </h2>
-                <p className="mt-0.5 text-sm text-slate-600">
-                  Vista rápida por fases
-                </p>
-              </div>
-              <div className="p-5">
-                <ProjectGanttPro
-                  phases={phases.map((p) => ({
-                    id: p.id,
-                    name: p.name,
-                    start_date: p.start_date,
-                    end_date: p.end_date,
-                    sort_order: p.sort_order ?? 0,
-                    phase_key: p.phase_key ?? null,
-                  }))}
-                  projectStart={ganttProjectStart}
-                  projectEnd={ganttProjectEnd}
-                  title="Vista rápida por fases"
-                  showLegend={false}
-                  height={280}
-                />
-              </div>
-            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <Card className="overflow-hidden">
+            <CardHeader className="border-b border-slate-200 bg-slate-50/50">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Plan visual
+              </CardTitle>
+              <p className="text-sm text-slate-600 mt-0.5">Vista rápida por fases</p>
+            </CardHeader>
+            <CardContent>
+              <ProjectGanttPro
+                phases={phases.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  start_date: p.start_date,
+                  end_date: p.end_date,
+                  sort_order: p.sort_order ?? 0,
+                  phase_key: p.phase_key ?? null,
+                }))}
+                projectStart={ganttProjectStart}
+                projectEnd={ganttProjectEnd}
+                title="Vista rápida por fases"
+                showLegend={false}
+                height={280}
+              />
+            </CardContent>
+          </Card>
 
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
+          <Card className="overflow-hidden">
+            <CardHeader className="border-b border-slate-200 bg-slate-50/50">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <CardTitle className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                   Fases del proyecto
-                </p>
+                </CardTitle>
                 <div className="flex items-center gap-3">
-                {saveAllMessage && (
-                  <span
-                    className={
-                      saveAllMessage.startsWith("Error")
-                        ? "text-xs text-rose-600"
-                        : "text-xs text-emerald-600"
-                    }
+                  {saveAllMessage && (
+                    <span
+                      className={
+                        saveAllMessage.startsWith("Error")
+                          ? "text-xs text-rose-600"
+                          : "text-xs text-emerald-600"
+                      }
+                    >
+                      {saveAllMessage}
+                    </span>
+                  )}
+                  <Button
+                    onClick={handleSaveAll}
+                    disabled={savingAll}
                   >
-                    {saveAllMessage}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={handleSaveAll}
-                  disabled={savingAll}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {savingAll ? "Guardando…" : "Guardar planificación"}
-                </button>
+                    {savingAll ? "Guardando…" : "Guardar planificación"}
+                  </Button>
+                </div>
               </div>
-              </div>
-            </div>
-            <div className="overflow-x-auto -mx-1">
+            </CardHeader>
+            <CardContent className="p-0 overflow-x-auto">
+            <div className="overflow-x-auto min-w-0">
               <table className="w-full text-left min-w-[520px]">
                 <thead className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200 shadow-sm">
                   <tr>
@@ -483,12 +473,12 @@ export default function ProjectPlanningPage() {
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
+            </div>
+            </CardContent>
+        </Card>
         </>
         )}
-      </div>
-    </main>
+    </PageShell>
   );
 }
 

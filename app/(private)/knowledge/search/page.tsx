@@ -60,7 +60,7 @@ export default function KnowledgeSearchPage() {
     <PageShell>
       <Link
         href="/knowledge"
-        className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-indigo-600 mb-6"
+        className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-indigo-600 mb-6"
       >
         ← Volver a Knowledge
       </Link>
@@ -97,11 +97,11 @@ export default function KnowledgeSearchPage() {
 
       <Card>
         <CardHeader className="border-b border-slate-200 bg-slate-50/50">
-          <CardTitle className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <CardTitle className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Resultados
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-5">
+        <CardContent>
           {!searched ? (
             <p className="text-sm text-slate-500">
               Escribe un término y pulsa Buscar para buscar en títulos y resúmenes.
@@ -113,26 +113,24 @@ export default function KnowledgeSearchPage() {
               No se encontraron páginas para tu búsqueda.
             </p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-0.5">
               {results.map((r) => (
                 <li key={r.page_id}>
                   <Link
                     href={`/knowledge/${r.page_id}`}
-                    className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 hover:bg-slate-50 transition"
+                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                   >
-                    <div className="flex items-start gap-3">
-                      <FileText className="h-5 w-5 shrink-0 text-slate-400 mt-0.5" />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-slate-900">{r.title}</p>
-                        {r.summary && (
-                          <p className="mt-1 text-sm text-slate-600 line-clamp-2">
-                            {r.summary}
-                          </p>
-                        )}
-                        <Badge variant="brand" className="mt-2">
-                          {PAGE_TYPE_LABELS[r.page_type] ?? r.page_type}
-                        </Badge>
-                      </div>
+                    <FileText className="h-[18px] w-[18px] shrink-0 text-slate-400" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-slate-900">{r.title}</p>
+                      {r.summary && (
+                        <p className="mt-0.5 text-xs text-slate-600 line-clamp-2">
+                          {r.summary}
+                        </p>
+                      )}
+                      <Badge variant="brand" className="mt-1.5">
+                        {PAGE_TYPE_LABELS[r.page_type] ?? r.page_type}
+                      </Badge>
                     </div>
                   </Link>
                 </li>

@@ -136,7 +136,7 @@ export default function ProjectsPage() {
           <CardTitle>Buscador de proyectos</CardTitle>
           <p className="text-xs text-slate-500 mt-0.5">Filtra por nombre, descripción o estado.</p>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent>
           <Input
             type="text"
             value={search}
@@ -147,7 +147,7 @@ export default function ProjectsPage() {
         </CardContent>
       </Card>
 
-      <div className="mt-6">
+      <div>
         {loadingProjects ? (
           <p className="p-6 text-sm text-slate-500">Cargando proyectos...</p>
         ) : errorMsg ? (
