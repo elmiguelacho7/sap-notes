@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import { ProjectCard, type ProjectCardProject } from "@/components/projects/ProjectCard";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
 type ProjectRow = {
   id: string;
@@ -119,53 +124,36 @@ export default function ProjectsPage() {
   });
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-7 space-y-5">
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Proyectos</h1>
-          <p className="text-sm text-slate-600 max-w-xl">
-            Registra y organiza aquí tus proyectos internos.
-          </p>
-        </div>
+    <PageShell>
+      <PageHeader
+        title="Proyectos"
+        description="Registra y organiza aquí tus proyectos internos."
+        actions={<Button onClick={() => router.push("/projects/new")}>Nuevo proyecto</Button>}
+      />
 
-        <button
-          onClick={() => router.push("/projects/new")}
-          className="self-start bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700"
-        >
-          Nuevo proyecto
-        </button>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Buscador de proyectos</CardTitle>
+          <p className="text-xs text-slate-500 mt-0.5">Filtra por nombre, descripción o estado.</p>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <Input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Escribe para filtrar..."
+            className="max-w-sm"
+          />
+        </CardContent>
+      </Card>
 
-      {/* BUSCADOR */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-slate-900">
-            Buscador de proyectos
-          </p>
-          <p className="text-xs text-slate-500">
-            Filtra por nombre, descripción o estado.
-          </p>
-        </div>
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Escribe para filtrar..."
-          className="w-full md:w-64 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-      </div>
-
-      {/* GRID OF CARDS */}
-      <div>
+      <div className="mt-6">
         {loadingProjects ? (
           <p className="p-6 text-sm text-slate-500">Cargando proyectos...</p>
         ) : errorMsg ? (
           <p className="p-6 text-sm text-red-500">{errorMsg}</p>
         ) : filteredProjects.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">
-            No se han encontrado proyectos con los filtros actuales.
-          </p>
+          <p className="p-6 text-sm text-slate-500">No se han encontrado proyectos con los filtros actuales.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredProjects.map((project) => (
@@ -174,6 +162,6 @@ export default function ProjectsPage() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

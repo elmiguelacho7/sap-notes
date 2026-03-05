@@ -1,8 +1,20 @@
 @import "tailwindcss";
 
+@import "tailwindcss";
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Design tokens — Notion-like (light) */
+  --bg: 255 255 255;
+  --panel: 255 255 255;
+  --muted: 248 250 252;
+  --border: 226 232 240;
+  --text: 15 23 42;
+  --subtext: 71 85 105;
+  --brand: 79 70 229;
+  --brand-soft: 238 242 255;
+  --shadow: 0 1px 2px rgba(0,0,0,.06);
 }
 
 @theme inline {

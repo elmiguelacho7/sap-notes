@@ -8,6 +8,11 @@ import { supabase } from "@/lib/supabaseClient";
 import { getPage, upsertBlocks } from "@/lib/knowledgeService";
 import { getPageGraph } from "@/lib/knowledgeGraphService";
 import type { KnowledgePage, KnowledgeBlock, KnowledgeBlockType } from "@/lib/types/knowledge";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 const BLOCK_TYPES: { value: KnowledgeBlockType; label: string }[] = [
   { value: "rich_text", label: "Rich text" },
@@ -313,31 +318,31 @@ export default function KnowledgePageDetail() {
 
   if (!pageId) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <PageShell>
         <p className="text-sm text-slate-600">ID de página no válido.</p>
-      </div>
+      </PageShell>
     );
   }
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <PageShell>
         <p className="text-sm text-slate-500">Cargando…</p>
-      </div>
+      </PageShell>
     );
   }
 
   if (error && !page) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <PageShell>
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         <Link href="/knowledge" className="mt-4 inline-block text-sm text-indigo-600 hover:underline">Volver a Knowledge</Link>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <PageShell>
       <Link
         href="/knowledge"
         className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-indigo-600 mb-4"
@@ -346,27 +351,26 @@ export default function KnowledgePageDetail() {
         Volver a Knowledge
       </Link>
 
-      <header className="flex items-center justify-between gap-4 mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900">{page?.title ?? "Page"}</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/knowledge/${pageId}/graph`}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-          >
-            <Network className="h-4 w-4" />
-            View Graph
-          </Link>
-          <button
-            type="button"
-            onClick={saveBlocks}
-            disabled={saving}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            {saving ? "Guardando…" : saveSuccess ? "Guardado" : "Guardar"}
-          </button>
-        </div>
-      </header>
+      <PageHeader
+        title={page?.title ?? "Page"}
+        actions={
+          <>
+            <Link href={`/knowledge/${pageId}/graph`}>
+              <Button variant="secondary">
+                <Network className="h-4 w-4" />
+                View Graph
+              </Button>
+            </Link>
+            <Button
+              onClick={saveBlocks}
+              disabled={saving}
+            >
+              <Save className="h-4 w-4" />
+              {saving ? "Guardando…" : saveSuccess ? "Guardado" : "Guardar"}
+            </Button>
+          </>
+        }
+      />
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 mb-4">{error}</div>}
 
@@ -409,13 +413,13 @@ export default function KnowledgePageDetail() {
       </div>
 
       {/* Related Knowledge */}
-      <div className="mt-8 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 px-4 py-3 bg-slate-50/50">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <Card className="mt-8 overflow-hidden">
+        <CardHeader className="border-b border-slate-200 bg-slate-50/50">
+          <CardTitle className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Related Knowledge
-          </h2>
-        </div>
-        <div className="p-4">
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-5">
           {graph.edges.length === 0 ? (
             <p className="text-sm text-slate-500">No links to other pages yet.</p>
           ) : (
@@ -427,20 +431,18 @@ export default function KnowledgePageDetail() {
                   <li key={`${edge.from_page_id}-${edge.to_page_id}-${edge.link_type}-${i}`}>
                     <Link
                       href={`/knowledge/${otherId}`}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2 text-sm text-slate-700 hover:border-slate-200 hover:bg-slate-50 transition"
+                      className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-2 text-sm text-slate-700 hover:border-slate-200 hover:bg-slate-50 transition"
                     >
                       <span className="font-medium truncate">{title}</span>
-                      <span className="shrink-0 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
-                        {edge.link_type.replace(/_/g, " ")}
-                      </span>
+                      <Badge variant="brand">{edge.link_type.replace(/_/g, " ")}</Badge>
                     </Link>
                   </li>
                 );
               })}
             </ul>
           )}
-        </div>
-      </div>
-    </div>
+        </CardContent>
+      </Card>
+    </PageShell>
   );
 }

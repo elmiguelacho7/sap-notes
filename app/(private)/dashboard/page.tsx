@@ -4,6 +4,12 @@ import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Badge } from "@/components/ui/Badge";
 
 type ProjectSummary = {
   id: string;
@@ -174,250 +180,140 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="w-full">
-      <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
-        {/* Header */}
-        <div>
-          <p className="text-xs text-slate-500 mb-1">
-            Resumen de tu trabajo en curso
-          </p>
-          <h1 className="text-2xl font-bold text-slate-900">
-            Dashboard general
-          </h1>
-          <p className="text-sm text-slate-600/90 max-w-xl mt-1">
-            Visión rápida de proyectos, notas y acceso directo al asistente de IA.
-          </p>
+    <PageShell>
+      <PageHeader
+        title="Dashboard general"
+        description="Visión rápida de proyectos, notas y acceso directo al asistente de IA."
+      />
+
+      {errorMsg && (
+        <div className="flex flex-wrap items-center gap-2 text-sm mb-6">
+          <p className="text-red-600">{errorMsg}</p>
+          <Button variant="secondary" onClick={() => { setErrorMsg(null); void loadData(); }}>
+            Reintentar
+          </Button>
         </div>
+      )}
 
-        {/* Error del dashboard */}
-        {errorMsg && (
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <p className="text-red-600">{errorMsg}</p>
-            <button
-              type="button"
-              onClick={() => {
-                setErrorMsg(null);
-                void loadData();
-              }}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-            >
-              Reintentar
-            </button>
-          </div>
-        )}
+      <section className="space-y-6">
+        <h2 className="text-lg font-semibold text-slate-900">Resumen general</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <KpiCard title="Proyectos totales" value={loadingStats ? "…" : stats.totalProjects.toString() || "0"} subtitle="Todos los proyectos registrados." />
+          <KpiCard title="Proyectos activos" value={loadingStats ? "…" : stats.openProjects.toString() || "0"} subtitle="En curso / no cerrados." />
+          <KpiCard title="Notas totales" value={loadingStats ? "…" : stats.totalNotes.toString() || "0"} subtitle="Memoria funcional acumulada." />
+          <KpiCard title="Notas de hoy" value={loadingStats ? "…" : stats.todayNotes.toString() || "0"} subtitle="Nuevas notas en la fecha actual." accent />
+        </div>
+      </section>
 
-        {/* Resumen general - KPIs */}
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Resumen general
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <KpiCard
-              title="Proyectos totales"
-              value={
-                loadingStats ? "…" : stats.totalProjects.toString() || "0"
-              }
-              subtitle="Todos los proyectos registrados."
-            />
-            <KpiCard
-              title="Proyectos activos"
-              value={
-                loadingStats ? "…" : stats.openProjects.toString() || "0"
-              }
-              subtitle="En curso / no cerrados."
-            />
-            <KpiCard
-              title="Notas totales"
-              value={loadingStats ? "…" : stats.totalNotes.toString() || "0"}
-              subtitle="Memoria funcional acumulada."
-            />
-            <KpiCard
-              title="Notas de hoy"
-              value={loadingStats ? "…" : stats.todayNotes.toString() || "0"}
-              subtitle="Nuevas notas en la fecha actual."
-              accent
-            />
-          </div>
-        </section>
-
-        {/* Grid principal: Última actividad + Asistente */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Columna izquierda (2/3) - Última actividad */}
-          <div className="lg:col-span-2">
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-              <h2 className="text-sm font-semibold text-slate-900">
-                Última actividad
-              </h2>
-              <p className="text-xs text-slate-500/90">
-                Proyectos y notas creadas más recientemente.
-              </p>
-
-              <div className="space-y-4">
-                {/* Proyectos recientes */}
-                <div>
-                  <p className="text-xs font-semibold text-slate-700 mb-2">
-                    Proyectos recientes
-                  </p>
-                  {loadingStats ? (
-                    <p className="text-xs text-slate-400">
-                      Cargando proyectos…
-                    </p>
-                  ) : recentProjects.length === 0 ? (
-                    <p className="text-xs text-slate-400">
-                      Aún no hay proyectos registrados.
-                    </p>
-                  ) : (
-                    <div className="space-y-2 max-h-72 overflow-y-auto">
-                      {recentProjects.map((p) => (
-                        <div
-                          key={p.id}
-                          className="flex items-center justify-between rounded-xl border border-slate-100 bg-white px-3 py-2.5 hover:bg-slate-50 transition-colors cursor-pointer"
-                          onClick={() => router.push(`/projects/${p.id}`)}
-                        >
-                          <div>
-                            <p className="text-sm font-medium text-slate-900">
-                              {p.name}
-                            </p>
-                            <p className="text-[11px] text-slate-500">
-                              {new Date(
-                                p.created_at
-                              ).toLocaleDateString("es-ES")}
-                            </p>
-                          </div>
-                          {p.status && (
-                            <StatusPill status={p.status} />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Notas recientes */}
-                <div>
-                  <p className="text-xs font-semibold text-slate-700 mb-2">
-                    Notas recientes
-                  </p>
-                  {loadingStats ? (
-                    <p className="text-xs text-slate-400">
-                      Cargando notas…
-                    </p>
-                  ) : recentNotes.length === 0 ? (
-                    <p className="text-xs text-slate-400">
-                      Aún no hay notas registradas.
-                    </p>
-                  ) : (
-                    <div className="space-y-2 max-h-72 overflow-y-auto">
-                      {recentNotes.map((n) => (
-                        <div
-                          key={n.id}
-                          className="flex items-center justify-between rounded-xl border border-slate-100 bg-white px-3 py-2.5 hover:bg-slate-50 transition-colors cursor-pointer"
-                          onClick={() => router.push(`/notes/${n.id}`)}
-                        >
-                          <div>
-                            <p className="text-sm font-medium text-slate-900">
-                              {n.title}
-                            </p>
-                            <p className="text-[11px] text-slate-500">
-                              {new Date(
-                                n.created_at
-                              ).toLocaleDateString("es-ES")}
-                            </p>
-                          </div>
-                          <div className="flex flex-col items-end gap-0.5">
-                            {n.client && (
-                              <span className="text-[10px] rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700">
-                                {n.client}
-                              </span>
-                            )}
-                            {n.module && (
-                              <span className="text-[10px] rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
-                                {n.module}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
-          </div>
-
-          {/* Columna derecha (1/3) - Asistente de implementación */}
-          <div>
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4 flex flex-col border-t-4 border-t-indigo-500">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-sm font-semibold text-slate-900">
-                    Asistente de implementación
-                  </h2>
-                  <p className="text-xs text-slate-500/90 mt-0.5">
-                    Chat del asistente para ayudarte con errores, configuraciones
-                    y procesos SAP.
-                  </p>
-                </div>
-                <span
-                  className={`inline-flex h-2 w-2 rounded-full shrink-0 ${
-                    chatLoading ? "bg-amber-400" : "bg-emerald-400"
-                  }`}
-                />
-              </div>
-
-              <div className="flex flex-col min-h-[200px]">
-                <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1 text-xs">
-                  {chatMessages.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-slate-500 text-[11px]">
-                      Indica el proyecto, el error (por ejemplo CK701, NR751,
-                      VK715…) o el proceso que quieres revisar y el asistente te
-                      propondrá posibles causas y pasos.
-                    </div>
-                  ) : (
-                    chatMessages.map((msg, idx) => (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Última actividad</CardTitle>
+              <p className="text-xs text-slate-500 mt-1">Proyectos y notas creadas más recientemente.</p>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-0">
+              <div>
+                <p className="text-xs font-semibold text-slate-700 mb-2">Proyectos recientes</p>
+                {loadingStats ? (
+                  <p className="text-sm text-slate-500">Cargando proyectos…</p>
+                ) : recentProjects.length === 0 ? (
+                  <p className="text-sm text-slate-500">Aún no hay proyectos registrados.</p>
+                ) : (
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {recentProjects.map((p) => (
                       <div
-                        key={idx}
-                        className={`max-w-[90%] rounded-xl px-3 py-2 ${
-                          msg.role === "user"
-                            ? "ml-auto bg-indigo-600 text-white"
-                            : "mr-auto bg-slate-100 text-slate-800"
-                        }`}
+                        key={p.id}
+                        className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer"
+                        onClick={() => router.push(`/projects/${p.id}`)}
                       >
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{p.name}</p>
+                          <p className="text-[11px] text-slate-500">{new Date(p.created_at).toLocaleDateString("es-ES")}</p>
+                        </div>
+                        {p.status && <StatusPill status={p.status} />}
                       </div>
-                    ))
-                  )}
-                </div>
-
-                {chatError && (
-                  <p className="text-[11px] text-red-600 mt-2">{chatError}</p>
+                    ))}
+                  </div>
                 )}
-
-                <form
-                  onSubmit={handleSendMessage}
-                  className="flex items-center gap-2 mt-3"
-                >
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Escribe tu mensaje para la IA…"
-                    className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-                  />
-                  <button
-                    type="submit"
-                    disabled={chatLoading || !chatInput.trim()}
-                    className="text-sm font-medium px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 transition-colors"
-                  >
-                    {chatLoading ? "Enviando…" : "Enviar"}
-                  </button>
-                </form>
               </div>
-            </section>
-          </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-700 mb-2">Notas recientes</p>
+                {loadingStats ? (
+                  <p className="text-sm text-slate-500">Cargando notas…</p>
+                ) : recentNotes.length === 0 ? (
+                  <p className="text-sm text-slate-500">Aún no hay notas registradas.</p>
+                ) : (
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {recentNotes.map((n) => (
+                      <div
+                        key={n.id}
+                        className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer"
+                        onClick={() => router.push(`/notes/${n.id}`)}
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{n.title}</p>
+                          <p className="text-[11px] text-slate-500">{new Date(n.created_at).toLocaleDateString("es-ES")}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-0.5">
+                          {n.client && <Badge variant="brand">{n.client}</Badge>}
+                          {n.module && <Badge>{n.module}</Badge>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
+
+        <Card className="border-t-4 border-t-indigo-500">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle>Asistente de implementación</CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">Chat del asistente para ayudarte con errores, configuraciones y procesos SAP.</p>
+              </div>
+              <span className={`h-2 w-2 rounded-full shrink-0 ${chatLoading ? "bg-amber-400" : "bg-emerald-400"}`} />
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col min-h-[200px] pt-0">
+            <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1 text-sm">
+              {chatMessages.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-slate-500 text-xs">
+                  Indica el proyecto, el error (por ejemplo CK701, NR751, VK715…) o el proceso que quieres revisar y el asistente te propondrá posibles causas y pasos.
+                </div>
+              ) : (
+                chatMessages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`max-w-[90%] rounded-xl px-3 py-2 ${
+                      msg.role === "user" ? "ml-auto bg-indigo-600 text-white" : "mr-auto bg-slate-100 text-slate-800"
+                    }`}
+                  >
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  </div>
+                ))
+              )}
+            </div>
+            {chatError && <p className="text-xs text-red-600 mt-2">{chatError}</p>}
+            <form onSubmit={handleSendMessage} className="flex items-center gap-2 mt-4">
+              <Input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Escribe tu mensaje para la IA…"
+                className="flex-1"
+              />
+              <Button type="submit" disabled={chatLoading || !chatInput.trim()}>
+                {chatLoading ? "Enviando…" : "Enviar"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </PageShell>
   );
 }
 
@@ -450,18 +346,10 @@ function KpiCard({
   accent?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm flex flex-col justify-between transition-shadow hover:shadow">
-      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">
-        {title}
-      </p>
-      <p
-        className={`text-2xl font-bold ${
-          accent ? "text-emerald-600" : "text-slate-900"
-        }`}
-      >
-        {value}
-      </p>
-      <p className="text-[11px] text-slate-400 mt-1">{subtitle}</p>
+    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm flex flex-col justify-between transition-shadow hover:shadow">
+      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">{title}</p>
+      <p className={`text-2xl font-bold ${accent ? "text-emerald-600" : "text-slate-900"}`}>{value}</p>
+      <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
     </div>
   );
 }

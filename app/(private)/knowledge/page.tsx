@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, FolderOpen, FileText, Search } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { logSupabaseError } from "@/lib/logSupabaseError";
 import {
   listSpaces,
   createSpace,
@@ -12,6 +13,12 @@ import {
   createPage,
 } from "@/lib/knowledgeService";
 import type { KnowledgeSpace, KnowledgePage } from "@/lib/types/knowledge";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from "@/components/ui/Modal";
 
 export default function KnowledgePage() {
   const router = useRouter();
@@ -66,6 +73,22 @@ export default function KnowledgePage() {
     loadPages();
   }, [loadPages]);
 
+  // Temporary: sanity ping to surface Supabase/RLS errors for knowledge_spaces
+  useEffect(() => {
+    (async () => {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      console.log("Supabase URL hostname:", url ? new URL(url).hostname : "MISSING");
+
+      const { data: _ping, error: pingError } = await supabase
+        .from("knowledge_spaces")
+        .select("id")
+        .limit(1);
+      if (pingError) {
+        logSupabaseError("knowledge/page.tsx sanity ping knowledge_spaces", pingError);
+      }
+    })();
+  }, []);
+
   const handleCreateSpace = async (e: FormEvent) => {
     e.preventDefault();
     const name = newSpaceName.trim();
@@ -110,36 +133,31 @@ export default function KnowledgePage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900">Knowledge</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/knowledge/search"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-          >
-            <Search className="h-4 w-4" />
-            Buscar
-          </Link>
-          <button
-            type="button"
-            onClick={() => { setSaveError(null); setModalSpace(true); }}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-          >
-            <Plus className="h-4 w-4" />
-            New Space
-          </button>
-          <button
-            type="button"
-            onClick={() => { setSaveError(null); setModalPage(true); }}
-            disabled={!selectedSpaceId}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" />
-            New Page
-          </button>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Knowledge"
+        actions={
+          <>
+            <Link href="/knowledge/search">
+              <Button variant="secondary">
+                <Search className="h-4 w-4" />
+                Buscar
+              </Button>
+            </Link>
+            <Button variant="secondary" onClick={() => { setSaveError(null); setModalSpace(true); }}>
+              <Plus className="h-4 w-4" />
+              New Space
+            </Button>
+            <Button
+              disabled={!selectedSpaceId}
+              onClick={() => { setSaveError(null); setModalPage(true); }}
+            >
+              <Plus className="h-4 w-4" />
+              New Page
+            </Button>
+          </>
+        }
+      />
 
       {error && (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 mb-6">
@@ -148,14 +166,13 @@ export default function KnowledgePage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left: spaces */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="border-b border-slate-200 px-4 py-3 bg-slate-50/50">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b border-slate-200 bg-slate-50/50">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Spaces
-            </h2>
-          </div>
-          <div className="p-2">
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-2">
             {loading ? (
               <p className="text-sm text-slate-500 px-2 py-4">Cargando…</p>
             ) : spaces.length === 0 ? (
@@ -169,10 +186,10 @@ export default function KnowledgePage() {
                     <button
                       type="button"
                       onClick={() => setSelectedSpaceId(space.id)}
-                      className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
+                      className={`w-full flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${
                         selectedSpaceId === space.id
-                          ? "bg-indigo-600 text-white"
-                          : "text-slate-700 hover:bg-slate-100"
+                          ? "bg-indigo-50 text-indigo-700"
+                          : "text-slate-700 hover:bg-slate-50"
                       }`}
                     >
                       <FolderOpen className="h-4 w-4 shrink-0" />
@@ -182,17 +199,16 @@ export default function KnowledgePage() {
                 ))}
               </ul>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Right: pages */}
-        <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="border-b border-slate-200 px-4 py-3 bg-slate-50/50">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <Card className="md:col-span-2 overflow-hidden">
+          <CardHeader className="border-b border-slate-200 bg-slate-50/50">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Pages
-            </h2>
-          </div>
-          <div className="p-4">
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-5">
             {!selectedSpaceId ? (
               <p className="text-sm text-slate-500">
                 Selecciona un espacio para ver sus páginas.
@@ -207,7 +223,7 @@ export default function KnowledgePage() {
                   <li key={page.id}>
                     <Link
                       href={`/knowledge/${page.id}`}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       <FileText className="h-4 w-4 shrink-0 text-slate-400" />
                       <span className="font-medium">{page.title}</span>
@@ -216,29 +232,23 @@ export default function KnowledgePage() {
                 ))}
               </ul>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Modal: New Space */}
       {modalSpace && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          onClick={() => !saving && setModalSpace(false)}
-        >
-          <div
-            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg max-w-md w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-lg font-semibold text-slate-900">New Space</h2>
-            <form onSubmit={handleCreateSpace} className="mt-4 space-y-3">
+        <Modal onClose={() => !saving && setModalSpace(false)}>
+          <form onSubmit={handleCreateSpace}>
+            <ModalHeader>
+              <ModalTitle>New Space</ModalTitle>
+            </ModalHeader>
+            <ModalBody className="space-y-4 pt-4">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Name *</label>
-                <input
+                <Input
                   type="text"
                   value={newSpaceName}
                   onChange={(e) => setNewSpaceName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="e.g. SAP Configuration"
                   disabled={saving}
                 />
@@ -249,79 +259,55 @@ export default function KnowledgePage() {
                   value={newSpaceDesc}
                   onChange={(e) => setNewSpaceDesc(e.target.value)}
                   rows={2}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="h-auto w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-200 placeholder:text-slate-400"
                   placeholder="Brief description"
                   disabled={saving}
                 />
               </div>
               {saveError && <p className="text-sm text-red-600">{saveError}</p>}
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setModalSpace(false)}
-                  disabled={saving}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving || !newSpaceName.trim()}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {saving ? "Creating…" : "Create"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button type="button" variant="secondary" onClick={() => setModalSpace(false)} disabled={saving}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving || !newSpaceName.trim()}>
+                {saving ? "Creating…" : "Create"}
+              </Button>
+            </ModalFooter>
+          </form>
+        </Modal>
       )}
 
-      {/* Modal: New Page */}
       {modalPage && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          onClick={() => !saving && setModalPage(false)}
-        >
-          <div
-            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg max-w-md w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-lg font-semibold text-slate-900">New Page</h2>
-            <form onSubmit={handleCreatePage} className="mt-4 space-y-3">
+        <Modal onClose={() => !saving && setModalPage(false)}>
+          <form onSubmit={handleCreatePage}>
+            <ModalHeader>
+              <ModalTitle>New Page</ModalTitle>
+            </ModalHeader>
+            <ModalBody className="space-y-4 pt-4">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Title *</label>
-                <input
+                <Input
                   type="text"
                   value={newPageTitle}
                   onChange={(e) => setNewPageTitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="e.g. How to configure variant valuation"
                   disabled={saving}
                 />
               </div>
               {saveError && <p className="text-sm text-red-600">{saveError}</p>}
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setModalPage(false)}
-                  disabled={saving}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving || !newPageTitle.trim()}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {saving ? "Creating…" : "Create"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button type="button" variant="secondary" onClick={() => setModalPage(false)} disabled={saving}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving || !newPageTitle.trim()}>
+                {saving ? "Creating…" : "Create"}
+              </Button>
+            </ModalFooter>
+          </form>
+        </Modal>
       )}
-    </div>
+    </PageShell>
   );
 }

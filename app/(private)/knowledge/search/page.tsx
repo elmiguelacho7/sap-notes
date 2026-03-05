@@ -6,6 +6,12 @@ import { Search, FileText } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { searchKnowledge } from "@/lib/knowledgeService";
 import type { KnowledgeSearchResult } from "@/lib/types/knowledge";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/Input";
 
 const PAGE_TYPE_LABELS: Record<string, string> = {
   how_to: "How-to",
@@ -51,7 +57,7 @@ export default function KnowledgeSearchPage() {
   );
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <PageShell>
       <Link
         href="/knowledge"
         className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-indigo-600 mb-6"
@@ -59,28 +65,27 @@ export default function KnowledgeSearchPage() {
         ← Volver a Knowledge
       </Link>
 
-      <h1 className="text-2xl font-semibold text-slate-900 mb-6">Buscar en Knowledge</h1>
+      <PageHeader
+        title="Buscar en Knowledge"
+        description="Busca por título o resumen en las páginas de knowledge."
+      />
 
       <form onSubmit={runSearch} className="mb-6">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input
+            <Input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar por título o resumen..."
-              className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="pl-10"
               aria-label="Search knowledge"
             />
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
-          >
+          <Button type="submit" disabled={loading}>
             {loading ? "Buscando…" : "Buscar"}
-          </button>
+          </Button>
         </div>
       </form>
 
@@ -90,13 +95,13 @@ export default function KnowledgeSearchPage() {
         </div>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 px-4 py-3 bg-slate-50/50">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <Card>
+        <CardHeader className="border-b border-slate-200 bg-slate-50/50">
+          <CardTitle className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Resultados
-          </h2>
-        </div>
-        <div className="p-4">
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-5">
           {!searched ? (
             <p className="text-sm text-slate-500">
               Escribe un término y pulsa Buscar para buscar en títulos y resúmenes.
@@ -113,7 +118,7 @@ export default function KnowledgeSearchPage() {
                 <li key={r.page_id}>
                   <Link
                     href={`/knowledge/${r.page_id}`}
-                    className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 hover:shadow transition"
+                    className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 hover:bg-slate-50 transition"
                   >
                     <div className="flex items-start gap-3">
                       <FileText className="h-5 w-5 shrink-0 text-slate-400 mt-0.5" />
@@ -124,9 +129,9 @@ export default function KnowledgeSearchPage() {
                             {r.summary}
                           </p>
                         )}
-                        <span className="inline-flex mt-2 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                        <Badge variant="brand" className="mt-2">
                           {PAGE_TYPE_LABELS[r.page_type] ?? r.page_type}
-                        </span>
+                        </Badge>
                       </div>
                     </div>
                   </Link>
@@ -134,8 +139,8 @@ export default function KnowledgeSearchPage() {
               ))}
             </ul>
           )}
-        </div>
-      </section>
-    </div>
+        </CardContent>
+      </Card>
+    </PageShell>
   );
 }

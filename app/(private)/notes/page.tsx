@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import { RowActions } from "@/components/RowActions";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Badge } from "@/components/ui/Badge";
 
 type Note = {
   id: string;
@@ -194,35 +200,17 @@ export default function NotesPage() {
   // RENDER
   // ==========================
   return (
-    <div className="w-full px-6 py-6">
+    <PageShell>
       <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
-        {/* COLUMNA IZQUIERDA: NOTAS */}
         <div className="flex-1 min-w-0">
-          {/* HEADER */}
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-semibold text-slate-900">
-                Notas generales
-              </h1>
-              <p className="mt-1 text-sm text-slate-600 max-w-xl">
-                Base de conocimiento global. Aquí se registran notas que
-                no pertenecen a un proyecto concreto: errores recurrentes,
-                configuraciones estándar, decisiones funcionales, etc.
-              </p>
-            </div>
+          <PageHeader
+            title="Notas generales"
+            description="Base de conocimiento global. Aquí se registran notas que no pertenecen a un proyecto concreto: errores recurrentes, configuraciones estándar, decisiones funcionales, etc."
+            actions={<Button onClick={() => router.push("/notes/new")}>Nueva nota general</Button>}
+          />
 
-            <button
-              type="button"
-              onClick={() => router.push("/notes/new")}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
-            >
-              <span className="text-base leading-none">＋</span>
-              Nueva nota general
-            </button>
-          </div>
-
-          {/* CARD LISTADO */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5">
+          <Card>
+            <CardContent className="p-5">
             {errorMsg && (
               <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                 {errorMsg}
@@ -357,7 +345,8 @@ export default function NotesPage() {
                 ))}
               </div>
             )}
-          </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* COLUMNA DERECHA: CHAT IA GLOBAL */}
@@ -425,6 +414,6 @@ export default function NotesPage() {
           </div>
         </aside>
       </div>
-    </div>
+    </PageShell>
   );
 }

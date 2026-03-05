@@ -88,16 +88,10 @@ function NavItem({
         className={`group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors w-full ${
           collapsed ? "justify-center" : "justify-start"
         } ${
-          isActive
-            ? "bg-indigo-600 text-white shadow-sm"
-            : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+          isActive ? "bg-indigo-50 text-indigo-700" : "text-slate-700 hover:bg-slate-100"
         }`}
       >
-        <Icon
-          className={`h-4 w-4 shrink-0 ${
-            isActive ? "text-white" : "text-slate-500 group-hover:text-slate-200"
-          }`}
-        />
+        <Icon className="h-4 w-4 shrink-0" aria-hidden />
         <span className={collapsed ? "hidden" : "truncate"}>{item.label}</span>
       </button>
     </div>
@@ -186,36 +180,32 @@ export default function PrivateLayout({
   };
 
   if (!isReady) {
-    return <main className="min-h-screen bg-slate-100 flex" />;
+    return <main className="min-h-screen bg-slate-50 flex" />;
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 flex">
-      {/* Sidebar - dark theme */}
+    <main className="min-h-screen bg-slate-50 flex">
+      {/* Sidebar — light, Notion/Linear style */}
       <aside
-        className={`bg-slate-950 border-r border-slate-800 flex flex-col transition-[width] duration-300 ease-in-out shrink-0 ${
-          collapsed ? "w-16" : "w-60"
-        }`}
+        className={`bg-white border-r border-slate-200 flex flex-col transition-[width] duration-300 ease-in-out shrink-0 ${collapsed ? "w-16" : "w-60"}`}
       >
         <div
-          className={`py-4 border-b border-slate-800 flex min-h-[73px] shrink-0 ${
-            collapsed
-              ? "flex-col items-center justify-center gap-2 px-0"
-              : "flex-row items-center gap-2 px-3"
+          className={`py-4 border-b border-slate-200 flex min-h-[73px] shrink-0 ${
+            collapsed ? "flex-col items-center justify-center gap-2 px-0" : "flex-row items-center gap-2 px-3"
           }`}
         >
           <div className="h-8 w-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
             PH
           </div>
           <div className={collapsed ? "hidden overflow-hidden" : "min-w-0 flex-1"}>
-            <p className="text-sm font-semibold text-white truncate">Project Hub</p>
+            <p className="text-sm font-semibold text-slate-900 truncate">Project Hub</p>
             <p className="text-[11px] text-slate-500 truncate">Entorno interno</p>
           </div>
           {!collapsed && (
             <button
               type="button"
               onClick={handleToggle}
-              className="ml-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-600 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+              className="ml-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
               aria-label="Contraer menú"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -225,7 +215,7 @@ export default function PrivateLayout({
             <button
               type="button"
               onClick={handleToggle}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-600 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
               aria-label="Expandir menú"
             >
               <ChevronRight className="h-4 w-4" />
@@ -234,76 +224,51 @@ export default function PrivateLayout({
         </div>
 
         <nav className="flex-1 px-2 py-4 space-y-0.5 text-sm overflow-y-auto min-h-0">
-          {filterByRole(mainNavItems).map((item) => (
-            <NavItem
-              key={item.href}
-              item={item}
-              isActive={isActive(item.href)}
-              collapsed={collapsed}
-              onNavigate={(href) => router.push(href)}
-            />
-          ))}
-
           {!collapsed && (
-            <p className="px-3 pt-5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <p className="px-3 pt-2 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Navegación
+            </p>
+          )}
+          {filterByRole(mainNavItems).map((item) => (
+            <NavItem key={item.href} item={item} isActive={isActive(item.href)} collapsed={collapsed} onNavigate={(href) => router.push(href)} />
+          ))}
+          {!collapsed && (
+            <p className="px-3 pt-4 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               Ajustes
             </p>
           )}
           {filterByRole(secondaryNavItems).map((item) => (
-            <NavItem
-              key={item.href}
-              item={item}
-              isActive={isActive(item.href)}
-              collapsed={collapsed}
-              onNavigate={(href) => router.push(href)}
-            />
+            <NavItem key={item.href} item={item} isActive={isActive(item.href)} collapsed={collapsed} onNavigate={(href) => router.push(href)} />
           ))}
         </nav>
 
-        <div
-          className={`flex items-center border-t border-slate-800 px-3 py-3 shrink-0 ${
-            collapsed ? "justify-center flex-col gap-2" : "justify-between gap-3"
-          }`}
-        >
+        <div className={`flex items-center border-t border-slate-200 px-3 py-3 shrink-0 ${collapsed ? "justify-center flex-col gap-2" : "justify-between gap-3"}`}>
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-slate-200 shrink-0">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 text-xs font-semibold shrink-0">
               N
             </div>
             {!collapsed && (
               <div className="flex flex-col min-w-0">
-                <span className="text-xs font-medium text-slate-300 truncate">Sesión</span>
+                <span className="text-xs font-medium text-slate-700 truncate">Sesión</span>
                 <span className="text-xs text-slate-500 truncate">Entorno interno</span>
               </div>
             )}
           </div>
           {collapsed ? (
-            <button
-              type="button"
-              onClick={handleLogout}
-              title="Cerrar sesión"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
-              aria-label="Cerrar sesión"
-            >
+            <button type="button" onClick={handleLogout} title="Cerrar sesión" className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors" aria-label="Cerrar sesión">
               <LogOut className="h-4 w-4" />
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="text-xs font-medium text-slate-400 hover:text-slate-200 shrink-0 transition-colors"
-            >
+            <button type="button" onClick={handleLogout} className="text-xs font-medium text-slate-600 hover:text-slate-900 shrink-0 transition-colors">
               Cerrar sesión
             </button>
           )}
         </div>
       </aside>
 
-      {/* Contenido */}
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
         <header className="shrink-0 flex items-center justify-between gap-4 px-4 md:px-6 h-16 border-b border-slate-200 bg-white shadow-sm">
-          <h1 className="text-xl font-semibold text-slate-900 truncate">
-            {getPageTitle(pathname)}
-          </h1>
+          <h1 className="text-xl font-semibold text-slate-900 truncate">{getPageTitle(pathname)}</h1>
           <UserMenu />
         </header>
         <section className="flex-1 min-h-0 overflow-auto bg-slate-50">{children}</section>
