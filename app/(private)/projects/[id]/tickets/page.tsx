@@ -138,6 +138,7 @@ export default function ProjectTicketsPage() {
   return (
     <div className="space-y-6">
       <ProjectPageHeader
+        variant="section"
         title="Tickets del proyecto"
         subtitle="Incidencias y solicitudes vinculadas a este proyecto."
         primaryActionLabel="Nuevo ticket"
@@ -152,12 +153,11 @@ export default function ProjectTicketsPage() {
 
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         {loading ? (
-          <div className="px-4 py-6 text-sm text-slate-500">
-            Cargando tickets…
-          </div>
+          <div className="px-6 py-10 text-sm text-slate-500">Cargando tickets…</div>
         ) : tickets.length === 0 ? (
-          <div className="px-4 py-6 text-sm text-slate-500">
-            No hay tickets en este proyecto. Crea uno con el botón «Nuevo ticket».
+          <div className="px-6 py-12 text-center">
+            <p className="text-sm font-medium text-slate-700">No hay tickets en este proyecto</p>
+            <p className="mt-1 text-sm text-slate-500">Crea uno con el botón «Nuevo ticket».</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

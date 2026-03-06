@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Search, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { searchKnowledge } from "@/lib/knowledgeService";
 import type { KnowledgeSearchResult } from "@/lib/types/knowledge";
@@ -11,7 +11,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Input } from "@/components/ui/Input";
+import { SearchInput } from "@/components/ui/SearchInput";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const PAGE_TYPE_LABELS: Record<string, string> = {
   how_to: "How-to",
@@ -58,67 +59,80 @@ export default function KnowledgeSearchPage() {
 
   return (
     <PageShell>
-      <Link
-        href="/knowledge"
-        className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-indigo-600 mb-6"
-      >
-        ← Volver a Knowledge
-      </Link>
+      <div className="space-y-8">
+        <div className="flex flex-col gap-2">
+          <Link
+            href="/knowledge"
+            className="text-xs text-slate-500 hover:text-indigo-600 transition-colors"
+          >
+            ← Volver a Knowledge
+          </Link>
+        </div>
 
       <PageHeader
         title="Buscar en Knowledge"
         description="Busca por título o resumen en las páginas de knowledge."
       />
 
+      <section>
+        <h2 className="text-sm font-semibold text-slate-800 mb-1">Búsqueda</h2>
+        <p className="text-xs text-slate-500 mb-5">Introduce un término y pulsa Buscar para buscar en títulos y resúmenes.</p>
       <form onSubmit={runSearch} className="mb-6">
         <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por título o resumen..."
-              className="pl-10"
-              aria-label="Search knowledge"
-            />
-          </div>
+          <SearchInput
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por título o resumen..."
+            className="flex-1"
+            aria-label="Search knowledge"
+          />
           <Button type="submit" disabled={loading}>
             {loading ? "Buscando…" : "Buscar"}
           </Button>
         </div>
       </form>
+      </section>
 
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 mb-6">
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      <Card>
-        <CardHeader className="border-b border-slate-200 bg-slate-50/50">
+      <section>
+        <h2 className="text-sm font-semibold text-slate-800 mb-1">Resultados</h2>
+        <p className="text-xs text-slate-500 mb-5">Páginas que coinciden con tu búsqueda.</p>
+      <Card className="rounded-2xl border border-slate-200 shadow-sm">
+        <CardHeader className="border-b border-slate-200 bg-slate-50/50 px-5 py-3">
           <CardTitle className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Resultados
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-5">
           {!searched ? (
-            <p className="text-sm text-slate-500">
-              Escribe un término y pulsa Buscar para buscar en títulos y resúmenes.
-            </p>
+            <EmptyState
+              title="Escribe para buscar"
+              description="Introduce un término y pulsa Buscar para buscar en títulos y resúmenes."
+              icon={<FileText className="h-5 w-5" />}
+            />
           ) : loading ? (
-            <p className="text-sm text-slate-500">Cargando…</p>
+            <div className="py-12 text-center">
+              <p className="text-sm font-medium text-slate-700">Cargando resultados…</p>
+              <p className="mt-1 text-sm text-slate-500">Un momento.</p>
+            </div>
           ) : results.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              No se encontraron páginas para tu búsqueda.
-            </p>
+            <EmptyState
+              title="Sin resultados"
+              description="No se encontraron páginas para tu búsqueda. Prueba otros términos."
+              icon={<FileText className="h-5 w-5" />}
+            />
           ) : (
             <ul className="space-y-0.5">
               {results.map((r) => (
                 <li key={r.page_id}>
                   <Link
                     href={`/knowledge/${r.page_id}`}
-                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                    className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                   >
                     <FileText className="h-[18px] w-[18px] shrink-0 text-slate-400" />
                     <div className="min-w-0 flex-1">
@@ -139,6 +153,8 @@ export default function KnowledgeSearchPage() {
           )}
         </CardContent>
       </Card>
+      </section>
+      </div>
     </PageShell>
   );
 }

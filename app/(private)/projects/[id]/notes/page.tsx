@@ -117,6 +117,7 @@ export default function ProjectNotesPage() {
   return (
     <div className="space-y-6">
       <ProjectPageHeader
+        variant="section"
         title="Notas del proyecto"
         subtitle="Notas y memoria funcional vinculadas a este proyecto."
         primaryActionLabel="Nueva nota"
@@ -131,12 +132,11 @@ export default function ProjectNotesPage() {
 
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         {loading ? (
-          <div className="px-4 py-6 text-sm text-slate-500">
-            Cargando notas…
-          </div>
+          <div className="px-6 py-10 text-sm text-slate-500">Cargando notas…</div>
         ) : notes.length === 0 ? (
-          <div className="px-4 py-6 text-sm text-slate-500">
-            No hay notas en este proyecto. Crea una desde el botón «Nueva nota».
+          <div className="px-6 py-12 text-center">
+            <p className="text-sm font-medium text-slate-700">No hay notas en este proyecto</p>
+            <p className="mt-1 text-sm text-slate-500">Crea una desde el botón «Nueva nota».</p>
           </div>
         ) : (
           <ul className="divide-y divide-slate-100">

@@ -7,6 +7,7 @@ import {
   ProjectNotFoundError,
 } from "@/lib/services/projectService";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { buildSapitoContext, type SapitoScope } from "@/lib/ai/sapitoContext";
 
 const NOTES_LIMIT = 30;
 const LINKS_LIMIT = 20;
@@ -54,23 +55,34 @@ export async function POST(req: Request) {
       typeof body.sessionId === "string" && body.sessionId.trim()
         ? body.sessionId.trim()
         : "no-session";
-    const scope = typeof body.scope === "string" ? body.scope : undefined;
+    const scopeParam = typeof body.scope === "string" ? body.scope : undefined;
+
+    // Sapito Brain v1: determine scope for context (global | project | notes)
+    const scope: SapitoScope =
+      projectId != null
+        ? "project"
+        : scopeParam === "notes" || scopeParam === "global-notes"
+          ? "notes"
+          : "global";
 
     let context: AgentContext;
 
     if (projectId) {
       try {
-        const [stats, notesResult, linksResult] = await Promise.all([
-          getProjectStats(projectId),
-          getProjectNotes(projectId, NOTES_LIMIT),
-          getProjectLinks(projectId, LINKS_LIMIT),
-        ]);
+        const [stats, notesResult, linksResult, sapitoContextSummary] =
+          await Promise.all([
+            getProjectStats(projectId),
+            getProjectNotes(projectId, NOTES_LIMIT),
+            getProjectLinks(projectId, LINKS_LIMIT),
+            buildSapitoContext({ scope: "project", projectId, message }),
+          ]);
         context = {
           projectId,
           stats,
           notes: notesResult.notes,
           links: linksResult.links,
           mode: "project",
+          sapitoContextSummary: sapitoContextSummary ?? "",
         };
       } catch (err) {
         if (err instanceof ProjectNotFoundError) {
@@ -87,13 +99,32 @@ export async function POST(req: Request) {
         scope,
         mode: "project",
       });
+    } else if (scope === "notes") {
+      const sapitoContextSummary = await buildSapitoContext({
+        scope: "notes",
+        message,
+      });
+      context = {
+        projectId: null,
+        stats: null,
+        notes: [],
+        links: [],
+        mode: "notes",
+        sapitoContextSummary: sapitoContextSummary ?? "",
+      };
+      console.log("project-agent API hit", { sessionId, scope, mode: "notes" });
     } else {
+      const sapitoContextSummary = await buildSapitoContext({
+        scope: "global",
+        message,
+      });
       context = {
         projectId: null,
         stats: null,
         notes: [],
         links: [],
         mode: "global",
+        sapitoContextSummary: sapitoContextSummary ?? "",
       };
       console.log("project-agent API hit", {
         sessionId,

@@ -9,7 +9,8 @@ import TasksBoard, {
   type BoardTask,
   type CreateTaskPayload,
 } from "@/app/components/TasksBoard";
-import { ChevronLeft } from "lucide-react";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 function serializeUnknownError(e: unknown): Record<string, unknown> {
   if (e instanceof Error) {
@@ -212,29 +213,25 @@ export default function ProjectTasksPage() {
 
   if (!projectId) {
     return (
-      <main className="min-h-screen bg-slate-50">
-        <div className="max-w-5xl mx-auto px-4 py-6">
-          <p className="text-sm text-slate-600">No se ha encontrado el identificador del proyecto.</p>
-        </div>
-      </main>
+      <PageShell>
+        <p className="text-sm text-slate-600">No se ha encontrado el identificador del proyecto.</p>
+      </PageShell>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <PageShell>
+      <div className="space-y-8">
         {showCreandoBanner && (
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 transition-opacity duration-300">
             Creando...
           </div>
         )}
-        <Link
-          href={`/projects/${projectId}`}
-          className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-indigo-600"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Volver al proyecto
-        </Link>
+        <PageHeader
+          variant="section"
+          title="Tareas"
+          description="Organiza y gestiona las tareas del proyecto."
+        />
 
         {activityFilter && (
           <p className="text-sm text-slate-600">
@@ -255,9 +252,11 @@ export default function ProjectTasksPage() {
         )}
 
         {activities.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-8 text-center text-sm text-slate-500">
-            Crea primero actividades en Planificación → Actividades por fase. Luego podrás crear
-            tareas vinculadas a cada actividad.
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-6 py-12 text-center">
+            <p className="text-sm font-medium text-slate-700">Sin tareas aún</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Crea actividades en Planificación → Actividades por fase. Luego podrás crear tareas vinculadas.
+            </p>
           </div>
         ) : (
           <TasksBoard
@@ -277,6 +276,6 @@ export default function ProjectTasksPage() {
           />
         )}
       </div>
-    </main>
+    </PageShell>
   );
 }

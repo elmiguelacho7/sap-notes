@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 export default function GeneralTasksPage() {
   return (
     <PageShell>
+      <div className="space-y-8">
       <PageHeader
         title="Tareas generales"
         description="Tareas generales que no pertenecen a un proyecto específico (roadmap general, ideas, tareas internas, etc.)."
@@ -18,6 +19,7 @@ export default function GeneralTasksPage() {
           subtitle="Tareas generales que no pertenecen a un proyecto específico (roadmap general, ideas, tareas internas, etc.)."
         />
       </section>
+      </div>
     </PageShell>
   );
 }

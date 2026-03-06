@@ -18,6 +18,8 @@ export type ObjectActionsProps = {
   archiveEndpoint?: string;
   /** Callback after successful archive (e.g. refresh project data). If not set, redirects to list. */
   onArchived?: () => void;
+  /** Use "dark" when rendering inside a dark header/shell (e.g. project workspace header). */
+  variant?: "light" | "dark";
 };
 
 const ENTITY_LABELS: Record<ObjectActionsEntity, string> = {
@@ -52,11 +54,23 @@ export function ObjectActions({
   deleteEndpoint,
   archiveEndpoint,
   onArchived,
+  variant = "light",
 }: ObjectActionsProps) {
   const router = useRouter();
   const [modal, setModal] = useState<"delete" | "archive" | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const isDark = variant === "dark";
+  const editBtnClass = isDark
+    ? "inline-flex items-center gap-1.5 rounded-xl border border-slate-600 bg-slate-800 px-3 h-9 text-sm font-medium text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
+    : "inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 h-8 text-sm font-medium text-white hover:bg-indigo-700 transition-colors";
+  const archiveBtnClass = isDark
+    ? "inline-flex items-center gap-1.5 rounded-xl border border-slate-600 bg-slate-800/80 px-3 h-9 text-sm font-medium text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
+    : "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 h-8 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors";
+  const deleteBtnClass = isDark
+    ? "inline-flex items-center gap-1.5 rounded-xl border border-rose-500/50 bg-rose-500/10 px-3 h-9 text-sm font-medium text-rose-300 hover:bg-rose-500/20 transition-colors"
+    : "inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-white px-3 h-8 text-sm font-medium text-rose-600 hover:bg-rose-50 transition-colors";
 
   const label = ENTITY_LABELS[entity];
   const listPath = LIST_PATHS[entity];
@@ -134,7 +148,7 @@ export function ObjectActions({
           <button
             type="button"
             onClick={handleEdit}
-            className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 h-8 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+            className={editBtnClass}
           >
             <Pencil className="h-3.5 w-3.5" />
             Editar
@@ -144,7 +158,7 @@ export function ObjectActions({
           <button
             type="button"
             onClick={() => setModal("archive")}
-            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 h-8 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            className={archiveBtnClass}
           >
             <Archive className="h-3.5 w-3.5" />
             Archivar
@@ -154,7 +168,7 @@ export function ObjectActions({
           <button
             type="button"
             onClick={() => setModal("delete")}
-            className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-white px-3 h-8 text-sm font-medium text-rose-600 hover:bg-rose-50 transition-colors"
+            className={deleteBtnClass}
           >
             <Trash2 className="h-3.5 w-3.5" />
             Eliminar

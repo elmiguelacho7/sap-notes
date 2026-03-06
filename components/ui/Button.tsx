@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-type Variant = "default" | "secondary" | "ghost";
+type Variant = "default" | "secondary" | "ghost" | "destructive";
 
 const variantClasses: Record<Variant, string> = {
   default:
@@ -9,6 +9,8 @@ const variantClasses: Record<Variant, string> = {
     "bg-slate-100 text-slate-900 hover:bg-slate-200 border-slate-200",
   ghost:
     "bg-transparent text-slate-700 hover:bg-slate-100 border-transparent",
+  destructive:
+    "bg-red-600 text-white hover:bg-red-700 border-transparent",
 };
 
 export function Button({

@@ -10,7 +10,7 @@ import {
   updateProjectPhase,
   type ProjectPhase,
 } from "@/lib/services/projectPhaseService";
-import { ChevronLeft, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import ProjectGanttPro from "@/app/components/ProjectGanttPro";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -310,16 +310,9 @@ export default function ProjectPlanningPage() {
 
   return (
     <PageShell>
-      <Link
-        href={`/projects/${projectId}`}
-        className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-indigo-600"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        Volver al proyecto
-      </Link>
-
       <PageHeader
-        title={loading ? "Cargando…" : `${project?.name ?? "Proyecto"} · Planificación`}
+        variant="section"
+        title="Planificación"
         description="Define el orden y las fechas de las fases SAP Activate de este proyecto."
         actions={
           <div className="flex flex-wrap items-center gap-2">

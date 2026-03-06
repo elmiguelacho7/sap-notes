@@ -419,3 +419,80 @@ export async function deleteProjectLink(
 
   if (error) throw error;
 }
+
+// ==========================
+// Project sources (external knowledge sources for Sapito)
+// ==========================
+
+export type ProjectSourceSummary = {
+  id: string;
+  project_id: string;
+  source_type: string;
+  name: string;
+  description: string | null;
+  source_url: string | null;
+  external_id: string | null;
+  external_parent_id: string | null;
+  sync_enabled: boolean;
+  sync_mode: string;
+  last_synced_at: string | null;
+  last_sync_status: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreateProjectSourcePayload = {
+  name: string;
+  source_type: string;
+  source_url?: string | null;
+  description?: string | null;
+  external_id?: string | null;
+  sync_enabled?: boolean;
+};
+
+export async function getProjectSources(
+  projectId: string,
+  limit: number = 100
+): Promise<{ projectId: string; sources: ProjectSourceSummary[] }> {
+  await ensureProjectExists(projectId);
+
+  const { data, error } = await supabaseAdmin
+    .from("project_sources")
+    .select(
+      "id, project_id, source_type, name, description, source_url, external_id, external_parent_id, sync_enabled, sync_mode, last_synced_at, last_sync_status, created_by, created_at, updated_at"
+    )
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  const sources = (data ?? []) as ProjectSourceSummary[];
+  return { projectId, sources };
+}
+
+export async function createProjectSource(
+  projectId: string,
+  payload: CreateProjectSourcePayload,
+  createdBy: string | null = null
+): Promise<{ projectId: string; source: ProjectSourceSummary }> {
+  await ensureProjectExists(projectId);
+
+  const { data: inserted, error } = await supabaseAdmin
+    .from("project_sources")
+    .insert({
+      project_id: projectId,
+      name: payload.name.trim(),
+      source_type: payload.source_type,
+      description: payload.description?.trim() || null,
+      source_url: payload.source_url?.trim() || null,
+      external_id: payload.external_id?.trim() || null,
+      sync_enabled: payload.sync_enabled ?? false,
+      created_by: createdBy,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { projectId, source: inserted as ProjectSourceSummary };
+}

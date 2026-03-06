@@ -6,7 +6,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import { getProjectPhases, type ProjectPhase } from "@/lib/services/projectPhaseService";
-import { ChevronLeft, Plus, Pencil, Save, Trash2, ListTodo } from "lucide-react";
+import { Plus, Pencil, Save, Trash2, ListTodo } from "lucide-react";
 
 // Types aligned with DB: project_activities uses name, due_date; status/priority are text
 // NOTE: In the future, each activity will spawn one or more tasks. The tasks table will include
@@ -289,26 +289,18 @@ export default function ProjectActivitiesPageContent() {
             Creando...
           </div>
         )}
-        <Link
-          href={`/projects/${projectId}`}
-          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Volver al proyecto
-        </Link>
-
         {errorMsg && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
             {errorMsg}
           </div>
         )}
 
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900">
-              Actividades del proyecto
+            <h1 className="text-lg font-medium tracking-tight text-slate-700">
+              Actividades
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-0.5 text-sm text-slate-500">
               Plan de trabajo estructurado por fases SAP Activate.
             </p>
           </div>

@@ -14,7 +14,6 @@ import {
 } from "@/lib/knowledgeService";
 import type { KnowledgeSpace, KnowledgePage } from "@/lib/types/knowledge";
 import { PageShell } from "@/components/layout/PageShell";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -133,52 +132,63 @@ export default function KnowledgePage() {
   };
 
   return (
-    <PageShell>
-      <PageHeader
-        title="Knowledge"
-        actions={
-          <>
-            <Link href="/knowledge/search">
-              <Button variant="secondary">
-                <Search className="h-4 w-4" />
-                Buscar
-              </Button>
-            </Link>
-            <Button variant="secondary" onClick={() => { setSaveError(null); setModalSpace(true); }}>
-              <Plus className="h-4 w-4" />
-              New Space
+    <PageShell wide>
+      <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Knowledge</h1>
+          <p className="mt-1 text-sm text-slate-600 max-w-2xl">
+            Espacios y páginas de conocimiento global. Crea espacios, añade páginas y busca en todo el contenido.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <Link href="/knowledge/search">
+            <Button variant="secondary">
+              <Search className="h-4 w-4" />
+              Buscar
             </Button>
-            <Button
-              disabled={!selectedSpaceId}
-              onClick={() => { setSaveError(null); setModalPage(true); }}
-            >
-              <Plus className="h-4 w-4" />
-              New Page
-            </Button>
-          </>
-        }
-      />
+          </Link>
+          <Button variant="secondary" onClick={() => { setSaveError(null); setModalSpace(true); }}>
+            <Plus className="h-4 w-4" />
+            New Space
+          </Button>
+          <Button
+            disabled={!selectedSpaceId}
+            onClick={() => { setSaveError(null); setModalPage(true); }}
+          >
+            <Plus className="h-4 w-4" />
+            New Page
+          </Button>
+        </div>
+      </div>
 
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 mb-6">
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="overflow-hidden">
-          <CardHeader className="border-b border-slate-200 bg-slate-50/50">
-            <CardTitle className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+      <section>
+        <h2 className="text-sm font-semibold text-slate-800 mb-1">Espacios y páginas</h2>
+        <p className="text-xs text-slate-500 mb-4">Selecciona un espacio para ver sus páginas. Crea espacios y páginas desde los botones de arriba.</p>
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+        <Card className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm flex flex-col min-h-[320px]">
+          <CardHeader className="border-b border-slate-200 bg-slate-50/80 px-5 py-4 shrink-0">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Spaces
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-2">
+          <CardContent className="p-4 flex-1 min-h-0 flex flex-col">
             {loading ? (
-              <p className="text-sm text-slate-500 px-3 py-4">Cargando…</p>
+              <div className="py-12 text-center">
+                <p className="text-sm font-medium text-slate-700">Cargando espacios…</p>
+                <p className="mt-1 text-sm text-slate-500">Un momento.</p>
+              </div>
             ) : spaces.length === 0 ? (
-              <p className="text-sm text-slate-500 px-3 py-4">
-                No hay espacios. Crea uno con «New Space».
-              </p>
+              <div className="py-12 text-center">
+                <p className="text-sm font-medium text-slate-700">No hay espacios</p>
+                <p className="mt-1 text-sm text-slate-500">Crea uno con «New Space».</p>
+              </div>
             ) : (
               <ul className="space-y-0.5">
                 {spaces.map((space) => (
@@ -186,7 +196,7 @@ export default function KnowledgePage() {
                     <button
                       type="button"
                       onClick={() => setSelectedSpaceId(space.id)}
-                      className={`w-full flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${
+                      className={`w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors ${
                         selectedSpaceId === space.id
                           ? "bg-indigo-50 text-indigo-700"
                           : "text-slate-700 hover:bg-slate-50"
@@ -202,28 +212,32 @@ export default function KnowledgePage() {
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-2 overflow-hidden">
-          <CardHeader className="border-b border-slate-200 bg-slate-50/50">
-            <CardTitle className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <Card className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm flex flex-col min-h-[320px]">
+          <CardHeader className="border-b border-slate-200 bg-slate-50/80 px-5 py-4 shrink-0">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Pages
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-5 flex-1 min-h-0 flex flex-col">
             {!selectedSpaceId ? (
-              <p className="text-sm text-slate-500">
-                Selecciona un espacio para ver sus páginas.
-              </p>
+              <div className="flex-1 flex flex-col items-center justify-center py-12 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
+                <FolderOpen className="h-10 w-10 text-slate-300 mb-3" />
+                <p className="text-sm font-medium text-slate-700">Selecciona un espacio</p>
+                <p className="mt-1 text-xs text-slate-500 max-w-xs">Elige un espacio de la lista para ver sus páginas.</p>
+              </div>
             ) : pages.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                No hay páginas en este espacio. Crea una con «New Page».
-              </p>
+              <div className="flex-1 flex flex-col items-center justify-center py-12 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
+                <FileText className="h-10 w-10 text-slate-300 mb-3" />
+                <p className="text-sm font-medium text-slate-700">No hay páginas en este espacio</p>
+                <p className="mt-1 text-xs text-slate-500 max-w-xs">Crea una con el botón «New Page».</p>
+              </div>
             ) : (
               <ul className="space-y-0.5">
                 {pages.map((page) => (
                   <li key={page.id}>
                     <Link
                       href={`/knowledge/${page.id}`}
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       <FileText className="h-[18px] w-[18px] shrink-0 text-slate-400" />
                       <span className="font-medium">{page.title}</span>
@@ -234,6 +248,8 @@ export default function KnowledgePage() {
             )}
           </CardContent>
         </Card>
+      </div>
+      </section>
       </div>
 
       {modalSpace && (

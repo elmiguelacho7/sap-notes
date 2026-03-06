@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 /** Returns headers with Bearer token for admin API calls (session is in localStorage). */
 async function getAdminAuthHeaders(): Promise<Record<string, string>> {
@@ -57,19 +59,25 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-sm text-slate-500">Cargando...</p>
-      </div>
+      <PageShell wide={false}>
+        <div className="py-12 text-center">
+          <p className="text-sm font-medium text-slate-700">Cargando…</p>
+          <p className="mt-1 text-sm text-slate-500">Un momento.</p>
+        </div>
+      </PageShell>
     );
   }
 
   if (appRole !== "superadmin") {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-center text-sm text-slate-600">
-          Acceso restringido. Solo los administradores pueden ver este panel.
-        </p>
-      </div>
+      <PageShell wide={false}>
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-5 py-12 text-center">
+          <p className="text-sm font-medium text-slate-700">Acceso restringido</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Solo los administradores pueden ver este panel.
+          </p>
+        </div>
+      </PageShell>
     );
   }
 
@@ -80,18 +88,12 @@ function AdminPanel() {
   const [activeTab, setActiveTab] = useState<TabId>("users");
 
   return (
-    <div className="w-full">
-      <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900">
-              Panel de administración
-            </h1>
-            <p className="text-sm text-slate-500">
-              Gestiona usuarios, roles y acceso a proyectos.
-            </p>
-          </div>
-        </div>
+    <PageShell wide={false}>
+      <div className="space-y-8">
+      <PageHeader
+        title="Panel de administración"
+        description="Gestiona usuarios, roles y acceso a proyectos."
+      />
 
         <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 text-sm">
           <button
@@ -139,7 +141,7 @@ function AdminPanel() {
         {activeTab === "projects" && <ProjectAccessPanel />}
         {activeTab === "clients" && <ClientsPanel />}
       </div>
-    </div>
+    </PageShell>
   );
 }
 

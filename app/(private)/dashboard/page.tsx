@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
-import { PageShell } from "@/components/layout/PageShell";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { PageHeader } from "@/components/ui/page/PageHeader";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card/Card";
+import { StatCard } from "@/components/ui/stat/StatCard";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
+import { FolderOpen, FileText, LayoutGrid, ArrowRight } from "lucide-react";
 
 type ProjectSummary = {
   id: string;
@@ -33,10 +34,7 @@ type DashboardStats = {
   todayNotes: number;
 };
 
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
+const RECENT_COUNT = 5;
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -53,12 +51,6 @@ export default function DashboardPage() {
   const [loadingStats, setLoadingStats] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatError, setChatError] = useState<string | null>(null);
-
-  // Carga de datos del dashboard
   const loadData = async () => {
     setLoadingStats(true);
     setErrorMsg(null);
@@ -102,8 +94,8 @@ export default function DashboardPage() {
         (n) => new Date(n.created_at).toDateString() === hoy
       );
 
-      setRecentProjects(projects.slice(0, 3));
-      setRecentNotes(notes.slice(0, 3));
+      setRecentProjects(projects.slice(0, RECENT_COUNT));
+      setRecentNotes(notes.slice(0, RECENT_COUNT));
       setStats({
         totalProjects: projects.length,
         openProjects: openProjects.length,
@@ -122,198 +114,204 @@ export default function DashboardPage() {
     void loadData();
   }, []);
 
-  // Enviar mensaje al agente IA (/api/project-agent, modo global sin projectId)
-  const handleSendMessage = async (e: FormEvent) => {
-    e.preventDefault();
-    const userMessageContent = chatInput.trim();
-    if (!userMessageContent || chatLoading) return;
-
-    setChatMessages((prev) => [...prev, { role: "user", content: userMessageContent }]);
-    setChatInput("");
-    setChatError(null);
-    setChatLoading(true);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId: string | null = user?.id ?? null;
-
-      const res = await fetch("/api/project-agent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: userMessageContent,
-          userId,
-        }),
-      });
-
-      if (!res.ok) {
-        let errMessage =
-          "No se pudo obtener respuesta de la IA. Inténtalo de nuevo.";
-        try {
-          const data = (await res.json()) as { error?: string };
-          if (data?.error) errMessage = data.error;
-        } catch {
-          // use default errMessage
-        }
-        setChatError(errMessage);
-        setChatLoading(false);
-        return;
-      }
-
-      const data = (await res.json()) as { reply?: string };
-      const replyText =
-        typeof data?.reply === "string"
-          ? data.reply
-          : "No he podido obtener una respuesta del asistente ahora mismo.";
-      setChatMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: replyText },
-      ]);
-    } catch (err) {
-      console.error("Dashboard project-agent request failed", err);
-      setChatError(
-        "No se pudo obtener respuesta de la IA. Inténtalo de nuevo."
-      );
-    } finally {
-      setChatLoading(false);
-    }
-  };
+  const recentActivityCount = recentProjects.length + recentNotes.length;
 
   return (
-    <PageShell>
+    <div className="space-y-8">
       <PageHeader
-        title="Dashboard general"
-        description="Visión rápida de proyectos, notas y acceso directo al asistente de IA."
+        title="Dashboard"
+        description="Visión global de la plataforma: indicadores, actividad reciente y accesos rápidos."
       />
 
       {errorMsg && (
-        <div className="flex flex-wrap items-center gap-2 text-sm mb-6">
-          <p className="text-red-600">{errorMsg}</p>
+        <div className="rounded-2xl border border-red-900/50 bg-red-950/30 px-5 py-4 flex flex-wrap items-center gap-3">
+          <p className="text-sm text-red-300">{errorMsg}</p>
           <Button variant="secondary" onClick={() => { setErrorMsg(null); void loadData(); }}>
             Reintentar
           </Button>
         </div>
       )}
 
-      <section className="space-y-6">
-        <h2 className="text-lg font-semibold text-slate-900">Resumen general</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <KpiCard title="Proyectos totales" value={loadingStats ? "…" : stats.totalProjects.toString() || "0"} subtitle="Todos los proyectos registrados." />
-          <KpiCard title="Proyectos activos" value={loadingStats ? "…" : stats.openProjects.toString() || "0"} subtitle="En curso / no cerrados." />
-          <KpiCard title="Notas totales" value={loadingStats ? "…" : stats.totalNotes.toString() || "0"} subtitle="Memoria funcional acumulada." />
-          <KpiCard title="Notas de hoy" value={loadingStats ? "…" : stats.todayNotes.toString() || "0"} subtitle="Nuevas notas en la fecha actual." accent />
+      {/* 1) KPI row — platform indicators */}
+      <section>
+        <h2 className="text-sm font-semibold text-slate-200 mb-1">Indicadores de plataforma</h2>
+        <p className="text-xs text-slate-500 mb-5">Resumen de proyectos y notas en la base de conocimiento.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <StatCard
+            label="Proyectos totales"
+            value={loadingStats ? "—" : stats.totalProjects}
+            trend="Todos los proyectos registrados."
+          />
+          <StatCard
+            label="Proyectos activos"
+            value={loadingStats ? "—" : stats.openProjects}
+            trend="En curso / no cerrados."
+          />
+          <StatCard
+            label="Notas totales"
+            value={loadingStats ? "—" : stats.totalNotes}
+            trend="Memoria funcional acumulada."
+          />
+          <StatCard
+            label="Notas de hoy"
+            value={loadingStats ? "—" : stats.todayNotes}
+            trend="Creadas en la fecha actual."
+          />
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Última actividad</CardTitle>
-              <p className="text-xs text-slate-500 mt-1">Proyectos y notas creadas más recientemente.</p>
+      {/* 2) Platform signals — compact at-a-glance */}
+      <section>
+        <h2 className="text-sm font-semibold text-slate-200 mb-1">Señales de plataforma</h2>
+        <p className="text-xs text-slate-500 mb-5">Estado actual y actividad reciente a simple vista.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-slate-700/80 bg-slate-800/50 px-5 py-4">
+            <div className="flex items-center gap-2 text-slate-400">
+              <FolderOpen className="h-4 w-4 shrink-0" />
+              <span className="text-[11px] font-medium uppercase tracking-wide">Proyectos activos</span>
+            </div>
+            <p className="mt-2 text-xl font-semibold text-white tracking-tight">
+              {loadingStats ? "—" : stats.openProjects}
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">En curso</p>
+          </div>
+          <div className="rounded-2xl border border-slate-700/80 bg-slate-800/50 px-5 py-4">
+            <div className="flex items-center gap-2 text-slate-400">
+              <FileText className="h-4 w-4 shrink-0" />
+              <span className="text-[11px] font-medium uppercase tracking-wide">Notas hoy</span>
+            </div>
+            <p className="mt-2 text-xl font-semibold text-white tracking-tight">
+              {loadingStats ? "—" : stats.todayNotes}
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">Nuevas hoy</p>
+          </div>
+          <div className="rounded-2xl border border-slate-700/80 bg-slate-800/50 px-5 py-4">
+            <div className="flex items-center gap-2 text-slate-400">
+              <LayoutGrid className="h-4 w-4 shrink-0" />
+              <span className="text-[11px] font-medium uppercase tracking-wide">Últimos ítems</span>
+            </div>
+            <p className="mt-2 text-xl font-semibold text-white tracking-tight">
+              {loadingStats ? "—" : recentActivityCount}
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">Proyectos + notas recientes</p>
+          </div>
+        </div>
+      </section>
+
+      {/* 3) Recent activity — two clear groups */}
+      <section>
+        <h2 className="text-sm font-semibold text-slate-200 mb-1">Actividad reciente</h2>
+        <p className="text-xs text-slate-500 mb-5">Últimos proyectos y notas creados. Haz clic para abrir.</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="p-0 overflow-hidden rounded-2xl border border-slate-700/80 shadow-sm">
+            <CardHeader className="px-5 pt-5 pb-3 border-b border-slate-700/50">
+              <CardTitle className="text-base font-semibold text-slate-100">Proyectos recientes</CardTitle>
+              <CardDescription>Acceso rápido a los últimos proyectos.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6 pt-0">
-              <div>
-                <p className="text-xs font-semibold text-slate-700 mb-2">Proyectos recientes</p>
-                {loadingStats ? (
-                  <p className="text-sm text-slate-500">Cargando proyectos…</p>
-                ) : recentProjects.length === 0 ? (
-                  <p className="text-sm text-slate-500">Aún no hay proyectos registrados.</p>
-                ) : (
-                  <div className="space-y-2 max-h-72 overflow-y-auto">
-                    {recentProjects.map((p) => (
-                      <div
-                        key={p.id}
-                        className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer"
+            <CardContent className="px-5 py-4">
+              {loadingStats ? (
+                <p className="text-sm text-slate-500 py-8 text-center">Cargando…</p>
+              ) : recentProjects.length === 0 ? (
+                <p className="text-sm text-slate-500 py-8 text-center">Aún no hay proyectos registrados.</p>
+              ) : (
+                <ul className="space-y-2 max-h-64 overflow-y-auto">
+                  {recentProjects.map((p) => (
+                    <li key={p.id}>
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-700/80 bg-slate-800/40 px-4 py-3 text-left hover:bg-slate-800/80 transition-colors"
                         onClick={() => router.push(`/projects/${p.id}`)}
                       >
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">{p.name}</p>
-                          <p className="text-[11px] text-slate-500">{new Date(p.created_at).toLocaleDateString("es-ES")}</p>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-white truncate">{p.name}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{new Date(p.created_at).toLocaleDateString("es-ES")}</p>
                         </div>
-                        {p.status && <StatusPill status={p.status} />}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-700 mb-2">Notas recientes</p>
-                {loadingStats ? (
-                  <p className="text-sm text-slate-500">Cargando notas…</p>
-                ) : recentNotes.length === 0 ? (
-                  <p className="text-sm text-slate-500">Aún no hay notas registradas.</p>
-                ) : (
-                  <div className="space-y-2 max-h-72 overflow-y-auto">
-                    {recentNotes.map((n) => (
-                      <div
-                        key={n.id}
-                        className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer"
+                        {p.status && <span className="shrink-0"><StatusPill status={p.status} /></span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="p-0 overflow-hidden rounded-2xl border border-slate-700/80 shadow-sm">
+            <CardHeader className="px-5 pt-5 pb-3 border-b border-slate-700/50">
+              <CardTitle className="text-base font-semibold text-slate-100">Notas recientes</CardTitle>
+              <CardDescription>Últimas notas en la base de conocimiento.</CardDescription>
+            </CardHeader>
+            <CardContent className="px-5 py-4">
+              {loadingStats ? (
+                <p className="text-sm text-slate-500 py-8 text-center">Cargando…</p>
+              ) : recentNotes.length === 0 ? (
+                <p className="text-sm text-slate-500 py-8 text-center">Aún no hay notas registradas.</p>
+              ) : (
+                <ul className="space-y-2 max-h-64 overflow-y-auto">
+                  {recentNotes.map((n) => (
+                    <li key={n.id}>
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-700/80 bg-slate-800/40 px-4 py-3 text-left hover:bg-slate-800/80 transition-colors"
                         onClick={() => router.push(`/notes/${n.id}`)}
                       >
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">{n.title}</p>
-                          <p className="text-[11px] text-slate-500">{new Date(n.created_at).toLocaleDateString("es-ES")}</p>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-white truncate">{n.title ?? "Sin título"}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{new Date(n.created_at).toLocaleDateString("es-ES")}</p>
                         </div>
-                        <div className="flex flex-col items-end gap-0.5">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
                           {n.client && <Badge variant="brand">{n.client}</Badge>}
                           {n.module && <Badge>{n.module}</Badge>}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </CardContent>
           </Card>
         </div>
+      </section>
 
-        <Card className="border-t-4 border-t-indigo-500">
-          <CardHeader>
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <CardTitle>Asistente de implementación</CardTitle>
-                <p className="text-xs text-slate-500 mt-0.5">Chat del asistente para ayudarte con errores, configuraciones y procesos SAP.</p>
-              </div>
-              <span className={`h-2 w-2 rounded-full shrink-0 ${chatLoading ? "bg-amber-400" : "bg-emerald-400"}`} />
-            </div>
-          </CardHeader>
-          <CardContent className="flex flex-col min-h-[200px] pt-0">
-            <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1 text-sm">
-              {chatMessages.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-slate-500 text-xs">
-                  Indica el proyecto, el error (por ejemplo CK701, NR751, VK715…) o el proceso que quieres revisar y el asistente te propondrá posibles causas y pasos.
-                </div>
-              ) : (
-                chatMessages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={`max-w-[90%] rounded-xl px-3 py-2 ${
-                      msg.role === "user" ? "ml-auto bg-indigo-600 text-white" : "mr-auto bg-slate-100 text-slate-800"
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
-                  </div>
-                ))
-              )}
-            </div>
-            {chatError && <p className="text-xs text-red-600 mt-2">{chatError}</p>}
-            <form onSubmit={handleSendMessage} className="flex items-center gap-2 mt-4">
-              <Input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Escribe tu mensaje para la IA…"
-                className="flex-1"
-              />
-              <Button type="submit" disabled={chatLoading || !chatInput.trim()}>
-                {chatLoading ? "Enviando…" : "Enviar"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </PageShell>
+      {/* 4) Quick links — executive access */}
+      <section>
+        <h2 className="text-sm font-semibold text-slate-200 mb-1">Accesos rápidos</h2>
+        <p className="text-xs text-slate-500 mb-5">Navegación principal de la plataforma.</p>
+        <div className="rounded-2xl border border-slate-700/80 bg-slate-800/30 p-5">
+          <div className="flex flex-wrap gap-4">
+            <Link
+              href="/projects"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800/60 px-4 py-3 text-sm font-medium text-slate-200 hover:border-slate-500 hover:bg-slate-800/80 hover:text-white transition-colors"
+            >
+              <FolderOpen className="h-4 w-4 shrink-0" />
+              Proyectos
+              <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-70" />
+            </Link>
+            <Link
+              href="/notes"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800/60 px-4 py-3 text-sm font-medium text-slate-200 hover:border-slate-500 hover:bg-slate-800/80 hover:text-white transition-colors"
+            >
+              <FileText className="h-4 w-4 shrink-0" />
+              Notas
+              <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-70" />
+            </Link>
+            <Link
+              href="/knowledge"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800/60 px-4 py-3 text-sm font-medium text-slate-200 hover:border-slate-500 hover:bg-slate-800/80 hover:text-white transition-colors"
+            >
+              <LayoutGrid className="h-4 w-4 shrink-0" />
+              Knowledge
+              <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-70" />
+            </Link>
+            <Link
+              href="/my-work"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800/60 px-4 py-3 text-sm font-medium text-slate-200 hover:border-slate-500 hover:bg-slate-800/80 hover:text-white transition-colors"
+            >
+              Mi trabajo
+              <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-70" />
+            </Link>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -325,31 +323,11 @@ function StatusPill({ status }: { status: string }) {
     <span
       className={`text-[10px] rounded-full px-2 py-0.5 font-medium ${
         isActive
-          ? "bg-indigo-50 text-indigo-700"
-          : "bg-slate-100 text-slate-600"
+          ? "bg-indigo-500/20 text-indigo-300"
+          : "bg-slate-700 text-slate-400"
       }`}
     >
       {status}
     </span>
-  );
-}
-
-function KpiCard({
-  title,
-  value,
-  subtitle,
-  accent,
-}: {
-  title: string;
-  value: string;
-  subtitle: string;
-  accent?: boolean;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm flex flex-col justify-between transition-shadow hover:shadow">
-      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">{title}</p>
-      <p className={`text-2xl font-bold ${accent ? "text-emerald-600" : "text-slate-900"}`}>{value}</p>
-      <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
-    </div>
   );
 }

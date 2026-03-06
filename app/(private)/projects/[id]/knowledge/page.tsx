@@ -127,6 +127,7 @@ export default function ProjectKnowledgePage() {
   return (
     <div className="space-y-6">
       <ProjectPageHeader
+        variant="section"
         title="Knowledge"
         subtitle="Espacios y páginas de conocimiento vinculados a este proyecto."
         primaryActionLabel="Nuevo espacio"
@@ -150,9 +151,10 @@ export default function ProjectKnowledgePage() {
             {loading ? (
               <p className="text-sm text-slate-500 px-2 py-4">Cargando…</p>
             ) : spaces.length === 0 ? (
-              <p className="text-sm text-slate-500 px-2 py-4">
-                No hay espacios. Crea uno con «Nuevo espacio».
-              </p>
+              <div className="px-4 py-10 text-center">
+                <p className="text-sm font-medium text-slate-700">No hay espacios</p>
+                <p className="mt-1 text-sm text-slate-500">Crea uno con «Nuevo espacio».</p>
+              </div>
             ) : (
               <ul className="space-y-0.5">
                 {spaces.map((space) => (

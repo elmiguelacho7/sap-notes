@@ -130,6 +130,7 @@ export default function ProjectNewTicketPage() {
         </div>
       )}
       <ProjectPageHeader
+        variant="section"
         title="Nuevo ticket del proyecto"
         subtitle="Crea un ticket vinculado a este proyecto. Quedará listado en Tickets del proyecto."
       />

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { logSupabaseError } from "@/lib/logSupabaseError";
 import type {
   KnowledgeSpace,
   KnowledgePage,
@@ -33,8 +34,8 @@ export async function listSpaces(
 
   const { data, error } = await query;
   if (error) {
-    console.error("knowledgeService listSpaces", error);
-    throw new Error(error.message ?? "Error al cargar los espacios.");
+    logSupabaseError("knowledgeService.listSpaces", error);
+    throw new Error(error.message ?? "Supabase error");
   }
   return (data ?? []) as KnowledgeSpace[];
 }
@@ -69,7 +70,7 @@ export async function createSpace(
     .single();
 
   if (error) {
-    console.error("knowledgeService createSpace", error);
+    logSupabaseError("knowledgeService.createSpace", error);
     throw new Error(error.message ?? "Error al crear el espacio.");
   }
   return data as KnowledgeSpace;
@@ -90,7 +91,7 @@ export async function listPages(
     .order("updated_at", { ascending: false });
 
   if (error) {
-    console.error("knowledgeService listPages", error);
+    logSupabaseError("knowledgeService.listPages", error);
     throw new Error(error.message ?? "Error al cargar las páginas.");
   }
   return (data ?? []) as KnowledgePage[];
@@ -128,7 +129,7 @@ export async function createPage(
     .single();
 
   if (error) {
-    console.error("knowledgeService createPage", error);
+    logSupabaseError("knowledgeService.createPage", error);
     throw new Error(error.message ?? "Error al crear la página.");
   }
   return data as KnowledgePage;
@@ -149,7 +150,7 @@ export async function getPage(
     .single();
 
   if (pageError || !pageData) {
-    console.error("knowledgeService getPage", pageError);
+    logSupabaseError("knowledgeService.getPage", pageError);
     throw new Error("Página no encontrada.");
   }
 
@@ -160,7 +161,7 @@ export async function getPage(
     .order("sort_order", { ascending: true });
 
   if (blocksError) {
-    console.error("knowledgeService getPage blocks", blocksError);
+    logSupabaseError("knowledgeService.getPage blocks", blocksError);
     throw new Error("Error al cargar los bloques.");
   }
 
@@ -223,7 +224,7 @@ export async function upsertBlocks(
       .update({ content_json: row.content_json, sort_order: row.sort_order })
       .eq("id", row.id);
     if (error) {
-      console.error("knowledgeService upsertBlocks update", error);
+      logSupabaseError("knowledgeService.upsertBlocks update", error);
       throw new Error(error.message ?? "Error al actualizar bloques.");
     }
   }
@@ -234,7 +235,7 @@ export async function upsertBlocks(
       .insert(toInsert)
       .select();
     if (error) {
-      console.error("knowledgeService upsertBlocks insert", error);
+      logSupabaseError("knowledgeService.upsertBlocks insert", error);
       throw new Error(error.message ?? "Error al crear bloques.");
     }
     (inserted ?? []).forEach((r) => existingIds.add(r.id));
@@ -277,8 +278,8 @@ export async function searchKnowledge(
     .textSearch("search_vector", q);
 
   if (error) {
-    console.error("knowledgeService searchKnowledge", error);
-    throw new Error(error.message ?? "Error al buscar.");
+    logSupabaseError("knowledgeService.searchKnowledge", error);
+    throw new Error(error.message ?? "Supabase error");
   }
 
   const rows = (data ?? []) as Array<{

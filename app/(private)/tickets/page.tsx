@@ -7,6 +7,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError, hasLoggableSupabaseError } from "@/lib/supabaseError";
 import type { Ticket, TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
 import { RowActions } from "@/components/RowActions";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 const PRIORITY_LABELS: Record<TicketPriority, string> = {
   low: "Baja",
@@ -106,106 +108,108 @@ export default function TicketsPage() {
   }, []);
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">
-            Tickets
-          </h1>
-          <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-            Seguimiento de incidencias y solicitudes sin asignar a un proyecto.
-          </p>
-        </div>
-        <Link
-          href="/tickets/new"
-          className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition shrink-0"
-        >
-          <Plus className="h-4 w-4" />
-          Nuevo ticket
-        </Link>
-      </div>
+    <PageShell>
+      <div className="space-y-8">
+      <PageHeader
+        title="Tickets"
+        description="Seguimiento de incidencias y solicitudes sin asignar a un proyecto."
+        actions={
+          <Link
+            href="/tickets/new"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-transparent bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo ticket
+          </Link>
+        }
+      />
 
       {errorMsg && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
           {errorMsg}
         </div>
       )}
 
-      {/* Tabla de tickets */}
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="px-4 py-6 text-sm text-slate-500">
-            Cargando tickets…
-          </div>
-        ) : tickets.length === 0 ? (
-          <div className="px-4 py-6 text-sm text-slate-500">
-            No hay tickets. Crea uno desde la página de nuevo ticket o desde un proyecto.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/80">
-                  <th className="px-4 py-3 font-semibold text-slate-700">
-                    Título
-                  </th>
-                  <th className="px-4 py-3 font-semibold text-slate-700">
-                    Prioridad
-                  </th>
-                  <th className="px-4 py-3 font-semibold text-slate-700">
-                    Estado
-                  </th>
-                  <th className="px-4 py-3 font-semibold text-slate-700">
-                    Fecha de creación
-                  </th>
-                  <th className="px-4 py-3 font-semibold text-slate-700 text-right w-[120px]">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {tickets.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-50/50 transition">
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/tickets/${t.id}`}
-                        className="font-medium text-slate-900 hover:text-blue-600"
-                      >
-                        {t.title}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      <PriorityBadge priority={t.priority} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={t.status} />
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {new Date(t.created_at).toLocaleDateString("es-ES", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                      })}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <RowActions
-                        entity="ticket"
-                        id={t.id}
-                        viewHref={`/tickets/${t.id}`}
-                        canEdit={appRole === "superadmin"}
-                        canDelete={appRole === "superadmin"}
-                        deleteEndpoint={appRole === "superadmin" ? `/api/tickets/${t.id}` : undefined}
-                        onDeleted={loadTickets}
-                      />
-                    </td>
+      <section>
+        <h2 className="text-sm font-semibold text-slate-800 mb-1">Tickets globales</h2>
+        <p className="text-xs text-slate-500 mb-5">Listado de tickets no asignados a ningún proyecto.</p>
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          {loading ? (
+            <div className="px-5 py-12 text-center">
+              <p className="text-sm font-medium text-slate-700">Cargando tickets…</p>
+              <p className="mt-1 text-sm text-slate-500">Un momento.</p>
+            </div>
+          ) : tickets.length === 0 ? (
+            <div className="px-5 py-12 text-center">
+              <p className="text-sm font-medium text-slate-700">No hay tickets</p>
+              <p className="mt-1 text-sm text-slate-500">Crea uno desde el botón «Nuevo ticket» o desde un proyecto.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/80">
+                    <th className="px-5 py-3 font-semibold text-slate-700">
+                      Título
+                    </th>
+                    <th className="px-5 py-3 font-semibold text-slate-700">
+                      Prioridad
+                    </th>
+                    <th className="px-5 py-3 font-semibold text-slate-700">
+                      Estado
+                    </th>
+                    <th className="px-5 py-3 font-semibold text-slate-700">
+                      Fecha de creación
+                    </th>
+                    <th className="px-5 py-3 font-semibold text-slate-700 text-right w-[120px]">
+                      Acciones
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {tickets.map((t) => (
+                    <tr key={t.id} className="hover:bg-slate-50/50 transition">
+                      <td className="px-5 py-3">
+                        <Link
+                          href={`/tickets/${t.id}`}
+                          className="font-medium text-slate-900 hover:text-indigo-600"
+                        >
+                          {t.title}
+                        </Link>
+                      </td>
+                      <td className="px-5 py-3">
+                        <PriorityBadge priority={t.priority} />
+                      </td>
+                      <td className="px-5 py-3">
+                        <StatusBadge status={t.status} />
+                      </td>
+                      <td className="px-5 py-3 text-slate-600">
+                        {new Date(t.created_at).toLocaleDateString("es-ES", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <RowActions
+                          entity="ticket"
+                          id={t.id}
+                          viewHref={`/tickets/${t.id}`}
+                          canEdit={appRole === "superadmin"}
+                          canDelete={appRole === "superadmin"}
+                          deleteEndpoint={appRole === "superadmin" ? `/api/tickets/${t.id}` : undefined}
+                          onDeleted={loadTickets}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </section>
-    </div>
+      </div>
+    </PageShell>
   );
 }

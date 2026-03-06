@@ -6,8 +6,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import { RowActions } from "@/components/RowActions";
 import { PageShell } from "@/components/layout/PageShell";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { SapitoAvatar } from "@/components/ai/SapitoAvatar";
+import { AssistantSuggestionChips } from "@/components/ai/AssistantSuggestionChips";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
@@ -42,10 +42,17 @@ type Note = {
 };
 
 // ======================
-// CHAT WIDGET N8N
+// CHAT — Sapito Brain v1 (project-agent with scope notes)
 // ======================
 
-const N8N_WEBHOOK_URL = "/api/n8n";
+const PROJECT_AGENT_URL = "/api/project-agent";
+
+const NOTES_SUGGESTIONS = [
+  "¿Qué errores se repiten?",
+  "¿Qué módulos aparecen más?",
+  "¿Qué transacciones se mencionan?",
+  "¿Qué patrones ves en mis notas?",
+];
 
 type ChatMessage = {
   id: number;
@@ -116,63 +123,56 @@ export default function NotesPage() {
   const hasNotes = useMemo(() => notes.length > 0, [notes]);
 
   // ==========================
-  // ENVIAR MENSAJE AL CHAT N8N
+  // ENVIAR MENSAJE AL CHAT (Sapito project-agent, scope notes)
   // ==========================
-  const handleSendMessage = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
+  const sendMessage = async (userText: string) => {
+    const trimmed = userText.trim();
+    if (!trimmed || sending) return;
 
-    const userText = chatInput.trim();
+    setChatMessages((prev) => [
+      ...prev,
+      { id: Date.now(), from: "user", text: trimmed },
+    ]);
     setChatInput("");
-
-    const newUserMessage: ChatMessage = {
-      id: Date.now(),
-      from: "user",
-      text: userText,
-    };
-
-    setChatMessages((prev) => [...prev, newUserMessage]);
     setSending(true);
 
     try {
-      const res = await fetch(N8N_WEBHOOK_URL, {
+      const res = await fetch(PROJECT_AGENT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: userText,
-          // Para el chat general no pasamos projectId
-          scope: "global-notes",
+          message: trimmed,
+          scope: "notes",
         }),
       });
 
-      if (!res.ok) {
-        throw new Error("Error en la llamada a n8n");
-      }
+      const data = await res.json().catch(() => ({}));
+      const botText: string = res.ok
+        ? (data?.reply ?? "No he recibido una respuesta válida de Sapito.")
+        : (data?.error ?? "Ha ocurrido un error al contactar con Sapito.");
 
-      const data = await res.json();
-      const botText: string =
-        data?.reply ||
-        data?.answer ||
-        "No he recibido una respuesta válida del asistente.";
-
-      const newBotMessage: ChatMessage = {
-        id: Date.now() + 1,
-        from: "bot",
-        text: botText,
-      };
-
-      setChatMessages((prev) => [...prev, newBotMessage]);
+      setChatMessages((prev) => [
+        ...prev,
+        { id: Date.now() + 1, from: "bot", text: botText },
+      ]);
     } catch (error) {
-      handleSupabaseError("notes chat n8n", error);
-      const errorBotMessage: ChatMessage = {
-        id: Date.now() + 2,
-        from: "bot",
-        text: "Ha ocurrido un error al contactar con el asistente de IA.",
-      };
-      setChatMessages((prev) => [...prev, errorBotMessage]);
+      handleSupabaseError("notes chat Sapito", error);
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 2,
+          from: "bot",
+          text: "Ha ocurrido un error al contactar con Sapito.",
+        },
+      ]);
     } finally {
       setSending(false);
     }
+  };
+
+  const handleSendMessage = async (e: FormEvent) => {
+    e.preventDefault();
+    await sendMessage(chatInput);
   };
 
   // ==========================
@@ -201,113 +201,110 @@ export default function NotesPage() {
   // ==========================
   return (
     <PageShell>
-      <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
-        <div className="flex-1 min-w-0">
-          <PageHeader
-            title="Notas generales"
-            description="Base de conocimiento global. Aquí se registran notas que no pertenecen a un proyecto concreto: errores recurrentes, configuraciones estándar, decisiones funcionales, etc."
-            actions={<Button onClick={() => router.push("/notes/new")}>Nueva nota general</Button>}
-          />
+      <div className="flex flex-col gap-8 xl:flex-row xl:items-start xl:gap-8">
+        <div className="flex-1 min-w-0 space-y-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Notas generales</h1>
+              <p className="mt-1 text-sm text-slate-600 max-w-2xl">
+                Base de conocimiento global. Errores recurrentes, configuraciones estándar y decisiones funcionales.
+              </p>
+            </div>
+            <div className="shrink-0">
+              <Button onClick={() => router.push("/notes/new")}>Nueva nota general</Button>
+            </div>
+          </div>
 
-          <Card>
-            <CardContent className="p-5">
+          <section>
+            <h2 className="text-sm font-semibold text-slate-800 mb-1">Listado de notas</h2>
+            <p className="text-xs text-slate-500 mb-4">Ordenadas por fecha de creación.</p>
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="p-5">
             {errorMsg && (
-              <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                 {errorMsg}
               </div>
             )}
 
             {loadingNotes ? (
-              <div className="space-y-3">
-                <div className="h-4 w-40 rounded bg-slate-100 animate-pulse" />
-                <div className="space-y-2">
-                  <div className="h-20 rounded-xl bg-slate-50 animate-pulse" />
-                  <div className="h-20 rounded-xl bg-slate-50 animate-pulse" />
-                  <div className="h-20 rounded-xl bg-slate-50 animate-pulse" />
-                </div>
+              <div className="py-12 text-center">
+                <p className="text-sm font-medium text-slate-700">Cargando notas…</p>
+                <p className="mt-1 text-sm text-slate-500">Un momento.</p>
               </div>
             ) : !hasNotes ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center text-sm text-slate-500">
-                <p className="font-medium text-slate-700 mb-1">
-                  Todavía no hay notas generales.
-                </p>
-                <p className="max-w-sm">
-                  Crea tu primera nota para documentar un error típico,
-                  una configuración estándar o una decisión funcional
-                  que quieras reutilizar en futuros proyectos.
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <p className="text-sm font-medium text-slate-700">Todavía no hay notas generales</p>
+                <p className="mt-1 text-sm text-slate-500 max-w-sm">
+                  Crea tu primera nota para documentar un error típico, una configuración estándar o una decisión funcional que quieras reutilizar en futuros proyectos.
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {notes.map((note) => (
                   <article
                     key={note.id}
-                    className="rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3.5 hover:border-blue-200 hover:bg-blue-50/40 transition-colors"
+                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-slate-300 hover:bg-slate-50/50 transition-colors"
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 flex-1">
-                        <h2 className="text-sm font-semibold text-slate-900 truncate">
+                        <h2 className="text-base font-semibold text-slate-900 truncate">
                           {note.title}
                         </h2>
-
-                        {/* CHIPS SUPERIORES */}
-                        <div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
                           {note.note_type && (
-                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 border border-blue-100">
+                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-700 border border-blue-100">
                               {note.note_type}
                             </span>
                           )}
                           {note.system_type && (
-                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 border border-slate-200">
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-slate-700 border border-slate-200">
                               {note.system_type}
                             </span>
                           )}
                           {note.client && (
-                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700 border border-emerald-100">
-                              Cliente: {note.client}
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 border border-emerald-100">
+                              {note.client}
                             </span>
                           )}
                           {note.module && (
-                            <span className="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[11px] text-violet-700 border border-violet-100">
+                            <span className="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-violet-700 border border-violet-100">
                               {note.module}
                             </span>
                           )}
-                          {note.scope_item && (
-                            <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700 border border-amber-100">
-                              {note.scope_item}
+                          {note.error_code && (
+                            <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 font-semibold text-rose-700 border border-rose-100">
+                              {note.error_code}
                             </span>
                           )}
                           {note.transaction && (
-                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 border border-slate-200">
-                              Tx/App: {note.transaction}
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-slate-700 border border-slate-200">
+                              {note.transaction}
                             </span>
                           )}
-                          {note.error_code && (
-                            <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 border border-rose-100">
-                              Error: {note.error_code}
+                          {note.scope_item && (
+                            <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 border border-amber-100">
+                              {note.scope_item}
                             </span>
                           )}
+                          <span className="text-slate-500 whitespace-nowrap">
+                            {formatDate(note.created_at)}
+                          </span>
                         </div>
-
-                        {/* TEXTO / EXTRA INFO */}
                         {(note.body || note.extra_info) && (
-                          <p className="mt-2 text-xs text-slate-700">
+                          <p className="mt-3 text-sm text-slate-600 line-clamp-2">
                             {snippet(note.body || note.extra_info)}
                           </p>
                         )}
-
-                        {/* ENLACES */}
                         {(note.web_link_1 || note.web_link_2) && (
-                          <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                          <div className="mt-3 flex flex-wrap gap-2">
                             {note.web_link_1 && (
                               <a
                                 href={note.web_link_1}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 hover:border-slate-300 hover:bg-slate-100"
                               >
-                                <span>Enlace 1</span>
-                                <span className="text-[13px]">↗</span>
+                                Enlace 1 <span className="opacity-70">↗</span>
                               </a>
                             )}
                             {note.web_link_2 && (
@@ -315,21 +312,15 @@ export default function NotesPage() {
                                 href={note.web_link_2}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 hover:border-slate-300 hover:bg-slate-100"
                               >
-                                <span>Enlace 2</span>
-                                <span className="text-[13px]">↗</span>
+                                Enlace 2 <span className="opacity-70">↗</span>
                               </a>
                             )}
                           </div>
                         )}
                       </div>
-
-                      {/* Fecha y acciones de fila */}
                       <div className="flex flex-col items-end gap-2 shrink-0">
-                        <span className="text-[11px] text-slate-500 whitespace-nowrap">
-                          {formatDate(note.created_at)}
-                        </span>
                         <RowActions
                           entity="note"
                           id={note.id}
@@ -345,70 +336,82 @@ export default function NotesPage() {
                 ))}
               </div>
             )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+          </section>
         </div>
 
-        {/* COLUMNA DERECHA: CHAT IA GLOBAL */}
-        <aside className="w-full xl:w-80 xl:sticky xl:top-4">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col h-[420px]">
-            <h2 className="text-sm font-semibold text-slate-900">
-              Asistente de IA · Global
-            </h2>
-            <p className="mt-1 text-[11px] text-slate-500">
-              Usa este asistente para buscar patrones, resumir errores
-              recurrentes o pedir sugerencias sobre cómo estructurar tus
-              notas y procesos.
-            </p>
-
-            <div className="mt-3 flex-1 overflow-y-auto rounded-xl bg-slate-50/60 border border-slate-100 px-3 py-2.5 space-y-2 text-xs">
-              {chatMessages.length === 0 ? (
-                <p className="text-[11px] text-slate-400">
-                  Inicia la conversación preguntando, por ejemplo:
-                  <br />
-                  <span className="italic">
-                    “¿Cómo puedo clasificar mejor mis notas de errores
-                    KI100, CK701 y M7064?”
-                  </span>
-                </p>
-              ) : (
-                chatMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${
-                      msg.from === "user"
-                        ? "justify-end"
-                        : "justify-start"
-                    }`}
-                  >
-                    <div
-                      className={`max-w-[80%] rounded-2xl px-3 py-1.5 ${
-                        msg.from === "user"
-                          ? "bg-blue-600 text-white rounded-br-sm"
-                          : "bg-white text-slate-800 border border-slate-200 rounded-bl-sm"
-                      } text-[11px]`}
-                    >
-                      {msg.text}
+        {/* Intelligence panel — contextual companion */}
+        <aside className="w-full xl:w-[320px] xl:min-w-[280px] xl:sticky xl:top-4 shrink-0">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-[400px]">
+            <div className="shrink-0 px-5 py-4 border-b border-slate-200 bg-slate-50/80">
+              <div className="flex items-start gap-3">
+                <SapitoAvatar size="md" className="mt-0.5" />
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold text-slate-900">Sapito de notas</h2>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Patrones, errores recurrentes y sugerencias para organizar tu base de conocimiento.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+              <div className="space-y-3 text-sm">
+                {chatMessages.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-5 text-center">
+                    <p className="text-sm font-medium text-slate-700">Pregúntame lo que necesites</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Patrones, módulos, errores recurrentes y transacciones. Elige una sugerencia o escribe.
+                    </p>
+                    <p className="mt-3 text-[11px] text-slate-500">Sugerencias:</p>
+                    <div className="mt-2">
+                      <AssistantSuggestionChips
+                        suggestions={NOTES_SUGGESTIONS}
+                        onSelect={sendMessage}
+                        disabled={sending}
+                      />
                     </div>
                   </div>
-                ))
-              )}
+                ) : (
+                  <>
+                    {chatMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`flex ${
+                          msg.from === "user"
+                            ? "justify-end"
+                            : "justify-start"
+                        }`}
+                      >
+                        <div
+                          className={`max-w-[80%] rounded-2xl px-3.5 py-2 ${
+                            msg.from === "user"
+                              ? "bg-indigo-600 text-white"
+                              : "bg-white text-slate-800 border border-slate-200 shadow-sm"
+                          } text-sm`}
+                        >
+                          {msg.text}
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
             </div>
-
-            <form onSubmit={handleSendMessage} className="mt-3 flex gap-2">
+            <form onSubmit={handleSendMessage} className="shrink-0 p-4 border-t border-slate-200 flex gap-2 bg-white">
               <input
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Escribe tu pregunta..."
-                className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                placeholder="Pregunta sobre patrones, errores o estructura de notas…"
+                className="flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-60"
               />
               <button
                 type="submit"
                 disabled={sending || !chatInput.trim()}
-                className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed shrink-0"
               >
-                {sending ? "..." : "Enviar"}
+                {sending ? "Enviando…" : "Enviar"}
               </button>
             </form>
           </div>

@@ -14,12 +14,12 @@ import {
   handleSupabaseError,
 } from "@/lib/supabaseError";
 import { ObjectActions } from "@/components/ObjectActions";
+import { useProjectWorkspace } from "@/components/projects/ProjectWorkspaceContext";
 import type { TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
 import { FileText, BookOpen, Link as LinkIcon, Ticket, CalendarDays, AlertTriangle, CalendarClock, User, Ban, Plus, CheckSquare, ListTodo } from "lucide-react";
 import { getSuggestedKnowledgeForProject } from "@/lib/knowledgeService";
 import type { KnowledgePage } from "@/lib/types/knowledge";
 import { PageShell } from "@/components/layout/PageShell";
-import { PageHeader } from "@/components/layout/PageHeader";
 import {
   BarChart,
   Bar,
@@ -253,10 +253,6 @@ export default function ProjectDashboardPage() {
     };
   }, [createMenuOpen]);
 
-  // ==========================
-  // Carga: proyecto primero, luego datos relacionados
-  // ==========================
-
   const loadProject = useCallback(async (): Promise<boolean> => {
     const { data, error } = await supabase
       .from("projects")
@@ -275,6 +271,88 @@ export default function ProjectDashboardPage() {
     setProjectLoadFailed(false);
     return true;
   }, [projectId]);
+
+  const { setHeaderActions } = useProjectWorkspace();
+  useEffect(() => {
+    if (!project) return;
+    setHeaderActions(
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative" ref={createMenuRef}>
+          <button
+            type="button"
+            onClick={() => setCreateMenuOpen((o) => !o)}
+            className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 text-sm font-medium text-slate-200 shadow-sm hover:bg-slate-700 hover:text-white transition-colors"
+            aria-expanded={createMenuOpen}
+            aria-haspopup="true"
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            <span>+ Crear</span>
+          </button>
+          {createMenuOpen && (
+            <div
+              className="absolute right-0 top-full z-50 mt-1 min-w-[200px] rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+              role="menu"
+            >
+              <Link
+                href={`/projects/${projectId}/tasks?new=1`}
+                role="menuitem"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                onClick={() => setCreateMenuOpen(false)}
+              >
+                <CheckSquare className="h-4 w-4 shrink-0" />
+                Nueva tarea
+              </Link>
+              <Link
+                href={`/projects/${projectId}/notes?new=1`}
+                role="menuitem"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                onClick={() => setCreateMenuOpen(false)}
+              >
+                <FileText className="h-4 w-4 shrink-0" />
+                Nueva nota
+              </Link>
+              <Link
+                href={`/projects/${projectId}/tickets?new=1`}
+                role="menuitem"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                onClick={() => setCreateMenuOpen(false)}
+              >
+                <Ticket className="h-4 w-4 shrink-0" />
+                Nuevo ticket
+              </Link>
+              <Link
+                href={`/projects/${projectId}/planning/activities?new=1`}
+                role="menuitem"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                onClick={() => setCreateMenuOpen(false)}
+              >
+                <ListTodo className="h-4 w-4 shrink-0" />
+                Nueva actividad
+              </Link>
+            </div>
+          )}
+        </div>
+        {permissions && (
+          <ObjectActions
+            entity="project"
+            id={projectId}
+            canEdit={permissions.canEdit}
+            canDelete={permissions.canDelete}
+            canArchive={permissions.canArchive}
+            archiveEndpoint={`/api/projects/${projectId}/archive`}
+            deleteEndpoint={`/api/projects/${projectId}`}
+            onArchived={() => void loadProject()}
+            variant="dark"
+          />
+        )}
+      </div>
+    );
+    return () => setHeaderActions(null);
+  }, [project, permissions, createMenuOpen, setHeaderActions, projectId, loadProject]);
+
+  // ==========================
+  // Carga: proyecto primero, luego datos relacionados
+  // ==========================
 
   useEffect(() => {
     if (!projectId) {
@@ -1089,92 +1167,7 @@ export default function ProjectDashboardPage() {
 
   return (
     <PageShell>
-      <div className="space-y-6">
-        {/* 1) Header */}
-        <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{project.name}</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Proyecto SAP · Creado el {new Date(project.created_at).toLocaleDateString("es-ES")}
-            </p>
-            {project.description && (
-              <p className="mt-1 text-sm text-slate-600">{project.description}</p>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <div className="relative" ref={createMenuRef}>
-              <button
-                type="button"
-                onClick={() => setCreateMenuOpen((o) => !o)}
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition"
-                aria-expanded={createMenuOpen}
-                aria-haspopup="true"
-              >
-                <Plus className="h-4 w-4 shrink-0" />
-                <span>+ Crear</span>
-              </button>
-              {createMenuOpen && (
-                <div
-                  className="absolute right-0 top-full z-50 mt-1 min-w-[200px] rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
-                  role="menu"
-                >
-                  <Link
-                    href={`/projects/${projectId}/tasks?new=1`}
-                    role="menuitem"
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
-                    onClick={() => setCreateMenuOpen(false)}
-                  >
-                    <CheckSquare className="h-4 w-4 shrink-0" />
-                    Nueva tarea
-                  </Link>
-                  <Link
-                    href={`/projects/${projectId}/notes?new=1`}
-                    role="menuitem"
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
-                    onClick={() => setCreateMenuOpen(false)}
-                  >
-                    <FileText className="h-4 w-4 shrink-0" />
-                    Nueva nota
-                  </Link>
-                  <Link
-                    href={`/projects/${projectId}/tickets?new=1`}
-                    role="menuitem"
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
-                    onClick={() => setCreateMenuOpen(false)}
-                  >
-                    <Ticket className="h-4 w-4 shrink-0" />
-                    Nuevo ticket
-                  </Link>
-                  <Link
-                    href={`/projects/${projectId}/planning/activities?new=1`}
-                    role="menuitem"
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
-                    onClick={() => setCreateMenuOpen(false)}
-                  >
-                    <ListTodo className="h-4 w-4 shrink-0" />
-                    Nueva actividad
-                  </Link>
-                </div>
-              )}
-            </div>
-            {project.status && (
-              <ProjectStatusBadge status={project.status} />
-            )}
-            {permissions && (
-              <ObjectActions
-                entity="project"
-                id={projectId}
-                canEdit={permissions.canEdit}
-                canDelete={permissions.canDelete}
-                canArchive={permissions.canArchive}
-                archiveEndpoint={`/api/projects/${projectId}/archive`}
-                deleteEndpoint={`/api/projects/${projectId}`}
-                onArchived={() => void loadProject()}
-              />
-            )}
-          </div>
-        </section>
-
+      <div className="space-y-8">
         {errorMsg && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-[11px] text-red-700">
             {errorMsg}
@@ -1187,9 +1180,107 @@ export default function ProjectDashboardPage() {
           </div>
         )}
 
-        {/* 2) KPI row */}
+        {/* 1) Project Health — hero block first for hierarchy */}
         <section>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <h2 className="text-sm font-semibold text-slate-800 mb-1">Salud del proyecto</h2>
+          <p className="text-xs text-slate-500 mb-5">
+            Estado general, progreso y fase actual.
+          </p>
+          {projectTasksLoading ? (
+            <p className="text-xs text-slate-500 py-6">Cargando indicadores…</p>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                  Puntuación
+                </p>
+                <p
+                  className={`mt-2 text-4xl font-semibold tracking-tight ${
+                    projectHealthScore.label === "Healthy"
+                      ? "text-emerald-700"
+                      : projectHealthScore.label === "Attention"
+                        ? "text-amber-700"
+                        : "text-red-700"
+                  }`}
+                >
+                  {projectHealthScore.score}
+                </p>
+                <p
+                  className={`text-sm font-medium mt-1 ${
+                    projectHealthScore.label === "Healthy"
+                      ? "text-emerald-600"
+                      : projectHealthScore.label === "Attention"
+                        ? "text-amber-600"
+                        : "text-red-600"
+                  }`}
+                >
+                  {projectHealthScore.label}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Progreso, vencidas, bloqueadas y riesgo.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                  Progreso general
+                </p>
+                <p className="mt-2 text-3xl font-semibold text-slate-900">
+                  {healthMetrics.progressGeneral}%
+                </p>
+                <div className="mt-3 h-3 w-full rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-indigo-500 transition-all"
+                    style={{ width: `${healthMetrics.progressGeneral}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  {dashboardActivities.length > 0
+                    ? "Promedio de avance de actividades"
+                    : "Tareas hechas / total"}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                  Fase actual
+                </p>
+                <p className="mt-2 text-xl font-semibold text-slate-900">
+                  {planningSummary.currentPhase?.name ?? "—"}
+                </p>
+                {planningSummary.currentPhase?.end_date && (
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Fin previsto:{" "}
+                    {new Date(planningSummary.currentPhase.end_date).toLocaleDateString("es-ES", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                    {(() => {
+                      const end = new Date(planningSummary.currentPhase!.end_date!);
+                      end.setHours(0, 0, 0, 0);
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const days = Math.ceil((end.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+                      if (days > 0) return ` · ${days} días restantes`;
+                      if (days === 0) return " · Hoy";
+                      return ` · Hace ${-days} días`;
+                    })()}
+                  </p>
+                )}
+                {!planningSummary.currentPhase?.end_date && planningSummary.currentPhase && (
+                  <p className="text-[11px] text-slate-500 mt-0.5">Sin fecha de fin</p>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* 2) KPI summary */}
+        <section>
+          <h2 className="text-sm font-semibold text-slate-800 mb-1">Indicadores</h2>
+          <p className="text-xs text-slate-500 mb-5">
+            Resumen de notas, tickets y actividades del proyecto.
+          </p>
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-5">
             <KpiCard
               title="Notas totales"
               value={loadingStats ? "..." : (stats != null ? String(stats.total_notes) : "—")}
@@ -1211,8 +1302,8 @@ export default function ProjectDashboardPage() {
               value={loadingTickets ? "..." : String(openTicketsCount)}
               subtitle="Tickets en estado abierto."
             />
-            <section className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <section className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
                 Actividades del proyecto
               </p>
               <p className="mt-2 text-2xl font-semibold text-slate-900">
@@ -1237,24 +1328,24 @@ export default function ProjectDashboardPage() {
           </div>
         </section>
 
-        {/* Visual Insights: 2 charts from existing in-memory data */}
+        {/* 3) Visual Insights */}
         <section>
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Visual Insights</h2>
-          <p className="text-xs text-slate-500 mb-4">
+          <h2 className="text-sm font-semibold text-slate-800 mb-1">Visual Insights</h2>
+          <p className="text-xs text-slate-500 mb-5">
             Resumen visual a partir de tareas y actividades ya cargadas.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden min-h-[280px] flex flex-col">
+              <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50 shrink-0">
                 <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                   Tareas por estado
                 </h3>
               </div>
-              <div className="p-5">
+              <div className="p-5 flex-1 flex flex-col justify-center">
                 {projectTasksLoading ? (
                   <p className="text-sm text-slate-500">Cargando…</p>
                 ) : tasksByStatusChartData.length === 0 ? (
-                  <p className="text-sm text-slate-500 py-8 text-center">Sin datos suficientes</p>
+                  <p className="text-sm text-slate-500 py-10 text-center">Sin datos suficientes</p>
                 ) : (
                   <div className="h-[220px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1284,17 +1375,17 @@ export default function ProjectDashboardPage() {
                 )}
               </div>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden min-h-[280px] flex flex-col">
+              <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50 shrink-0">
                 <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                   Actividades por fase
                 </h3>
               </div>
-              <div className="p-5">
+              <div className="p-5 flex-1 flex flex-col justify-center">
                 {activitiesLoading || loadingProjectPhases ? (
                   <p className="text-sm text-slate-500">Cargando…</p>
                 ) : activitiesByPhaseChartData.length === 0 ? (
-                  <p className="text-sm text-slate-500 py-8 text-center">Sin datos suficientes</p>
+                  <p className="text-sm text-slate-500 py-10 text-center">Sin datos suficientes</p>
                 ) : (
                   <div className="h-[220px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1325,121 +1416,32 @@ export default function ProjectDashboardPage() {
           </div>
         </section>
 
-        {/* 3) Project Health */}
+        {/* 4) Contexto operativo: alertas, riesgo, próximas tareas */}
         <section>
-          <ProjectHealthCard score={projectHealth} loading={loadingStats} />
-        </section>
-
-        {/* Salud del proyecto: KPIs + próximas tareas + estados */}
-        <section>
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">
-            Salud del proyecto
+          <h2 className="text-sm font-semibold text-slate-800 mb-1">
+            Contexto operativo
           </h2>
-          <p className="text-xs text-slate-500 mb-4">
-            Resumen de tareas y riesgo de actividades (vista solo lectura).
+          <p className="text-xs text-slate-500 mb-5">
+            Alertas, riesgo por fase, próximas tareas y estados.
           </p>
 
           {projectTasksLoading ? (
             <p className="text-xs text-slate-500">Cargando indicadores…</p>
           ) : (
             <>
-              {/* A) Hero Row */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                    Project Health
-                  </p>
-                  <p
-                    className={`mt-2 text-4xl font-semibold ${
-                      projectHealthScore.label === "Healthy"
-                        ? "text-emerald-700"
-                        : projectHealthScore.label === "Attention"
-                          ? "text-amber-700"
-                          : "text-red-700"
-                    }`}
-                  >
-                    {projectHealthScore.score}
-                  </p>
-                  <p
-                    className={`text-sm font-medium mt-1 ${
-                      projectHealthScore.label === "Healthy"
-                        ? "text-emerald-600"
-                        : projectHealthScore.label === "Attention"
-                          ? "text-amber-600"
-                          : "text-red-600"
-                    }`}
-                  >
-                    {projectHealthScore.label}
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Progreso, vencidas, bloqueadas y riesgo.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                    Progreso general
-                  </p>
-                  <p className="mt-2 text-3xl font-semibold text-slate-900">
-                    {healthMetrics.progressGeneral}%
-                  </p>
-                  <div className="mt-3 h-3 w-full rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-indigo-500 transition-all"
-                      style={{ width: `${healthMetrics.progressGeneral}%` }}
-                    />
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    {dashboardActivities.length > 0
-                      ? "Promedio de avance de actividades"
-                      : "Tareas hechas / total"}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                    Fase actual
-                  </p>
-                  <p className="mt-2 text-xl font-semibold text-slate-900">
-                    {planningSummary.currentPhase?.name ?? "—"}
-                  </p>
-                  {planningSummary.currentPhase?.end_date && (
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Fin previsto:{" "}
-                      {new Date(planningSummary.currentPhase.end_date).toLocaleDateString("es-ES", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                      {(() => {
-                        const end = new Date(planningSummary.currentPhase!.end_date!);
-                        end.setHours(0, 0, 0, 0);
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        const days = Math.ceil((end.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
-                        if (days > 0) return ` · ${days} días restantes`;
-                        if (days === 0) return " · Hoy";
-                        return ` · Hace ${-days} días`;
-                      })()}
-                    </p>
-                  )}
-                  {!planningSummary.currentPhase?.end_date && planningSummary.currentPhase && (
-                    <p className="text-[11px] text-slate-500 mt-0.5">Sin fecha de fin</p>
-                  )}
-                </div>
-              </div>
-
               {/* KPI row: Vencidas, Bloqueadas, Riesgo alto */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-6">
+                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Vencidas</p>
                   <p className="mt-2 text-2xl font-semibold text-slate-900">{healthMetrics.overdueTasks}</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">Tareas con fecha límite pasada</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Bloqueadas</p>
                   <p className="mt-2 text-2xl font-semibold text-slate-900">{healthMetrics.blockedTasks}</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">Tareas en estado bloqueado</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Riesgo alto</p>
                   <p className="mt-2 text-2xl font-semibold text-slate-900">{healthMetrics.highRiskActivitiesCount}</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">Actividades con riesgo alto</p>
@@ -1447,8 +1449,8 @@ export default function ProjectDashboardPage() {
               </div>
 
               {/* Row A: Hoy | Riesgo por fase | Project Intelligence */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm h-full flex flex-col">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
+                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm h-full flex flex-col">
                   <h3 className="text-xs font-semibold text-slate-800 mb-0.5">Hoy</h3>
                   <p className="text-[11px] text-slate-500 mb-2">Alertas y enlaces rápidos.</p>
                   <ul className="space-y-0.5 text-sm flex-1">
@@ -1478,7 +1480,7 @@ export default function ProjectDashboardPage() {
                     </Link>
                   </ul>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm h-full flex flex-col">
+                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm h-full flex flex-col">
                   <h3 className="text-xs font-semibold text-slate-800 mb-0.5">Riesgo por fase</h3>
                   <p className="text-[11px] text-slate-500 mb-2">
                     Actividades por nivel de riesgo por fase.
@@ -1515,13 +1517,13 @@ export default function ProjectDashboardPage() {
                     </ul>
                   )}
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm h-full flex flex-col">
-                  <h3 className="text-xs font-semibold text-slate-800 mb-0.5">Project Intelligence</h3>
+                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm h-full flex flex-col">
+                  <h3 className="text-xs font-semibold text-slate-800 mb-0.5">Inteligencia del proyecto</h3>
                   <p className="text-[11px] text-slate-500 mb-2">
-                    Riesgos y señales importantes.
+                    Señales derivadas de actividades, tareas y estado actual del proyecto.
                   </p>
                   {projectInsights.length === 0 ? (
-                    <p className="text-sm text-slate-500">Sin alertas importantes</p>
+                    <p className="text-sm text-slate-500">Sin señales relevantes en este momento.</p>
                   ) : (
                     <ul className="space-y-2 flex-1">
                       {projectInsights.map((insight, i) => (
@@ -1549,8 +1551,8 @@ export default function ProjectDashboardPage() {
               </div>
 
               {/* Row B: Próximas tareas (left) | Estados de tareas (right) */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm h-full flex flex-col">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm h-full flex flex-col">
                   <h3 className="text-xs font-semibold text-slate-800 mb-0.5">
                     Próximas tareas
                   </h3>
@@ -1602,7 +1604,7 @@ export default function ProjectDashboardPage() {
                   </Link>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm h-full flex flex-col">
+                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm h-full flex flex-col">
                   <h3 className="text-xs font-semibold text-slate-800 mb-0.5">
                     Estados de tareas
                   </h3>
@@ -1670,24 +1672,24 @@ export default function ProjectDashboardPage() {
                 </div>
               </div>
 
-              {/* Suggested Knowledge */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <h3 className="text-xs font-semibold text-slate-800 mb-0.5">
-                    Suggested Knowledge
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mb-2">
-                    Páginas de conocimiento vinculadas a este proyecto.
-                  </p>
+              {/* Suggested Knowledge — elevated as distinct capability */}
+              <div className="mt-8 pt-8 border-t border-slate-200">
+                <h3 className="text-sm font-semibold text-slate-800 mb-0.5">
+                  Knowledge del proyecto
+                </h3>
+                <p className="text-xs text-slate-500 mb-4">
+                  Páginas de conocimiento vinculadas a este proyecto.
+                </p>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/50 px-5 py-5">
                   {suggestedKnowledge.length === 0 ? (
-                    <p className="text-xs text-slate-500">Ninguna página vinculada aún.</p>
+                    <p className="text-sm text-slate-500">Ninguna página vinculada aún.</p>
                   ) : (
-                    <ul className="space-y-0.5">
+                    <ul className="space-y-1">
                       {suggestedKnowledge.map((page) => (
                         <li key={page.id}>
                           <Link
                             href={`/knowledge/${page.id}`}
-                            className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                            className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-white hover:shadow-sm transition-colors"
                           >
                             <BookOpen className="h-[18px] w-[18px] shrink-0 text-slate-400" />
                             <span className="truncate">{page.title}</span>
@@ -1698,7 +1700,7 @@ export default function ProjectDashboardPage() {
                   )}
                   <Link
                     href={`/projects/${projectId}/knowledge`}
-                    className="mt-3 inline-block text-[11px] font-medium text-indigo-600 hover:text-indigo-700"
+                    className="mt-4 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-700"
                   >
                     Ver Knowledge del proyecto →
                   </Link>
@@ -1710,26 +1712,14 @@ export default function ProjectDashboardPage() {
 
         {/* Resumen de planificación */}
         <section>
-          {/* Debug: confirm phases are loaded (remove once verified) */}
-          {loadingProjectPhases ? (
-            <p className="text-xs text-slate-500 mt-4">Cargando fases de planificación…</p>
-          ) : (
-            <p className="text-xs text-slate-500 mt-4">Fases cargadas: {projectPhases.length}</p>
-          )}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-900">
-                  Resumen de planificación
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Vista rápida de las fases SAP Activate de este proyecto.
-                </p>
-              </div>
+          <h2 className="text-sm font-semibold text-slate-800 mb-1">Resumen de planificación</h2>
+          <p className="text-xs text-slate-500 mb-5">Vista rápida de las fases SAP Activate de este proyecto.</p>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex justify-end mb-4">
               <button
                 type="button"
                 onClick={() => router.push(`/projects/${projectId}/planning`)}
-                className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
               >
                 Ver planificación
               </button>
@@ -1785,20 +1775,14 @@ export default function ProjectDashboardPage() {
 
         {/* Estado de actividades */}
         <section>
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-900">
-                  Estado de actividades
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Resumen del plan de trabajo del proyecto.
-                </p>
-              </div>
+          <h2 className="text-sm font-semibold text-slate-800 mb-1">Estado de actividades</h2>
+          <p className="text-xs text-slate-500 mb-5">Resumen del plan de trabajo del proyecto.</p>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex justify-end mb-4">
               <button
                 type="button"
                 onClick={() => router.push(`/projects/${projectId}/planning/activities`)}
-                className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
               >
                 Ver todas
               </button>
@@ -1905,15 +1889,13 @@ export default function ProjectDashboardPage() {
         {/* SAP Activate Plan */}
         {(activatePlan?.phases?.length ?? 0) > 0 && (
           <section>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Plan SAP Activate</h2>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Fases y fechas planificadas · Actividades por fase
-              </p>
+            <h2 className="text-sm font-semibold text-slate-800 mb-1">Plan SAP Activate</h2>
+            <p className="text-xs text-slate-500 mb-5">Fases y fechas planificadas · Actividades por fase.</p>
+            <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
               {loadingActivatePlan ? (
-                <p className="mt-3 text-[11px] text-slate-500">Cargando…</p>
+                <p className="text-sm text-slate-500">Cargando…</p>
               ) : (
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2">
                   {activatePlan?.phases?.map((phase) => {
                     const pct = phase.completionPercent;
                     const traffic = pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-slate-300";
@@ -1936,13 +1918,13 @@ export default function ProjectDashboardPage() {
                   }) ?? null}
                 </div>
               )}
-              <Link href={`/projects/${projectId}/planning`} className="mt-2 inline-block text-[11px] font-medium text-indigo-600 hover:text-indigo-800">
-                Editar fases del proyecto →
-              </Link>
-              <div className="mt-3">
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Link href={`/projects/${projectId}/planning`} className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                  Editar fases del proyecto →
+                </Link>
                 <Link
                   href={`/projects/${projectId}/planning`}
-                  className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                 >
                   Ir a planificación
                 </Link>
@@ -1951,11 +1933,14 @@ export default function ProjectDashboardPage() {
           </section>
         )}
 
-        {/* 4) Module impact + Recent activity */}
-        <section className="grid gap-4 lg:grid-cols-3">
+        {/* Module impact + Recent activity */}
+        <section>
+          <h2 className="text-sm font-semibold text-slate-800 mb-1">Impacto y actividad</h2>
+          <p className="text-xs text-slate-500 mb-5">Módulos impactados y actividad reciente del proyecto.</p>
+          <div className="grid gap-5 lg:grid-cols-3">
           <div className="lg:col-span-1">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Impacto por módulos</h2>
+            <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-800">Impacto por módulos</h3>
               <p className="text-[11px] text-slate-500 mt-0.5">Módulos SAP con notas asociadas.</p>
               {loadingStats ? (
                 <p className="mt-3 text-[11px] text-slate-500">Cargando…</p>
@@ -1970,8 +1955,8 @@ export default function ProjectDashboardPage() {
             </div>
           </div>
           <div className="lg:col-span-2">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Actividad reciente</h2>
+            <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-800">Actividad reciente</h3>
               <p className="text-[11px] text-slate-500 mt-0.5">Últimas notas y tickets del proyecto.</p>
               {loadingNotes || loadingTickets ? (
                 <p className="mt-3 text-[11px] text-slate-500">Cargando…</p>
@@ -2006,11 +1991,14 @@ export default function ProjectDashboardPage() {
               </Link>
             </div>
           </div>
+          </div>
         </section>
 
-        {/* 5) Metrics + actions: 4 entry-point cards */}
+        {/* Accesos rápidos */}
         <section>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <h2 className="text-sm font-semibold text-slate-800 mb-1">Accesos rápidos</h2>
+          <p className="text-xs text-slate-500 mb-5">Notas, knowledge, enlaces, tickets y planificación.</p>
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             <MetricActionCard
               title="Notas del proyecto"
               value={loadingStats ? "…" : (stats != null ? String(stats.total_notes) : "—")}
@@ -2083,37 +2071,6 @@ function ProjectStatusBadge({ status }: { status: string }) {
   );
 }
 
-function ProjectHealthCard({ score, loading }: { score: number; loading?: boolean }) {
-  const status =
-    score >= 80 ? "Buena" : score >= 50 ? "Media" : "Crítica";
-  const barColor =
-    score >= 80 ? "bg-emerald-500" : score >= 50 ? "bg-amber-500" : "bg-rose-500";
-  const textColor =
-    score >= 80 ? "text-emerald-700" : score >= 50 ? "text-amber-700" : "text-rose-700";
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <p className="text-[11px] text-slate-500 mb-1">Salud del proyecto</p>
-      {loading ? (
-        <p className="text-sm text-slate-500">Cargando…</p>
-      ) : (
-        <>
-          <div className="flex items-center justify-between gap-2 mt-1">
-            <span className={`text-2xl font-semibold ${textColor}`}>{score}</span>
-            <span className={`text-[11px] font-medium ${textColor}`}>{status}</span>
-          </div>
-          <div className="h-2 w-full rounded-full bg-slate-100 mt-2">
-            <div
-              className={`h-2 rounded-full ${barColor} transition-[width] duration-300`}
-              style={{ width: `${score}%` }}
-            />
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 function KpiCard({
   title,
   value,
@@ -2126,13 +2083,13 @@ function KpiCard({
   error?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm flex flex-col justify-between">
-      <p className="text-[11px] text-slate-500 mb-1">{title}</p>
+    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm flex flex-col justify-between">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1">{title}</p>
       <p className="text-2xl font-semibold text-slate-900">{value}</p>
       {error ? (
         <p className="text-[11px] text-red-600 mt-1">{error}</p>
       ) : (
-        <p className="text-[11px] text-slate-400 mt-1">{subtitle}</p>
+        <p className="text-[11px] text-slate-500 mt-1">{subtitle}</p>
       )}
     </div>
   );
@@ -2154,7 +2111,7 @@ function MetricActionCard({
   return (
     <Link
       href={href}
-      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm flex flex-col gap-2 hover:border-slate-300 hover:shadow transition"
+      className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm flex flex-col gap-2 hover:border-slate-300 hover:shadow transition"
     >
       <div className="flex items-center justify-between gap-2">
         <span className="text-slate-400">{icon}</span>

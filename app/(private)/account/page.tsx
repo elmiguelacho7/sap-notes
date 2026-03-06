@@ -3,6 +3,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -116,27 +118,26 @@ export default function AccountPage() {
 
   if (loading) {
     return (
-      <div className="w-full">
-        <div className="max-w-6xl mx-auto px-6 py-6">
-          <p className="text-sm text-slate-500">Cargando...</p>
+      <PageShell wide={false}>
+        <div className="py-12 text-center">
+          <p className="text-sm font-medium text-slate-700">Cargando…</p>
+          <p className="mt-1 text-sm text-slate-500">Un momento.</p>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="w-full">
-      <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">Cuenta</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Información de tu cuenta y opciones de seguridad.
-          </p>
-        </div>
+    <PageShell wide={false}>
+      <div className="space-y-8">
+      <PageHeader
+        title="Cuenta"
+        description="Información de tu cuenta y opciones de seguridad."
+      />
 
         {/* Información de la cuenta */}
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-          <h2 className="text-sm font-semibold text-slate-900">
+          <h2 className="text-sm font-semibold text-slate-800">
             Información de la cuenta
           </h2>
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -157,7 +158,7 @@ export default function AccountPage() {
 
         {/* Cambiar contraseña */}
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-          <h2 className="text-sm font-semibold text-slate-900">
+          <h2 className="text-sm font-semibold text-slate-800">
             Cambiar contraseña
           </h2>
           <p className="text-sm text-slate-500">
@@ -166,13 +167,13 @@ export default function AccountPage() {
           </p>
 
           {errorMsg && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {errorMsg}
             </div>
           )}
 
           {successMsg && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
               {successMsg}
             </div>
           )}
@@ -277,6 +278,6 @@ export default function AccountPage() {
           </p>
         </section>
       </div>
-    </div>
+    </PageShell>
   );
 }

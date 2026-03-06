@@ -48,7 +48,9 @@ export type AgentContext = {
   stats: ProjectStatsResult | null;
   notes: NoteSummary[];
   links: ProjectLinkSummary[];
-  mode: "global" | "project";
+  mode: "global" | "project" | "notes";
+  /** Sapito Brain v1: structured context summary (platform/project/notes) for the prompt */
+  sapitoContextSummary?: string;
 };
 
 // ==========================
@@ -102,27 +104,49 @@ ${linksBlock}`;
 const GLOBAL_CONTEXT_PLACEHOLDER =
   "No hay contexto de un proyecto concreto. Responde de forma general según los conocimientos del asistente.";
 
-// ==========================
-// System prompts
-// ==========================
+const SYSTEM_PROMPT_PROJECT = `Eres Sapito, el asistente operativo del proyecto SAP. Actúas como copiloto práctico: resumir estado, señalar riesgos cuando los datos lo apoyen y proponer la siguiente acción.
 
-const SYSTEM_PROMPT_PROJECT = `Eres un asistente de IA que ayuda a un consultor senior SAP a gestionar un proyecto concreto de implementación SAP.
+Recibes: datos estructurados del proyecto (tareas abiertas/vencidas/bloqueadas, tickets abiertos/prioridad, actividades vencidas/próximas), notas del proyecto y enlaces.
 
-Recibes: la pregunta del usuario, las notas del proyecto y los enlaces del proyecto.
+Formato de respuesta cuando haya contexto útil:
+1. Breve resumen de estado (1-2 frases).
+2. Interpretación de riesgo o prioridad: si hay tareas vencidas, tickets urgentes/alta prioridad o actividades vencidas, menciónalo con calma y utilidad. No inventes riesgo si no hay datos que lo indiquen; no exageres señales débiles.
+3. Siguiente acción sugerida (concreta y breve).
 
 Reglas:
-- Basa siempre tus respuestas en el contexto del proyecto cuando sea posible.
-- Si hay notas relevantes (mismo error_code, módulo o tema), resúmelas y relaciónalas con la pregunta.
-- Si hay enlaces útiles, indica cuáles pueden ayudar y por qué.
-- Si el contexto no contiene información relevante, dilo con claridad y no inventes detalles.
-- Responde en ESPAÑOL, con un tono claro, conciso y profesional.
-- Para errores SAP, intenta estructurar la respuesta como: Diagnóstico, Causa, Posible solución.
-- Si el usuario pide un resumen, ofrece un resumen ejecutivo y puntos clave.`;
+- Usa SIEMPRE los datos estructurados proporcionados para responder. No des respuestas genéricas si tienes números concretos.
+- Si no hay información relevante para la pregunta, dilo con claridad y no inventes.
+- Responde en ESPAÑOL. Tono: técnico, conciso, cercano y creíble para consultores SAP.
+- Para errores SAP en notas: Diagnóstico, Causa, Posible solución.
+- Mantén las respuestas cortas. Evita rodeos.`;
 
-const SYSTEM_PROMPT_GLOBAL = `You are a SAP implementation assistant without a specific project.
-Answer the user's questions in a general way. If the user mentions a project explicitly, treat it as normal conversation context, but do not rely on any project-specific notes.
-Responde en ESPAÑOL, con un tono claro, conciso y profesional.
-Para errores SAP, intenta estructurar la respuesta como: Diagnóstico, Causa, Posible solución.`;
+const SYSTEM_PROMPT_GLOBAL = `Eres Sapito, el asistente de la plataforma SAP Notes Hub. Sin proyecto concreto: das una vista de plataforma y orientas hacia dónde mirar.
+
+Recibes: datos estructurados de plataforma (proyectos totales/activos, notas totales/creadas hoy, tickets abiertos si aplica).
+
+Formato de respuesta cuando haya datos:
+1. Breve resumen de la plataforma (proyectos activos, actividad de notas, tickets si aplica).
+2. Si hay señales que requieran atención (p. ej. muchos tickets abiertos), menciónalo con calma. No inventes problemas si los datos no los muestran.
+3. Sugerencia de dónde mirar a continuación cuando sea útil: dashboard, lista de proyectos, mi trabajo, notas.
+
+Reglas:
+- Usa los datos estructurados proporcionados. Responde en ESPAÑOL. Tono: claro, conciso, profesional.
+- Si preguntan por errores o transacciones SAP en general, responde con Diagnóstico, Causa, Posible solución.
+- Respuestas cortas. No verboso.`;
+
+const SYSTEM_PROMPT_NOTES = `Eres Sapito, el asistente del hub de notas. Ayudas a ver patrones en la base de notas: módulos más usados, códigos de error frecuentes, transacciones mencionadas.
+
+Recibes: resumen de insights (total notas, tops por módulo, error y transacción). Úsalo para responder con datos reales.
+
+Formato de respuesta cuando haya datos:
+1. Breve resumen de lo que muestran los datos (qué se repite, qué destaca).
+2. Interpretación práctica: qué puede indicar esa repetición (p. ej. módulos más tocados, errores recurrentes).
+3. Acción sugerida cuando sea útil: consolidar conocimiento repetido, crear una nota resumen, etiquetar temas recurrentes, revisar documentación de transacciones repetidas. Mantén la sugerencia concreta y breve.
+
+Reglas:
+- Responde en ESPAÑOL. Técnico, conciso, útil.
+- Si no hay datos suficientes o no hay repetición clara, dilo con naturalidad.
+- No inventes cifras. Solo usa los datos del resumen proporcionado.`;
 
 // ==========================
 // Prompt template
@@ -130,6 +154,10 @@ Para errores SAP, intenta estructurar la respuesta como: Diagnóstico, Causa, Po
 
 const template = PromptTemplate.fromTemplate(`
 {systemPrompt}
+
+{knowledgeInstruction}
+
+{sapitoContextBlock}
 
 Contexto del proyecto:
 ----------------------
@@ -154,17 +182,35 @@ export async function runProjectAgent(params: {
   const ctx = params.context;
 
   const isProjectMode = ctx.mode === "project" && ctx.projectId != null;
+  const isNotesMode = ctx.mode === "notes";
 
   const systemPrompt = isProjectMode
     ? SYSTEM_PROMPT_PROJECT
-    : SYSTEM_PROMPT_GLOBAL;
+    : isNotesMode
+      ? SYSTEM_PROMPT_NOTES
+      : SYSTEM_PROMPT_GLOBAL;
+
+  const sapitoContextBlock =
+    ctx.sapitoContextSummary?.trim() != null && ctx.sapitoContextSummary.trim() !== ""
+      ? `Datos estructurados (usa esto como fuente de verdad para resumir, priorizar y sugerir siguiente acción):\n${ctx.sapitoContextSummary.trim()}`
+      : "";
+
+  const knowledgeInstruction =
+    ctx.sapitoContextSummary?.includes("Contexto SAP Knowledge") ||
+    ctx.sapitoContextSummary?.includes("SAP Knowledge Context")
+      ? "Cuando uses el 'Contexto SAP Knowledge' anterior: basa la respuesta en ese contenido; ofrece pasos procedimentales cuando aplique; no inventes información que no esté en el contexto; si el contexto es insuficiente, dilo con claridad."
+      : "";
 
   const projectContext = isProjectMode
     ? buildProjectContextText(ctx.notes, ctx.links)
-    : GLOBAL_CONTEXT_PLACEHOLDER;
+    : isNotesMode
+      ? "Contexto: panel de notas (insights de la base de notas)."
+      : GLOBAL_CONTEXT_PLACEHOLDER;
 
   const prompt = await template.format({
     systemPrompt,
+    knowledgeInstruction,
+    sapitoContextBlock,
     projectContext,
     userMessage: params.message,
   });
@@ -185,11 +231,5 @@ export async function runProjectAgent(params: {
 
   const content = response.content;
   const llmReply = typeof content === "string" ? content : String(content ?? "");
-
-  if (isProjectMode) {
-    const debugHeader = `[LangChain Project Agent] Notas: ${ctx.notes.length}, Enlaces: ${ctx.links.length}.\n\n`;
-    return debugHeader + llmReply;
-  }
-
   return llmReply;
 }
