@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { getGoogleAuthUrl, isGoogleOAuthConfigured } from "@/lib/integrations/googleAuth";
+import {
+  getGoogleAuthUrl,
+  isGoogleOAuthConfigured,
+} from "@/lib/integrations/googleAuth";
 import { getCurrentUserIdFromRequest } from "@/lib/auth/serverAuth";
 import { cookies } from "next/headers";
 
@@ -9,7 +12,8 @@ const STATE_COOKIE_MAX_AGE = 600; // 10 minutes
 
 /**
  * GET /api/integrations/google/connect
- * Redirects to Google OAuth consent. Caller must be authenticated.
+ * Returns Google OAuth URL as JSON. Caller must send Authorization: Bearer <token>.
+ * Does not redirect; frontend performs window.location.href = response.url.
  */
 export async function GET(req: Request) {
   try {
@@ -43,7 +47,7 @@ export async function GET(req: Request) {
     cookieStore.set(STATE_USER_COOKIE_NAME, userId, cookieOpts);
 
     const url = getGoogleAuthUrl(state);
-    return NextResponse.redirect(url);
+    return NextResponse.json({ url });
   } catch (err) {
     console.error("[integrations/google/connect]", err);
     return NextResponse.json(

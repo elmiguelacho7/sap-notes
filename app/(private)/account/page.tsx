@@ -123,23 +123,14 @@ export default function AccountPage() {
       const res = await fetch("/api/integrations/google/connect", {
         method: "GET",
         headers: { Authorization: `Bearer ${session.access_token}` },
-        redirect: "manual",
       });
-      if (res.status === 401) {
-        const data = await res.json().catch(() => ({}));
-        setGoogleConnectError((data as { error?: string }).error ?? "Debes iniciar sesión para conectar Google Drive.");
+      const data = await res.json().catch(() => ({})) as { url?: string; error?: string };
+      if (!res.ok) {
+        setGoogleConnectError(data.error ?? (res.status === 401 ? "Debes iniciar sesión para conectar Google Drive." : "Error al iniciar la conexión con Google."));
         return;
       }
-      if (res.status === 302 || res.status === 307) {
-        const location = res.headers.get("Location");
-        if (location) {
-          window.location.href = location;
-          return;
-        }
-      }
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setGoogleConnectError((data as { error?: string }).error ?? "Error al iniciar la conexión con Google.");
+      if (data.url) {
+        window.location.href = data.url;
         return;
       }
       setGoogleConnectError("Respuesta inesperada del servidor. Inténtalo de nuevo.");
