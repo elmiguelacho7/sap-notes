@@ -23,6 +23,7 @@ type ProjectSourceRow = {
   description: string | null;
   source_url: string | null;
   external_id: string | null;
+  integration_id: string | null;
   sync_enabled: boolean;
   sync_mode: string;
   last_synced_at: string | null;
@@ -52,10 +53,19 @@ const SOURCE_TYPE_OPTIONS: { value: string; label: string }[] = [
 ];
 
 const SYNC_STATUS_LABELS: Record<string, string> = {
-  never: "Sin sincronizar",
+  never: "Nunca",
+  running: "En curso",
   success: "Correcto",
   partial: "Parcial",
   error: "Error",
+};
+
+type IntegrationOption = {
+  id: string;
+  provider: string;
+  display_name: string;
+  account_email: string | null;
+  status: string;
 };
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
@@ -100,9 +110,13 @@ export default function ProjectLinksPage() {
   const [sourceFormUrl, setSourceFormUrl] = useState("");
   const [sourceFormDescription, setSourceFormDescription] = useState("");
   const [sourceFormExternalId, setSourceFormExternalId] = useState("");
+  const [sourceFormIntegrationId, setSourceFormIntegrationId] = useState("");
   const [sourceFormSyncEnabled, setSourceFormSyncEnabled] = useState(false);
   const [savingSource, setSavingSource] = useState(false);
   const [sourceFormError, setSourceFormError] = useState<string | null>(null);
+  const [googleIntegrations, setGoogleIntegrations] = useState<IntegrationOption[]>([]);
+  const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const loadLinks = useCallback(async () => {
     if (!projectId) return;
@@ -311,9 +325,20 @@ export default function ProjectLinksPage() {
     setSourceFormUrl("");
     setSourceFormDescription("");
     setSourceFormExternalId("");
+    setSourceFormIntegrationId("");
     setSourceFormSyncEnabled(false);
     setSourceFormError(null);
     setSourceModalOpen(true);
+    // Load user integrations for Google Drive dropdown
+    getAuthHeaders().then((headers) => {
+      fetch("/api/integrations", { headers })
+        .then((res) => res.json().catch(() => ({ integrations: [] })))
+        .then((data: { integrations?: IntegrationOption[] }) => {
+          const list = (data.integrations ?? []).filter((i) => i.provider === "google_drive");
+          setGoogleIntegrations(list);
+        })
+        .catch(() => setGoogleIntegrations([]));
+    });
   };
 
   const closeSourceModal = () => {
@@ -340,6 +365,7 @@ export default function ProjectLinksPage() {
           source_url: sourceFormUrl.trim() || null,
           description: sourceFormDescription.trim() || null,
           external_id: sourceFormExternalId.trim() || null,
+          integration_id: sourceFormIntegrationId.trim() || null,
           sync_enabled: sourceFormSyncEnabled,
         }),
       });
@@ -367,6 +393,35 @@ export default function ProjectLinksPage() {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const canSyncSource = (src: ProjectSourceRow) =>
+    (src.source_type === "google_drive_folder" || src.source_type === "google_drive_file") &&
+    !!src.integration_id &&
+    !!src.external_id;
+
+  const handleSyncSource = async (src: ProjectSourceRow) => {
+    if (!projectId || !canSyncSource(src)) return;
+    setSyncingSourceId(src.id);
+    setSyncError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/projects/${projectId}/sources/${src.id}/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSyncError((data as { error?: string }).error ?? "No se pudo sincronizar esta fuente");
+        return;
+      }
+      setSyncError(null);
+      await loadSources();
+    } catch {
+      setSyncError("Error de conexión.");
+    } finally {
+      setSyncingSourceId(null);
+    }
   };
 
   if (!projectId) {
@@ -485,6 +540,11 @@ export default function ProjectLinksPage() {
             {errorSources}
           </div>
         )}
+        {syncError && (
+          <div className="px-4 py-2 border-b border-amber-200 bg-amber-50 text-sm text-amber-800">
+            {syncError}
+          </div>
+        )}
         {loadingSources ? (
           <div className="px-6 py-10 text-sm text-slate-500">Cargando fuentes…</div>
         ) : sources.length === 0 ? (
@@ -515,13 +575,20 @@ export default function ProjectLinksPage() {
                       {SOURCE_TYPE_OPTIONS.find((o) => o.value === src.source_type)?.label ?? src.source_type}
                     </span>
                     <span>
-                      Sincronización: {SYNC_STATUS_LABELS[src.last_sync_status] ?? src.last_sync_status}
+                      Estado de sincronización: {syncingSourceId === src.id
+                        ? SYNC_STATUS_LABELS.running
+                        : SYNC_STATUS_LABELS[src.last_sync_status] ?? src.last_sync_status}
                     </span>
                     {src.last_synced_at && (
-                      <span>Última sync: {formatSyncDate(src.last_synced_at)}</span>
+                      <span>Última sincronización: {formatSyncDate(src.last_synced_at)}</span>
                     )}
                     {src.sync_enabled && (
                       <span className="text-emerald-600">Sync activada</span>
+                    )}
+                    {src.integration_id && (
+                      <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] text-indigo-700">
+                        Cuenta vinculada
+                      </span>
                     )}
                   </div>
                   {src.description && (
@@ -530,7 +597,22 @@ export default function ProjectLinksPage() {
                   {src.source_url && (
                     <p className="mt-1 text-xs text-slate-500 truncate max-w-2xl">{src.source_url}</p>
                   )}
+                  {src.last_sync_status === "success" && (
+                    <p className="mt-1 text-xs text-emerald-600">Esta fuente ya puede ser utilizada por Sapito</p>
+                  )}
                 </div>
+                {canEdit && canSyncSource(src) && (
+                  <div className="shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleSyncSource(src)}
+                      disabled={syncingSourceId !== null}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60 transition"
+                    >
+                      {syncingSourceId === src.id ? "Sincronizando…" : "Sincronizar"}
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -660,7 +742,7 @@ export default function ProjectLinksPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-lg font-semibold text-slate-900">Nueva fuente</h2>
-            <p className="mt-1 text-xs text-slate-500">Registra una fuente externa para que Sapito pueda indexarla más adelante.</p>
+            <p className="mt-1 text-xs text-slate-500">Registra una fuente externa. Esta fuente podrá sincronizarse con Sapito en el siguiente paso.</p>
             <form onSubmit={handleCreateSource} className="mt-4 space-y-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Nombre *</label>
@@ -686,6 +768,46 @@ export default function ProjectLinksPage() {
                   ))}
                 </select>
               </div>
+              {(sourceFormType === "google_drive_folder" || sourceFormType === "google_drive_file") && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Cuenta de Google Drive</label>
+                  <select
+                    value={sourceFormIntegrationId}
+                    onChange={(e) => setSourceFormIntegrationId(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    <option value="">Seleccionar cuenta conectada</option>
+                    {googleIntegrations.map((int) => (
+                      <option key={int.id} value={int.id}>
+                        {int.account_email || int.display_name || int.id}
+                      </option>
+                    ))}
+                  </select>
+                  {googleIntegrations.length === 0 && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Conecta una cuenta en Cuenta → Integraciones conectadas.
+                    </p>
+                  )}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  {(sourceFormType === "google_drive_folder" || sourceFormType === "google_drive_file")
+                    ? "ID de carpeta o archivo (opcional)"
+                    : "ID externo (opcional)"}
+                </label>
+                <input
+                  type="text"
+                  value={sourceFormExternalId}
+                  onChange={(e) => setSourceFormExternalId(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  placeholder={
+                    sourceFormType === "google_drive_folder" || sourceFormType === "google_drive_file"
+                      ? "ID de la carpeta o archivo en Drive"
+                      : "Ej: ID de espacio Confluence"
+                  }
+                />
+              </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">URL (opcional)</label>
                 <input
@@ -706,16 +828,6 @@ export default function ProjectLinksPage() {
                   placeholder="Breve descripción de la fuente"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">ID externo (opcional)</label>
-                <input
-                  type="text"
-                  value={sourceFormExternalId}
-                  onChange={(e) => setSourceFormExternalId(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  placeholder="Ej: ID de carpeta Drive o de espacio Confluence"
-                />
-              </div>
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -725,7 +837,7 @@ export default function ProjectLinksPage() {
                   className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 <label htmlFor="source-sync-enabled" className="text-sm text-slate-700">
-                  Sincronización activada (para uso futuro)
+                  Sincronización activada (esta fuente podrá sincronizarse con Sapito en el siguiente paso)
                 </label>
               </div>
               {sourceFormError && (

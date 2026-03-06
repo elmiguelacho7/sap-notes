@@ -1,18 +1,33 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 
 const MIN_PASSWORD_LENGTH = 8;
 
+type IntegrationSummary = {
+  id: string;
+  provider: string;
+  display_name: string;
+  account_email: string | null;
+  status: string;
+  created_at: string;
+};
+
 export default function AccountPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState<string | null>(null);
   const [fullName, setFullName] = useState<string | null>(null);
+
+  const [integrations, setIntegrations] = useState<IntegrationSummary[]>([]);
+  const [integrationsLoading, setIntegrationsLoading] = useState(false);
+  const [googleConnectError, setGoogleConnectError] = useState<string | null>(null);
+  const [googleConnected, setGoogleConnected] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -50,6 +65,50 @@ export default function AccountPage() {
       cancelled = true;
     };
   }, []);
+
+  // Query params: google=connected | error=...
+  useEffect(() => {
+    const google = searchParams?.get("google");
+    const err = searchParams?.get("error");
+    if (google === "connected") setGoogleConnected(true);
+    if (err) {
+      const messages: Record<string, string> = {
+        missing_params: "Faltan parámetros en la respuesta de Google.",
+        invalid_state: "Sesión de conexión inválida. Inténtalo de nuevo.",
+        not_authenticated: "Debes iniciar sesión para conectar.",
+        config: "Configuración del servidor incompleta.",
+        callback_failed: "Error al conectar con Google. Inténtalo más tarde.",
+      };
+      setGoogleConnectError(messages[err] || "Error al conectar con Google.");
+    }
+  }, [searchParams]);
+
+  // Load integrations (for status)
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setIntegrationsLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          setIntegrations([]);
+          return;
+        }
+        const res = await fetch("/api/integrations", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (cancelled) return;
+        const data = await res.json().catch(() => ({ integrations: [] }));
+        setIntegrations((data as { integrations?: IntegrationSummary[] }).integrations ?? []);
+      } catch {
+        if (!cancelled) setIntegrations([]);
+      } finally {
+        if (!cancelled) setIntegrationsLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [googleConnected]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -134,6 +193,56 @@ export default function AccountPage() {
         title="Cuenta"
         description="Información de tu cuenta y opciones de seguridad."
       />
+
+        {/* Integraciones conectadas */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+          <h2 className="text-sm font-semibold text-slate-800">
+            Integraciones conectadas
+          </h2>
+          <p className="text-sm text-slate-500">
+            Conecta tu cuenta de Google Drive para poder usar carpetas o archivos como fuentes del proyecto en el siguiente paso.
+          </p>
+          {googleConnectError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {googleConnectError}
+            </div>
+          )}
+          {googleConnected && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              Cuenta de Google conectada correctamente.
+            </div>
+          )}
+          {integrationsLoading ? (
+            <p className="text-sm text-slate-500">Cargando…</p>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                <div>
+                  <p className="font-medium text-slate-800">Google Drive</p>
+                  {integrations.some((i) => i.provider === "google_drive") ? (
+                    <>
+                      <p className="mt-1 text-xs text-slate-600">
+                        Cuenta conectada:{" "}
+                        {integrations.find((i) => i.provider === "google_drive")?.account_email ?? "—"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        Estado: {integrations.find((i) => i.provider === "google_drive")?.status === "active" ? "Activo" : "Revisar"}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-1 text-xs text-slate-500">No conectado</p>
+                  )}
+                </div>
+                <a
+                  href="/api/integrations/google/connect"
+                  className="rounded-full bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 transition-colors shrink-0"
+                >
+                  {integrations.some((i) => i.provider === "google_drive") ? "Reconectar" : "Conectar Google Drive"}
+                </a>
+              </div>
+            </div>
+          )}
+        </section>
 
         {/* Información de la cuenta */}
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">

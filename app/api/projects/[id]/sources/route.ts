@@ -5,6 +5,7 @@ import {
   ProjectNotFoundError,
   type CreateProjectSourcePayload,
 } from "@/lib/services/projectService";
+import { getCurrentUserIdFromRequest } from "@/lib/auth/serverAuth";
 
 export type { ProjectSourceSummary } from "@/lib/services/projectService";
 
@@ -112,13 +113,11 @@ export async function POST(req: Request, { params }: RouteParams) {
       source_url: typeof body.source_url === "string" ? body.source_url.trim() || null : null,
       description: typeof body.description === "string" ? body.description.trim() || null : null,
       external_id: typeof body.external_id === "string" ? body.external_id.trim() || null : null,
+      integration_id: typeof body.integration_id === "string" ? body.integration_id.trim() || null : null,
       sync_enabled: typeof body.sync_enabled === "boolean" ? body.sync_enabled : false,
     };
 
-    const createdBy =
-      typeof body.created_by === "string" && body.created_by.trim()
-        ? body.created_by.trim()
-        : null;
+    const createdBy = await getCurrentUserIdFromRequest(req);
 
     const result = await createProjectSource(projectId, payload, createdBy);
     return NextResponse.json(result, { status: 201 });

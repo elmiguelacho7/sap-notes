@@ -433,6 +433,7 @@ export type ProjectSourceSummary = {
   source_url: string | null;
   external_id: string | null;
   external_parent_id: string | null;
+  integration_id: string | null;
   sync_enabled: boolean;
   sync_mode: string;
   last_synced_at: string | null;
@@ -448,6 +449,7 @@ export type CreateProjectSourcePayload = {
   source_url?: string | null;
   description?: string | null;
   external_id?: string | null;
+  integration_id?: string | null;
   sync_enabled?: boolean;
 };
 
@@ -460,7 +462,7 @@ export async function getProjectSources(
   const { data, error } = await supabaseAdmin
     .from("project_sources")
     .select(
-      "id, project_id, source_type, name, description, source_url, external_id, external_parent_id, sync_enabled, sync_mode, last_synced_at, last_sync_status, created_by, created_at, updated_at"
+      "id, project_id, source_type, name, description, source_url, external_id, external_parent_id, integration_id, sync_enabled, sync_mode, last_synced_at, last_sync_status, created_by, created_at, updated_at"
     )
     .eq("project_id", projectId)
     .order("created_at", { ascending: false })
@@ -478,6 +480,20 @@ export async function createProjectSource(
 ): Promise<{ projectId: string; source: ProjectSourceSummary }> {
   await ensureProjectExists(projectId);
 
+  let integrationId: string | null = null;
+  if (payload.integration_id?.trim()) {
+    const { data: integration } = await supabaseAdmin
+      .from("external_integrations")
+      .select("id")
+      .eq("id", payload.integration_id.trim())
+      .eq("owner_profile_id", createdBy ?? "")
+      .maybeSingle();
+    if (!integration) {
+      throw new Error("Integration not found or not owned by current user");
+    }
+    integrationId = (integration as { id: string }).id;
+  }
+
   const { data: inserted, error } = await supabaseAdmin
     .from("project_sources")
     .insert({
@@ -487,6 +503,7 @@ export async function createProjectSource(
       description: payload.description?.trim() || null,
       source_url: payload.source_url?.trim() || null,
       external_id: payload.external_id?.trim() || null,
+      integration_id: integrationId,
       sync_enabled: payload.sync_enabled ?? false,
       created_by: createdBy,
     })
