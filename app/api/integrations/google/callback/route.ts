@@ -24,7 +24,7 @@ export async function GET(req: Request) {
   try {
     if (!code || !state) {
       console.error("[integrations/google/callback] Missing code or state");
-      return NextResponse.redirect(`${FRONTEND_ACCOUNT}?error=missing_params`);
+      return NextResponse.redirect(new URL(`${FRONTEND_ACCOUNT}?error=missing_params`, req.url));
     }
 
     const cookieStore = await cookies();
@@ -35,11 +35,11 @@ export async function GET(req: Request) {
 
     if (!storedState || storedState !== state) {
       console.error("[integrations/google/callback] Invalid or missing state");
-      return NextResponse.redirect(`${FRONTEND_ACCOUNT}?error=invalid_state`);
+      return NextResponse.redirect(new URL(`${FRONTEND_ACCOUNT}?error=invalid_state`, req.url));
     }
     if (!storedUserId?.trim()) {
       console.warn("[integrations/google/callback] No user id in cookie");
-      return NextResponse.redirect(`${FRONTEND_ACCOUNT}?error=not_authenticated`);
+      return NextResponse.redirect(new URL(`${FRONTEND_ACCOUNT}?error=not_authenticated`, req.url));
     }
 
     const ownerProfileId = storedUserId.trim();
@@ -90,9 +90,9 @@ export async function GET(req: Request) {
       });
     }
 
-    return NextResponse.redirect(`${FRONTEND_ACCOUNT}?google=connected`);
+    return NextResponse.redirect(new URL(`${FRONTEND_ACCOUNT}?google=connected`, req.url));
   } catch (err) {
     console.error("[integrations/google/callback]", err);
-    return NextResponse.redirect(`${FRONTEND_ACCOUNT}?error=callback_failed`);
+    return NextResponse.redirect(new URL(`${FRONTEND_ACCOUNT}?error=callback_failed`, req.url));
   }
 }
