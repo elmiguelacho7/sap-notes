@@ -28,6 +28,7 @@ export default function AccountPage() {
   const [integrationsLoading, setIntegrationsLoading] = useState(false);
   const [googleConnectError, setGoogleConnectError] = useState<string | null>(null);
   const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleConnectPending, setGoogleConnectPending] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -109,6 +110,45 @@ export default function AccountPage() {
     load();
     return () => { cancelled = true; };
   }, [googleConnected]);
+
+  const handleConnectGoogleDrive = async () => {
+    setGoogleConnectError(null);
+    setGoogleConnectPending(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setGoogleConnectError("Debes iniciar sesión para conectar Google Drive.");
+        return;
+      }
+      const res = await fetch("/api/integrations/google/connect", {
+        method: "GET",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        redirect: "manual",
+      });
+      if (res.status === 401) {
+        const data = await res.json().catch(() => ({}));
+        setGoogleConnectError((data as { error?: string }).error ?? "Debes iniciar sesión para conectar Google Drive.");
+        return;
+      }
+      if (res.status === 302 || res.status === 307) {
+        const location = res.headers.get("Location");
+        if (location) {
+          window.location.href = location;
+          return;
+        }
+      }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setGoogleConnectError((data as { error?: string }).error ?? "Error al iniciar la conexión con Google.");
+        return;
+      }
+      setGoogleConnectError("Respuesta inesperada del servidor. Inténtalo de nuevo.");
+    } catch {
+      setGoogleConnectError("Error de conexión. Inténtalo de nuevo.");
+    } finally {
+      setGoogleConnectPending(false);
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -233,12 +273,14 @@ export default function AccountPage() {
                     <p className="mt-1 text-xs text-slate-500">No conectado</p>
                   )}
                 </div>
-                <a
-                  href="/api/integrations/google/connect"
-                  className="rounded-full bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 transition-colors shrink-0"
+                <button
+                  type="button"
+                  onClick={handleConnectGoogleDrive}
+                  disabled={googleConnectPending}
+                  className="rounded-full bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 transition-colors shrink-0 disabled:opacity-60"
                 >
-                  {integrations.some((i) => i.provider === "google_drive") ? "Reconectar" : "Conectar Google Drive"}
-                </a>
+                  {googleConnectPending ? "Redirigiendo…" : integrations.some((i) => i.provider === "google_drive") ? "Reconectar" : "Conectar Google Drive"}
+                </button>
               </div>
             </div>
           )}

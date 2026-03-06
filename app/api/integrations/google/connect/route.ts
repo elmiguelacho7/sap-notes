@@ -4,6 +4,7 @@ import { getCurrentUserIdFromRequest } from "@/lib/auth/serverAuth";
 import { cookies } from "next/headers";
 
 const STATE_COOKIE_NAME = "google_oauth_state";
+const STATE_USER_COOKIE_NAME = "google_oauth_user_id";
 const STATE_COOKIE_MAX_AGE = 600; // 10 minutes
 
 /**
@@ -22,6 +23,7 @@ export async function GET(req: Request) {
 
     const userId = await getCurrentUserIdFromRequest(req);
     if (!userId) {
+      console.warn("[integrations/google/connect] No session (Bearer or cookies)");
       return NextResponse.json(
         { error: "Debes iniciar sesión para conectar Google Drive." },
         { status: 401 }
@@ -30,13 +32,15 @@ export async function GET(req: Request) {
 
     const state = crypto.randomUUID();
     const cookieStore = await cookies();
-    cookieStore.set(STATE_COOKIE_NAME, state, {
+    const cookieOpts = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "lax" as const,
       path: "/",
       maxAge: STATE_COOKIE_MAX_AGE,
-    });
+    };
+    cookieStore.set(STATE_COOKIE_NAME, state, cookieOpts);
+    cookieStore.set(STATE_USER_COOKIE_NAME, userId, cookieOpts);
 
     const url = getGoogleAuthUrl(state);
     return NextResponse.redirect(url);

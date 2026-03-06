@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
   getGoogleOAuthEnv,
@@ -10,6 +9,7 @@ import {
 } from "@/lib/integrations/googleAuth";
 
 const STATE_COOKIE_NAME = "google_oauth_state";
+const STATE_USER_COOKIE_NAME = "google_oauth_user_id";
 const FRONTEND_ACCOUNT = "/account";
 
 /**
@@ -29,46 +29,22 @@ export async function GET(req: Request) {
 
     const cookieStore = await cookies();
     const storedState = cookieStore.get(STATE_COOKIE_NAME)?.value;
+    const storedUserId = cookieStore.get(STATE_USER_COOKIE_NAME)?.value;
     cookieStore.delete(STATE_COOKIE_NAME);
+    cookieStore.delete(STATE_USER_COOKIE_NAME);
 
     if (!storedState || storedState !== state) {
-      console.error("[integrations/google/callback] Invalid state");
+      console.error("[integrations/google/callback] Invalid or missing state");
       return NextResponse.redirect(`${FRONTEND_ACCOUNT}?error=invalid_state`);
     }
-
-    getGoogleOAuthEnv(); // validate env before continuing
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return NextResponse.redirect(`${FRONTEND_ACCOUNT}?error=config`);
-    }
-
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options as Record<string, unknown>)
-            );
-          } catch {
-            // ignore
-          }
-        },
-      },
-    });
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user?.id) {
+    if (!storedUserId?.trim()) {
+      console.warn("[integrations/google/callback] No user id in cookie");
       return NextResponse.redirect(`${FRONTEND_ACCOUNT}?error=not_authenticated`);
     }
 
-    const ownerProfileId = user.id;
+    const ownerProfileId = storedUserId.trim();
+
+    getGoogleOAuthEnv(); // validate env before continuing
 
     const tokens = await exchangeCodeForTokens(code);
     const userInfo = await fetchGoogleUserInfo(tokens.access_token);
