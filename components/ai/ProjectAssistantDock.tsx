@@ -34,10 +34,10 @@ export function ProjectAssistantDock({
           <div className="relative w-full max-w-md bg-white shadow-xl flex flex-col border-l border-slate-200 rounded-l-2xl overflow-hidden animate-in slide-in-from-right duration-200">
             <div className="shrink-0 flex items-center justify-between gap-2 px-5 py-4 border-b border-slate-200 bg-slate-50/80">
               <div className="flex items-start gap-3 min-w-0">
-                <SapitoAvatar size="md" className="mt-0.5" />
+                <SapitoAvatar size="md" className="mt-0.5 shrink-0" />
                 <div className="min-w-0">
                   <h2 className="text-sm font-semibold text-slate-900">Sapito del proyecto</h2>
-                  <p className="text-xs text-slate-500 mt-0.5 truncate">
+                  <p className="text-xs text-slate-500 mt-1 truncate">
                     {projectName ? `${projectName} — ` : ""}Asistente técnico con contexto del proyecto.
                   </p>
                 </div>
@@ -51,7 +51,7 @@ export function ProjectAssistantDock({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex-1 min-h-0 overflow-hidden p-4">
+            <div className="flex-1 min-h-0 overflow-hidden p-4 flex flex-col">
               <ProjectAssistantChat projectId={projectId} projectName={projectName} />
             </div>
           </div>

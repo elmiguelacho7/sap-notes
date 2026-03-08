@@ -7,7 +7,8 @@ import {
   ProjectNotFoundError,
 } from "@/lib/services/projectService";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { buildSapitoContext, type SapitoScope } from "@/lib/ai/sapitoContext";
+import { buildSapitoContext, type SapitoScope, type RetrievalDebug } from "@/lib/ai/sapitoContext";
+import { classifySapIntent, shouldIncludeWorkspaceSummary } from "@/lib/ai/sapitoIntent";
 
 const NOTES_LIMIT = 30;
 const LINKS_LIMIT = 20;
@@ -57,6 +58,9 @@ export async function POST(req: Request) {
         : "no-session";
     const scopeParam = typeof body.scope === "string" ? body.scope : undefined;
 
+    // Intent-first routing: classify before building context so SAP questions don't get dashboard summary.
+    const sapIntent = classifySapIntent(message);
+
     // Sapito Brain v1: determine scope for context (global | project | notes)
     const scope: SapitoScope =
       projectId != null
@@ -69,13 +73,14 @@ export async function POST(req: Request) {
 
     if (projectId) {
       try {
-        const [stats, notesResult, linksResult, sapitoContextSummary] =
+        const [stats, notesResult, linksResult, sapitoResult] =
           await Promise.all([
             getProjectStats(projectId),
             getProjectNotes(projectId, NOTES_LIMIT),
             getProjectLinks(projectId, LINKS_LIMIT),
-            buildSapitoContext({ scope: "project", projectId, message }),
+            buildSapitoContext({ scope: "project", projectId, message, sapIntent }),
           ]);
+        const { contextText: sapitoContextSummary, retrievalDebug } = sapitoResult;
         context = {
           projectId,
           stats,
@@ -83,6 +88,8 @@ export async function POST(req: Request) {
           links: linksResult.links,
           mode: "project",
           sapitoContextSummary: sapitoContextSummary ?? "",
+          sapIntent,
+          retrievalDebug: retrievalDebug ?? { chunkCount: 0, documentTitles: [], usedRetrieval: false },
         };
       } catch (err) {
         if (err instanceof ProjectNotFoundError) {
@@ -100,9 +107,10 @@ export async function POST(req: Request) {
         mode: "project",
       });
     } else if (scope === "notes") {
-      const sapitoContextSummary = await buildSapitoContext({
+      const sapitoResult = await buildSapitoContext({
         scope: "notes",
         message,
+        sapIntent,
       });
       context = {
         projectId: null,
@@ -110,13 +118,16 @@ export async function POST(req: Request) {
         notes: [],
         links: [],
         mode: "notes",
-        sapitoContextSummary: sapitoContextSummary ?? "",
+        sapitoContextSummary: sapitoResult.contextText ?? "",
+        sapIntent,
+        retrievalDebug: sapitoResult.retrievalDebug ?? { chunkCount: 0, documentTitles: [], usedRetrieval: false },
       };
       console.log("project-agent API hit", { sessionId, scope, mode: "notes" });
     } else {
-      const sapitoContextSummary = await buildSapitoContext({
+      const sapitoResult = await buildSapitoContext({
         scope: "global",
         message,
+        sapIntent,
       });
       context = {
         projectId: null,
@@ -124,7 +135,9 @@ export async function POST(req: Request) {
         notes: [],
         links: [],
         mode: "global",
-        sapitoContextSummary: sapitoContextSummary ?? "",
+        sapitoContextSummary: sapitoResult.contextText ?? "",
+        sapIntent,
+        retrievalDebug: sapitoResult.retrievalDebug ?? { chunkCount: 0, documentTitles: [], usedRetrieval: false },
       };
       console.log("project-agent API hit", {
         sessionId,
@@ -132,6 +145,20 @@ export async function POST(req: Request) {
         mode: "global",
       });
     }
+
+    const includeWorkspaceSummary = shouldIncludeWorkspaceSummary(context.sapIntent);
+    const retrievalUsed = (context.retrievalDebug?.usedRetrieval ?? false) === true;
+
+    console.log("[Sapito routing]", {
+      detectedIntent: context.sapIntent,
+      workspaceContextIncluded: includeWorkspaceSummary,
+      retrievalUsed,
+      documentsMatched: context.retrievalDebug?.documentTitles?.length ?? 0,
+      ...(process.env.NODE_ENV === "development" && {
+        knowledgeChunksRetrieved: context.retrievalDebug?.chunkCount ?? 0,
+        topMatchedDocumentTitles: context.retrievalDebug?.documentTitles?.slice(0, 5) ?? [],
+      }),
+    });
 
     const reply = await runProjectAgent({
       message,
@@ -163,7 +190,14 @@ export async function POST(req: Request) {
     }
 
     console.log("project-agent success");
-    return NextResponse.json({ reply });
+    const payload: { reply: string; grounded?: boolean; debug?: RetrievalDebug } = {
+      reply,
+      grounded: (context.retrievalDebug?.usedRetrieval ?? false) === true,
+    };
+    if (process.env.NODE_ENV === "development" && context.retrievalDebug) {
+      payload.debug = context.retrievalDebug;
+    }
+    return NextResponse.json(payload);
   } catch (err) {
     console.error("project-agent API error", err);
     return NextResponse.json(

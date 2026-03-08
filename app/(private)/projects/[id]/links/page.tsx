@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
+import Image from "next/image";
 import { Pencil, Trash2, Database } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
+import { getSapitoProject } from "@/lib/agents/agentRegistry";
 
 type ProjectLinkRow = {
   id: string;
@@ -45,6 +47,8 @@ const LINK_TYPE_OPTIONS = [
 const SOURCE_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: "google_drive_folder", label: "Carpeta de Google Drive" },
   { value: "google_drive_file", label: "Archivo de Google Drive" },
+  { value: "sap_help", label: "SAP Help Portal" },
+  { value: "official_web", label: "Official SAP web" },
   { value: "sharepoint_library", label: "Biblioteca SharePoint" },
   { value: "confluence_space", label: "Espacio Confluence" },
   { value: "jira_project", label: "Proyecto Jira" },
@@ -117,6 +121,8 @@ export default function ProjectLinksPage() {
   const [googleIntegrations, setGoogleIntegrations] = useState<IntegrationOption[]>([]);
   const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncDriveLoading, setSyncDriveLoading] = useState(false);
+  const [syncDriveMessage, setSyncDriveMessage] = useState<string | null>(null);
 
   const loadLinks = useCallback(async () => {
     if (!projectId) return;
@@ -424,6 +430,32 @@ export default function ProjectLinksPage() {
     }
   };
 
+  const handleSyncGoogleDrive = async () => {
+    if (!projectId) return;
+    setSyncDriveLoading(true);
+    setSyncDriveMessage(null);
+    setSyncError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/integrations/google/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ projectId }),
+      });
+      const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string; message?: string; chunksCreated?: number; filesProcessed?: number };
+      if (!res.ok) {
+        setSyncDriveMessage((data as { error?: string }).error ?? "No se pudo sincronizar Google Drive.");
+        return;
+      }
+      setSyncDriveMessage(data.message ?? (data.ok ? "Sync completed" : "Sincronización completada con errores."));
+      await loadSources();
+    } catch {
+      setSyncDriveMessage("Error de conexión.");
+    } finally {
+      setSyncDriveLoading(false);
+    }
+  };
+
   if (!projectId) {
     return (
       <div className="space-y-6">
@@ -436,8 +468,8 @@ export default function ProjectLinksPage() {
     <div className="space-y-6">
       <ProjectPageHeader
         variant="section"
-        title="Enlaces y fuentes del proyecto"
-        subtitle="Enlaces rápidos y fuentes externas para que Sapito pueda indexar y aprender."
+        title="Enlaces y fuentes de conocimiento"
+        subtitle="Enlaces operativos (Jira, Confluence, etc.) y fuentes de conocimiento del proyecto para Sapito. Google Drive se gestiona desde Admin."
         primaryActionLabel={canEdit ? "Nuevo enlace" : undefined}
         primaryActionOnClick={canEdit ? openCreateModal : undefined}
       />
@@ -451,6 +483,7 @@ export default function ProjectLinksPage() {
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
           <h2 className="text-sm font-semibold text-slate-800">Enlaces del proyecto</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Enlaces operativos de navegación: Jira, tableros, Confluence, carpeta principal, etc.</p>
           <p className="text-xs text-slate-500 mt-0.5">Accesos rápidos a documentación y herramientas.</p>
         </div>
         {loading ? (
@@ -515,29 +548,56 @@ export default function ProjectLinksPage() {
         )}
       </section>
 
-      {/* Fuentes del proyecto */}
+      {/* Fuentes de conocimiento (Sapito del Proyecto) */}
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Database className="h-4 w-4 text-slate-600" aria-hidden />
+          <div className="flex items-center gap-3">
+            <div className="relative h-10 w-10 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+              <Image
+                src={getSapitoProject().avatarImage}
+                alt=""
+                fill
+                className="object-cover"
+                sizes="40px"
+              />
+            </div>
             <div>
-              <h2 className="text-sm font-semibold text-slate-800">Fuentes del proyecto</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Fuentes externas para Sapito (Drive, SharePoint, Confluence, etc.).</p>
+              <h2 className="text-sm font-semibold text-slate-800">Project knowledge sources</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Fuentes de conocimiento de este proyecto. Google Drive y fuentes globales se gestionan desde Admin → Knowledge Sources.</p>
             </div>
           </div>
           {canEdit && (
-            <button
-              type="button"
-              onClick={openSourceModal}
-              className="rounded-full bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 transition-colors shrink-0"
-            >
-              Nueva fuente
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {sources.some((s) => s.source_type === "google_drive_folder" || s.source_type === "google_drive_file") && (
+                <button
+                  type="button"
+                  onClick={handleSyncGoogleDrive}
+                  disabled={syncDriveLoading}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60 transition"
+                >
+                  {syncDriveLoading ? "Sincronizando…" : "Sync Google Drive"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={openSourceModal}
+                className="rounded-full bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 transition-colors shrink-0"
+              >
+                Nueva fuente
+              </button>
+            </div>
           )}
         </div>
         {errorSources && (
-          <div className="px-4 py-2 border-b border-red-100 bg-red-50 text-sm text-red-700">
-            {errorSources}
+          <div className="px-4 py-2 border-b border-red-100 bg-red-50 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-red-700">{errorSources}</span>
+            <button
+              type="button"
+              onClick={() => void loadSources()}
+              className="rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
+            >
+              Reintentar
+            </button>
           </div>
         )}
         {syncError && (
@@ -545,20 +605,33 @@ export default function ProjectLinksPage() {
             {syncError}
           </div>
         )}
+        {syncDriveMessage && (
+          <div className={`px-4 py-2 border-b text-sm ${syncDriveMessage.startsWith("Sync") || syncDriveMessage.includes("completad") ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+            {syncDriveMessage}
+          </div>
+        )}
         {loadingSources ? (
           <div className="px-6 py-10 text-sm text-slate-500">Cargando fuentes…</div>
         ) : sources.length === 0 ? (
           <div className="px-6 py-12 text-center">
-            <p className="text-sm font-medium text-slate-700">No hay fuentes registradas</p>
-            <p className="mt-1 text-sm text-slate-500">Añade una fuente (Google Drive, SharePoint, URL, etc.) para que Sapito pueda usarla más adelante.</p>
+            <p className="text-sm font-medium text-slate-700">Este proyecto aún no tiene fuentes de conocimiento</p>
+            <p className="mt-1 text-sm text-slate-500">Las fuentes de Google Drive y el conocimiento global se gestionan desde Admin. Añade aquí fuentes ya conectadas o enlaza otras fuentes.</p>
+            <a
+              href="/admin"
+              className="mt-3 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-800"
+            >
+              Ir a Admin → Knowledge Sources
+            </a>
             {canEdit && (
-              <button
-                type="button"
-                onClick={openSourceModal}
-                className="mt-4 rounded-full bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-              >
-                Nueva fuente
-              </button>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={openSourceModal}
+                  className="rounded-full bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                >
+                  Nueva fuente
+                </button>
+              </div>
             )}
           </div>
         ) : (
@@ -785,7 +858,7 @@ export default function ProjectLinksPage() {
                   </select>
                   {googleIntegrations.length === 0 && (
                     <p className="mt-1 text-xs text-slate-500">
-                      Conecta una cuenta en Cuenta → Integraciones conectadas.
+                      Google Drive se gestiona desde Admin. Conecta una cuenta en Admin → Knowledge Sources y vuelve aquí para elegir la fuente del proyecto.
                     </p>
                   )}
                 </div>

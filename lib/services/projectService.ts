@@ -511,5 +511,26 @@ export async function createProjectSource(
     .single();
 
   if (error) throw error;
-  return { projectId, source: inserted as ProjectSourceSummary };
+  const source = inserted as ProjectSourceSummary;
+
+  // Dual-write to knowledge_sources so Drive sync and retrieval use it.
+  // Project knowledge is private to this project; never shared across projects.
+  await supabaseAdmin.from("knowledge_sources").insert({
+    scope_type: "project",
+    project_id: projectId,
+    source_type: payload.source_type,
+    source_name: payload.name.trim(),
+    external_ref: payload.external_id?.trim() || null,
+    source_url: payload.source_url?.trim() || null,
+    status: "active",
+    sync_enabled: payload.sync_enabled ?? false,
+    integration_id: integrationId,
+    created_by: createdBy,
+  }).then(({ error: ksError }) => {
+    if (ksError) {
+      console.error("[projectService] knowledge_sources dual-write failed", ksError.message);
+    }
+  });
+
+  return { projectId, source };
 }

@@ -35,7 +35,9 @@ function sourceIdentifier(fileId: string): string {
 async function processOneFile(
   accessToken: string,
   fileInfo: DriveFileInfo,
-  _projectSourceId: string
+  projectId: string,
+  projectSourceName: string,
+  sourceType: "google_drive_folder" | "google_drive_file"
 ): Promise<{ processed: number; skipped: boolean; error: string | null }> {
   const fileId = fileInfo.id;
   const mimeType = fileInfo.mimeType;
@@ -69,7 +71,8 @@ async function processOneFile(
   }
 
   let inserted = 0;
-  for (const ch of chunks) {
+  for (let i = 0; i < chunks.length; i++) {
+    const ch = chunks[i];
     try {
       const embedding = await getEmbedding(ch.content);
       const { error: insError } = await supabaseAdmin.from("knowledge_documents").insert({
@@ -78,6 +81,12 @@ async function processOneFile(
         source: ch.source,
         module: ch.module,
         embedding,
+        project_id: projectId,
+        source_type: sourceType,
+        source_name: projectSourceName || name,
+        external_ref: fileId,
+        chunk_index: i,
+        mime_type: mimeType,
       });
       if (insError) throw insError;
       inserted++;
@@ -200,7 +209,13 @@ export async function POST(_req: Request, { params }: RouteParams) {
           );
           for (const file of files) {
             filesSeen++;
-            const result = await processOneFile(accessToken, file, source.id);
+            const result = await processOneFile(
+              accessToken,
+              file,
+              source.project_id,
+              source.name,
+              source.source_type as "google_drive_folder" | "google_drive_file"
+            );
             if (result.error) {
               filesFailed++;
               if (result.error && !errorMessages.includes(result.error)) {
@@ -220,7 +235,9 @@ export async function POST(_req: Request, { params }: RouteParams) {
         const result = await processOneFile(
           accessToken,
           { id: meta.id, name: meta.name, mimeType: meta.mimeType },
-          source.id
+          source.project_id,
+          source.name,
+          source.source_type as "google_drive_folder" | "google_drive_file"
         );
         if (result.error) {
           filesFailed = 1;

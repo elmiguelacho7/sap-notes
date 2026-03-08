@@ -2,9 +2,11 @@
 
 import { useState, type FormEvent, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { SapitoAvatar } from "./SapitoAvatar";
 import { AssistantSuggestionChips } from "./AssistantSuggestionChips";
+import { AssistantMessageContent } from "./AssistantMessageContent";
 
-type ChatMessage = { role: "user" | "assistant"; content: string };
+type ChatMessage = { role: "user" | "assistant"; content: string; grounded?: boolean };
 
 const AGENT_URL = "/api/project-agent";
 
@@ -59,11 +61,11 @@ export function ProjectAssistantChat({
         return;
       }
 
-      const data = (await res.json()) as { reply?: string };
+      const data = (await res.json()) as { reply?: string; grounded?: boolean };
       const reply = typeof data?.reply === "string"
         ? data.reply
         : "No he podido obtener una respuesta de Sapito ahora mismo.";
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: reply, grounded: data?.grounded === true }]);
     } catch (err) {
       console.error("Project agent request failed", err);
       setError("No se pudo obtener respuesta de la IA. Inténtalo de nuevo.");
@@ -80,10 +82,13 @@ export function ProjectAssistantChat({
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 space-y-4 text-sm">
-          {messages.length === 0 ? (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5 space-y-6 text-sm">
+          {messages.length === 0 && !loading ? (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center">
-              <p className="text-sm font-medium text-slate-700">Estoy listo para ayudarte con este proyecto</p>
+              <div className="flex justify-center mb-3">
+                <SapitoAvatar size="lg" />
+              </div>
+              <p className="text-sm font-medium text-slate-700">Soy Sapito, tu asistente del proyecto</p>
               <p className="mt-1 text-xs text-slate-500">
                 Pregunta por riesgos, tareas vencidas, tickets o el siguiente foco. Tengo contexto de este proyecto.
               </p>
@@ -96,23 +101,59 @@ export function ProjectAssistantChat({
                 />
               </div>
             </div>
+          ) : messages.length === 0 && loading ? (
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-center">
+              <SapitoAvatar size="lg" className="mx-auto mb-2 inline-block" />
+              <p className="text-sm font-medium text-slate-700">Sapito está pensando…</p>
+            </div>
           ) : (
-            messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-              >
+            <>
+              {messages.map((msg, idx) => (
                 <div
-                  className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${
-                    msg.role === "user"
-                      ? "bg-indigo-600 text-white"
-                      : "bg-white text-slate-800 border border-slate-200 shadow-sm"
-                  }`}
+                  key={idx}
+                  className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                  {msg.role === "assistant" && (
+                    <div className="mt-1 shrink-0">
+                      <SapitoAvatar size="sm" />
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[88%] min-w-0 rounded-2xl px-4 py-3.5 ${
+                      msg.role === "user"
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "bg-white text-slate-800 border border-slate-200/80 shadow-sm"
+                    }`}
+                  >
+                    {msg.role === "assistant" && msg.grounded === true && (
+                      <p className="text-[11px] text-slate-500 mb-2.5 pb-2 border-b border-slate-100 font-medium">
+                        Según la documentación sincronizada
+                      </p>
+                    )}
+                    {msg.role === "assistant" && msg.grounded === false && (
+                      <p className="text-[11px] text-slate-400 mb-2.5 pb-2 border-b border-slate-100">
+                        Respuesta general (sin documentación indexada)
+                      </p>
+                    )}
+                    {msg.role === "assistant" ? (
+                      <AssistantMessageContent content={msg.content} />
+                    ) : (
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+              {loading && (
+                <div className="flex gap-3 justify-start">
+                  <div className="mt-1 shrink-0">
+                    <SapitoAvatar size="sm" />
+                  </div>
+                  <div className="rounded-2xl px-4 py-3.5 bg-slate-100 text-slate-500 text-sm border border-slate-200/80">
+                    Sapito está pensando…
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -121,20 +162,20 @@ export function ProjectAssistantChat({
         <p className="mt-2 px-1 text-xs text-red-600">{error}</p>
       )}
 
-      <form onSubmit={handleSubmit} className="mt-4 flex items-center gap-2 shrink-0 p-1">
+      <form onSubmit={handleSubmit} className="mt-4 flex items-center gap-2.5 shrink-0 p-1">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Mensaje, error SAP o consulta sobre este proyecto…"
           disabled={loading}
-          className="flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-60"
+          className="flex-1 rounded-xl border border-slate-200 bg-white/80 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-60 shadow-sm"
           aria-label="Mensaje para Sapito del proyecto"
         />
         <button
           type="submit"
           disabled={loading || !input.trim()}
-          className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 shrink-0 transition-colors"
+          className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 shrink-0 transition-colors shadow-sm"
         >
           {loading ? "Enviando…" : "Enviar"}
         </button>

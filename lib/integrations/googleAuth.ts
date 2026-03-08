@@ -7,6 +7,14 @@ const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
 
+/**
+ * OAuth scopes for Google Drive integration.
+ * - drive.readonly: required to list files in folders and read/export file content for Sapito sync
+ *   (metadata-only scope would not allow downloading or exporting Docs to text).
+ * - email, profile: used for display name and account email in the app.
+ * The app is currently in a testing phase with test users; a narrower or lower-friction
+ * permission model may be considered in a future iteration (e.g. if Google offers more granular Drive scopes).
+ */
 const SCOPES = [
   "https://www.googleapis.com/auth/drive.readonly",
   "email",
@@ -41,6 +49,19 @@ export function getGoogleOAuthEnv(): GoogleEnv {
   }
 
   return { clientId, clientSecret, redirectUri };
+}
+
+/**
+ * Returns the redirect URI host for debugging (no secrets). Use only in server logs.
+ */
+export function getRedirectUriHostForLog(): string {
+  try {
+    const uri = process.env.GOOGLE_REDIRECT_URI?.trim();
+    if (!uri) return "(not set)";
+    return new URL(uri).host;
+  } catch {
+    return "(invalid)";
+  }
 }
 
 /**

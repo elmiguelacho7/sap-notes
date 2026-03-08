@@ -6,6 +6,9 @@ import type {
   NoteSummary,
   ProjectLinkSummary,
 } from "@/lib/services/projectService";
+import type { SapIntentCategory } from "@/lib/ai/sapitoIntent";
+import { shouldIncludeWorkspaceSummary, isSapKnowledgeIntent } from "@/lib/ai/sapitoIntent";
+import { SYSTEM_PROMPT_SAP_KNOWLEDGE } from "@/lib/langchain/prompts/sapKnowledgePrompt";
 
 // ==========================
 // Env (OpenAI only; context is built by the API route)
@@ -51,6 +54,10 @@ export type AgentContext = {
   mode: "global" | "project" | "notes";
   /** Sapito Brain v1: structured context summary (platform/project/notes) for the prompt */
   sapitoContextSummary?: string;
+  /** Optional SAP intent (error/transaction/customizing/process/solution_design) for answer format */
+  sapIntent?: SapIntentCategory;
+  /** Optional retrieval debug (chunk count, document titles); included in response in development only */
+  retrievalDebug?: { chunkCount: number; documentTitles: string[]; usedRetrieval: boolean; threshold?: string };
 };
 
 // ==========================
@@ -149,6 +156,52 @@ Reglas:
 - No inventes cifras. Solo usa los datos del resumen proporcionado.`;
 
 // ==========================
+// SAP intent → answer format instructions (Sapito consulting assistant)
+// ==========================
+
+const ANSWER_FORMAT_BY_INTENT: Record<Exclude<SapIntentCategory, "generic">, string> = {
+  sap_error: `Formato de respuesta para esta consulta (error SAP):
+- Error identificado / área probable
+- Causa probable
+- Dónde revisar (transacción, tabla, log)
+- Acción sugerida`,
+
+  sap_transaction: `Formato de respuesta para esta consulta (transacción SAP):
+- Transacción/aplicación identificada
+- Propósito
+- Datos clave o uso típico
+- Consideraciones importantes`,
+
+  sap_customizing: `Formato de respuesta para esta consulta (customizing SAP):
+- Escenario
+- Análisis
+- Pasos recomendados (IMG/customizing)
+- Asignaciones o dependencias importantes`,
+
+  sap_process: `Formato de respuesta para esta consulta (proceso SAP):
+- Resumen del proceso
+- Pasos clave
+- Módulos/documentos relacionados
+- Riesgos o controles`,
+
+  sap_solution_design: `Formato de respuesta para esta consulta (diseño de solución SAP):
+- Escenario
+- Opciones de diseño
+- Recomendación
+- Impactos/consideraciones`,
+
+  workspace_summary: `Formato de respuesta para esta consulta (resumen de plataforma):
+- Resumen de la plataforma (proyectos, notas, tickets si aplica).
+- Señales que requieran atención si las hay.
+- Sugerencia de dónde mirar a continuación.`,
+
+  project_status: `Formato de respuesta para esta consulta (estado del proyecto):
+- Resumen de estado del proyecto (tareas, tickets, actividades).
+- Riesgo o prioridad si los datos lo indican.
+- Siguiente acción sugerida.`,
+};
+
+// ==========================
 // Prompt template
 // ==========================
 
@@ -156,6 +209,8 @@ const template = PromptTemplate.fromTemplate(`
 {systemPrompt}
 
 {knowledgeInstruction}
+
+{sapFormatInstruction}
 
 {sapitoContextBlock}
 
@@ -183,33 +238,76 @@ export async function runProjectAgent(params: {
 
   const isProjectMode = ctx.mode === "project" && ctx.projectId != null;
   const isNotesMode = ctx.mode === "notes";
+  const includeWorkspaceSummary = shouldIncludeWorkspaceSummary(ctx.sapIntent);
 
-  const systemPrompt = isProjectMode
-    ? SYSTEM_PROMPT_PROJECT
-    : isNotesMode
-      ? SYSTEM_PROMPT_NOTES
-      : SYSTEM_PROMPT_GLOBAL;
+  // Use SAP-knowledge prompt when we did NOT inject workspace/project summary, so the model never assumes dashboard data.
+  const systemPrompt = includeWorkspaceSummary
+    ? isProjectMode
+      ? SYSTEM_PROMPT_PROJECT
+      : isNotesMode
+        ? SYSTEM_PROMPT_NOTES
+        : SYSTEM_PROMPT_GLOBAL
+    : SYSTEM_PROMPT_SAP_KNOWLEDGE;
+
+  if (typeof systemPrompt !== "string" || !systemPrompt.trim()) {
+    throw new Error("projectAgent: systemPrompt is missing or empty");
+  }
 
   const sapitoContextBlock =
     ctx.sapitoContextSummary?.trim() != null && ctx.sapitoContextSummary.trim() !== ""
-      ? `Datos estructurados (usa esto como fuente de verdad para resumir, priorizar y sugerir siguiente acción):\n${ctx.sapitoContextSummary.trim()}`
+      ? includeWorkspaceSummary
+        ? `Datos estructurados (usa esto como fuente de verdad para resumir, priorizar y sugerir siguiente acción):\n${ctx.sapitoContextSummary.trim()}`
+        : `Documentación y contexto recuperado. Responde únicamente según este contenido. No incluyas resumen de proyecto ni de plataforma.\n${ctx.sapitoContextSummary.trim()}`
       : "";
 
   const knowledgeInstruction =
     ctx.sapitoContextSummary?.includes("Contexto SAP Knowledge") ||
-    ctx.sapitoContextSummary?.includes("SAP Knowledge Context")
-      ? "Cuando uses el 'Contexto SAP Knowledge' anterior: basa la respuesta en ese contenido; ofrece pasos procedimentales cuando aplique; no inventes información que no esté en el contexto; si el contexto es insuficiente, dilo con claridad."
+    ctx.sapitoContextSummary?.includes("SAP Knowledge Context") ||
+    ctx.sapitoContextSummary?.includes("Contexto del proyecto (documentos")
+      ? `Prioridad de conocimiento para esta respuesta (respeta este orden):
+1) Documentación SAP recuperada (fragmentos en el contexto anterior) — es la máxima prioridad; la respuesta debe reflejarlos claramente.
+2) Conocimiento de proyecto (documentos del proyecto si aparecen en el contexto).
+3) Conocimiento general del modelo solo si lo anterior no cubre la pregunta.
+
+Cuando el contexto anterior incluya documentación técnica recuperada (Contexto del proyecto o Contexto SAP Knowledge):
+- PRIORIZA ese contenido: basa la respuesta en los fragmentos proporcionados.
+- Inicia con una frase de grounding (ej.: "Según la documentación SAP...", "According to SAP documentation...") y luego la respuesta estructurada.
+- Si la información es parcial, dilo con claridad; no inventes lo que no está en el contexto.
+- NUNCA afirmes haber encontrado documentos si no se te proporcionó ninguno.
+- Estructura sustancial: ## Escenario, ## Análisis, ## Pasos recomendados, ## Consideraciones. Usa markdown: ## para secciones, - o 1. para listas, **negrita** para términos clave. No uses HTML.`
+      : !includeWorkspaceSummary
+        ? `Cuando NO haya documentación recuperada en el contexto anterior:
+- Responde con conocimiento general SAP de forma clara y útil.
+- Indica brevemente que es respuesta general, por ejemplo: "No hay documentación específica indexada para esto; según conocimiento general SAP:" y luego la respuesta estructurada. No inventes documentos. Mantén tono seguro y profesional.
+- Formato de salida: usa markdown para legibilidad: ## para secciones, - o 1. para listas, **negrita** para términos clave. No uses HTML.`
+        : "";
+
+  const structureNote =
+    ctx.sapIntent && ctx.sapIntent !== "generic"
+      ? "Presenta cada sección del formato indicado con ## (ej. ## Escenario, ## Análisis, ## Pasos recomendados) para mejor legibilidad. En respuestas muy breves puedes omitir headings."
       : "";
 
-  const projectContext = isProjectMode
-    ? buildProjectContextText(ctx.notes, ctx.links)
-    : isNotesMode
-      ? "Contexto: panel de notas (insights de la base de notas)."
-      : GLOBAL_CONTEXT_PLACEHOLDER;
+  const sapFormatInstruction =
+    ctx.sapIntent && ctx.sapIntent !== "generic"
+      ? `${ANSWER_FORMAT_BY_INTENT[ctx.sapIntent]}${structureNote ? `\n\n${structureNote}` : ""}`
+      : "";
+
+  const projectContext = includeWorkspaceSummary
+    ? isProjectMode
+      ? buildProjectContextText(ctx.notes, ctx.links)
+      : isNotesMode
+        ? "Contexto: panel de notas (insights de la base de notas)."
+        : GLOBAL_CONTEXT_PLACEHOLDER
+    : isProjectMode
+      ? "Pregunta de conocimiento SAP o general. Responde solo con base en la documentación proporcionada. No incluyas resumen de proyecto ni contadores."
+      : isNotesMode
+        ? "Pregunta de conocimiento o general. Responde solo con base en la documentación proporcionada."
+        : GLOBAL_CONTEXT_PLACEHOLDER;
 
   const prompt = await template.format({
     systemPrompt,
     knowledgeInstruction,
+    sapFormatInstruction,
     sapitoContextBlock,
     projectContext,
     userMessage: params.message,

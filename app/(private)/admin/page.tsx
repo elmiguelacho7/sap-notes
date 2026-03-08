@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { getSapitoGeneral } from "@/lib/agents/agentRegistry";
 
 /** Returns headers with Bearer token for admin API calls (session is in localStorage). */
 async function getAdminAuthHeaders(): Promise<Record<string, string>> {
@@ -16,7 +18,7 @@ async function getAdminAuthHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-type TabId = "users" | "projects" | "clients";
+type TabId = "users" | "projects" | "clients" | "knowledge";
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -129,6 +131,17 @@ function AdminPanel() {
           >
             Clientes
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("knowledge")}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+              activeTab === "knowledge"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            Knowledge Sources
+          </button>
           <a
             href="/admin/roles"
             className="px-3 py-1.5 rounded-lg font-medium text-slate-500 hover:text-slate-900 transition-colors"
@@ -140,6 +153,7 @@ function AdminPanel() {
         {activeTab === "users" && <UsersRolesPanel />}
         {activeTab === "projects" && <ProjectAccessPanel />}
         {activeTab === "clients" && <ClientsPanel />}
+        {activeTab === "knowledge" && <GlobalKnowledgeSourcesPanel />}
       </div>
     </PageShell>
   );
@@ -731,6 +745,570 @@ function ProjectAccessPanel() {
             </>
           )}
         </div>
+      </div>
+    </section>
+  );
+}
+
+type GlobalKnowledgeSourceRow = {
+  id: string;
+  scope_type: string;
+  project_id?: string | null;
+  project_name?: string | null;
+  source_type: string;
+  source_name: string;
+  external_ref: string | null;
+  source_url: string | null;
+  status: string;
+  sync_enabled: boolean;
+  last_synced_at: string | null;
+  integration_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type IntegrationOption = {
+  id: string;
+  provider: string;
+  display_name: string;
+  account_email: string | null;
+  status: string;
+};
+
+const GLOBAL_SOURCE_TYPE_LABELS: Record<string, string> = {
+  google_drive_folder: "Carpeta Google Drive",
+  google_drive_file: "Archivo Google Drive",
+  sap_help: "SAP Help Portal",
+  official_web: "Official SAP web",
+  sharepoint_library: "Biblioteca SharePoint",
+  confluence_space: "Espacio Confluence",
+  jira_project: "Proyecto Jira",
+  web_url: "URL web",
+  manual_upload: "Carga manual",
+};
+
+type SyncStatusKey = "never" | "synced" | "syncing" | "error";
+
+const SYNC_STATUS_LABELS: Record<SyncStatusKey, string> = {
+  never: "Never synced",
+  synced: "Synced",
+  syncing: "Syncing",
+  error: "Error",
+};
+
+function getSyncStatus(
+  s: GlobalKnowledgeSourceRow,
+  syncingSourceId: string | null
+): SyncStatusKey {
+  if (syncingSourceId === s.id) return "syncing";
+  if (s.status === "error") return "error";
+  if (s.last_synced_at != null) return "synced";
+  return "never";
+}
+
+/** Show Sync now for Google Drive folder/file sources; API will return clear error if integration or ref missing. */
+function isDriveSource(s: GlobalKnowledgeSourceRow): boolean {
+  return s.source_type === "google_drive_folder" || s.source_type === "google_drive_file";
+}
+
+function GlobalKnowledgeSourcesPanel() {
+  const [sources, setSources] = useState<GlobalKnowledgeSourceRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [scopeFilter, setScopeFilter] = useState<"global" | "project" | "all">("global");
+  const [integrations, setIntegrations] = useState<IntegrationOption[]>([]);
+  const [integrationsLoading, setIntegrationsLoading] = useState(false);
+  const [googleConnectPending, setGoogleConnectPending] = useState(false);
+  const [newSourceType, setNewSourceType] = useState("web_url");
+  const [newSourceName, setNewSourceName] = useState("");
+  const [newSourceUrl, setNewSourceUrl] = useState("");
+  const [newExternalRef, setNewExternalRef] = useState("");
+  const [newIntegrationId, setNewIntegrationId] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  const canSyncSource = (s: GlobalKnowledgeSourceRow) =>
+    isDriveSource(s) && !!s.integration_id && !!s.external_ref;
+
+  const handleConnectGoogleDrive = async () => {
+    setGoogleConnectPending(true);
+    setError(null);
+    try {
+      const headers = await getAdminAuthHeaders();
+      const res = await fetch("/api/integrations/google/connect?return_url=/admin", { headers });
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok) {
+        setError(data.error ?? "Error al iniciar la conexión con Google.");
+        return;
+      }
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setError("Respuesta inesperada del servidor.");
+    } catch {
+      setError("Error de conexión.");
+    } finally {
+      setGoogleConnectPending(false);
+    }
+  };
+
+  const loadIntegrations = useCallback(async () => {
+    setIntegrationsLoading(true);
+    try {
+      const headers = await getAdminAuthHeaders();
+      const res = await fetch("/api/integrations", { headers });
+      const data = (await res.json().catch(() => ({ integrations: [] }))) as { integrations?: IntegrationOption[] };
+      setIntegrations((data.integrations ?? []).filter((i) => i.provider === "google_drive"));
+    } catch {
+      setIntegrations([]);
+    } finally {
+      setIntegrationsLoading(false);
+    }
+  }, []);
+
+  const handleSync = async (id: string) => {
+    setSyncingSourceId(id);
+    setSyncMessage(null);
+    setError(null);
+    try {
+      const headers = await getAdminAuthHeaders();
+      const res = await fetch(`/api/admin/knowledge-sources/${id}/sync`, {
+        method: "POST",
+        headers,
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        message?: string;
+        chunksCreated?: number;
+        filesProcessed?: number;
+        documentsProcessed?: number;
+        errors?: string[];
+        status?: string;
+      };
+      if (!res.ok) {
+        setSyncMessage(data.error ?? "No se pudo sincronizar la fuente.");
+        void loadSources();
+        return;
+      }
+      const docs = data.documentsProcessed ?? data.filesProcessed ?? 0;
+      const chunks = data.chunksCreated ?? 0;
+      if (data.ok) {
+        setSyncMessage(
+          data.message ?? `Sincronización completada. ${docs} documentos, ${chunks} fragmentos.`
+        );
+      } else {
+        setSyncMessage(
+          data.message ?? data.error ?? `Sincronización con errores. ${docs} documentos, ${chunks} fragmentos.`
+        );
+      }
+      void loadSources();
+    } catch {
+      setSyncMessage("Error de conexión.");
+    } finally {
+      setSyncingSourceId(null);
+    }
+  };
+
+  const loadSources = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const headers = await getAdminAuthHeaders();
+      const res = await fetch(`/api/admin/knowledge-sources?scope=${scopeFilter}`, { headers });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(data.error ?? "Error al cargar las fuentes.");
+        setSources([]);
+        return;
+      }
+      const data = (await res.json()) as { sources?: GlobalKnowledgeSourceRow[] };
+      setSources(data.sources ?? []);
+    } catch {
+      setError("Error de conexión.");
+      setSources([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [scopeFilter]);
+
+  useEffect(() => {
+    void loadSources();
+  }, [loadSources]);
+
+  useEffect(() => {
+    void loadIntegrations();
+  }, [loadIntegrations]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSourceName.trim() || saving) return;
+    setSaving(true);
+    setCreateError(null);
+    try {
+      const headers = await getAdminAuthHeaders();
+      headers["Content-Type"] = "application/json";
+      const body: Record<string, unknown> = {
+        source_type: newSourceType,
+        source_name: newSourceName.trim(),
+        source_url: newSourceUrl.trim() || null,
+        external_ref: newExternalRef.trim() || null,
+      };
+      if ((newSourceType === "google_drive_folder" || newSourceType === "google_drive_file") && newIntegrationId.trim()) {
+        body.integration_id = newIntegrationId.trim();
+      }
+      const res = await fetch("/api/admin/knowledge-sources", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; source?: GlobalKnowledgeSourceRow };
+      if (!res.ok) {
+        setCreateError(data.error ?? "Error al crear la fuente.");
+        return;
+      }
+      setNewSourceName("");
+      setNewSourceUrl("");
+      setNewExternalRef("");
+      setNewIntegrationId("");
+      if (data.source) setSources((prev) => [data.source!, ...prev]);
+    } catch {
+      setCreateError("Error de conexión.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    setError(null);
+    try {
+      const headers = await getAdminAuthHeaders();
+      const res = await fetch(`/api/admin/knowledge-sources/${id}`, {
+        method: "DELETE",
+        headers,
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(data.error ?? "Error al eliminar la fuente.");
+        return;
+      }
+      setSources((prev) => prev.filter((s) => s.id !== id));
+    } catch {
+      setError("Error de conexión.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const formatSyncDate = (iso: string | null) => {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleString("es-ES", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const hasGoogleIntegration = integrations.length > 0;
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="relative h-10 w-10 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+            <Image
+              src={getSapitoGeneral().avatarImage}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="40px"
+            />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">
+              Knowledge Sources
+            </h2>
+            <p className="text-xs text-slate-500 max-w-xl">
+              Global and project knowledge used by Sapito to answer with broader context. Managed from Admin.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Platform integrations: Google Drive — primary entry point */}
+      <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+        <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+          Platform integrations
+        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-medium text-slate-800">Google Drive</p>
+            {integrationsLoading ? (
+              <p className="mt-1 text-xs text-slate-500">Cargando…</p>
+            ) : hasGoogleIntegration ? (
+              <>
+                <p className="mt-1 text-xs text-slate-600">
+                  Conectado: {integrations[0]?.account_email ?? integrations[0]?.display_name ?? "—"}
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Usado para fuentes globales y de proyecto. Conecta aquí para gestionar desde Admin.
+                </p>
+              </>
+            ) : (
+              <p className="mt-1 text-xs text-slate-500">
+                Conecta una cuenta de Google Drive para crear fuentes de conocimiento global o por proyecto.
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleConnectGoogleDrive}
+            disabled={googleConnectPending}
+            className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 transition-colors shrink-0"
+          >
+            {googleConnectPending ? "Redirigiendo…" : hasGoogleIntegration ? "Reconectar Google Drive" : "Connect Google Drive"}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm text-red-600">{error}</p>
+          <button
+            type="button"
+            onClick={() => void loadSources()}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+      {syncMessage && (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            syncMessage.includes("completada") && !syncMessage.includes("errores")
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : syncMessage.includes("Error") || syncMessage.includes("errores")
+                ? "border-red-200 bg-red-50 text-red-800"
+                : "border-amber-200 bg-amber-50 text-amber-800"
+          }`}
+        >
+          {syncMessage}
+        </div>
+      )}
+
+      <form onSubmit={handleCreate} className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+        <p className="text-xs font-medium text-slate-700 uppercase tracking-wide">
+          Crear fuente global
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">Tipo</label>
+            <select
+              value={newSourceType}
+              onChange={(e) => setNewSourceType(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              disabled={saving}
+            >
+              {Object.entries(GLOBAL_SOURCE_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            {(newSourceType === "sap_help" || newSourceType === "official_web") && (
+              <p className="mt-1 text-xs text-slate-500">
+                Registra URLs del portal SAP Help o documentación oficial. La sincronización/indexación para estos tipos está prevista.
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">Nombre *</label>
+            <input
+              type="text"
+              value={newSourceName}
+              onChange={(e) => setNewSourceName(e.target.value)}
+              placeholder="Nombre de la fuente"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              disabled={saving}
+            />
+          </div>
+          {(newSourceType === "google_drive_folder" || newSourceType === "google_drive_file") && (
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">Cuenta Google Drive</label>
+              <select
+                value={newIntegrationId}
+                onChange={(e) => setNewIntegrationId(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                disabled={saving}
+              >
+                <option value="">Seleccionar cuenta</option>
+                {integrations.map((int) => (
+                  <option key={int.id} value={int.id}>
+                    {int.account_email || int.display_name || int.id}
+                  </option>
+                ))}
+              </select>
+              {!hasGoogleIntegration && (
+                <p className="mt-1 text-xs text-slate-500">Conecta Google Drive arriba.</p>
+              )}
+            </div>
+          )}
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">URL</label>
+            <input
+              type="text"
+              value={newSourceUrl}
+              onChange={(e) => setNewSourceUrl(e.target.value)}
+              placeholder="https://..."
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">Ref externa (ej. ID carpeta)</label>
+            <input
+              type="text"
+              value={newExternalRef}
+              onChange={(e) => setNewExternalRef(e.target.value)}
+              placeholder="Opcional"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              disabled={saving}
+            />
+          </div>
+        </div>
+        <button
+          type="submit"
+          disabled={!newSourceName.trim() || saving}
+          className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+        >
+          {saving ? "Creando…" : "Crear fuente global"}
+        </button>
+        {createError && (
+          <p className="text-sm text-red-600">{createError}</p>
+        )}
+      </form>
+
+      <div>
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+            Listado
+          </p>
+          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs">
+            {(["global", "project", "all"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setScopeFilter(s)}
+                className={`px-2 py-1 rounded-md font-medium transition-colors ${
+                  scopeFilter === s ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                {s === "global" ? "Global" : s === "project" ? "Project" : "All"}
+              </button>
+            ))}
+          </div>
+        </div>
+        {loading ? (
+          <p className="text-sm text-slate-500">Cargando fuentes…</p>
+        ) : sources.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            {scopeFilter === "global" && "No hay fuentes globales. Crea una para que Sapito use conocimiento reutilizable (por ejemplo SAP Help o Google Drive)."}
+            {scopeFilter === "project" && "No hay fuentes de proyecto listadas aquí."}
+            {scopeFilter === "all" && "No hay fuentes de conocimiento. Añade una fuente global o de proyecto para empezar."}
+          </p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="py-3 px-4">Nombre</th>
+                  <th className="py-3 px-4">Tipo</th>
+                  <th className="py-3 px-4">Scope</th>
+                  <th className="py-3 px-4">Proyecto</th>
+                  <th className="py-3 px-4">Sync status</th>
+                  <th className="py-3 px-4">Última sync</th>
+                  <th className="py-3 px-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sources.map((s) => {
+                  const syncStatus = getSyncStatus(s, syncingSourceId);
+                  return (
+                  <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3 px-4 text-slate-900 font-medium">{s.source_name}</td>
+                    <td className="py-3 px-4">
+                      <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                        {GLOBAL_SOURCE_TYPE_LABELS[s.source_type] ?? s.source_type}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">
+                        {s.scope_type === "global" ? "Global" : "Project"}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-slate-600">
+                      {s.scope_type === "project" && (s.project_name ?? s.project_id ?? "—")}
+                      {s.scope_type === "global" && "—"}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                          syncStatus === "syncing"
+                            ? "bg-amber-100 text-amber-800"
+                            : syncStatus === "error"
+                              ? "bg-red-100 text-red-800"
+                              : syncStatus === "synced"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {SYNC_STATUS_LABELS[syncStatus]}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-slate-600 text-xs">
+                      {s.last_synced_at ? formatSyncDate(s.last_synced_at) : "—"}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {isDriveSource(s) ? (
+                          <button
+                            type="button"
+                            onClick={() => handleSync(s.id)}
+                            disabled={syncingSourceId !== null}
+                            title={!canSyncSource(s) ? "Configura cuenta de Google Drive y Ref externa (ID carpeta) en la fuente" : "Sincronizar ahora"}
+                            className="text-xs font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
+                          >
+                            {syncingSourceId === s.id ? "Syncing…" : "Sync now"}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-slate-400" title="Sync solo disponible para fuentes Google Drive">
+                            —
+                          </span>
+                        )}
+                        {s.scope_type === "global" && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(s.id)}
+                            disabled={deletingId !== null}
+                            className="text-xs font-medium text-rose-600 hover:text-rose-700 disabled:opacity-50"
+                          >
+                            {deletingId === s.id ? "Eliminando…" : "Eliminar"}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );})}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </section>
   );

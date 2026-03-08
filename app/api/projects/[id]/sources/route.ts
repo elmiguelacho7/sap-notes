@@ -17,6 +17,8 @@ const MAX_LIMIT = 200;
 const SOURCE_TYPES = [
   "google_drive_folder",
   "google_drive_file",
+  "sap_help",
+  "official_web",
   "sharepoint_library",
   "confluence_space",
   "jira_project",

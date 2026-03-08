@@ -9,10 +9,12 @@ import { cookies } from "next/headers";
 const STATE_COOKIE_NAME = "google_oauth_state";
 const STATE_USER_COOKIE_NAME = "google_oauth_user_id";
 const STATE_COOKIE_MAX_AGE = 600; // 10 minutes
+const RETURN_URL_COOKIE_NAME = "google_oauth_return_url";
 
 /**
  * GET /api/integrations/google/connect
  * Returns Google OAuth URL as JSON. Caller must send Authorization: Bearer <token>.
+ * Optional query: return_url=/admin — after callback, redirect here (same-origin only).
  * Does not redirect; frontend performs window.location.href = response.url.
  */
 export async function GET(req: Request) {
@@ -46,8 +48,14 @@ export async function GET(req: Request) {
     cookieStore.set(STATE_COOKIE_NAME, state, cookieOpts);
     cookieStore.set(STATE_USER_COOKIE_NAME, userId, cookieOpts);
 
-    const url = getGoogleAuthUrl(state);
-    return NextResponse.json({ url });
+    const url = new URL(req.url);
+    const returnUrl = url.searchParams.get("return_url");
+    if (returnUrl && typeof returnUrl === "string" && returnUrl.startsWith("/") && !returnUrl.startsWith("//")) {
+      cookieStore.set(RETURN_URL_COOKIE_NAME, returnUrl.trim(), { ...cookieOpts, maxAge: STATE_COOKIE_MAX_AGE });
+    }
+
+    const authUrl = getGoogleAuthUrl(state);
+    return NextResponse.json({ url: authUrl });
   } catch (err) {
     console.error("[integrations/google/connect]", err);
     return NextResponse.json(

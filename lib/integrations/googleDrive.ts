@@ -146,16 +146,18 @@ export async function getFileMetadata(
   return { id: f.id, name: f.name, mimeType: f.mimeType || "application/octet-stream" };
 }
 
-/** MIME types we can extract text from in this sprint. */
+/** MIME types we can extract text from (including PDF and DOCX). */
 export const SUPPORTED_MIME_TYPES = new Set([
   "text/plain",
   "text/markdown",
   "text/x-markdown",
   "application/vnd.google-apps.document", // Google Docs -> export to text/plain
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
 ]);
 
 /**
- * Fetch or export file content as UTF-8 text. Supports text/plain, text/markdown, Google Docs.
+ * Fetch or export file content as UTF-8 text. Supports text/plain, text/markdown, Google Docs, PDF, DOCX.
  * For unsupported types returns null (caller should skip or record as skipped).
  */
 export async function getFileContentAsText(
@@ -192,6 +194,24 @@ export async function getFileContentAsText(
     }
     const text = await res.text();
     return text?.trim() || null;
+  }
+  if (normalized === "application/pdf" || normalized === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    const url = `${DRIVE_API_BASE}/files/${fileId}?alt=media`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) {
+      console.error("[googleDrive] Binary download failed", fileId, res.status);
+      return null;
+    }
+    const arrayBuffer = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    if (normalized === "application/pdf") {
+      const { extractPdfText } = await import("@/lib/integrations/documentExtractors");
+      return await extractPdfText(buffer);
+    }
+    const { extractDocxText } = await import("@/lib/integrations/documentExtractors");
+    return await extractDocxText(buffer);
   }
   return null;
 }

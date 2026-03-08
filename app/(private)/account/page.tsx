@@ -231,7 +231,7 @@ export default function AccountPage() {
             Integraciones conectadas
           </h2>
           <p className="text-sm text-slate-500">
-            Conecta tu cuenta de Google Drive para poder usar carpetas o archivos como fuentes del proyecto en el siguiente paso.
+            Conecta tu cuenta de Google Drive para usar carpetas o archivos como fuentes de conocimiento (global o por proyecto). La conexión se gestiona principalmente desde Admin → Knowledge Sources.
           </p>
           {googleConnectError && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

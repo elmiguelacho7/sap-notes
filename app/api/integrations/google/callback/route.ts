@@ -11,10 +11,11 @@ import {
 const STATE_COOKIE_NAME = "google_oauth_state";
 const STATE_USER_COOKIE_NAME = "google_oauth_user_id";
 const FRONTEND_ACCOUNT = "/account";
+const RETURN_URL_COOKIE_NAME = "google_oauth_return_url";
 
 /**
  * GET /api/integrations/google/callback
- * Handles Google OAuth callback: exchange code, store integration, redirect to account.
+ * Handles Google OAuth callback: exchange code, store integration, redirect to account or return_url.
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -30,8 +31,10 @@ export async function GET(req: Request) {
     const cookieStore = await cookies();
     const storedState = cookieStore.get(STATE_COOKIE_NAME)?.value;
     const storedUserId = cookieStore.get(STATE_USER_COOKIE_NAME)?.value;
+    const returnUrl = cookieStore.get(RETURN_URL_COOKIE_NAME)?.value;
     cookieStore.delete(STATE_COOKIE_NAME);
     cookieStore.delete(STATE_USER_COOKIE_NAME);
+    cookieStore.delete(RETURN_URL_COOKIE_NAME);
 
     if (!storedState || storedState !== state) {
       console.error("[integrations/google/callback] Invalid or missing state");
@@ -90,7 +93,12 @@ export async function GET(req: Request) {
       });
     }
 
-    return NextResponse.redirect(new URL(`${FRONTEND_ACCOUNT}?google=connected`, req.url));
+    const baseUrl = new URL(req.url);
+    const origin = `${baseUrl.protocol}//${baseUrl.host}`;
+    const redirectPath = returnUrl && returnUrl.startsWith("/") && !returnUrl.startsWith("//")
+      ? returnUrl + (returnUrl.includes("?") ? "&" : "?") + "google=connected"
+      : `${FRONTEND_ACCOUNT}?google=connected`;
+    return NextResponse.redirect(new URL(redirectPath, origin));
   } catch (err) {
     console.error("[integrations/google/callback]", err);
     return NextResponse.redirect(new URL(`${FRONTEND_ACCOUNT}?error=callback_failed`, req.url));
