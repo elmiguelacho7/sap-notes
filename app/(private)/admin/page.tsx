@@ -779,6 +779,7 @@ const GLOBAL_SOURCE_TYPE_LABELS: Record<string, string> = {
   google_drive_folder: "Carpeta Google Drive",
   google_drive_file: "Archivo Google Drive",
   sap_help: "SAP Help Portal",
+  sap_official: "SAP Official",
   official_web: "Official SAP web",
   sharepoint_library: "Biblioteca SharePoint",
   confluence_space: "Espacio Confluence",
@@ -811,6 +812,11 @@ function isDriveSource(s: GlobalKnowledgeSourceRow): boolean {
   return s.source_type === "google_drive_folder" || s.source_type === "google_drive_file";
 }
 
+/** Official SAP curated URL sources: sync indexes the single page into knowledge_documents. */
+function isCuratedSapSource(s: GlobalKnowledgeSourceRow): boolean {
+  return s.source_type === "sap_help" || s.source_type === "official_web" || s.source_type === "sap_official";
+}
+
 function GlobalKnowledgeSourcesPanel() {
   const [sources, setSources] = useState<GlobalKnowledgeSourceRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -831,7 +837,8 @@ function GlobalKnowledgeSourcesPanel() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const canSyncSource = (s: GlobalKnowledgeSourceRow) =>
-    isDriveSource(s) && !!s.integration_id && !!s.external_ref;
+    (isDriveSource(s) && !!s.integration_id && !!s.external_ref) ||
+    (isCuratedSapSource(s) && !!s.source_url?.trim());
 
   const handleConnectGoogleDrive = async () => {
     setGoogleConnectPending(true);
@@ -1121,9 +1128,9 @@ function GlobalKnowledgeSourcesPanel() {
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
-            {(newSourceType === "sap_help" || newSourceType === "official_web") && (
+            {(newSourceType === "sap_help" || newSourceType === "official_web" || newSourceType === "sap_official") && (
               <p className="mt-1 text-xs text-slate-500">
-                Registra URLs del portal SAP Help o documentación oficial. La sincronización/indexación para estos tipos está prevista.
+                Añade la URL de la página SAP (una por fuente). Al sincronizar se indexará solo esa página en la capa de documentación oficial.
               </p>
             )}
           </div>
@@ -1276,18 +1283,18 @@ function GlobalKnowledgeSourcesPanel() {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {isDriveSource(s) ? (
+                        {isDriveSource(s) || isCuratedSapSource(s) ? (
                           <button
                             type="button"
                             onClick={() => handleSync(s.id)}
-                            disabled={syncingSourceId !== null}
-                            title={!canSyncSource(s) ? "Configura cuenta de Google Drive y Ref externa (ID carpeta) en la fuente" : "Sincronizar ahora"}
+                            disabled={syncingSourceId !== null || !canSyncSource(s)}
+                            title={!canSyncSource(s) ? (isCuratedSapSource(s) ? "Añade la URL de la página SAP en la fuente" : "Configura cuenta de Google Drive y Ref externa (ID carpeta) en la fuente") : "Sincronizar ahora"}
                             className="text-xs font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
                           >
                             {syncingSourceId === s.id ? "Syncing…" : "Sync now"}
                           </button>
                         ) : (
-                          <span className="text-xs text-slate-400" title="Sync solo disponible para fuentes Google Drive">
+                          <span className="text-xs text-slate-400" title="Sync solo disponible para Google Drive o SAP oficial (sap_help, sap_official, official_web)">
                             —
                           </span>
                         )}

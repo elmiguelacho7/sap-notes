@@ -139,6 +139,7 @@ const ALLOWED_SOURCE_TYPES = [
   "google_drive_folder",
   "google_drive_file",
   "sap_help",
+  "sap_official",
   "official_web",
   "sharepoint_library",
   "confluence_space",

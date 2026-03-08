@@ -9,7 +9,7 @@ import {
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { resolveGlobalContext, resolveProjectContext } from "@/lib/ai/contextResolvers";
 import { type RetrievalDebug } from "@/lib/ai/sapitoContext";
-import { classifySapIntent, shouldIncludeWorkspaceSummary } from "@/lib/ai/sapitoIntent";
+import { classifySapIntent, shouldIncludeWorkspaceSummary, isProjectStatusQuestion } from "@/lib/ai/sapitoIntent";
 
 /** Assistant mode: global (SAP Copilot) or project (Project Copilot). Single engine, behavior by mode. */
 export type SapitoMode = "global" | "project";
@@ -77,7 +77,11 @@ export async function POST(req: Request) {
 
     const effectiveProjectId = mode === "global" ? null : projectId;
 
-    const sapIntent = classifySapIntent(message);
+    let sapIntent = classifySapIntent(message, effectiveProjectId ?? undefined);
+    // Ensure project-status questions in project mode never get generic (so we use PROJECT prompt and inject context).
+    if (mode === "project" && effectiveProjectId && sapIntent === "generic" && isProjectStatusQuestion(message)) {
+      sapIntent = "project_status";
+    }
     const includeWorkspaceSummary = shouldIncludeWorkspaceSummary(sapIntent);
 
     let context: AgentContext;

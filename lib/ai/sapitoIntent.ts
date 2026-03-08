@@ -34,6 +34,29 @@ export function shouldIncludeWorkspaceSummary(intent: SapIntentCategory | undefi
   return intent === "workspace_summary" || intent === "project_status";
 }
 
+/** Normalize for accent-insensitive match: strip diacritics so "como" matches "cómo". */
+function normalizeForMatch(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function normalizedContains(message: string, ...patterns: (string | RegExp)[]): boolean {
+  const lower = message.toLowerCase().trim();
+  const normalized = normalizeForMatch(message);
+  for (const p of patterns) {
+    if (typeof p === "string") {
+      const patternNorm = normalizeForMatch(p);
+      if (lower.includes(p.toLowerCase()) || normalized.includes(patternNorm)) return true;
+    } else {
+      if (p.test(message) || p.test(lower) || p.test(normalized)) return true;
+    }
+  }
+  return false;
+}
+
 /** Known SAP terms: transactions, tech terms. Used to boost transaction/customizing detection. */
 export const KNOWN_SAP_TERMS = [
   "VA01", "VA02", "VA03", "VK01", "VK02", "VK11", "VK12", "VL01N", "VL02N", "VL03N",
@@ -44,16 +67,44 @@ export const KNOWN_SAP_TERMS = [
   "FICO", "S/4HANA", "S4HANA", "ECC", "BTP", "Fiori", "FIORI",
 ] as const;
 
-function normalizedContains(message: string, ...patterns: (string | RegExp)[]): boolean {
-  const lower = message.toLowerCase().trim();
-  for (const p of patterns) {
-    if (typeof p === "string") {
-      if (lower.includes(p.toLowerCase())) return true;
-    } else {
-      if (p.test(message) || p.test(lower)) return true;
-    }
-  }
-  return false;
+/**
+ * Keyword detection for project status / progress / overview questions.
+ * Used when projectId is present to classify as project_status instead of generic.
+ * Does NOT affect SAP intents (error, transaction, customizing, process) — those are checked first.
+ */
+export function isProjectStatusQuestion(message: string): boolean {
+  if (!message || message.trim().length < 2) return false;
+  const m = message.trim();
+  return (
+    normalizedContains(
+      m,
+      // Spanish
+      "proyecto",
+      "estado del proyecto",
+      "progreso del proyecto",
+      "cómo va el proyecto",
+      "cómo va este proyecto",
+      "resumen del proyecto",
+      "situación del proyecto",
+      "estado de mi proyecto",
+      // English
+      "project status",
+      "project progress",
+      "project health",
+      "how is the project",
+      "how's the project",
+      "project overview",
+      "project summary",
+      "progress of the project",
+      "progress of this project",
+      "status of the project",
+      "status of this project",
+      "how the project is going",
+      "how this project is going"
+    ) ||
+    /\b(project\s+(status|progress|health|overview|summary|metrics)|estado\s+del\s+proyecto|progreso\s+del\s+proyecto|resumen\s+del\s+proyecto)\b/i.test(m) ||
+    /\b(how\s+is\s+(the|this)\s+project\s+(going|doing)?|how('s|\s+is)\s+(the|this)\s+project)\b/i.test(m)
+  );
 }
 
 function containsKnownSapTerm(message: string): boolean {
@@ -68,10 +119,10 @@ function containsKnownSapTerm(message: string): boolean {
 
 /**
  * Classify user message into one SAP intent category.
- * Order: workspace_summary > project_status > sap_* > generic.
- * Only workspace_summary and project_status get dashboard/project summary injected.
+ * Order: workspace_summary > project_status (inline) > sap_* > project_status (when projectId) > generic.
+ * When projectId is present and the message looks like a project status question, returns project_status before generic.
  */
-export function classifySapIntent(message: string): SapIntentCategory {
+export function classifySapIntent(message: string, projectId?: string | null): SapIntentCategory {
   if (!message || message.trim().length < 3) return "generic";
 
   const m = message.trim();
@@ -167,6 +218,11 @@ export function classifySapIntent(message: string): SapIntentCategory {
   // Pattern boost: if no other category matched but message contains known SAP terms, treat as SAP process.
   if (hasSapPattern(m)) {
     return "sap_process";
+  }
+
+  // When in project context, treat project status/progress/overview questions as project_status (before generic).
+  if (projectId && isProjectStatusQuestion(m)) {
+    return "project_status";
   }
 
   return "generic";

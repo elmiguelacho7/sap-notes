@@ -278,6 +278,56 @@ export async function searchProjectMemory(
 }
 
 /**
+ * Semantic search over curated official SAP documentation only (document_type sap_help/sap_official, scope global).
+ * Used for Official SAP Knowledge Layer; priority in global mode and as fallback in project mode.
+ */
+export async function searchOfficialSapKnowledge(
+  query: string,
+  topK: number = 5
+): Promise<KnowledgeChunk[]> {
+  if (!query?.trim()) return [];
+
+  try {
+    const queryEmbedding = await getQueryEmbedding(query.trim());
+    const { data, error } = await supabaseAdmin.rpc("search_official_sap_knowledge", {
+      query_embedding: queryEmbedding,
+      match_limit: Math.min(Math.max(1, topK), 20),
+    });
+
+    if (error) {
+      console.error("[knowledgeSearch] searchOfficialSapKnowledge RPC error", error.message);
+      return [];
+    }
+
+    const rows = (data ?? []) as Array<{
+      id: string;
+      title: string | null;
+      content: string;
+      source: string | null;
+      module: string | null;
+      source_name?: string | null;
+      external_ref?: string | null;
+      source_url?: string | null;
+      document_type?: string | null;
+    }>;
+
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title ?? null,
+      content: r.content ?? "",
+      source: r.source ?? null,
+      module: r.module ?? null,
+      source_name: r.source_name ?? r.source ?? null,
+      external_ref: r.external_ref ?? null,
+      scope_type: "global" as const,
+    }));
+  } catch (err) {
+    console.error("[knowledgeSearch] searchOfficialSapKnowledge error", err);
+    return [];
+  }
+}
+
+/**
  * Multi-tenant semantic search: strict isolation by scope (global / project / user).
  * - If projectId is set: returns (global) OR (project AND project_id = projectId) OR (user AND user_id = userId), ordered project > user > global.
  * - If projectId is not set: returns only global.

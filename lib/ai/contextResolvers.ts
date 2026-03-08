@@ -61,6 +61,24 @@ function formatKnowledgeContext(chunks: KnowledgeChunk[], fromProject: boolean):
   return lines.join("\n");
 }
 
+/** Official SAP docs: instruct model to ground with 'According to SAP documentation...' when used. */
+function formatOfficialSapContext(chunks: KnowledgeChunk[]): string {
+  const lines: string[] = [
+    "Documentación oficial SAP indexada (según la documentación SAP…). Si usas este contenido, inicia la respuesta con: \"According to SAP documentation...\" o \"Según la documentación SAP...\":",
+  ];
+  for (const c of chunks) {
+    const title = c.title || "(sin título)";
+    const modulePart = c.module ? ` | Módulo: ${c.module}` : "";
+    const sourcePart = c.source_name ? ` | Fuente: ${c.source_name}` : "";
+    const content =
+      c.content.slice(0, CHUNK_CONTENT_CAP).trim() +
+      (c.content.length > CHUNK_CONTENT_CAP ? "…" : "");
+    lines.push(`- ${title}${modulePart}${sourcePart}`);
+    lines.push(`  Contenido: ${content}`);
+  }
+  return lines.join("\n");
+}
+
 function formatPlatformSummary(s: PlatformStats): string {
   const lines: string[] = [
     "Resumen de la plataforma:",
@@ -145,47 +163,58 @@ export async function resolveGlobalContext(
     try {
       const isSapIntent = isSapKnowledgeIntent(sapIntent);
       const maxChunks = isSapIntent ? MAX_CHUNKS_SAP : MAX_CHUNKS_AFTER_DIVERSITY;
-      retrievalScopes.push("global_knowledge");
+      retrievalScopes.push("official_sap", "global_knowledge");
 
-      const { chunks: globalChunks, scopeBreakdown } = await searchMultiTenantKnowledge(
-        null,
-        null,
-        searchQuery,
-        isSapIntent ? 6 : 10
-      );
-      console.log("[Sapito multi-tenant retrieval]", {
-        userId: null,
-        projectId: null,
-        documentsRetrieved: globalChunks.length,
-        scopeBreakdown,
-      });
+      // Global mode: 1) official SAP knowledge, 2) other global knowledge.
+      const [officialChunks, multiResult] = await Promise.all([
+        getOfficialSapKnowledgeContext(searchQuery, 4),
+        searchMultiTenantKnowledge(null, null, searchQuery, isSapIntent ? 6 : 10),
+      ]);
 
-      const diverse = ensureChunkDiversity(globalChunks, MAX_PER_SOURCE, maxChunks);
-      if (diverse.length > 0) {
-        sections.push(formatKnowledgeContext(diverse, false));
+      const officialIds = new Set(officialChunks.map((c) => c.id));
+      const otherChunks = (multiResult.chunks ?? []).filter((c) => !officialIds.has(c.id));
+      const diverse = ensureChunkDiversity(otherChunks, MAX_PER_SOURCE, maxChunks);
+
+      if (officialChunks.length > 0) {
+        sections.push(formatOfficialSapContext(officialChunks));
         retrievalDebug = {
-          chunkCount: diverse.length,
-          documentTitles: Array.from(new Set(diverse.map((c) => c.title || "(sin título)"))),
+          chunkCount: officialChunks.length,
+          documentTitles: Array.from(new Set(officialChunks.map((c) => c.title || "(sin título)"))),
           usedRetrieval: true,
         };
       }
-
-      retrievalScopes.push("official_sap");
-      const officialChunks = await getOfficialSapKnowledgeContext(searchQuery, 2);
-      if (officialChunks.length > 0) {
-        sections.push(formatKnowledgeContext(officialChunks, false));
+      if (diverse.length > 0) {
+        sections.push(formatKnowledgeContext(diverse, false));
         if (!retrievalDebug.usedRetrieval) {
           retrievalDebug = {
-            chunkCount: officialChunks.length,
-            documentTitles: officialChunks.map((c) => c.title || "(sin título)"),
+            chunkCount: diverse.length,
+            documentTitles: Array.from(new Set(diverse.map((c) => c.title || "(sin título)"))),
             usedRetrieval: true,
           };
         } else {
           retrievalDebug.documentTitles = Array.from(
-            new Set([...retrievalDebug.documentTitles, ...officialChunks.map((c) => c.title || "(sin título)")])
+            new Set([...retrievalDebug.documentTitles, ...diverse.map((c) => c.title || "(sin título)")])
           );
-          retrievalDebug.chunkCount += officialChunks.length;
+          retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + diverse.length;
         }
+      }
+
+      if (officialChunks.length === 0 && diverse.length === 0) {
+        console.log("[Sapito multi-tenant retrieval]", {
+          userId: null,
+          projectId: null,
+          documentsRetrieved: 0,
+          scopeBreakdown: multiResult.scopeBreakdown,
+        });
+      } else {
+        console.log("[Sapito multi-tenant retrieval]", {
+          userId: null,
+          projectId: null,
+          documentsRetrieved: officialChunks.length + diverse.length,
+          officialCount: officialChunks.length,
+          otherGlobalCount: diverse.length,
+          scopeBreakdown: multiResult.scopeBreakdown,
+        });
       }
     } catch (err) {
       console.error("[GlobalContextResolver] retrieval error", err);
@@ -231,22 +260,27 @@ export async function resolveProjectContext(
       const maxChunks = isSapIntent ? MAX_CHUNKS_SAP : MAX_CHUNKS_AFTER_DIVERSITY;
       const topK = isSapIntent ? 6 : 10;
 
-      retrievalScopes.push("project_memory");
-      const [memoryChunks, multiResult] = await Promise.all([
+      retrievalScopes.push("project_memory", "project_documents", "global_fallback", "official_sap");
+      const [memoryChunks, multiResult, officialChunks] = await Promise.all([
         searchProjectMemory(projectId, userId, searchQuery, MAX_MEMORY_ITEMS),
         searchMultiTenantKnowledge(projectId, userId, searchQuery, topK),
+        getOfficialSapKnowledgeContext(searchQuery, 4),
       ]);
 
       const memoriesFound = memoryChunks.length;
       const projectsUsed = memoriesFound > 0 ? [projectId] : [];
       console.log("[Sapito memory retrieval]", { memoriesFound, projectsUsed });
 
-      retrievalScopes.push("project_documents", "global_fallback");
       const multiChunks = multiResult.chunks;
+      const officialIds = new Set(officialChunks.map((c) => c.id));
+      const otherChunks = multiChunks.filter((c) => !officialIds.has(c.id));
+      const diverse = ensureChunkDiversity(otherChunks, MAX_PER_SOURCE, maxChunks);
+
       console.log("[Sapito multi-tenant retrieval]", {
         userId,
         projectId,
         documentsRetrieved: multiChunks.length,
+        officialCount: officialChunks.length,
         scopeBreakdown: multiResult.scopeBreakdown,
       });
 
@@ -261,7 +295,7 @@ export async function resolveProjectContext(
         };
       }
 
-      const diverse = ensureChunkDiversity(multiChunks, MAX_PER_SOURCE, maxChunks);
+      // Project mode order: memory → project/global docs → official SAP (so official is support/fallback).
       if (diverse.length > 0) {
         sections.push(formatKnowledgeContext(diverse, true));
         retrievalDebug = {
@@ -272,23 +306,12 @@ export async function resolveProjectContext(
           memoryCount: retrievalDebug.memoryCount ?? 0,
         };
       }
-
-      retrievalScopes.push("official_sap");
-      const officialChunks = await getOfficialSapKnowledgeContext(searchQuery, 2);
       if (officialChunks.length > 0) {
-        sections.push(formatKnowledgeContext(officialChunks, false));
-        if (!retrievalDebug.usedRetrieval) {
-          retrievalDebug = {
-            chunkCount: officialChunks.length,
-            documentTitles: officialChunks.map((c) => c.title || "(sin título)"),
-            usedRetrieval: true,
-          };
-        } else {
-          retrievalDebug.documentTitles = Array.from(
-            new Set([...retrievalDebug.documentTitles, ...officialChunks.map((c) => c.title || "(sin título)")])
-          );
-          retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + officialChunks.length;
-        }
+        sections.push(formatOfficialSapContext(officialChunks));
+        retrievalDebug.documentTitles = Array.from(
+          new Set([...retrievalDebug.documentTitles, ...officialChunks.map((c) => c.title || "(sin título)")])
+        );
+        retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + officialChunks.length;
       }
     } catch (err) {
       console.error("[ProjectContextResolver] retrieval error", err);

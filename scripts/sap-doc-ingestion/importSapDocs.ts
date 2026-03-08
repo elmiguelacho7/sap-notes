@@ -25,7 +25,7 @@ export type SapDocSource = {
   title: string;
   module: string;
   topic: string;
-  document_type?: string;
+  document_type?: "sap_help" | "sap_official";
 };
 
 export type SapDocChunk = {
@@ -165,7 +165,7 @@ async function main() {
     }
     const meta = {
       title: src.title,
-      source: src.document_type === "sap_help" ? "SAP Help" : "SAP Documentation",
+      source: src.document_type === "sap_help" ? "SAP Help" : src.document_type === "sap_official" ? "SAP Official" : "SAP Documentation",
       module: src.module,
       topic: src.topic,
       document_type: src.document_type ?? "sap_help",
@@ -191,11 +191,13 @@ async function main() {
         title: ch.title,
         content: ch.content,
         source: ch.source,
+        source_name: ch.source,
         module: ch.module,
         topic: ch.topic,
         document_type: ch.document_type,
         source_url: ch.source_url,
         project_id: null,
+        scope_type: "global",
         embedding,
       });
       if (error) throw error;

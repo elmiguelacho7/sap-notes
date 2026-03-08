@@ -5,5 +5,19 @@
     "module": "SD",
     "topic": "enterprise_structure",
     "document_type": "sap_help"
+  },
+  {
+    "url": "https://help.sap.com/docs/SAP_ERP/6.0/en-US/4a5b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e/idoc-overview.html",
+    "title": "IDoc Overview (ALE/IDoc)",
+    "module": "BC",
+    "topic": "ale_idoc",
+    "document_type": "sap_help"
+  },
+  {
+    "url": "https://help.sap.com/docs/SAP_EWM/9.0/en-US/7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e/handling-units.html",
+    "title": "Handling Units in EWM",
+    "module": "EWM",
+    "topic": "handling_unit",
+    "document_type": "sap_official"
   }
 ]

@@ -247,14 +247,35 @@ export async function runProjectAgent(params: {
   const isNotesMode = ctx.mode === "notes";
   const includeWorkspaceSummary = shouldIncludeWorkspaceSummary(ctx.sapIntent);
 
-  // Use SAP-knowledge prompt when we did NOT inject workspace/project summary, so the model never assumes dashboard data.
-  const systemPrompt = includeWorkspaceSummary
-    ? isProjectMode
-      ? SYSTEM_PROMPT_PROJECT
-      : isNotesMode
-        ? SYSTEM_PROMPT_NOTES
-        : SYSTEM_PROMPT_GLOBAL
-    : SYSTEM_PROMPT_SAP_KNOWLEDGE;
+  // PART 1: Prompt selection by intent. project_status must use PROJECT prompt; do NOT use SAP_KNOWLEDGE for project_status.
+  let systemPrompt: string;
+  if (ctx.sapIntent === "project_status" && isProjectMode) {
+    systemPrompt = SYSTEM_PROMPT_PROJECT;
+  } else if (ctx.sapIntent === "workspace_summary") {
+    systemPrompt = isNotesMode ? SYSTEM_PROMPT_NOTES : SYSTEM_PROMPT_GLOBAL;
+  } else if (isSapKnowledgeIntent(ctx.sapIntent)) {
+    systemPrompt = SYSTEM_PROMPT_SAP_KNOWLEDGE;
+  } else if (includeWorkspaceSummary) {
+    systemPrompt = isProjectMode ? SYSTEM_PROMPT_PROJECT : isNotesMode ? SYSTEM_PROMPT_NOTES : SYSTEM_PROMPT_GLOBAL;
+  } else {
+    systemPrompt = SYSTEM_PROMPT_SAP_KNOWLEDGE;
+  }
+
+  const promptUsed =
+    systemPrompt === SYSTEM_PROMPT_PROJECT
+      ? "SYSTEM_PROMPT_PROJECT"
+      : systemPrompt === SYSTEM_PROMPT_GLOBAL
+        ? "SYSTEM_PROMPT_GLOBAL"
+        : systemPrompt === SYSTEM_PROMPT_NOTES
+          ? "SYSTEM_PROMPT_NOTES"
+          : "SYSTEM_PROMPT_SAP_KNOWLEDGE";
+  if (process.env.NODE_ENV === "development") {
+    console.log("[Sapito routing]", {
+      intent: ctx.sapIntent,
+      projectId: ctx.projectId ?? null,
+      promptUsed,
+    });
+  }
 
   if (typeof systemPrompt !== "string" || !systemPrompt.trim()) {
     throw new Error("projectAgent: systemPrompt is missing or empty");
@@ -267,12 +288,15 @@ export async function runProjectAgent(params: {
         : `Documentación y contexto recuperado. Responde únicamente según este contenido. No incluyas resumen de proyecto ni de plataforma.\n${ctx.sapitoContextSummary.trim()}`
       : "";
 
+  // When intent is project_status, prioritize project metrics/overview; do not use SAP-docs-only instruction.
   const knowledgeInstruction =
-    ctx.sapitoContextSummary?.includes("Contexto SAP Knowledge") ||
-    ctx.sapitoContextSummary?.includes("SAP Knowledge Context") ||
-    ctx.sapitoContextSummary?.includes("Contexto del proyecto (documentos") ||
-    ctx.sapitoContextSummary?.includes("Experiencia previa del proyecto SAP")
-      ? `Prioridad de conocimiento para esta respuesta (respeta este orden):
+    ctx.sapIntent === "project_status" && isProjectMode
+      ? "El usuario pregunta por el estado o progreso del proyecto. Usa como fuente principal los datos estructurados del proyecto anteriores (resumen del proyecto, tareas, tickets, actividades, notas). Puedes referirte a métricas como progreso, fase, notas, tickets y actividades. Responde en español con un resumen conciso."
+      : ctx.sapitoContextSummary?.includes("Contexto SAP Knowledge") ||
+        ctx.sapitoContextSummary?.includes("SAP Knowledge Context") ||
+        ctx.sapitoContextSummary?.includes("Contexto del proyecto (documentos") ||
+        ctx.sapitoContextSummary?.includes("Experiencia previa del proyecto SAP")
+        ? `Prioridad de conocimiento para esta respuesta (respeta este orden):
 1) Experiencia previa del proyecto (si aparece en el contexto): cuando la uses, EMPIEZA la respuesta con: "Based on previous SAP project experience..."
 2) Documentación SAP recuperada (fragmentos en el contexto anterior) — máxima prioridad; la respuesta debe reflejarlos claramente.
 3) Conocimiento de proyecto (documentos del proyecto si aparecen en el contexto).
@@ -286,12 +310,12 @@ Cuando incluya documentación técnica recuperada (Contexto del proyecto o Conte
 - Si la información es parcial, dilo con claridad; no inventes lo que no está en el contexto.
 - NUNCA afirmes haber encontrado documentos si no se te proporcionó ninguno.
 - Estructura sustancial: ## Escenario, ## Análisis, ## Pasos recomendados, ## Consideraciones. Usa markdown: ## para secciones, - o 1. para listas, **negrita** para términos clave. No uses HTML.`
-      : !includeWorkspaceSummary
-        ? `Cuando NO haya documentación recuperada en el contexto anterior:
+        : !includeWorkspaceSummary
+          ? `Cuando NO haya documentación recuperada en el contexto anterior:
 - Responde con conocimiento general SAP de forma clara y útil.
 - Indica brevemente que es respuesta general, por ejemplo: "No hay documentación específica indexada para esto; según conocimiento general SAP:" y luego la respuesta estructurada. No inventes documentos. Mantén tono seguro y profesional.
 - Formato de salida: usa markdown para legibilidad: ## para secciones, - o 1. para listas, **negrita** para términos clave. No uses HTML.`
-        : "";
+          : "";
 
   const structureNote =
     ctx.sapIntent && ctx.sapIntent !== "generic"
@@ -323,6 +347,33 @@ Cuando incluya documentación técnica recuperada (Contexto del proyecto o Conte
     projectContext,
     userMessage: params.message,
   });
+
+  const fullContext = [sapitoContextBlock, projectContext].filter(Boolean).join("\n");
+  const hasProjectOverview =
+    /resumen del proyecto|Resumen del proyecto/i.test(ctx.sapitoContextSummary ?? "");
+  const hasProjectMetrics =
+    /tareas abiertas|tickets abiertos|actividades (vencidas|próximas)/i.test(ctx.sapitoContextSummary ?? "");
+  const hasNotesSummary = ctx.notes.length > 0 || /NOTAS DEL PROYECTO|Nota \d+:/i.test(projectContext);
+  const hasActivitiesSummary =
+    /actividades (vencidas|próximas)|Actividades/i.test(ctx.sapitoContextSummary ?? "");
+  const hasTicketsSummary =
+    /tickets abiertos|alta prioridad|Tickets/i.test(ctx.sapitoContextSummary ?? "") ||
+    (ctx.links?.length ?? 0) > 0;
+
+  if (process.env.NODE_ENV === "development") {
+    console.log("[Project Copilot debug]", {
+      mode: ctx.mode,
+      projectId: ctx.projectId ?? null,
+      intent: ctx.sapIntent,
+      promptUsed,
+      hasProjectOverview,
+      hasProjectMetrics,
+      hasNotesSummary,
+      hasActivitiesSummary,
+      hasTicketsSummary,
+      contextPreview: fullContext.slice(0, 800),
+    });
+  }
 
   const llm = new ChatOpenAI({
     openAIApiKey,

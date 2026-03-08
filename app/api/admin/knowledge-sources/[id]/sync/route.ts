@@ -1,7 +1,8 @@
 /**
  * POST /api/admin/knowledge-sources/[id]/sync
- * Sync a knowledge source (global or project-scoped) Google Drive into knowledge_documents.
- * Superadmin only. Global: project_id = null. Project: uses source's project_id.
+ * Sync a knowledge source into knowledge_documents.
+ * - Google Drive: folder/file content (PDF/DOCX).
+ * - sap_help / official_web: single curated URL only (fetch → clean → chunk → embed). No crawling.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,6 +15,7 @@ import {
   type DriveFileInfo,
 } from "@/lib/integrations/googleDrive";
 import { getEmbedding } from "@/lib/knowledge/ingestHelpers";
+import { ingestCuratedSapPage } from "@/lib/knowledge/curatedSapIngest";
 
 const SUPPORTED_MIME_TYPES = new Set([
   "application/pdf",
@@ -97,7 +99,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { data: source, error: sourceError } = await supabaseAdmin
       .from("knowledge_sources")
-      .select("id, scope_type, project_id, source_type, source_name, external_ref, integration_id")
+      .select("id, scope_type, project_id, source_type, source_name, external_ref, source_url, integration_id")
       .eq("id", sourceId)
       .single();
 
@@ -115,6 +117,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       source_type: string;
       source_name: string;
       external_ref: string | null;
+      source_url: string | null;
       integration_id: string | null;
     };
 
@@ -130,9 +133,78 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         { status: 400 }
       );
     }
+
+    // Curated official SAP (single URL only; no crawling).
+    if (row.source_type === "sap_help" || row.source_type === "official_web" || row.source_type === "sap_official") {
+      if (row.scope_type !== "global") {
+        return NextResponse.json(
+          { error: "Fuentes SAP oficiales deben ser globales (scope_type = global)." },
+          { status: 400 }
+        );
+      }
+      const url = (row.source_url ?? "").trim();
+      if (!url) {
+        return NextResponse.json(
+          { error: "Falta source_url en la fuente. Añade la URL de la página SAP a indexar." },
+          { status: 400 }
+        );
+      }
+      try {
+        const documentType = (row.source_type === "official_web" || row.source_type === "sap_official") ? "sap_official" : "sap_help";
+        const { chunksInserted } = await ingestCuratedSapPage({
+          url,
+          title: row.source_name || "SAP Documentation",
+          module: "general",
+          topic: "curated",
+          document_type: documentType,
+          source_name: row.source_name || "SAP Help",
+        });
+        const finishedAt = new Date().toISOString();
+        await supabaseAdmin
+          .from("knowledge_sources")
+          .update({
+            last_synced_at: finishedAt,
+            updated_at: finishedAt,
+            status: "active",
+          })
+          .eq("id", sourceId);
+        console.log("[admin/knowledge-sources/sync] curated SAP done", { sourceId: sourceId.slice(0, 8), chunksInserted });
+        return NextResponse.json({
+          ok: true,
+          documentsProcessed: 1,
+          chunksCreated: chunksInserted,
+          errors: [],
+          status: "synced",
+          last_sync_at: finishedAt,
+          message: `Página indexada. ${chunksInserted} fragmentos.`,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[admin/knowledge-sources/sync] curated SAP ingest error", msg);
+        const finishedAt = new Date().toISOString();
+        await supabaseAdmin
+          .from("knowledge_sources")
+          .update({
+            last_synced_at: finishedAt,
+            updated_at: finishedAt,
+            status: "error",
+          })
+          .eq("id", sourceId);
+        return NextResponse.json({
+          ok: false,
+          documentsProcessed: 0,
+          chunksCreated: 0,
+          errors: [msg],
+          status: "error",
+          last_sync_at: finishedAt,
+          message: `Error al indexar: ${msg}`,
+        }, { status: 500 });
+      }
+    }
+
     if (row.source_type !== "google_drive_folder" && row.source_type !== "google_drive_file") {
       return NextResponse.json(
-        { error: "Esta fuente no es de Google Drive. Solo se puede sincronizar carpetas o archivos de Drive." },
+        { error: "Esta fuente no es de Google Drive ni SAP oficial. Solo se puede sincronizar Drive o fuentes sap_help / sap_official / official_web." },
         { status: 400 }
       );
     }
