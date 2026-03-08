@@ -23,6 +23,8 @@ export type GlobalKnowledgeSourceRow = {
   status: string;
   sync_enabled: boolean;
   last_synced_at: string | null;
+  last_sync_error: string | null;
+  last_sync_status_detail: string | null;
   integration_id: string | null;
   created_at: string;
   updated_at: string;
@@ -67,7 +69,7 @@ export async function GET(request: NextRequest) {
     let data: unknown = null;
     let error: { code?: string; message?: string } | null = null;
 
-    const selectFields = "id, scope_type, project_id, source_type, source_name, external_ref, source_url, status, sync_enabled, last_synced_at, integration_id, created_at, updated_at";
+    const selectFields = "id, scope_type, project_id, source_type, source_name, external_ref, source_url, status, sync_enabled, last_synced_at, last_sync_error, last_sync_status_detail, integration_id, created_at, updated_at";
 
     if (scope === "global") {
       const result = await supabaseAdmin

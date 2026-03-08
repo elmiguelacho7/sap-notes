@@ -762,6 +762,8 @@ type GlobalKnowledgeSourceRow = {
   status: string;
   sync_enabled: boolean;
   last_synced_at: string | null;
+  last_sync_error?: string | null;
+  last_sync_status_detail?: string | null;
   integration_id: string | null;
   created_at: string;
   updated_at: string;
@@ -796,6 +798,35 @@ const SYNC_STATUS_LABELS: Record<SyncStatusKey, string> = {
   syncing: "Syncing",
   error: "Error",
 };
+
+/** User-facing labels for curated SAP sync failure detail codes. */
+const SYNC_DETAIL_LABELS: Record<string, string> = {
+  js_required: "Page requires JavaScript",
+  no_content: "No readable content extracted",
+  zero_chunks: "0 chunks generated",
+  embed_failed: "Failed during embedding",
+  insert_failed: "Failed during insert",
+  other: "Sync failed",
+};
+
+/** Compact sync result line for curated SAP sources when status is error. */
+function getSyncDetailLine(s: GlobalKnowledgeSourceRow): string | null {
+  if (s.status !== "error") return null;
+  const err = s.last_sync_error?.trim();
+  if (err) {
+    const firstLine = err.split(/\n/)[0].trim();
+    if (firstLine.length <= 90 && (firstLine.includes("chars)") || firstLine.includes("chunks generated")))
+      return firstLine;
+    if (firstLine.length <= 90) return firstLine;
+  }
+  const detail = s.last_sync_status_detail;
+  if (detail && SYNC_DETAIL_LABELS[detail]) return SYNC_DETAIL_LABELS[detail];
+  if (err) {
+    const short = err.slice(0, 80);
+    return short + (err.length > 80 ? "…" : "");
+  }
+  return null;
+}
 
 function getSyncStatus(
   s: GlobalKnowledgeSourceRow,
@@ -1129,9 +1160,29 @@ function GlobalKnowledgeSourcesPanel() {
               ))}
             </select>
             {(newSourceType === "sap_help" || newSourceType === "official_web" || newSourceType === "sap_official") && (
-              <p className="mt-1 text-xs text-slate-500">
-                Añade la URL de la página SAP (una por fuente). Al sincronizar se indexará solo esa página en la capa de documentación oficial.
-              </p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xs text-slate-500">
+                  Añade la URL de la página (una por fuente). Al sincronizar se indexará solo esa página.
+                </p>
+                <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1.5 border border-amber-200">
+                  <strong>Guía:</strong> Las páginas SAP Help solo se indexan cuando el contenido legible está en el HTML inicial. Las que cargan todo por JavaScript no se pueden indexar con este flujo. Si una URL falla, prueba otra página curada o usa un documento/PDF como alternativa.
+                </p>
+                {newSourceType === "sap_help" && (
+                  <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1">
+                    <strong>SAP Help Portal:</strong> solo URLs de help.sap.com. No uses community.sap.com (esas páginas usan JavaScript y no se pueden indexar aquí).
+                  </p>
+                )}
+                {newSourceType === "sap_official" && (
+                  <p className="text-xs text-slate-600">
+                    <strong>SAP Official:</strong> documentación oficial SAP aprobada (p. ej. help.sap.com u otras fuentes oficiales).
+                  </p>
+                )}
+                {newSourceType === "official_web" && (
+                  <p className="text-xs text-slate-600">
+                    <strong>Official Web:</strong> páginas públicas curadas (p. ej. community.sap.com u otros dominios). Si la página requiere JavaScript o verificación anti-bot, la sincronización fallará con un mensaje claro.
+                  </p>
+                )}
+              </div>
             )}
           </div>
           <div>
@@ -1264,19 +1315,26 @@ function GlobalKnowledgeSourcesPanel() {
                       {s.scope_type === "global" && "—"}
                     </td>
                     <td className="py-3 px-4">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          syncStatus === "syncing"
-                            ? "bg-amber-100 text-amber-800"
-                            : syncStatus === "error"
-                              ? "bg-red-100 text-red-800"
-                              : syncStatus === "synced"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {SYNC_STATUS_LABELS[syncStatus]}
-                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium w-fit ${
+                            syncStatus === "syncing"
+                              ? "bg-amber-100 text-amber-800"
+                              : syncStatus === "error"
+                                ? "bg-red-100 text-red-800"
+                                : syncStatus === "synced"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {SYNC_STATUS_LABELS[syncStatus]}
+                        </span>
+                        {isCuratedSapSource(s) && getSyncDetailLine(s) && (
+                          <span className="text-xs text-slate-500 max-w-[220px] truncate" title={s.last_sync_error ?? undefined}>
+                            {getSyncDetailLine(s)}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3 px-4 text-slate-600 text-xs">
                       {s.last_synced_at ? formatSyncDate(s.last_synced_at) : "—"}

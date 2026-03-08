@@ -15,12 +15,32 @@ import {
   type DriveFileInfo,
 } from "@/lib/integrations/googleDrive";
 import { getEmbedding } from "@/lib/knowledge/ingestHelpers";
-import { ingestCuratedSapPage } from "@/lib/knowledge/curatedSapIngest";
+import { ingestCuratedSapPage, validateUrlForSourceType } from "@/lib/knowledge/curatedSapIngest";
 
 const SUPPORTED_MIME_TYPES = new Set([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
+
+/** Map curated SAP ingest error message to a short code for UI and persistence. */
+function classifyCuratedSyncError(message: string): string {
+  const m = message.toLowerCase();
+  if (
+    m.includes("javascript") ||
+    m.includes("bot verification") ||
+    m.includes("cannot be indexed by the current ingestion")
+  ) return "js_required";
+  if (
+    m.includes("no readable content") ||
+    m.includes("insufficient content") ||
+    m.includes("no or insufficient content") ||
+    m.includes("extracted text too short")
+  ) return "no_content";
+  if (m.includes("zero chunks") || m.includes("chunk generation produced zero")) return "zero_chunks";
+  if (m.includes("embedding generation failed")) return "embed_failed";
+  if (m.includes("insert chunk failed") || m.includes("failed to delete existing chunks")) return "insert_failed";
+  return "other";
+}
 
 // ~600 tokens (500-800 range), ~4 chars per token
 const CHUNK_SIZE_CHARS = 2400;
@@ -149,6 +169,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           { status: 400 }
         );
       }
+      const validation = validateUrlForSourceType(url, row.source_type);
+      if (!validation.ok) {
+        return NextResponse.json(
+          { error: validation.error ?? "La URL no es válida para este tipo de fuente." },
+          { status: 400 }
+        );
+      }
       try {
         const documentType = (row.source_type === "official_web" || row.source_type === "sap_official") ? "sap_official" : "sap_help";
         const { chunksInserted } = await ingestCuratedSapPage({
@@ -166,6 +193,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             last_synced_at: finishedAt,
             updated_at: finishedAt,
             status: "active",
+            last_sync_error: null,
+            last_sync_status_detail: null,
           })
           .eq("id", sourceId);
         console.log("[admin/knowledge-sources/sync] curated SAP done", { sourceId: sourceId.slice(0, 8), chunksInserted });
@@ -181,6 +210,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error("[admin/knowledge-sources/sync] curated SAP ingest error", msg);
+        const detailCode = classifyCuratedSyncError(msg);
         const finishedAt = new Date().toISOString();
         await supabaseAdmin
           .from("knowledge_sources")
@@ -188,6 +218,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             last_synced_at: finishedAt,
             updated_at: finishedAt,
             status: "error",
+            last_sync_error: msg.slice(0, 500),
+            last_sync_status_detail: detailCode,
           })
           .eq("id", sourceId);
         return NextResponse.json({
@@ -197,6 +229,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           errors: [msg],
           status: "error",
           last_sync_at: finishedAt,
+          sync_status_detail: detailCode,
           message: `Error al indexar: ${msg}`,
         }, { status: 500 });
       }
