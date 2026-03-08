@@ -27,6 +27,9 @@ const GROUNDING_LABELS: Record<string, string> = {
   project_documents: "Según la documentación sincronizada del proyecto.",
   official_sap: "Según la documentación SAP indexada.",
   global_knowledge: "Según la documentación sincronizada.",
+  weekly_focus: "Basado en las prioridades y el enfoque semanal del workspace.",
+  project_health: "Basado en el análisis de salud del proyecto.",
+  project_risk: "Basado en el Project Risk Radar del proyecto.",
   general: "Respuesta general.",
 };
 
@@ -40,6 +43,9 @@ function getGroundingLabel(scopes: string[], resolvedProjectTitle?: string | nul
   if (scopes.includes("platform_summary")) return GROUNDING_LABELS.platform_summary;
   if (scopes.includes("project_summary")) return GROUNDING_LABELS.project_summary;
   if (scopes.includes("notes_insights")) return GROUNDING_LABELS.notes_insights;
+  if (scopes.includes("weekly_focus")) return GROUNDING_LABELS.weekly_focus;
+  if (scopes.includes("project_health")) return GROUNDING_LABELS.project_health;
+  if (scopes.includes("project_risk")) return GROUNDING_LABELS.project_risk;
   if (scopes.includes("project_memory")) return GROUNDING_LABELS.project_memory;
   if (scopes.includes("official_sap")) return GROUNDING_LABELS.official_sap;
   if (scopes.some((s) => s.includes("document") || s.includes("knowledge")))

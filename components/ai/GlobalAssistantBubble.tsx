@@ -92,7 +92,7 @@ export function GlobalAssistantBubble() {
         >
           <div className="shrink-0 px-4 py-4 border-b border-slate-200 bg-slate-50/80">
             <div className="flex items-start gap-3">
-              <SapitoAvatar size="md" className="mt-0.5 shrink-0" />
+              <SapitoAvatar size="md" className="mt-0.5 shrink-0" thinking={loading} />
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-semibold text-slate-900">Sapito</h3>
                 <p className="text-xs text-slate-500 mt-1">
@@ -126,7 +126,7 @@ export function GlobalAssistantBubble() {
               </div>
             ) : messages.length === 0 && loading ? (
               <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-6 text-center">
-                <SapitoAvatar size="lg" className="mx-auto mb-2 inline-block" />
+                <SapitoAvatar size="lg" className="mx-auto mb-2 inline-block" thinking />
                 <p className="text-sm font-medium text-slate-700">Sapito está pensando…</p>
               </div>
             ) : (
@@ -164,7 +164,7 @@ export function GlobalAssistantBubble() {
                 {loading && (
                   <div className="flex gap-3 justify-start">
                     <div className="mt-1 shrink-0">
-                      <SapitoAvatar size="sm" />
+                      <SapitoAvatar size="sm" thinking />
                     </div>
                     <div className="rounded-2xl px-4 py-3.5 bg-slate-100 text-slate-500 text-sm border border-slate-200/80">
                       Sapito está pensando…

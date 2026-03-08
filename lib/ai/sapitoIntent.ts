@@ -14,6 +14,8 @@ export type SapIntentCategory =
   | "sap_solution_design"
   | "workspace_summary"
   | "project_status"
+  | "project_risk"
+  | "weekly_focus"
   | "generic";
 
 /** Intents that are SAP knowledge questions; do NOT inject dashboard/project summary. */
@@ -32,6 +34,16 @@ export function isSapKnowledgeIntent(intent: SapIntentCategory | undefined): boo
 /** Only for these intents do we inject platform/project/notes summary (dashboard-style). */
 export function shouldIncludeWorkspaceSummary(intent: SapIntentCategory | undefined): boolean {
   return intent === "workspace_summary" || intent === "project_status";
+}
+
+/** True when intent is weekly focus (productivity priorities); use workspace focus analyzer, not SAP docs. */
+export function isWeeklyFocusIntent(intent: SapIntentCategory | undefined): boolean {
+  return intent === "weekly_focus";
+}
+
+/** True when intent is project risk radar; use risk analyzer, not SAP docs. */
+export function isProjectRiskIntent(intent: SapIntentCategory | undefined): boolean {
+  return intent === "project_risk";
 }
 
 /** Normalize for accent-insensitive match: strip diacritics so "como" matches "cómo". */
@@ -126,6 +138,48 @@ export function classifySapIntent(message: string, projectId?: string | null): S
   if (!message || message.trim().length < 3) return "generic";
 
   const m = message.trim();
+
+  // Weekly focus / productivity priorities (before workspace_summary to avoid overlap)
+  if (
+    normalizedContains(
+      m,
+      "what should i focus on this week",
+      "what needs my attention this week",
+      "where should i focus now",
+      "focus this week",
+      "weekly priorities",
+      "prioridades de esta semana",
+      "en qué debo enfocarme esta semana",
+      "qué necesita mi atención",
+      "what should i focus on",
+      "where should i focus",
+      "what needs my attention",
+      "weekly focus",
+      "enfoque de la semana",
+      "prioridades semanales"
+    ) ||
+    /\b(focus\s+(on\s+)?(this\s+)?week|weekly\s+priorit|prioridades\s+(de\s+)?(esta\s+)?semana)\b/i.test(m)
+  ) {
+    return "weekly_focus";
+  }
+
+  // Project risk radar (explicit risk questions; do not overlap with project status/summary)
+  if (
+    normalizedContains(
+      m,
+      "project risk",
+      "what risks exist in this project",
+      "is this project in danger",
+      "is this project at risk",
+      "what should worry me",
+      "riesgos del proyecto",
+      "qué riesgos hay en este proyecto",
+      "este proyecto está en riesgo"
+    ) ||
+    /\b(que\s+riesgos\s+hay|riesgos\s+del\s+proyecto)\b/i.test(normalizeForMatch(m))
+  ) {
+    return "project_risk";
+  }
 
   // Explicit request for workspace/dashboard/platform summary
   if (

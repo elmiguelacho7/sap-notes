@@ -7,7 +7,7 @@ import type {
   ProjectLinkSummary,
 } from "@/lib/services/projectService";
 import type { SapIntentCategory } from "@/lib/ai/sapitoIntent";
-import { shouldIncludeWorkspaceSummary, isSapKnowledgeIntent } from "@/lib/ai/sapitoIntent";
+import { shouldIncludeWorkspaceSummary, isSapKnowledgeIntent, isWeeklyFocusIntent, isProjectRiskIntent } from "@/lib/ai/sapitoIntent";
 import { SYSTEM_PROMPT_SAP_KNOWLEDGE } from "@/lib/langchain/prompts/sapKnowledgePrompt";
 
 // ==========================
@@ -206,6 +206,43 @@ const ANSWER_FORMAT_BY_INTENT: Record<Exclude<SapIntentCategory, "generic">, str
 - Resumen de estado del proyecto (tareas, tickets, actividades).
 - Riesgo o prioridad si los datos lo indican.
 - Siguiente acción sugerida.`,
+
+  weekly_focus: `Formato de respuesta para esta consulta (enfoque semanal):
+Responde con la siguiente estructura en markdown:
+## Weekly Focus
+
+### Priority 1
+[Primera prioridad según los datos proporcionados]
+
+### Priority 2
+[Segunda prioridad si aplica]
+
+### Priority 3
+[Tercera prioridad si aplica]
+
+### Recommended next actions
+- [Acción recomendada 1]
+- [Acción recomendada 2]
+
+Usa ÚNICAMENTE los datos estructurados de enfoque semanal proporcionados en el contexto. No cites documentación SAP. Responde en español.`,
+
+  project_risk: `Formato de respuesta para esta consulta (riesgos del proyecto):
+Responde con la siguiente estructura en markdown:
+## Project Risk Radar
+
+### Risk level
+[Nivel de riesgo según los datos: low / medium / high]
+
+### Main signals
+- [Señal 1]
+- [Señal 2]
+...
+
+### Recommended actions
+- [Acción recomendada 1]
+- [Acción recomendada 2]
+
+Usa ÚNICAMENTE los datos del Project Risk Radar proporcionados en el contexto. No cites documentación SAP. Responde en español.`,
 };
 
 // ==========================
@@ -251,6 +288,10 @@ export async function runProjectAgent(params: {
   let systemPrompt: string;
   if (ctx.sapIntent === "project_status" && isProjectMode) {
     systemPrompt = SYSTEM_PROMPT_PROJECT;
+  } else if (ctx.sapIntent === "weekly_focus") {
+    systemPrompt = isProjectMode ? SYSTEM_PROMPT_PROJECT : SYSTEM_PROMPT_GLOBAL;
+  } else if (ctx.sapIntent === "project_risk" && isProjectMode) {
+    systemPrompt = SYSTEM_PROMPT_PROJECT;
   } else if (ctx.sapIntent === "workspace_summary") {
     systemPrompt = isNotesMode ? SYSTEM_PROMPT_NOTES : SYSTEM_PROMPT_GLOBAL;
   } else if (isSapKnowledgeIntent(ctx.sapIntent)) {
@@ -283,16 +324,22 @@ export async function runProjectAgent(params: {
 
   const sapitoContextBlock =
     ctx.sapitoContextSummary?.trim() != null && ctx.sapitoContextSummary.trim() !== ""
-      ? includeWorkspaceSummary
+      ? includeWorkspaceSummary || isWeeklyFocusIntent(ctx.sapIntent) || isProjectRiskIntent(ctx.sapIntent)
         ? `Datos estructurados (usa esto como fuente de verdad para resumir, priorizar y sugerir siguiente acción):\n${ctx.sapitoContextSummary.trim()}`
         : `Documentación y contexto recuperado. Responde únicamente según este contenido. No incluyas resumen de proyecto ni de plataforma.\n${ctx.sapitoContextSummary.trim()}`
       : "";
 
   // When intent is project_status, prioritize project metrics/overview; do not use SAP-docs-only instruction.
+  // When intent is weekly_focus, use ONLY the focus data; do NOT answer with generic SAP documentation.
+  // When intent is project_risk, use ONLY the risk radar data; do NOT answer with generic SAP documentation.
   const knowledgeInstruction =
     ctx.sapIntent === "project_status" && isProjectMode
       ? "El usuario pregunta por el estado o progreso del proyecto. Usa como fuente principal los datos estructurados del proyecto anteriores (resumen del proyecto, tareas, tickets, actividades, notas). Puedes referirte a métricas como progreso, fase, notas, tickets y actividades. Responde en español con un resumen conciso."
-      : ctx.sapitoContextSummary?.includes("Contexto SAP Knowledge") ||
+      : ctx.sapIntent === "weekly_focus"
+        ? "El usuario pregunta por el enfoque o prioridades de la semana. Usa ÚNICAMENTE los datos estructurados de enfoque semanal del contexto anterior (prioridades y acciones recomendadas). Responde con la estructura: ## Weekly Focus, ### Priority 1, ### Priority 2, etc., ### Recommended next actions. No cites documentación SAP ni des respuestas genéricas. Responde en español."
+        : ctx.sapIntent === "project_risk" && isProjectMode
+          ? "El usuario pregunta por los riesgos del proyecto. Usa ÚNICAMENTE los datos del Project Risk Radar del contexto anterior (nivel de riesgo, señales, recomendaciones). Responde con la estructura: ## Project Risk Radar, ### Risk level, ### Main signals, ### Recommended actions. No cites documentación SAP. Responde en español."
+          : ctx.sapitoContextSummary?.includes("Contexto SAP Knowledge") ||
         ctx.sapitoContextSummary?.includes("SAP Knowledge Context") ||
         ctx.sapitoContextSummary?.includes("Contexto del proyecto (documentos") ||
         ctx.sapitoContextSummary?.includes("Experiencia previa del proyecto SAP")
@@ -327,12 +374,16 @@ Cuando incluya documentación técnica recuperada (Contexto del proyecto o Conte
       ? `${ANSWER_FORMAT_BY_INTENT[ctx.sapIntent]}${structureNote ? `\n\n${structureNote}` : ""}`
       : "";
 
-  const projectContext = includeWorkspaceSummary
-    ? isProjectMode
+  const projectContext = includeWorkspaceSummary || isWeeklyFocusIntent(ctx.sapIntent) || isProjectRiskIntent(ctx.sapIntent)
+    ? isProjectMode && !isWeeklyFocusIntent(ctx.sapIntent) && !isProjectRiskIntent(ctx.sapIntent)
       ? buildProjectContextText(ctx.notes, ctx.links)
       : isNotesMode
         ? "Contexto: panel de notas (insights de la base de notas)."
-        : GLOBAL_CONTEXT_PLACEHOLDER
+        : isWeeklyFocusIntent(ctx.sapIntent)
+          ? "Contexto: enfoque semanal (prioridades del workspace). Usa solo los datos estructurados de prioridades y acciones recomendadas."
+          : isProjectRiskIntent(ctx.sapIntent)
+            ? "Contexto: Project Risk Radar. Usa solo los datos de nivel de riesgo, señales y recomendaciones proporcionados."
+            : GLOBAL_CONTEXT_PLACEHOLDER
     : isProjectMode
       ? "Pregunta de conocimiento SAP o general. Responde solo con base en la documentación proporcionada. No incluyas resumen de proyecto ni contadores."
       : isNotesMode

@@ -7,6 +7,8 @@
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getPlatformMetrics } from "@/lib/metrics/platformMetrics";
+import { analyzeProjectHealth, type ProjectHealthSignals } from "@/lib/ai/projectIntelligence";
+import { analyzeProjectRisk } from "@/lib/ai/projectRisk";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -40,6 +42,93 @@ export type NotesInsights = {
   topErrorCodes: Array<{ code: string; count: number }>;
   topTransactions: Array<{ code: string; count: number }>;
 };
+
+// ==========================
+// Sapito tool registry (for LLM tool-calling / API invocation by name)
+// ==========================
+
+export type SapitoToolDefinition = {
+  name: string;
+  description: string;
+  parameters: {
+    type: "object";
+    properties: Record<string, { type: string; description: string }>;
+    required: string[];
+  };
+};
+
+export const SAPITO_TOOLS: SapitoToolDefinition[] = [
+  {
+    name: "analyze_project_health",
+    description: "Analyze the health and risk level of a project",
+    parameters: {
+      type: "object",
+      properties: {
+        projectId: {
+          type: "string",
+          description: "Project identifier",
+        },
+      },
+      required: ["projectId"],
+    },
+  },
+  {
+    name: "analyze_project_risk",
+    description: "Analyze project risks and identify the main warning signals",
+    parameters: {
+      type: "object",
+      properties: {
+        projectId: {
+          type: "string",
+          description: "Project identifier",
+        },
+      },
+      required: ["projectId"],
+    },
+  },
+];
+
+export type AnalyzeProjectHealthResult = {
+  healthScore: number;
+  status: "healthy" | "warning" | "risk";
+  signals: ProjectHealthSignals;
+  recommendations: string[];
+};
+
+/**
+ * Execute a Sapito tool by name. Returns the tool result or throws on unknown tool.
+ * userId is required for project-scoped tools (e.g. analyze_project_health).
+ */
+export async function executeSapitoTool(
+  toolName: string,
+  params: Record<string, unknown>,
+  userId: string
+): Promise<unknown> {
+  switch (toolName) {
+    case "analyze_project_health": {
+      const projectId = typeof params.projectId === "string" ? params.projectId : String(params.projectId ?? "");
+      const report = await analyzeProjectHealth(projectId, userId);
+      return {
+        healthScore: report.score,
+        status: report.status,
+        signals: report.signals,
+        recommendations: report.recommendations,
+      } satisfies AnalyzeProjectHealthResult;
+    }
+    case "analyze_project_risk": {
+      const projectId = typeof params.projectId === "string" ? params.projectId : String(params.projectId ?? "");
+      const report = await analyzeProjectRisk(projectId, userId);
+      return {
+        riskLevel: report.level,
+        summary: report.summary,
+        signals: report.signals,
+        recommendations: report.recommendations,
+      };
+    }
+    default:
+      throw new Error(`Unknown Sapito tool: ${toolName}`);
+  }
+}
 
 // ==========================
 // getPlatformStats (delegates to getPlatformMetrics for user-scoped single source of truth)

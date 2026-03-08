@@ -7,9 +7,11 @@ import {
   getPlatformStats,
   getProjectOverview,
   getNotesInsights,
+  executeSapitoTool,
   type PlatformStats,
   type ProjectOverview,
   type NotesInsights,
+  type AnalyzeProjectHealthResult,
 } from "@/lib/ai/sapitoTools";
 import { getProjectMetrics } from "@/lib/metrics/platformMetrics";
 import {
@@ -21,14 +23,82 @@ import {
 } from "@/lib/ai/knowledgeSearch";
 import { getOfficialSapKnowledgeContext } from "@/lib/ai/officialSapKnowledge";
 import { normalizeQueryForSap } from "@/lib/ai/queryNormalize";
-import { shouldIncludeWorkspaceSummary, isSapKnowledgeIntent, type SapIntentCategory } from "@/lib/ai/sapitoIntent";
+import { shouldIncludeWorkspaceSummary, isSapKnowledgeIntent, isWeeklyFocusIntent, type SapIntentCategory } from "@/lib/ai/sapitoIntent";
 import type { RetrievalDebug } from "@/lib/ai/sapitoContext";
+import { analyzeWeeklyFocus, type WeeklyFocusResult } from "@/lib/ai/workspaceFocus";
+import type { ProjectRiskReport } from "@/lib/ai/projectRisk";
 
 const CHUNK_CONTENT_CAP = 1000;
 const MAX_CHUNKS_AFTER_DIVERSITY = 8;
 const MAX_CHUNKS_SAP = 6;
 const MAX_PER_SOURCE = 2;
 const MAX_MEMORY_ITEMS = 4;
+
+function detectProjectHealthIntent(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("project health") ||
+    m.includes("how healthy") ||
+    m.includes("is this project healthy") ||
+    m.includes("analyze project health")
+  );
+}
+
+function detectProjectRiskIntent(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("project risk") ||
+    m.includes("what risks exist in this project") ||
+    m.includes("is this project in danger") ||
+    m.includes("is this project at risk") ||
+    m.includes("what should worry me") ||
+    m.includes("riesgos del proyecto") ||
+    m.includes("qué riesgos hay en este proyecto") ||
+    m.includes("este proyecto está en riesgo") ||
+    /que\s+riesgos\s+hay/i.test(m) ||
+    /riesgos\s+del\s+proyecto/i.test(m)
+  );
+}
+
+function formatProjectHealthContext(result: AnalyzeProjectHealthResult): string {
+  const lines: string[] = [
+    "Análisis de salud del proyecto (usa como fuente de verdad para resumir estado y riesgos):",
+    `- Puntuación de salud: ${result.healthScore}/100`,
+    `- Estado: ${result.status}`,
+    `- Señales: tareas vencidas ${result.signals.overdueTasks}, tickets abiertos ${result.signals.openTickets}, actividad reciente (7 días) ${result.signals.recentActivity}, fases retrasadas ${result.signals.delayedPhases}`,
+  ];
+  if (result.recommendations.length > 0) {
+    lines.push("- Recomendaciones: " + result.recommendations.join("; "));
+  }
+  return lines.join("\n");
+}
+
+function formatWeeklyFocusContext(result: WeeklyFocusResult): string {
+  const lines: string[] = [
+    "Enfoque semanal (usa como fuente de verdad; responde con ## Weekly Focus, ### Priority 1/2/..., ### Recommended next actions):",
+    "Prioridades:",
+  ];
+  result.priorities.forEach((p, i) => {
+    lines.push(`- Prioridad ${i + 1}: ${p.title}. ${p.reason}`);
+  });
+  lines.push("Acciones recomendadas: " + result.recommendedNextActions.join("; "));
+  return lines.join("\n");
+}
+
+function formatProjectRiskContext(result: ProjectRiskReport): string {
+  const lines: string[] = [
+    "## Project Risk Radar",
+    `Risk level: ${result.level}`,
+    `Summary: ${result.summary}`,
+    "Signals:",
+    ...result.signals.map((s) => `- ${s.label}: ${s.value} (${s.severity}) — ${s.reason}`),
+    "Recommendations:",
+    ...result.recommendations.map((r) => `- ${r}`),
+    "",
+    "Responde usando la estructura: ## Project Risk Radar, ### Risk level, ### Main signals, ### Recommended actions. No uses documentación SAP.",
+  ];
+  return lines.join("\n");
+}
 
 function formatProjectMemoryContext(memories: ProjectMemoryChunk[]): string {
   const lines: string[] = [
@@ -160,8 +230,18 @@ export async function resolveGlobalContext(
     }
   }
 
+  if (isWeeklyFocusIntent(sapIntent) && userId) {
+    try {
+      const focusResult = await analyzeWeeklyFocus(userId);
+      sections.push(formatWeeklyFocusContext(focusResult));
+      retrievalScopes.push("weekly_focus");
+    } catch (err) {
+      console.error("[GlobalContextResolver] analyzeWeeklyFocus error", err);
+    }
+  }
+
   const searchQuery = normalizeQueryForSap(message) || (message ?? "").trim();
-  const runRetrieval = searchQuery.length > 0;
+  const runRetrieval = searchQuery.length > 0 && !isWeeklyFocusIntent(sapIntent);
   if (runRetrieval) {
     try {
       const isSapIntent = isSapKnowledgeIntent(sapIntent);
@@ -272,8 +352,52 @@ export async function resolveProjectContext(
     }
   }
 
+  if (detectProjectHealthIntent(message) && projectId && userId) {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Project health intent]", { message, projectId, triggered: true });
+    }
+    try {
+      const healthResult = (await executeSapitoTool(
+        "analyze_project_health",
+        { projectId },
+        userId
+      )) as AnalyzeProjectHealthResult;
+      sections.push(formatProjectHealthContext(healthResult));
+      retrievalScopes.push("project_health");
+    } catch (err) {
+      console.error("[ProjectContextResolver] analyze_project_health error", err);
+    }
+  }
+
+  if (detectProjectRiskIntent(message) && projectId && userId) {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Project risk intent]", { message, projectId, triggered: true });
+    }
+    try {
+      const riskResult = (await executeSapitoTool(
+        "analyze_project_risk",
+        { projectId },
+        userId
+      )) as ProjectRiskReport;
+      sections.push(formatProjectRiskContext(riskResult));
+      retrievalScopes.push("project_risk");
+    } catch (err) {
+      console.error("[ProjectContextResolver] analyze_project_risk error", err);
+    }
+  }
+
+  if (isWeeklyFocusIntent(sapIntent) && userId) {
+    try {
+      const focusResult = await analyzeWeeklyFocus(userId, projectId);
+      sections.push(formatWeeklyFocusContext(focusResult));
+      retrievalScopes.push("weekly_focus");
+    } catch (err) {
+      console.error("[ProjectContextResolver] analyzeWeeklyFocus error", err);
+    }
+  }
+
   const searchQuery = normalizeQueryForSap(message) || (message ?? "").trim();
-  const runRetrieval = searchQuery.length > 0;
+  const runRetrieval = searchQuery.length > 0 && !isWeeklyFocusIntent(sapIntent) && !detectProjectRiskIntent(message);
   if (runRetrieval) {
     try {
       const isSapIntent = isSapKnowledgeIntent(sapIntent);

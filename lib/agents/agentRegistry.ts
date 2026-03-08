@@ -1,7 +1,7 @@
 /**
  * Central registry for agent visual identity and copy.
  * Sapito imagery is agent-only; no SAP trademarks in assets.
- * Paths are under /agents/sapito/; missing files fall back to available ones.
+ * Paths are under /agents/sapito/; size-specific assets: sapito-avatar-{24,32,40,64,128,256}.png and sapito-thinking-{24,32,40,64,128,256}.png.
  */
 
 const SAPITO_BASE = "/agents/sapito";
@@ -24,24 +24,21 @@ export type AgentDefinition = {
   smallIcon: string;
 };
 
-/** Resolve image path; fallback to avatar if specific asset missing. If only one file exists (e.g. sapito-avatar.png), use it for all. */
-function img(path: string, fallback: string): string {
-  return path || fallback;
+/** Returns the image path for Sapito avatar or thinking state at the given pixel size. Avatar 24px uses 32px asset if sapito-avatar-24.png is missing. */
+export function getSapitoAvatarSrc(sizePx: number, thinking?: boolean): string {
+  const base = thinking ? "sapito-thinking" : "sapito-avatar";
+  const size = sizePx === 24 && !thinking ? 32 : sizePx;
+  return `${SAPITO_BASE}/${base}-${size}.png`;
 }
 
-/** Single asset fallback: when only one Sapito image exists, use it for all slots. */
-const singleAssetFallback = `${SAPITO_BASE}/sapito-avatar.png`;
-
-const sapitoAvatar = `${SAPITO_BASE}/sapito-avatar.png`;
-const sapitoMain = `${SAPITO_BASE}/sapito-main.png`;
-const sapitoThinking = `${SAPITO_BASE}/sapito-thinking.png`;
-const sapitoFavicon = `${SAPITO_BASE}/sapito-favicon.png`;
+const sapitoAvatarDefault = `${SAPITO_BASE}/sapito-avatar-40.png`;
+const sapitoThinkingDefault = `${SAPITO_BASE}/sapito-thinking-40.png`;
 
 const sapitoAssets: AgentAssetPaths = {
-  avatarImage: sapitoAvatar,
-  mainImage: sapitoMain || singleAssetFallback,
-  thinkingImage: img(sapitoThinking, sapitoAvatar),
-  smallIcon: img(sapitoFavicon, sapitoAvatar),
+  avatarImage: sapitoAvatarDefault,
+  mainImage: `${SAPITO_BASE}/sapito-avatar-64.png`,
+  thinkingImage: sapitoThinkingDefault,
+  smallIcon: `${SAPITO_BASE}/sapito-avatar-32.png`,
 };
 
 /**
