@@ -57,7 +57,14 @@ export type AgentContext = {
   /** Optional SAP intent (error/transaction/customizing/process/solution_design) for answer format */
   sapIntent?: SapIntentCategory;
   /** Optional retrieval debug (chunk count, document titles); included in response in development only */
-  retrievalDebug?: { chunkCount: number; documentTitles: string[]; usedRetrieval: boolean; threshold?: string };
+  retrievalDebug?: {
+    chunkCount: number;
+    documentTitles: string[];
+    usedRetrieval: boolean;
+    threshold?: string;
+    usedProjectMemory?: boolean;
+    memoryCount?: number;
+  };
 };
 
 // ==========================
@@ -263,13 +270,17 @@ export async function runProjectAgent(params: {
   const knowledgeInstruction =
     ctx.sapitoContextSummary?.includes("Contexto SAP Knowledge") ||
     ctx.sapitoContextSummary?.includes("SAP Knowledge Context") ||
-    ctx.sapitoContextSummary?.includes("Contexto del proyecto (documentos")
+    ctx.sapitoContextSummary?.includes("Contexto del proyecto (documentos") ||
+    ctx.sapitoContextSummary?.includes("Experiencia previa del proyecto SAP")
       ? `Prioridad de conocimiento para esta respuesta (respeta este orden):
-1) Documentación SAP recuperada (fragmentos en el contexto anterior) — es la máxima prioridad; la respuesta debe reflejarlos claramente.
-2) Conocimiento de proyecto (documentos del proyecto si aparecen en el contexto).
-3) Conocimiento general del modelo solo si lo anterior no cubre la pregunta.
+1) Experiencia previa del proyecto (si aparece en el contexto): cuando la uses, EMPIEZA la respuesta con: "Based on previous SAP project experience..."
+2) Documentación SAP recuperada (fragmentos en el contexto anterior) — máxima prioridad; la respuesta debe reflejarlos claramente.
+3) Conocimiento de proyecto (documentos del proyecto si aparecen en el contexto).
+4) Conocimiento general del modelo solo si lo anterior no cubre la pregunta.
 
-Cuando el contexto anterior incluya documentación técnica recuperada (Contexto del proyecto o Contexto SAP Knowledge):
+Cuando el contexto anterior incluya "Experiencia previa del proyecto SAP" y la uses:
+- EMPIEZA la respuesta con: "Based on previous SAP project experience..." y luego la explicación.
+Cuando incluya documentación técnica recuperada (Contexto del proyecto o Contexto SAP Knowledge):
 - PRIORIZA ese contenido: basa la respuesta en los fragmentos proporcionados.
 - Inicia con una frase de grounding (ej.: "Según la documentación SAP...", "According to SAP documentation...") y luego la respuesta estructurada.
 - Si la información es parcial, dilo con claridad; no inventes lo que no está en el contexto.

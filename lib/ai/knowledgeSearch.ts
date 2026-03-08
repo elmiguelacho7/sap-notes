@@ -42,6 +42,18 @@ export type KnowledgeChunk = {
   module: string | null;
   source_name?: string | null;
   external_ref?: string | null;
+  scope_type?: "global" | "project" | "user" | null;
+};
+
+/** Project memory item (problem/solution from past experience). Ranked first in retrieval. */
+export type ProjectMemoryChunk = {
+  id: string;
+  title: string | null;
+  problem: string | null;
+  solution: string;
+  module: string | null;
+  source_type: string | null;
+  created_at: string | null;
 };
 
 /** Prefer diversity: at most maxPerSource chunks per document (by title), total cap totalMax. */
@@ -210,5 +222,126 @@ export async function searchProjectKnowledge(
   } catch (err) {
     console.error("[knowledgeSearch] searchProjectKnowledge error", err);
     return [];
+  }
+}
+
+const DEFAULT_MEMORY_TOP_K = 4;
+
+/**
+ * Search project_knowledge_memory by project_id and user_id (filtered). Used first in ranking.
+ */
+export async function searchProjectMemory(
+  projectId: string,
+  userId: string | null,
+  query: string,
+  topK: number = DEFAULT_MEMORY_TOP_K
+): Promise<ProjectMemoryChunk[]> {
+  if (!projectId?.trim() || !query?.trim()) return [];
+
+  try {
+    const queryEmbedding = await getQueryEmbedding(query.trim());
+    const { data, error } = await supabaseAdmin.rpc("search_project_knowledge_memory", {
+      p_project_id: projectId,
+      p_user_id: userId ?? null,
+      query_embedding: queryEmbedding,
+      match_limit: Math.min(Math.max(1, topK), 20),
+    });
+
+    if (error) {
+      console.error("[knowledgeSearch] searchProjectMemory RPC error", error.message);
+      return [];
+    }
+
+    const rows = (data ?? []) as Array<{
+      id: string;
+      title: string | null;
+      problem: string | null;
+      solution: string;
+      module: string | null;
+      source_type: string | null;
+      created_at: string | null;
+    }>;
+
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title ?? null,
+      problem: r.problem ?? null,
+      solution: r.solution ?? "",
+      module: r.module ?? null,
+      source_type: r.source_type ?? null,
+      created_at: r.created_at ?? null,
+    }));
+  } catch (err) {
+    console.error("[knowledgeSearch] searchProjectMemory error", err);
+    return [];
+  }
+}
+
+/**
+ * Multi-tenant semantic search: strict isolation by scope (global / project / user).
+ * - If projectId is set: returns (global) OR (project AND project_id = projectId) OR (user AND user_id = userId), ordered project > user > global.
+ * - If projectId is not set: returns only global.
+ * Never returns project docs for other projects or user docs for other users.
+ */
+export type MultiTenantRetrievalResult = {
+  chunks: KnowledgeChunk[];
+  scopeBreakdown: { project: number; user: number; global: number };
+};
+
+export async function searchMultiTenantKnowledge(
+  projectId: string | null,
+  userId: string | null,
+  query: string,
+  topK: number = DEFAULT_TOP_K
+): Promise<MultiTenantRetrievalResult> {
+  const scopeBreakdown = { project: 0, user: 0, global: 0 };
+  if (!query?.trim()) return { chunks: [], scopeBreakdown };
+
+  try {
+    const queryEmbedding = await getQueryEmbedding(query.trim());
+    const { data, error } = await supabaseAdmin.rpc("search_knowledge_documents_multitenant", {
+      p_project_id: projectId ?? null,
+      p_user_id: userId ?? null,
+      query_embedding: queryEmbedding,
+      match_limit: Math.min(Math.max(1, topK), 50),
+    });
+
+    if (error) {
+      console.error("[knowledgeSearch] searchMultiTenantKnowledge RPC error", error.message);
+      return { chunks: [], scopeBreakdown };
+    }
+
+    const rows = (data ?? []) as Array<{
+      id: string;
+      title: string | null;
+      content: string;
+      source: string | null;
+      module: string | null;
+      source_name?: string | null;
+      external_ref?: string | null;
+      scope_type?: string | null;
+    }>;
+
+    const chunks: KnowledgeChunk[] = rows.map((r) => {
+      const scope = (r.scope_type === "project" || r.scope_type === "user" || r.scope_type === "global") ? r.scope_type : null;
+      if (scope === "project") scopeBreakdown.project++;
+      else if (scope === "user") scopeBreakdown.user++;
+      else if (scope === "global") scopeBreakdown.global++;
+      return {
+        id: r.id,
+        title: r.title ?? null,
+        content: r.content ?? "",
+        source: r.source ?? null,
+        module: r.module ?? null,
+        source_name: r.source_name ?? null,
+        external_ref: r.external_ref ?? null,
+        scope_type: scope,
+      };
+    });
+
+    return { chunks, scopeBreakdown };
+  } catch (err) {
+    console.error("[knowledgeSearch] searchMultiTenantKnowledge error", err);
+    return { chunks: [], scopeBreakdown };
   }
 }

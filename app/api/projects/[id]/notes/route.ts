@@ -5,6 +5,11 @@ import {
   ProjectNotFoundError,
   type CreateNotePayload,
 } from "@/lib/services/projectService";
+import { getCurrentUserIdFromRequest } from "@/lib/auth/serverAuth";
+import {
+  extractKnowledgeFromNote,
+  storeProjectMemory,
+} from "@/lib/ai/projectMemory";
 
 export type { NoteSummary } from "@/lib/services/projectService";
 
@@ -135,6 +140,18 @@ export async function POST(req: Request, { params }: RouteParams) {
     };
 
     const result = await createProjectNote(projectId, payload);
+
+    const userId = await getCurrentUserIdFromRequest(req);
+    const record = extractKnowledgeFromNote(
+      payload.title,
+      payload.body ?? null,
+      payload.module ?? null
+    );
+    if (record.solution.trim()) {
+      storeProjectMemory(projectId, userId ?? null, record, "project_note").catch((err) =>
+        console.error("[notes] project memory store failed", err)
+      );
+    }
 
     return NextResponse.json(result, { status: 201 });
   } catch (err) {

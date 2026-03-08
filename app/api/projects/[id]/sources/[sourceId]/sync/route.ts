@@ -14,6 +14,10 @@ import {
   getEmbedding,
   moduleFromFileName,
 } from "@/lib/knowledge/ingestHelpers";
+import {
+  extractKnowledgeFromDocument,
+  storeProjectMemory,
+} from "@/lib/ai/projectMemory";
 
 type RouteParams = { params: Promise<{ id: string; sourceId: string }> };
 
@@ -37,7 +41,8 @@ async function processOneFile(
   fileInfo: DriveFileInfo,
   projectId: string,
   projectSourceName: string,
-  sourceType: "google_drive_folder" | "google_drive_file"
+  sourceType: "google_drive_folder" | "google_drive_file",
+  userId: string | null
 ): Promise<{ processed: number; skipped: boolean; error: string | null }> {
   const fileId = fileInfo.id;
   const mimeType = fileInfo.mimeType;
@@ -95,6 +100,12 @@ async function processOneFile(
       console.error("[sync] Chunk insert failed", ch.title?.slice(0, 40), msg);
       return { processed: inserted, skipped: false, error: msg };
     }
+  }
+  const record = extractKnowledgeFromDocument(title, text, moduleLabel);
+  if (record.solution.trim()) {
+    storeProjectMemory(projectId, userId, record, "document_added").catch((err) =>
+      console.error("[sync] project memory store failed", err)
+    );
   }
   return { processed: inserted, skipped: false, error: null };
 }
@@ -214,7 +225,8 @@ export async function POST(_req: Request, { params }: RouteParams) {
               file,
               source.project_id,
               source.name,
-              source.source_type as "google_drive_folder" | "google_drive_file"
+              source.source_type as "google_drive_folder" | "google_drive_file",
+              userId
             );
             if (result.error) {
               filesFailed++;
@@ -237,7 +249,8 @@ export async function POST(_req: Request, { params }: RouteParams) {
           { id: meta.id, name: meta.name, mimeType: meta.mimeType },
           source.project_id,
           source.name,
-          source.source_type as "google_drive_folder" | "google_drive_file"
+          source.source_type as "google_drive_folder" | "google_drive_file",
+          userId
         );
         if (result.error) {
           filesFailed = 1;

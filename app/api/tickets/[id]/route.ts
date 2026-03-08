@@ -4,6 +4,10 @@ import {
 } from "@/lib/auth/serverAuth";
 import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import {
+  extractKnowledgeFromTicket,
+  storeProjectMemory,
+} from "@/lib/ai/projectMemory";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -39,6 +43,25 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         { error: "Se requiere status válido: open, in_progress, resolved, closed, cancelled." },
         { status: 400 }
       );
+    }
+
+    if (status === "closed") {
+      const { data: ticketRow, error: fetchErr } = await supabaseAdmin
+        .from("tickets")
+        .select("id, title, description, project_id, assigned_to")
+        .eq("id", ticketId)
+        .single();
+      if (!fetchErr && ticketRow?.project_id && (ticketRow.title || ticketRow.description)) {
+        const projectId = ticketRow.project_id as string;
+        const userId = (ticketRow.assigned_to as string | null) ?? user.userId ?? null;
+        const record = extractKnowledgeFromTicket(
+          (ticketRow.title as string) ?? "Issue resolved",
+          (ticketRow.description as string) || null
+        );
+        storeProjectMemory(projectId, userId, record, "ticket_closed").catch((err) =>
+          console.error("[tickets] project memory store failed", err)
+        );
+      }
     }
 
     const { error } = await supabaseAdmin

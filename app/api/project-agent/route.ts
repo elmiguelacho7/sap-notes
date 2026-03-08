@@ -7,8 +7,12 @@ import {
   ProjectNotFoundError,
 } from "@/lib/services/projectService";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { buildSapitoContext, type SapitoScope, type RetrievalDebug } from "@/lib/ai/sapitoContext";
+import { resolveGlobalContext, resolveProjectContext } from "@/lib/ai/contextResolvers";
+import { type RetrievalDebug } from "@/lib/ai/sapitoContext";
 import { classifySapIntent, shouldIncludeWorkspaceSummary } from "@/lib/ai/sapitoIntent";
+
+/** Assistant mode: global (SAP Copilot) or project (Project Copilot). Single engine, behavior by mode. */
+export type SapitoMode = "global" | "project";
 
 const NOTES_LIMIT = 30;
 const LINKS_LIMIT = 20;
@@ -29,6 +33,7 @@ export async function POST(req: Request) {
       userId?: string | null;
       sessionId?: string;
       scope?: string;
+      mode?: string;
     };
 
     const message =
@@ -57,32 +62,45 @@ export async function POST(req: Request) {
         ? body.sessionId.trim()
         : "no-session";
     const scopeParam = typeof body.scope === "string" ? body.scope : undefined;
+    const modeParam = body.mode === "global" || body.mode === "project" ? body.mode : undefined;
 
-    // Intent-first routing: classify before building context so SAP questions don't get dashboard summary.
+    // PART 1: mode = global | project (explicit or derived). Strict: project requires projectId; global never uses projectId for retrieval.
+    const mode: SapitoMode =
+      modeParam ?? (projectId != null ? "project" : "global");
+
+    if (mode === "project" && !projectId) {
+      return NextResponse.json(
+        { error: "En modo proyecto se requiere projectId." },
+        { status: 400 }
+      );
+    }
+
+    const effectiveProjectId = mode === "global" ? null : projectId;
+
     const sapIntent = classifySapIntent(message);
-
-    // Sapito Brain v1: determine scope for context (global | project | notes)
-    const scope: SapitoScope =
-      projectId != null
-        ? "project"
-        : scopeParam === "notes" || scopeParam === "global-notes"
-          ? "notes"
-          : "global";
+    const includeWorkspaceSummary = shouldIncludeWorkspaceSummary(sapIntent);
 
     let context: AgentContext;
+    let retrievalScopes: string[] = [];
 
-    if (projectId) {
+    if (mode === "project" && effectiveProjectId) {
       try {
-        const [stats, notesResult, linksResult, sapitoResult] =
+        const [stats, notesResult, linksResult, resolverResult] =
           await Promise.all([
-            getProjectStats(projectId),
-            getProjectNotes(projectId, NOTES_LIMIT),
-            getProjectLinks(projectId, LINKS_LIMIT),
-            buildSapitoContext({ scope: "project", projectId, message, sapIntent }),
+            getProjectStats(effectiveProjectId),
+            getProjectNotes(effectiveProjectId, NOTES_LIMIT),
+            getProjectLinks(effectiveProjectId, LINKS_LIMIT),
+            resolveProjectContext({
+              projectId: effectiveProjectId,
+              userId,
+              message,
+              sapIntent,
+            }),
           ]);
-        const { contextText: sapitoContextSummary, retrievalDebug } = sapitoResult;
+        const { contextText: sapitoContextSummary, retrievalDebug, retrievalScopes: scopes } = resolverResult;
+        retrievalScopes = scopes;
         context = {
-          projectId,
+          projectId: effectiveProjectId,
           stats,
           notes: notesResult.notes,
           links: linksResult.links,
@@ -100,64 +118,34 @@ export async function POST(req: Request) {
         }
         throw err;
       }
-      console.log("project-agent API hit", {
-        projectId,
-        sessionId,
-        scope,
-        mode: "project",
-      });
-    } else if (scope === "notes") {
-      const sapitoResult = await buildSapitoContext({
-        scope: "notes",
-        message,
-        sapIntent,
-      });
-      context = {
-        projectId: null,
-        stats: null,
-        notes: [],
-        links: [],
-        mode: "notes",
-        sapitoContextSummary: sapitoResult.contextText ?? "",
-        sapIntent,
-        retrievalDebug: sapitoResult.retrievalDebug ?? { chunkCount: 0, documentTitles: [], usedRetrieval: false },
-      };
-      console.log("project-agent API hit", { sessionId, scope, mode: "notes" });
     } else {
-      const sapitoResult = await buildSapitoContext({
-        scope: "global",
+      const notesVariant = scopeParam === "notes" || scopeParam === "global-notes";
+      const resolverResult = await resolveGlobalContext({
         message,
         sapIntent,
+        notesVariant,
       });
+      const { contextText: sapitoContextSummary, retrievalDebug, retrievalScopes: scopes } = resolverResult;
+      retrievalScopes = scopes;
       context = {
         projectId: null,
         stats: null,
         notes: [],
         links: [],
-        mode: "global",
-        sapitoContextSummary: sapitoResult.contextText ?? "",
+        mode: notesVariant ? "notes" : "global",
+        sapitoContextSummary: sapitoContextSummary ?? "",
         sapIntent,
-        retrievalDebug: sapitoResult.retrievalDebug ?? { chunkCount: 0, documentTitles: [], usedRetrieval: false },
+        retrievalDebug: retrievalDebug ?? { chunkCount: 0, documentTitles: [], usedRetrieval: false },
       };
-      console.log("project-agent API hit", {
-        sessionId,
-        scope,
-        mode: "global",
-      });
     }
 
-    const includeWorkspaceSummary = shouldIncludeWorkspaceSummary(context.sapIntent);
-    const retrievalUsed = (context.retrievalDebug?.usedRetrieval ?? false) === true;
-
-    console.log("[Sapito routing]", {
-      detectedIntent: context.sapIntent,
+    console.log("[Sapito mode routing]", {
+      mode,
+      userId: userId ?? null,
+      projectId: effectiveProjectId ?? null,
+      intent: sapIntent,
       workspaceContextIncluded: includeWorkspaceSummary,
-      retrievalUsed,
-      documentsMatched: context.retrievalDebug?.documentTitles?.length ?? 0,
-      ...(process.env.NODE_ENV === "development" && {
-        knowledgeChunksRetrieved: context.retrievalDebug?.chunkCount ?? 0,
-        topMatchedDocumentTitles: context.retrievalDebug?.documentTitles?.slice(0, 5) ?? [],
-      }),
+      retrievalScopes,
     });
 
     const reply = await runProjectAgent({
@@ -170,9 +158,9 @@ export async function POST(req: Request) {
       const { error: logError } = await supabaseAdmin
         .from("conversation_logs")
         .insert({
-          project_id: projectId ?? null,
+          project_id: effectiveProjectId ?? null,
           user_id: userId ?? "00000000-0000-0000-0000-000000000000",
-          mode: projectId ? "project" : "global",
+          mode: mode === "project" ? "project" : "global",
           user_message: message,
           assistant_reply: reply,
         });

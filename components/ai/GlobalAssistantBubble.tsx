@@ -44,6 +44,7 @@ export function GlobalAssistantBubble() {
           message: trimmed,
           userId,
           projectId: null,
+          mode: "global",
         }),
       });
 
@@ -86,7 +87,7 @@ export function GlobalAssistantBubble() {
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-semibold text-slate-900">Sapito</h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Asistente técnico SAP. Consultas sobre errores, transacciones y procesos.
+                  Global SAP Copilot — asistente técnico SAP. Consultas sobre errores, transacciones y procesos.
                 </p>
               </div>
               <span
@@ -102,7 +103,7 @@ export function GlobalAssistantBubble() {
                 <div className="flex justify-center mb-3">
                   <SapitoAvatar size="lg" />
                 </div>
-                <p className="text-sm font-medium text-slate-700">Soy Sapito, tu asistente técnico SAP</p>
+                <p className="text-sm font-medium text-slate-700">Soy Sapito, tu Global SAP Copilot</p>
                 <p className="mt-1 text-xs text-slate-500">
                   Puedo ayudarte con el estado de la plataforma, proyectos, notas y tickets. Elige una sugerencia o escribe.
                 </p>
@@ -196,7 +197,7 @@ export function GlobalAssistantBubble() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-white shadow-lg hover:bg-slate-800 transition-colors"
-        title="Sapito · Asistente técnico SAP"
+        title="Sapito · Global SAP Copilot"
         aria-label={open ? "Cerrar Sapito" : "Abrir Sapito"}
       >
         <SapitoAvatar size="lg" />

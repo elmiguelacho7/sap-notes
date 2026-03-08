@@ -24,7 +24,7 @@ export function ProjectAssistantDock({
           className="fixed inset-0 z-50 flex justify-end"
           aria-modal="true"
           role="dialog"
-          aria-label="Sapito del proyecto"
+          aria-label="Sapito Project Copilot"
         >
           <div
             className="absolute inset-0 bg-black/30"
@@ -36,9 +36,9 @@ export function ProjectAssistantDock({
               <div className="flex items-start gap-3 min-w-0">
                 <SapitoAvatar size="md" className="mt-0.5 shrink-0" />
                 <div className="min-w-0">
-                  <h2 className="text-sm font-semibold text-slate-900">Sapito del proyecto</h2>
+                  <h2 className="text-sm font-semibold text-slate-900">Project Copilot</h2>
                   <p className="text-xs text-slate-500 mt-1 truncate">
-                    {projectName ? `${projectName} — ` : ""}Asistente técnico con contexto del proyecto.
+                    {projectName ? `${projectName} — ` : ""}Sapito con contexto de este proyecto.
                   </p>
                 </div>
               </div>
@@ -64,11 +64,11 @@ export function ProjectAssistantDock({
           type="button"
           onClick={() => setOpen(true)}
           className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-colors"
-          title="Sapito del proyecto"
-          aria-label="Abrir Sapito del proyecto"
+          title="Project Copilot — Sapito"
+          aria-label="Abrir Project Copilot"
         >
           <SapitoAvatar size="sm" />
-          <span>Sapito del proyecto</span>
+          <span>Project Copilot</span>
         </button>
       </div>
     </>

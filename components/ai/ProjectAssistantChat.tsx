@@ -51,6 +51,7 @@ export function ProjectAssistantChat({
           projectId,
           message: trimmed,
           userId,
+          mode: "project",
         }),
       });
 
@@ -88,9 +89,9 @@ export function ProjectAssistantChat({
               <div className="flex justify-center mb-3">
                 <SapitoAvatar size="lg" />
               </div>
-              <p className="text-sm font-medium text-slate-700">Soy Sapito, tu asistente del proyecto</p>
+              <p className="text-sm font-medium text-slate-700">Soy Sapito, tu Project Copilot</p>
               <p className="mt-1 text-xs text-slate-500">
-                Pregunta por riesgos, tareas vencidas, tickets o el siguiente foco. Tengo contexto de este proyecto.
+                Asistente contextual de este proyecto. Pregunta por riesgos, tareas vencidas, tickets o el siguiente foco.
               </p>
               <p className="mt-3 text-[11px] text-slate-500">Sugerencias:</p>
               <div className="mt-3">
