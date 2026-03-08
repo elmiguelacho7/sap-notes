@@ -140,6 +140,6 @@ export async function analyzeProjectRisk(
     level,
     summary,
     signals,
-    recommendations: [...new Set(recommendations)],
+    recommendations: Array.from(new Set(recommendations)),
   };
 }
