@@ -11,7 +11,6 @@ import { StatCard } from "@/components/ui/stat/StatCard";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { FolderOpen, FileText, LayoutGrid, ArrowRight } from "lucide-react";
-
 type ProjectSummary = {
   id: string;
   name: string;
@@ -55,7 +54,7 @@ export default function DashboardPage() {
     setLoadingStats(true);
     setErrorMsg(null);
     try {
-      const [projResult, noteResult] = await Promise.all([
+      const [projResult, noteResult, sessionResult] = await Promise.all([
         supabase
           .from("projects")
           .select("id, name, status, created_at")
@@ -64,6 +63,7 @@ export default function DashboardPage() {
           .from("notes")
           .select("id, title, client, module, created_at")
           .order("created_at", { ascending: false }),
+        supabase.auth.getSession(),
       ]);
 
       let projects: ProjectSummary[] = [];
@@ -83,25 +83,38 @@ export default function DashboardPage() {
         notes = (noteResult.data ?? []) as NoteSummary[];
       }
 
-      const openProjects = projects.filter((p) => {
-        if (!p.status) return true;
-        const s = p.status.toLowerCase();
-        return !s.includes("cerrado") && !s.includes("closed");
-      });
-
-      const hoy = new Date().toDateString();
-      const todayNotes = notes.filter(
-        (n) => new Date(n.created_at).toDateString() === hoy
-      );
-
       setRecentProjects(projects.slice(0, RECENT_COUNT));
       setRecentNotes(notes.slice(0, RECENT_COUNT));
-      setStats({
-        totalProjects: projects.length,
-        openProjects: openProjects.length,
-        totalNotes: notes.length,
-        todayNotes: todayNotes.length,
-      });
+
+      const token = sessionResult.data?.session?.access_token;
+      if (token) {
+        try {
+          const res = await fetch("/api/metrics/platform", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const data = (await res.json()) as {
+              projects_total?: number;
+              projects_active?: number;
+              notes_total?: number;
+              notes_today?: number;
+              tickets_open?: number;
+            };
+            setStats({
+              totalProjects: data.projects_total ?? 0,
+              openProjects: data.projects_active ?? 0,
+              totalNotes: data.notes_total ?? 0,
+              todayNotes: data.notes_today ?? 0,
+            });
+          } else {
+            computeStatsFromLists(projects, notes);
+          }
+        } catch {
+          computeStatsFromLists(projects, notes);
+        }
+      } else {
+        computeStatsFromLists(projects, notes);
+      }
     } catch (e) {
       handleSupabaseError("dashboard loadData", e);
       setErrorMsg("No se pudieron cargar los datos del dashboard.");
@@ -109,6 +122,24 @@ export default function DashboardPage() {
       setLoadingStats(false);
     }
   };
+
+  function computeStatsFromLists(projects: ProjectSummary[], notes: NoteSummary[]) {
+    const openProjects = projects.filter((p) => {
+      if (!p.status) return true;
+      const s = p.status.toLowerCase();
+      return !s.includes("cerrado") && !s.includes("closed");
+    });
+    const hoy = new Date().toDateString();
+    const todayNotes = notes.filter(
+      (n) => new Date(n.created_at).toDateString() === hoy
+    );
+    setStats({
+      totalProjects: projects.length,
+      openProjects: openProjects.length,
+      totalNotes: notes.length,
+      todayNotes: todayNotes.length,
+    });
+  }
 
   useEffect(() => {
     void loadData();

@@ -53,6 +53,7 @@ export async function buildSapitoContext(
     message: message ?? "",
     sapIntent,
     notesVariant,
+    userId: userId ?? undefined,
   });
   return { contextText: result.contextText, retrievalDebug: result.retrievalDebug };
 }

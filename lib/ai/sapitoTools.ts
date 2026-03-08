@@ -1,10 +1,12 @@
 /**
  * Sapito Brain v1 — server-side tools that query Supabase for structured context.
  * Used by the context builder to feed the assistant with platform, project, and notes data.
+ * Platform stats: use getPlatformMetrics(userId) from @/lib/metrics/platformMetrics for user-scoped counts (single source of truth).
  * All functions are defensive: on failure they return safe defaults and log; they do not throw to callers.
  */
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getPlatformMetrics } from "@/lib/metrics/platformMetrics";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -40,64 +42,28 @@ export type NotesInsights = {
 };
 
 // ==========================
-// getPlatformStats
+// getPlatformStats (delegates to getPlatformMetrics for user-scoped single source of truth)
 // ==========================
 
 /**
- * Returns a compact global platform summary.
- * Uses: projects (status for active), notes (deleted_at null), tickets (open = not closed).
+ * Returns a compact global platform summary scoped to the user.
+ * Uses getPlatformMetrics(userId) so counts match dashboard and tenant isolation.
+ * When userId is null, returns zeros (no cross-tenant data).
  */
-export async function getPlatformStats(): Promise<PlatformStats> {
-  const fallback: PlatformStats = {
-    totalProjects: 0,
-    activeProjects: 0,
-    totalNotes: 0,
-    notesToday: 0,
-    openTickets: 0,
+export async function getPlatformStats(userId: string | null): Promise<PlatformStats> {
+  const metrics = await getPlatformMetrics(userId);
+  return {
+    totalProjects: metrics.projects_total,
+    activeProjects: metrics.projects_active,
+    totalNotes: metrics.notes_total,
+    notesToday: metrics.notes_today,
+    openTickets: metrics.tickets_open,
   };
+}
 
-  try {
-    const [projectsRes, notesTotalRes, notesTodayRes, ticketsRes] =
-      await Promise.all([
-        supabaseAdmin
-          .from("projects")
-          .select("id, status", { count: "exact", head: false }),
-        supabaseAdmin
-          .from("notes")
-          .select("id", { count: "exact", head: true })
-          .is("deleted_at", null),
-        supabaseAdmin
-          .from("notes")
-          .select("id", { count: "exact", head: true })
-          .is("deleted_at", null)
-          .gte("created_at", `${todayIso()}T00:00:00.000Z`),
-        supabaseAdmin
-          .from("tickets")
-          .select("id", { count: "exact", head: true })
-          .neq("status", "closed"),
-      ]);
-
-    const totalProjects = projectsRes.data?.length ?? 0;
-    const activeProjects =
-      projectsRes.data?.filter(
-        (p: { status?: string }) =>
-          p?.status === "planned" || p?.status === "in_progress"
-      ).length ?? 0;
-    const totalNotes = notesTotalRes.count ?? 0;
-    const notesToday = notesTodayRes.count ?? 0;
-    const openTickets = ticketsRes.count ?? 0;
-
-    return {
-      totalProjects,
-      activeProjects,
-      totalNotes,
-      notesToday,
-      openTickets,
-    };
-  } catch (err) {
-    console.error("[sapitoTools] getPlatformStats error", err);
-    return fallback;
-  }
+/** @deprecated Use getPlatformStats(userId) for user-scoped metrics. Kept for backward compat; calls getPlatformMetrics(null) which returns zeros. */
+export async function getPlatformStatsUnscoped(): Promise<PlatformStats> {
+  return getPlatformStats(null);
 }
 
 // ==========================

@@ -6,7 +6,7 @@ import { SapitoAvatar } from "./SapitoAvatar";
 import { AssistantSuggestionChips } from "./AssistantSuggestionChips";
 import { AssistantMessageContent } from "./AssistantMessageContent";
 
-type ChatMessage = { role: "user" | "assistant"; content: string; grounded?: boolean };
+type ChatMessage = { role: "user" | "assistant"; content: string; grounded?: boolean; groundingLabel?: string };
 
 const AGENT_URL = "/api/project-agent";
 
@@ -62,11 +62,16 @@ export function ProjectAssistantChat({
         return;
       }
 
-      const data = (await res.json()) as { reply?: string; grounded?: boolean };
+      const data = (await res.json()) as { reply?: string; grounded?: boolean; groundingLabel?: string };
       const reply = typeof data?.reply === "string"
         ? data.reply
         : "No he podido obtener una respuesta de Sapito ahora mismo.";
-      setMessages((prev) => [...prev, { role: "assistant", content: reply, grounded: data?.grounded === true }]);
+      setMessages((prev) => [...prev, {
+        role: "assistant",
+        content: reply,
+        grounded: data?.grounded === true,
+        groundingLabel: typeof data?.groundingLabel === "string" ? data.groundingLabel : undefined,
+      }]);
     } catch (err) {
       console.error("Project agent request failed", err);
       setError("No se pudo obtener respuesta de la IA. Inténtalo de nuevo.");
@@ -126,14 +131,9 @@ export function ProjectAssistantChat({
                         : "bg-white text-slate-800 border border-slate-200/80 shadow-sm"
                     }`}
                   >
-                    {msg.role === "assistant" && msg.grounded === true && (
+                    {msg.role === "assistant" && (msg.groundingLabel || msg.grounded !== undefined) && (
                       <p className="text-[11px] text-slate-500 mb-2.5 pb-2 border-b border-slate-100 font-medium">
-                        Según la documentación sincronizada
-                      </p>
-                    )}
-                    {msg.role === "assistant" && msg.grounded === false && (
-                      <p className="text-[11px] text-slate-400 mb-2.5 pb-2 border-b border-slate-100">
-                        Respuesta general (sin documentación indexada)
+                        {msg.groundingLabel ?? (msg.grounded === true ? "Según la documentación sincronizada" : "Respuesta general (sin documentación indexada)")}
                       </p>
                     )}
                     {msg.role === "assistant" ? (

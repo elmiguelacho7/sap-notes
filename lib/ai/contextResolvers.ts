@@ -11,6 +11,7 @@ import {
   type ProjectOverview,
   type NotesInsights,
 } from "@/lib/ai/sapitoTools";
+import { getProjectMetrics } from "@/lib/metrics/platformMetrics";
 import {
   searchMultiTenantKnowledge,
   searchProjectMemory,
@@ -129,6 +130,8 @@ export type GlobalResolverParams = {
   sapIntent?: SapIntentCategory;
   /** When true, include notes insights instead of platform stats for workspace summary (e.g. notes page). */
   notesVariant?: boolean;
+  /** User id for scoped platform metrics (required for counts to match dashboard). */
+  userId?: string | null;
 };
 
 /**
@@ -139,7 +142,7 @@ export type GlobalResolverParams = {
 export async function resolveGlobalContext(
   params: GlobalResolverParams
 ): Promise<ResolverResult> {
-  const { message, sapIntent, notesVariant } = params;
+  const { message, sapIntent, notesVariant, userId } = params;
   const sections: string[] = [];
   const retrievalScopes: string[] = [];
   let retrievalDebug: RetrievalDebug = { chunkCount: 0, documentTitles: [], usedRetrieval: false };
@@ -151,7 +154,7 @@ export async function resolveGlobalContext(
       sections.push(formatNotesSummary(insights));
       retrievalScopes.push("notes_insights");
     } else {
-      const stats = await getPlatformStats();
+      const stats = await getPlatformStats(userId ?? null);
       sections.push(formatPlatformSummary(stats));
       retrievalScopes.push("platform_summary");
     }
@@ -247,9 +250,26 @@ export async function resolveProjectContext(
 
   const includeSummary = shouldIncludeWorkspaceSummary(sapIntent);
   if (includeSummary) {
-    const overview = await getProjectOverview(projectId);
-    sections.push(formatProjectSummary(overview));
-    retrievalScopes.push("project_summary");
+    const metrics = await getProjectMetrics(projectId, userId);
+    if (metrics) {
+      const overview: ProjectOverview = {
+        projectId: metrics.projectId,
+        projectName: metrics.projectName,
+        openTasks: metrics.openTasks,
+        overdueTasks: metrics.overdueTasks,
+        blockedTasks: metrics.blockedTasks,
+        openTickets: metrics.openTickets,
+        highPriorityTickets: metrics.highPriorityTickets,
+        overdueActivities: metrics.overdueActivities,
+        upcomingActivities: metrics.upcomingActivities,
+      };
+      sections.push(formatProjectSummary(overview));
+      retrievalScopes.push("project_summary");
+    } else {
+      const overview = await getProjectOverview(projectId);
+      sections.push(formatProjectSummary(overview));
+      retrievalScopes.push("project_summary");
+    }
   }
 
   const searchQuery = normalizeQueryForSap(message) || (message ?? "").trim();
