@@ -87,22 +87,26 @@ export default function PrivateLayout({
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) {
+    supabase.auth.getUser().then(async ({ data: { user }, error: userError }) => {
+      if (userError || !user?.id) {
         router.replace("/");
         return;
       }
-      const userId = session.user?.id;
-      if (userId) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("app_role")
-          .eq("id", userId)
-          .single();
-        const role = (profile as { app_role?: string } | null)?.app_role;
-        if (role === "superadmin" || role === "consultant") {
-          setAppRole(role as AppRole);
-        }
+      const userId = user.id;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("app_role, is_active")
+        .eq("id", userId)
+        .single();
+      const row = profile as { app_role?: string; is_active?: boolean } | null;
+      // No profile or explicitly inactive => cannot access private app
+      if (!row || row.is_active === false) {
+        router.replace("/pending-activation");
+        return;
+      }
+      const role = row.app_role;
+      if (role === "superadmin" || role === "consultant") {
+        setAppRole(role as AppRole);
       }
       setIsReady(true);
     });
@@ -112,7 +116,25 @@ export default function PrivateLayout({
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
         router.replace("/");
+        return;
       }
+      // Re-validate is_active on any auth change (e.g. after email confirmation) so we never show private content to inactive users
+      const userId = session.user?.id;
+      if (!userId) {
+        router.replace("/");
+        return;
+      }
+      supabase
+        .from("profiles")
+        .select("is_active")
+        .eq("id", userId)
+        .single()
+        .then(({ data: profile }) => {
+          const row = profile as { is_active?: boolean } | null;
+          if (!row || row.is_active === false) {
+            router.replace("/pending-activation");
+          }
+        });
     });
 
     return () => subscription.unsubscribe();

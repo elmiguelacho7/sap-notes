@@ -13,6 +13,7 @@ export type UserWithRole = {
   email?: string | null;
   full_name?: string | null;
   app_role: string;
+  is_active: boolean;
 };
 
 export type ProjectMemberRow = {
@@ -103,12 +104,17 @@ export async function createAdminUser(
 
   const userId = authUser.user.id;
 
+  if (process.env.NODE_ENV === "development") {
+    console.debug("[createAdminUser] Upserting profile with is_active = true (admin-created user).");
+  }
+
   await supabaseAdmin.from("profiles").upsert(
     {
       id: userId,
       email,
       full_name: fullName,
       app_role: appRole,
+      is_active: true,
     },
     { onConflict: "id" }
   );
@@ -127,7 +133,7 @@ export async function createAdminUser(
 export async function getAllUsersWithRoles(): Promise<UserWithRole[]> {
   const { data: profiles, error: profilesError } = await supabaseAdmin
     .from("profiles")
-    .select("id, full_name, email, app_role")
+    .select("id, full_name, email, app_role, is_active")
     .order("id", { ascending: true });
 
   if (profilesError) {
@@ -141,6 +147,7 @@ export async function getAllUsersWithRoles(): Promise<UserWithRole[]> {
     full_name: string | null;
     email: string | null;
     app_role: string;
+    is_active: boolean;
   }[];
 
   // Prefer email from profiles; optionally enrich from Auth when available
@@ -156,6 +163,7 @@ export async function getAllUsersWithRoles(): Promise<UserWithRole[]> {
       email: emailById.get(p.id) ?? p.email ?? null,
       full_name: p.full_name ?? null,
       app_role: p.app_role,
+      is_active: p.is_active === true,
     }));
   } catch {
     return list.map((p) => ({
@@ -163,7 +171,28 @@ export async function getAllUsersWithRoles(): Promise<UserWithRole[]> {
       email: p.email ?? null,
       full_name: p.full_name ?? null,
       app_role: p.app_role,
+      is_active: p.is_active === true,
     }));
+  }
+}
+
+// ==========================
+// setUserActivation
+// ==========================
+
+export async function setUserActivation(
+  userId: string,
+  isActive: boolean
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("profiles")
+    .update({ is_active: isActive })
+    .eq("id", userId);
+
+  if (error) {
+    throw new Error(
+      `Failed to update user activation: ${error.message}`
+    );
   }
 }
 
@@ -441,4 +470,122 @@ export async function generateMagicLinkForInvite(
   }
 
   return link;
+}
+
+// ==========================
+// User deletion (safe: only when no transactional data)
+// ==========================
+
+/** Result of eligibility check for physical user deletion. */
+export type UserDeletionEligibility = {
+  allowed: boolean;
+  reason?: string;
+};
+
+/**
+ * Checks whether a user can be physically deleted.
+ * Deletion is blocked if the user has any transactional data (notes, tickets, tasks, etc.).
+ * project_members and project_invitations are not considered blocking; they are cleaned up during deletion.
+ */
+export async function canDeleteUser(userId: string): Promise<UserDeletionEligibility> {
+  if (!userId?.trim()) {
+    return { allowed: false, reason: "User id is required." };
+  }
+
+  const tablesToCheck: { table: string; column: string }[] = [
+    { table: "conversation_logs", column: "user_id" },
+    { table: "project_tasks", column: "assignee_profile_id" },
+    { table: "project_activities", column: "owner_profile_id" },
+    { table: "knowledge_sources", column: "created_by" },
+    { table: "knowledge_documents", column: "user_id" },
+    { table: "external_integrations", column: "owner_profile_id" },
+    { table: "projects", column: "created_by" },
+    { table: "knowledge_spaces", column: "owner_profile_id" },
+    { table: "knowledge_pages", column: "owner_profile_id" },
+  ];
+
+  for (const { table, column } of tablesToCheck) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from(table as "profiles")
+        .select("id")
+        .eq(column as "id", userId)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        if (error.code === "PGRST116" || error.message?.includes("column") || error.message?.includes("does not exist")) {
+          continue;
+        }
+        throw new Error(`${table}.${column}: ${error.message}`);
+      }
+      if (data) {
+        return {
+          allowed: false,
+          reason: "user_has_transactional_data",
+        };
+      }
+    } catch (err) {
+      if (err instanceof Error && (err.message.includes("column") || err.message.includes("does not exist"))) {
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  const optionalChecks: { table: string; column: string }[] = [
+    { table: "notes", column: "created_by" },
+    { table: "tickets", column: "created_by" },
+    { table: "tasks", column: "created_by" },
+  ];
+  for (const { table, column } of optionalChecks) {
+    try {
+      const { data } = await supabaseAdmin
+        .from(table as "profiles")
+        .select("id")
+        .eq(column as "id", userId)
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        return { allowed: false, reason: "user_has_transactional_data" };
+      }
+    } catch {
+      // Column or table may not exist; skip
+    }
+  }
+
+  return { allowed: true };
+}
+
+/**
+ * Physically deletes a user after eligibility has been confirmed.
+ * Cleans up project_members and project_invitations references, then deletes profile and auth user.
+ */
+export async function deleteUser(userId: string): Promise<void> {
+  if (!userId?.trim()) {
+    throw new Error("User id is required.");
+  }
+
+  const eligibility = await canDeleteUser(userId);
+  if (!eligibility.allowed) {
+    throw new Error(
+      eligibility.reason === "user_has_transactional_data"
+        ? "User has transactional data and cannot be deleted."
+        : eligibility.reason ?? "User cannot be deleted."
+    );
+  }
+
+  await supabaseAdmin.from("project_members").delete().eq("user_id", userId);
+  await supabaseAdmin.from("project_invitations").update({ invited_by: null }).eq("invited_by", userId);
+  await supabaseAdmin.from("project_invitations").update({ accepted_by: null }).eq("accepted_by", userId);
+
+  const { error: profileError } = await supabaseAdmin.from("profiles").delete().eq("id", userId);
+  if (profileError) {
+    throw new Error(`Failed to delete profile: ${profileError.message}`);
+  }
+
+  const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+  if (authError) {
+    throw new Error(`Failed to delete auth user: ${authError.message}`);
+  }
 }

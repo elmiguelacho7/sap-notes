@@ -2,6 +2,7 @@
 
 import { Suspense, useState, type FormEvent, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "../lib/supabaseClient";
 
 function LoginPageContent() {
@@ -13,15 +14,34 @@ function LoginPageContent() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Si ya hay sesión, mandamos directo al dashboard o a la URL solicitada
+  // Si ya hay sesión, comprobar activación antes de redirigir: solo permitir acceso privado si is_active = true
   useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        router.replace(nextUrl && nextUrl.startsWith("/") ? nextUrl : "/dashboard");
+    const checkSessionAndActivation = async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData.session;
+      if (!session?.user?.id) return;
+
+      // Use getUser() so identity is validated with the server, not just from storage
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_active")
+        .eq("id", userId)
+        .single();
+
+      const row = profile as { is_active?: boolean } | null;
+      // Inactivo o sin perfil => no permitir acceso privado; enviar a pendiente de activación
+      if (!row || row.is_active === false) {
+        router.replace("/pending-activation");
+        return;
       }
+
+      router.replace(nextUrl && nextUrl.startsWith("/") ? nextUrl : "/dashboard");
     };
-    checkSession();
+    checkSessionAndActivation();
   }, [router, nextUrl]);
 
   const handleLogin = async (e: FormEvent) => {
@@ -29,7 +49,7 @@ function LoginPageContent() {
     setErrorMsg(null);
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -40,7 +60,24 @@ function LoginPageContent() {
       return;
     }
 
+    // After login, enforce activation: do not send to private app if profile is inactive
+    const userId = data.user?.id;
+    if (userId) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_active")
+        .eq("id", userId)
+        .single();
+      const row = profile as { is_active?: boolean } | null;
+      if (!row || row.is_active === false) {
+        router.replace("/pending-activation");
+        setLoading(false);
+        return;
+      }
+    }
+
     router.push(nextUrl && nextUrl.startsWith("/") ? nextUrl : "/dashboard");
+    setLoading(false);
   };
 
   return (
@@ -120,6 +157,14 @@ function LoginPageContent() {
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
                 />
+                <p className="text-right">
+                  <Link
+                    href="/forgot-password"
+                    className="text-xs text-blue-600 hover:text-blue-700"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </Link>
+                </p>
               </div>
 
               {errorMsg && (
@@ -133,6 +178,13 @@ function LoginPageContent() {
               >
                 {loading ? "Validando..." : "Acceder"}
               </button>
+
+              <p className="text-center text-xs text-slate-500 pt-1">
+                ¿No tienes cuenta?{" "}
+                <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
+                  Crear cuenta
+                </Link>
+              </p>
             </form>
           </div>
 
