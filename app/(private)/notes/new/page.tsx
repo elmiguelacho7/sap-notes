@@ -49,6 +49,7 @@ export default function NewNotePage() {
   const searchParams = useSearchParams();
   const fromQuick = searchParams?.get("from") === "quick";
   const projectIdFromQuery = searchParams?.get("projectId") ?? "";
+  const isProjectMode = projectIdFromQuery.trim().length > 0;
 
   const [showCreandoBanner, setShowCreandoBanner] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -176,11 +177,45 @@ export default function NewNotePage() {
     setSaving(true);
 
     try {
-      const selectedClient = clients.find((c) => c.id === clientId) || null;
       const selectedModule = modules.find((m) => m.id === moduleId) || null;
       const selectedScopeItem =
         scopeItems.find((s) => s.id === scopeItemId) || null;
 
+      if (projectIdFromQuery.trim()) {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) headers.Authorization = `Bearer ${token}`;
+
+        const res = await fetch(`/api/projects/${projectIdFromQuery.trim()}/notes`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            title: title.trim(),
+            body: body.trim() || null,
+            module: selectedModule ? `${selectedModule.code} - ${selectedModule.name}` : null,
+            scope_items: selectedScopeItem
+              ? [`${selectedScopeItem.code} - ${selectedScopeItem.name}`]
+              : [],
+            error_code: errorCode.trim() || null,
+            web_link_1: webLink1.trim() || null,
+            web_link_2: webLink2.trim() || null,
+            extra_info: extraInfo.trim() || null,
+            is_knowledge_base: false,
+          }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setErrorMsg((data as { error?: string; details?: string }).error ?? (data as { details?: string }).details ?? "No se pudo crear la nota.");
+          setSaving(false);
+          return;
+        }
+        router.push(`/projects/${projectIdFromQuery.trim()}/notes`);
+        return;
+      }
+
+      const selectedClient = clients.find((c) => c.id === clientId) || null;
       const payload = {
         title: title.trim(),
         body: body.trim() || null,
@@ -212,9 +247,13 @@ export default function NewNotePage() {
         web_link_2: webLink2.trim() || null,
         extra_info: extraInfo.trim() || null,
 
-        // Nota general: sin proyecto asociado
+        // Nota general: sin proyecto asociado; created_by para ownership (RLS)
         project_id: null,
+        created_by: null, // set below from session
       };
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.id) (payload as Record<string, unknown>).created_by = user.id;
 
       const { error } = await supabase.from("notes").insert([payload]);
 
@@ -249,9 +288,9 @@ export default function NewNotePage() {
           Nueva nota
         </h1>
         <p className="mt-1 text-sm text-slate-600 max-w-2xl">
-          Registra una nueva nota de implementación, incidencia o decisión.
-          Esta nota será general (no ligada a un proyecto concreto) para
-          que puedas reutilizarla en futuros clientes y proyectos.
+          {projectIdFromQuery.trim()
+            ? "Crea una nota asociada al proyecto actual. Se guardará en la pestaña Notas del proyecto."
+            : "Registra una nueva nota de implementación, incidencia o decisión. Esta nota será general (no ligada a un proyecto concreto) para que puedas reutilizarla en futuros clientes y proyectos."}
         </p>
 
         <div className="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-7">
@@ -291,7 +330,8 @@ export default function NewNotePage() {
               />
             </div>
 
-            {/* TIPO DE NOTA Y SISTEMA */}
+            {/* TIPO DE NOTA Y SISTEMA (solo modo global) */}
+            {!isProjectMode && (
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
@@ -328,8 +368,10 @@ export default function NewNotePage() {
                 </select>
               </div>
             </div>
+            )}
 
-            {/* CLIENTE */}
+            {/* CLIENTE (solo modo global) */}
+            {!isProjectMode && (
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 Cliente (opcional)
@@ -348,6 +390,7 @@ export default function NewNotePage() {
                 ))}
               </select>
             </div>
+            )}
 
             {/* MÓDULO Y SCOPE ITEM */}
             <div className="grid gap-4 md:grid-cols-2">
@@ -391,8 +434,9 @@ export default function NewNotePage() {
               </div>
             </div>
 
-            {/* TRANSACCIÓN Y CÓDIGO DE ERROR */}
+            {/* TRANSACCIÓN Y CÓDIGO DE ERROR: en proyecto solo código de error */}
             <div className="grid gap-4 md:grid-cols-2">
+              {!isProjectMode && (
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
                   Transacción / App (opcional)
@@ -405,7 +449,7 @@ export default function NewNotePage() {
                   className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
                 />
               </div>
-
+              )}
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
                   Código de error (opcional)
@@ -471,7 +515,7 @@ export default function NewNotePage() {
             <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
               <button
                 type="button"
-                onClick={() => router.push("/notes")}
+                onClick={() => router.push(projectIdFromQuery.trim() ? `/projects/${projectIdFromQuery.trim()}/notes` : "/notes")}
                 className="text-sm text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-100"
               >
                 Cancelar

@@ -58,12 +58,11 @@ function buildBreadcrumbs(pathname: string): BreadcrumbItem[] {
   return items;
 }
 
-/** Standard (narrow) workspace: account, admin, update-password. Wide for all other private pages. */
+/** Standard (narrow) workspace: account, admin. Wide for all other private pages. */
 function isWideWorkspacePage(pathname: string): boolean {
   if (!pathname) return true;
   if (pathname === "/account") return false;
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return false;
-  if (pathname === "/update-password") return false;
   return true;
 }
 

@@ -9,6 +9,7 @@ function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextUrl = searchParams.get("next");
+  const resetSuccess = searchParams.get("reset") === "success";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -129,6 +130,12 @@ function LoginPageContent() {
             <p className="text-xs text-slate-500 mb-6">
               Introduce tus credenciales para acceder al espacio interno.
             </p>
+
+            {resetSuccess && (
+              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                Contraseña restablecida correctamente. Inicia sesión con tu nueva contraseña.
+              </div>
+            )}
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-1.5">

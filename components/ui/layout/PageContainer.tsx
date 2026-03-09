@@ -2,7 +2,7 @@
  * Wraps all page content. Design system v1.
  * Two variants:
  * - Wide workspace: max-w-[1600px], used for dashboard, my-work, projects, knowledge, notes, search, project workspace.
- * - Standard workspace: max-w-7xl, used for account, admin, update-password.
+ * - Standard workspace: max-w-7xl, used for account, admin.
  */
 import type { ReactNode } from "react";
 

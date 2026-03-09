@@ -336,15 +336,15 @@ export default function TasksBoard({
             .eq("is_active", true)
             .order("order_index", { ascending: true }),
           (() => {
+            // General board = only tasks with project_id IS NULL. Project board = tasks for that project.
+            const isGeneralBoard = projectId === null || projectId === undefined || projectId === "";
             let query = supabase.from("tasks").select("*").order("created_at", {
               ascending: true,
             });
 
-            if (projectId === null) {
-              // Tablero general → solo tareas sin proyecto
+            if (isGeneralBoard) {
               query = query.is("project_id", null);
-            } else if (projectId) {
-              // Tablero de un proyecto concreto
+            } else {
               query = query.eq("project_id", projectId);
             }
 
@@ -542,17 +542,22 @@ export default function TasksBoard({
     setCreating(true);
     setError(null);
 
+    const isGeneralBoard = projectId === undefined || projectId === null || projectId === "";
+    const { data: { user } } = await supabase.auth.getUser();
+    const insertPayload: Record<string, unknown> = {
+      title: newTitle.trim(),
+      description: newDescription.trim() || null,
+      priority: newPriority,
+      due_date: newDueDate ? newDueDate : null,
+      external_ref: newExternalRef.trim() || null,
+      status_id: defaultStatusId,
+      project_id: isGeneralBoard ? null : projectId,
+    };
+    if (isGeneralBoard && user?.id) insertPayload.created_by = user.id;
+
     const { data, error: insertError } = await supabase
       .from("tasks")
-      .insert({
-        title: newTitle.trim(),
-        description: newDescription.trim() || null,
-        priority: newPriority,
-        due_date: newDueDate ? newDueDate : null,
-        external_ref: newExternalRef.trim() || null,
-        status_id: defaultStatusId,
-        project_id: projectId ?? null,
-      })
+      .insert(insertPayload)
       .select("*")
       .single();
 
