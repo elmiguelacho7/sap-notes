@@ -62,6 +62,7 @@ export default function DashboardPage() {
         supabase
           .from("notes")
           .select("id, title, client, module, created_at")
+          .is("deleted_at", null)
           .order("created_at", { ascending: false }),
         supabase.auth.getSession(),
       ]);
@@ -107,13 +108,13 @@ export default function DashboardPage() {
               todayNotes: data.notes_today ?? 0,
             });
           } else {
-            computeStatsFromLists(projects, notes);
+            setStats({ totalProjects: 0, openProjects: 0, totalNotes: 0, todayNotes: 0 });
           }
         } catch {
-          computeStatsFromLists(projects, notes);
+          setStats({ totalProjects: 0, openProjects: 0, totalNotes: 0, todayNotes: 0 });
         }
       } else {
-        computeStatsFromLists(projects, notes);
+        setStats({ totalProjects: 0, openProjects: 0, totalNotes: 0, todayNotes: 0 });
       }
     } catch (e) {
       handleSupabaseError("dashboard loadData", e);
@@ -122,24 +123,6 @@ export default function DashboardPage() {
       setLoadingStats(false);
     }
   };
-
-  function computeStatsFromLists(projects: ProjectSummary[], notes: NoteSummary[]) {
-    const openProjects = projects.filter((p) => {
-      if (!p.status) return true;
-      const s = p.status.toLowerCase();
-      return !s.includes("cerrado") && !s.includes("closed");
-    });
-    const hoy = new Date().toDateString();
-    const todayNotes = notes.filter(
-      (n) => new Date(n.created_at).toDateString() === hoy
-    );
-    setStats({
-      totalProjects: projects.length,
-      openProjects: openProjects.length,
-      totalNotes: notes.length,
-      todayNotes: todayNotes.length,
-    });
-  }
 
   useEffect(() => {
     void loadData();

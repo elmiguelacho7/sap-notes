@@ -17,6 +17,7 @@ import {
   ChevronRight,
   LogOut,
   Briefcase,
+  Building2,
 } from "lucide-react";
 
 const ICON_CLASS = "h-[18px] w-[18px] shrink-0";
@@ -54,6 +55,7 @@ const SIDEBAR_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: "SYSTEM",
     items: [
+      { label: "Clients", href: "/clients", icon: Building2, roles: ["superadmin"] },
       { label: "Admin", href: "/admin", icon: ShieldCheck, roles: ["superadmin"] },
       { label: "Settings", href: "/account", icon: Settings },
     ],
@@ -112,6 +114,7 @@ export function Sidebar({
   const isActive = (path: string, itemLabel?: string) => {
     if (path === "/admin") return pathname === "/admin";
     if (path === "/account") return pathname === "/account";
+    if (path === "/clients") return pathname === "/clients";
     if (path === "/my-work") return pathname === "/my-work";
     if (path === "/knowledge/search") return pathname === "/knowledge/search";
     if (path === "/knowledge")

@@ -10,6 +10,10 @@ import {
   extractKnowledgeFromNote,
   storeProjectMemory,
 } from "@/lib/ai/projectMemory";
+import {
+  extractProjectMemoryFromNote,
+  storeExtractedProjectMemory,
+} from "@/lib/ai/projectMemoryExtractor";
 
 export type { NoteSummary } from "@/lib/services/projectService";
 
@@ -151,6 +155,23 @@ export async function POST(req: Request, { params }: RouteParams) {
       storeProjectMemory(projectId, userId ?? null, record, "project_note").catch((err) =>
         console.error("[notes] project memory store failed", err)
       );
+    }
+
+    const noteText = [payload.title, payload.body].filter(Boolean).join("\n\n");
+    if (noteText.trim().length >= 10) {
+      const noteId = result.note?.id ?? null;
+      extractProjectMemoryFromNote(noteText)
+        .then((items) => {
+          if (items.length > 0) {
+            return storeExtractedProjectMemory(
+              projectId,
+              "project_note",
+              noteId,
+              items
+            );
+          }
+        })
+        .catch((err) => console.error("[notes] project memory extraction failed", err));
     }
 
     return NextResponse.json(result, { status: 201 });

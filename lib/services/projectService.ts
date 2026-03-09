@@ -297,6 +297,42 @@ export async function getProjectKnowledgeNotes(
   return { projectId, notes };
 }
 
+// ==========================
+// Project memory (Brain)
+// ==========================
+
+export type ProjectMemoryRow = {
+  id: string;
+  project_id: string;
+  memory_type: string;
+  title: string | null;
+  summary: string;
+  source_type: string;
+  source_id: string | null;
+  created_at: string;
+};
+
+const BRAIN_MEMORY_LIMIT = 200;
+
+export async function getProjectMemory(
+  projectId: string,
+  limit: number = BRAIN_MEMORY_LIMIT
+): Promise<{ projectId: string; memories: ProjectMemoryRow[] }> {
+  await ensureProjectExists(projectId);
+
+  const { data, error } = await supabaseAdmin
+    .from("project_memory")
+    .select("id, project_id, memory_type, title, summary, source_type, source_id, created_at")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false })
+    .limit(Math.min(Math.max(1, limit), BRAIN_MEMORY_LIMIT));
+
+  if (error) throw error;
+
+  const memories = (data ?? []) as ProjectMemoryRow[];
+  return { projectId, memories };
+}
+
 export async function createProjectNote(
   projectId: string,
   payload: CreateNotePayload

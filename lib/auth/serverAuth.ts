@@ -47,6 +47,23 @@ export async function getCurrentUserId(_request?: NextRequest): Promise<string |
 }
 
 /**
+ * Returns the current user's access token (JWT) from the request, using either:
+ * - Authorization: Bearer <jwt> header, or
+ * - Cookie-based session (getSession).
+ * Use when you need to call Supabase as the user so RLS applies (e.g. search_knowledge).
+ */
+export async function getAccessTokenFromRequest(request: Request): Promise<string | null> {
+  const authHeader = request.headers.get("authorization");
+  const token = authHeader?.replace(/^Bearer\s+/i, "").trim();
+  if (token) return token;
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
+}
+
+/**
  * Returns the current user's id from the request, using either:
  * - Authorization: Bearer <jwt> header (when session is in localStorage and client sends token), or
  * - Cookies (when using @supabase/ssr cookie-based session).

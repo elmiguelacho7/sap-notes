@@ -18,7 +18,7 @@ async function getAdminAuthHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-type TabId = "users" | "projects" | "clients" | "knowledge";
+type TabId = "users" | "activations" | "knowledge";
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -40,11 +40,17 @@ export default function AdminPage() {
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("app_role")
+          .select("app_role, is_active")
           .eq("id", user.id)
           .single();
 
         if (cancelled) return;
+        const row = profile as { app_role?: string; is_active?: boolean } | null;
+        if (!row || row.is_active !== true) {
+          setAppRole(null);
+          setLoading(false);
+          return;
+        }
         setAppRole((profile as { app_role?: string } | null)?.app_role ?? null);
       } catch {
         if (!cancelled) setAppRole(null);
@@ -91,50 +97,39 @@ function AdminPanel() {
 
   return (
     <PageShell wide={false}>
-      <div className="space-y-8">
-      <PageHeader
-        title="Panel de administración"
-        description="Gestiona usuarios, roles y acceso a proyectos."
-      />
+      <div className="space-y-6">
+        <PageHeader
+          title="Administración de la plataforma"
+          description="Usuarios, activaciones, roles globales y fuentes de conocimiento."
+        />
 
-        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 text-sm">
+        <div className="inline-flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1.5 text-sm">
           <button
             type="button"
             onClick={() => setActiveTab("users")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
               activeTab === "users"
                 ? "bg-white text-slate-900 shadow-sm"
                 : "text-slate-500 hover:text-slate-900"
             }`}
           >
-            Usuarios y roles
+            Usuarios
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("projects")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              activeTab === "projects"
+            onClick={() => setActiveTab("activations")}
+            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === "activations"
                 ? "bg-white text-slate-900 shadow-sm"
                 : "text-slate-500 hover:text-slate-900"
             }`}
           >
-            Acceso a proyectos
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("clients")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              activeTab === "clients"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-900"
-            }`}
-          >
-            Clientes
+            Activaciones
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("knowledge")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
               activeTab === "knowledge"
                 ? "bg-white text-slate-900 shadow-sm"
                 : "text-slate-500 hover:text-slate-900"
@@ -144,18 +139,79 @@ function AdminPanel() {
           </button>
           <a
             href="/admin/roles"
-            className="px-3 py-1.5 rounded-lg font-medium text-slate-500 hover:text-slate-900 transition-colors"
+            className="px-3 py-2 rounded-lg font-medium text-slate-500 hover:text-slate-900 hover:bg-white/50 transition-colors"
           >
-            Roles y permisos
+            Roles globales
           </a>
         </div>
 
         {activeTab === "users" && <UsersRolesPanel />}
-        {activeTab === "projects" && <ProjectAccessPanel />}
-        {activeTab === "clients" && <ClientsPanel />}
+        {activeTab === "activations" && <ActivationsPanel />}
         {activeTab === "knowledge" && <GlobalKnowledgeSourcesPanel />}
       </div>
     </PageShell>
+  );
+}
+
+function ActivationsPanel() {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchUsers() {
+      try {
+        const headers = await getAdminAuthHeaders();
+        const res = await fetch("/api/admin/users", { headers });
+        if (cancelled) return;
+        if (!res.ok) return;
+        const data = (await res.json()) as { users?: AdminUser[] };
+        if (cancelled) return;
+        setUsers(data.users ?? []);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchUsers();
+    return () => { cancelled = true; };
+  }, []);
+
+  const pending = users.filter((u) => !u.is_active);
+  const active = users.filter((u) => u.is_active);
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
+        <h2 className="text-sm font-semibold text-slate-900">Activación de usuarios</h2>
+        <p className="text-xs text-slate-500 mt-1">
+          Los usuarios que se registran por la página pública quedan pendientes hasta que un administrador los active.
+        </p>
+      </div>
+      <div className="p-5">
+        {loading ? (
+          <p className="text-sm text-slate-500">Cargando…</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+              <p className="text-2xl font-semibold text-amber-800">{pending.length}</p>
+              <p className="text-sm font-medium text-amber-800">Pendientes</p>
+              <p className="text-xs text-amber-700 mt-0.5">Sin acceso a la plataforma</p>
+            </div>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+              <p className="text-2xl font-semibold text-emerald-800">{active.length}</p>
+              <p className="text-sm font-medium text-emerald-800">Activos</p>
+              <p className="text-xs text-emerald-700 mt-0.5">Pueden iniciar sesión</p>
+            </div>
+          </div>
+        )}
+        <a
+          href="/admin/users"
+          className="mt-4 inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+        >
+          Gestionar usuarios y activaciones
+        </a>
+      </div>
+    </section>
   );
 }
 
@@ -164,6 +220,7 @@ type AdminUser = {
   full_name?: string | null;
   email?: string | null;
   app_role: string;
+  is_active: boolean;
 };
 
 type AppRoleOption = {
@@ -313,7 +370,7 @@ function UsersRolesPanel() {
           href="/admin/users"
           className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700"
         >
-          Crear usuario
+          Gestionar usuarios
         </a>
       </div>
 
@@ -346,6 +403,7 @@ function UsersRolesPanel() {
               <tr className="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                 <th className="py-3 px-4">Usuario</th>
                 <th className="py-3 px-4">Rol</th>
+                <th className="py-3 px-4">Activación</th>
                 <th className="py-3 px-4 text-right">Acciones</th>
               </tr>
             </thead>
@@ -387,15 +445,28 @@ function UsersRolesPanel() {
                         )}
                       </select>
                     </td>
+                    <td className="py-3 px-4">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${user.is_active ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+                        {user.is_active ? "Activo" : "Pendiente"}
+                      </span>
+                    </td>
                     <td className="py-3 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleSaveRole(user.id)}
-                        disabled={savingUserId === user.id}
-                        className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                      >
-                        {savingUserId === user.id ? "Guardando..." : "Guardar"}
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveRole(user.id)}
+                          disabled={savingUserId === user.id}
+                          className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                        >
+                          {savingUserId === user.id ? "Guardando..." : "Guardar"}
+                        </button>
+                        <a
+                          href="/admin/users"
+                          className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                        >
+                          Gestionar
+                        </a>
+                      </div>
                     </td>
                   </tr>
                 );
