@@ -9,6 +9,7 @@
  */
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createSupabaseClientWithToken } from "@/lib/supabaseUserClient";
 import OpenAI from "openai";
 
 const OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
@@ -56,6 +57,15 @@ export type ProjectMemoryChunk = {
   created_at: string | null;
 };
 
+/** Result row from full-text search over knowledge_pages (RPC search_knowledge). */
+export type KnowledgePageHit = {
+  page_id: string;
+  title: string | null;
+  summary: string | null;
+  page_type: string | null;
+  rank: number;
+};
+
 /** Prefer diversity: at most maxPerSource chunks per document (by title), total cap totalMax. */
 export function ensureChunkDiversity(
   chunks: KnowledgeChunk[],
@@ -81,6 +91,63 @@ export function ensureChunkDiversity(
     }
   }
   return out;
+}
+
+/**
+ * Full-text search over knowledge_pages (title, summary). RPC: search_knowledge(query).
+ * Complementary to vector search; use as additional context for Sapito.
+ * When accessToken is provided, uses a user-scoped client so RLS applies (no cross-tenant leak).
+ * When accessToken is omitted, returns [] to avoid returning data outside the user's scope.
+ * Returns up to limit hits (default 4). Summary is truncated to avoid prompt bloat.
+ */
+const FULLTEXT_SUMMARY_CAP = 280;
+
+export async function searchKnowledgePagesFullText(
+  query: string,
+  limit: number = 4,
+  options?: { accessToken?: string | null }
+): Promise<KnowledgePageHit[]> {
+  if (!query?.trim()) return [];
+
+  const accessToken = options?.accessToken?.trim();
+  if (!accessToken) {
+    return [];
+  }
+
+  try {
+    const supabase = createSupabaseClientWithToken(accessToken);
+    const { data, error } = await supabase.rpc("search_knowledge", {
+      query: query.trim(),
+    });
+
+    if (error) {
+      console.error("[knowledgeSearch] search_knowledge RPC error", error.message);
+      return [];
+    }
+
+    const rows = (data ?? []) as Array<{
+      page_id: string;
+      title: string | null;
+      summary: string | null;
+      page_type: string | null;
+      space_id?: string;
+      rank: number;
+    }>;
+
+    return rows.slice(0, Math.max(1, limit)).map((r) => ({
+      page_id: r.page_id,
+      title: r.title ?? null,
+      summary:
+        r.summary != null
+          ? r.summary.slice(0, FULLTEXT_SUMMARY_CAP).trim() + (r.summary.length > FULLTEXT_SUMMARY_CAP ? "…" : "")
+          : null,
+      page_type: r.page_type ?? null,
+      rank: Number(r.rank) || 0,
+    }));
+  } catch (err) {
+    console.error("[knowledgeSearch] searchKnowledgePagesFullText error", err);
+    return [];
+  }
 }
 
 /**
@@ -273,6 +340,61 @@ export async function searchProjectMemory(
     }));
   } catch (err) {
     console.error("[knowledgeSearch] searchProjectMemory error", err);
+    return [];
+  }
+}
+
+/** Row from public.project_memory (extracted from notes). Used for project-history context. */
+export type ExtractedProjectMemoryRow = {
+  id: string;
+  memory_type: string;
+  title: string | null;
+  summary: string;
+  created_at: string | null;
+};
+
+const EXTRACTED_MEMORY_LIMIT = 12;
+
+/**
+ * Load recent rows from public.project_memory for a project (no semantic search).
+ * Used as primary project-history evidence alongside project_knowledge_memory.
+ */
+export async function getExtractedProjectMemory(
+  projectId: string,
+  limit: number = EXTRACTED_MEMORY_LIMIT
+): Promise<ExtractedProjectMemoryRow[]> {
+  if (!projectId?.trim()) return [];
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("project_memory")
+      .select("id, memory_type, title, summary, created_at")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .limit(Math.min(Math.max(1, limit), 20));
+
+    if (error) {
+      console.error("[knowledgeSearch] getExtractedProjectMemory error", error.message);
+      return [];
+    }
+
+    const rows = (data ?? []) as Array<{
+      id: string;
+      memory_type: string;
+      title: string | null;
+      summary: string;
+      created_at: string | null;
+    }>;
+
+    return rows.map((r) => ({
+      id: r.id,
+      memory_type: r.memory_type ?? "solution",
+      title: r.title ?? null,
+      summary: r.summary ?? "",
+      created_at: r.created_at ?? null,
+    }));
+  } catch (err) {
+    console.error("[knowledgeSearch] getExtractedProjectMemory error", err);
     return [];
   }
 }

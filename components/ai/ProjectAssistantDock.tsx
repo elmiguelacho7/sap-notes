@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { X } from "lucide-react";
 import { SapitoAvatar } from "./SapitoAvatar";
 import { ProjectAssistantChat } from "./ProjectAssistantChat";
+import { useProjectWorkspace } from "@/components/projects/ProjectWorkspaceContext";
 
 export type ProjectAssistantDockProps = {
   projectId: string;
@@ -14,7 +14,20 @@ export function ProjectAssistantDock({
   projectId,
   projectName,
 }: ProjectAssistantDockProps) {
-  const [open, setOpen] = useState(false);
+  const {
+    copilotOpen,
+    setCopilotOpen,
+    copilotPendingMessage,
+    setCopilotPendingMessage,
+  } = useProjectWorkspace();
+
+  const open = copilotOpen;
+  const setOpen = setCopilotOpen;
+
+  const handleClose = () => {
+    setOpen(false);
+    setCopilotPendingMessage("");
+  };
 
   return (
     <>
@@ -28,7 +41,7 @@ export function ProjectAssistantDock({
         >
           <div
             className="absolute inset-0 bg-black/30"
-            onClick={() => setOpen(false)}
+            onClick={handleClose}
             aria-hidden="true"
           />
           <div className="relative w-full max-w-md bg-white shadow-xl flex flex-col border-l border-slate-200 rounded-l-2xl overflow-hidden animate-in slide-in-from-right duration-200">
@@ -44,7 +57,7 @@ export function ProjectAssistantDock({
               </div>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={handleClose}
                 className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition"
                 aria-label="Cerrar panel"
               >
@@ -52,7 +65,12 @@ export function ProjectAssistantDock({
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-hidden p-4 flex flex-col">
-              <ProjectAssistantChat projectId={projectId} projectName={projectName} />
+              <ProjectAssistantChat
+                projectId={projectId}
+                projectName={projectName}
+                initialMessage={copilotPendingMessage}
+                onClearInitialMessage={() => setCopilotPendingMessage("")}
+              />
             </div>
           </div>
         </div>

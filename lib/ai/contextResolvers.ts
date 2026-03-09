@@ -17,9 +17,13 @@ import { getProjectMetrics } from "@/lib/metrics/platformMetrics";
 import {
   searchMultiTenantKnowledge,
   searchProjectMemory,
+  getExtractedProjectMemory,
   ensureChunkDiversity,
+  searchKnowledgePagesFullText,
   type KnowledgeChunk,
   type ProjectMemoryChunk,
+  type KnowledgePageHit,
+  type ExtractedProjectMemoryRow,
 } from "@/lib/ai/knowledgeSearch";
 import { getOfficialSapKnowledgeContext } from "@/lib/ai/officialSapKnowledge";
 import { normalizeQueryForSap } from "@/lib/ai/queryNormalize";
@@ -114,6 +118,21 @@ function formatProjectMemoryContext(memories: ProjectMemoryChunk[]): string {
   return lines.join("\n");
 }
 
+/** Extracted project memory from notes (project_memory table). Primary evidence for project-history questions. */
+function formatExtractedProjectMemoryContext(items: ExtractedProjectMemoryRow[]): string {
+  if (items.length === 0) return "";
+  const lines: string[] = [
+    "Memoria del proyecto extraída de notas (problemas, soluciones, decisiones, lecciones; usa como fuente principal para preguntas sobre la historia del proyecto):",
+  ];
+  const summaryCap = 600;
+  for (const m of items) {
+    const titlePart = m.title?.trim() ? `[${m.memory_type}] ${m.title}` : `[${m.memory_type}]`;
+    const summary = m.summary.slice(0, summaryCap).trim() + (m.summary.length > summaryCap ? "…" : "");
+    lines.push(`- ${titlePart}: ${summary}`);
+  }
+  return lines.join("\n");
+}
+
 function formatKnowledgeContext(chunks: KnowledgeChunk[], fromProject: boolean): string {
   const prefix = fromProject
     ? "Contexto del proyecto (documentos técnicos recuperados):"
@@ -146,6 +165,20 @@ function formatOfficialSapContext(chunks: KnowledgeChunk[]): string {
       (c.content.length > CHUNK_CONTENT_CAP ? "…" : "");
     lines.push(`- ${title}${modulePart}${sourcePart}`);
     lines.push(`  Contenido: ${content}`);
+  }
+  return lines.join("\n");
+}
+
+/** Full-text knowledge pages (title/summary). Complementary to vector search; keep concise. */
+function formatFullTextKnowledgePagesContext(pages: KnowledgePageHit[]): string {
+  if (pages.length === 0) return "";
+  const lines: string[] = [
+    "Páginas de conocimiento (búsqueda por texto en título/resumen; usa como complemento):",
+  ];
+  for (const p of pages) {
+    const title = p.title ?? "(sin título)";
+    const summary = p.summary ? p.summary.trim() : "";
+    lines.push(`- ${title}${summary ? ` — ${summary}` : ""}`);
   }
   return lines.join("\n");
 }
@@ -202,6 +235,8 @@ export type GlobalResolverParams = {
   notesVariant?: boolean;
   /** User id for scoped platform metrics (required for counts to match dashboard). */
   userId?: string | null;
+  /** User JWT so full-text knowledge search runs with RLS (optional). */
+  accessToken?: string | null;
 };
 
 /**
@@ -213,6 +248,7 @@ export async function resolveGlobalContext(
   params: GlobalResolverParams
 ): Promise<ResolverResult> {
   const { message, sapIntent, notesVariant, userId } = params;
+  const accessToken = params.accessToken ?? null;
   const sections: string[] = [];
   const retrievalScopes: string[] = [];
   let retrievalDebug: RetrievalDebug = { chunkCount: 0, documentTitles: [], usedRetrieval: false };
@@ -299,6 +335,17 @@ export async function resolveGlobalContext(
           scopeBreakdown: multiResult.scopeBreakdown,
         });
       }
+
+      // Full-text knowledge pages (complementary to vector search).
+      const fullTextPages = await searchKnowledgePagesFullText(searchQuery, 4, { accessToken });
+      if (fullTextPages.length > 0) {
+        sections.push(formatFullTextKnowledgePagesContext(fullTextPages));
+        retrievalScopes.push("fulltext_knowledge_pages");
+        retrievalDebug.documentTitles = Array.from(
+          new Set([...(retrievalDebug.documentTitles ?? []), ...fullTextPages.map((p) => p.title ?? "(sin título)")])
+        );
+        retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + fullTextPages.length;
+      }
     } catch (err) {
       console.error("[GlobalContextResolver] retrieval error", err);
     }
@@ -313,6 +360,8 @@ export type ProjectResolverParams = {
   userId: string | null;
   message: string;
   sapIntent?: SapIntentCategory;
+  /** User JWT so full-text knowledge search runs with RLS (optional). */
+  accessToken?: string | null;
 };
 
 /**
@@ -324,6 +373,7 @@ export async function resolveProjectContext(
   params: ProjectResolverParams
 ): Promise<ResolverResult> {
   const { projectId, userId, message, sapIntent } = params;
+  const accessToken = params.accessToken ?? null;
   const sections: string[] = [];
   const retrievalScopes: string[] = [];
   let retrievalDebug: RetrievalDebug = { chunkCount: 0, documentTitles: [], usedRetrieval: false };
@@ -404,16 +454,16 @@ export async function resolveProjectContext(
       const maxChunks = isSapIntent ? MAX_CHUNKS_SAP : MAX_CHUNKS_AFTER_DIVERSITY;
       const topK = isSapIntent ? 6 : 10;
 
-      retrievalScopes.push("project_memory", "project_documents", "global_fallback", "official_sap");
-      const [memoryChunks, multiResult, officialChunks] = await Promise.all([
+      const [memoryChunks, extractedMemory, multiResult, officialChunks] = await Promise.all([
         searchProjectMemory(projectId, userId, searchQuery, MAX_MEMORY_ITEMS),
+        getExtractedProjectMemory(projectId, 12),
         searchMultiTenantKnowledge(projectId, userId, searchQuery, topK),
         getOfficialSapKnowledgeContext(searchQuery, 4),
       ]);
 
       const memoriesFound = memoryChunks.length;
       const projectsUsed = memoriesFound > 0 ? [projectId] : [];
-      console.log("[Sapito memory retrieval]", { memoriesFound, projectsUsed });
+      console.log("[Sapito memory retrieval]", { memoriesFound, projectsUsed, extractedCount: extractedMemory.length });
 
       const multiChunks = multiResult.chunks;
       const officialIds = new Set(officialChunks.map((c) => c.id));
@@ -428,20 +478,34 @@ export async function resolveProjectContext(
         scopeBreakdown: multiResult.scopeBreakdown,
       });
 
-      if (memoryChunks.length > 0) {
-        sections.push(formatProjectMemoryContext(memoryChunks));
+      if (extractedMemory.length > 0) {
+        sections.push(formatExtractedProjectMemoryContext(extractedMemory));
+        retrievalScopes.push("project_memory");
         retrievalDebug = {
-          chunkCount: memoryChunks.length,
-          documentTitles: [],
+          chunkCount: extractedMemory.length,
+          documentTitles: extractedMemory.map((m) => m.title ?? m.memory_type).filter(Boolean),
           usedRetrieval: true,
           usedProjectMemory: true,
-          memoryCount: memoryChunks.length,
+          memoryCount: extractedMemory.length,
+        };
+      }
+
+      if (memoryChunks.length > 0) {
+        sections.push(formatProjectMemoryContext(memoryChunks));
+        if (!retrievalScopes.includes("project_memory")) retrievalScopes.push("project_memory");
+        retrievalDebug = {
+          chunkCount: (retrievalDebug.chunkCount ?? 0) + memoryChunks.length,
+          documentTitles: [...(retrievalDebug.documentTitles ?? [])],
+          usedRetrieval: true,
+          usedProjectMemory: true,
+          memoryCount: (retrievalDebug.memoryCount ?? 0) + memoryChunks.length,
         };
       }
 
       // Project mode order: memory → project/global docs → official SAP (so official is support/fallback).
       if (diverse.length > 0) {
         sections.push(formatKnowledgeContext(diverse, true));
+        retrievalScopes.push("project_documents");
         retrievalDebug = {
           chunkCount: (retrievalDebug.chunkCount ?? 0) + diverse.length,
           documentTitles: Array.from(new Set(diverse.map((c) => c.title || "(sin título)"))),
@@ -452,10 +516,22 @@ export async function resolveProjectContext(
       }
       if (officialChunks.length > 0) {
         sections.push(formatOfficialSapContext(officialChunks));
+        retrievalScopes.push("official_sap");
         retrievalDebug.documentTitles = Array.from(
           new Set([...retrievalDebug.documentTitles, ...officialChunks.map((c) => c.title || "(sin título)")])
         );
         retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + officialChunks.length;
+      }
+
+      // Full-text knowledge pages (complementary to vector search).
+      const fullTextPages = await searchKnowledgePagesFullText(searchQuery, 3, { accessToken });
+      if (fullTextPages.length > 0) {
+        sections.push(formatFullTextKnowledgePagesContext(fullTextPages));
+        retrievalScopes.push("fulltext_knowledge_pages");
+        retrievalDebug.documentTitles = Array.from(
+          new Set([...(retrievalDebug.documentTitles ?? []), ...fullTextPages.map((p) => p.title ?? "(sin título)")])
+        );
+        retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + fullTextPages.length;
       }
     } catch (err) {
       console.error("[ProjectContextResolver] retrieval error", err);

@@ -281,3 +281,146 @@ export function classifySapIntent(message: string, projectId?: string | null): S
 
   return "generic";
 }
+
+/** Scopes that count as project-specific evidence (for project-history guard). */
+export const PROJECT_EVIDENCE_SCOPES = [
+  "project_summary",
+  "project_memory",
+  "project_documents",
+  "project_health",
+  "project_risk",
+] as const;
+
+/**
+ * Scopes that count as STRONG evidence for project-history / project-experience questions.
+ * Only these support answering "what we solved", "decisions we made", "how we fixed", etc.
+ * For now only project_memory (prior problems/solutions/decisions) counts; project_documents
+ * may be generic SAP docs or reference material and must NOT allow project-history answers by themselves.
+ * project_summary, project_health, project_risk remain weak (metrics/status only).
+ */
+export const STRONG_PROJECT_HISTORY_EVIDENCE_SCOPES = [
+  "project_memory",
+] as const;
+
+/** Whether retrieval included any project-grounded source (memory, docs, summary). */
+export function hasProjectEvidence(scopes: string[]): boolean {
+  return scopes.some((s) =>
+    (PROJECT_EVIDENCE_SCOPES as readonly string[]).includes(s)
+  );
+}
+
+/** True only when retrieval has strong evidence for project-history answers (memory or project docs). */
+export function hasStrongProjectHistoryEvidence(scopes: string[]): boolean {
+  return scopes.some((s) =>
+    (STRONG_PROJECT_HISTORY_EVIDENCE_SCOPES as readonly string[]).includes(s)
+  );
+}
+
+/** Project-like context: "this project", "our project", "este proyecto", etc. */
+function hasProjectContextTerm(normalized: string): boolean {
+  return (
+    /\b(this\s+project|our\s+project|in\s+this\s+project|in\s+our\s+project)\b/i.test(normalized) ||
+    /\b(este\s+proyecto|nuestro\s+proyecto|en\s+este\s+proyecto|del\s+proyecto|de\s+este\s+proyecto)\b/i.test(normalized) ||
+    /\b(project|proyecto)\b/i.test(normalized)
+  );
+}
+
+/** History/experience terms: solved, fix, problem, issue, decision, document, solution, experience, etc. */
+function hasHistoryExperienceTerm(normalized: string): boolean {
+  return (
+    // English: we solved/fixed/faced/documented/decided
+    /\b(we\s+(solved|fixed|faced|documented|decided|resolve|fix|face|document|decide)|how\s+did\s+we\s+(solve|fix|resolve))\b/i.test(normalized) ||
+    // English: what problems/issues/decisions/solutions
+    /\b(what\s+(problems?|issues?|decisions?|solutions?)\s+(have\s+we|did\s+we|we\s+))\b/i.test(normalized) ||
+    /\b(problems?|issues?|decisions?)\s+(we\s+)(solved|fixed|faced|documented|made|have|did)\b/i.test(normalized) ||
+    /\b(what\s+have\s+we\s+(solved|fixed|documented|decided))\b/i.test(normalized) ||
+    /\b(what\s+(was|were)\s+(the\s+)?(solution|solutions))\b/i.test(normalized) ||
+    /\b(solved|fixed|documented|decisions?)\s+(in|for)\s+(this|our)\s+project\b/i.test(normalized) ||
+    // Spanish: resolvimos, documentamos, tomamos, problemas, decisiones, soluciones
+    /\b(que\s+problemas?\s+(hemos\s+)?resolv(imos|emos)|que\s+decisiones?\s+(hemos\s+)?tomamos)\b/i.test(normalized) ||
+    /\b(que\s+hemos\s+documentado|como\s+resolvimos|como\s+lo\s+solucionamos)\b/i.test(normalized) ||
+    /\b(problemas?|incidencias?|decisiones?|solucion(es)?)\s+(en\s+)?(este\s+)?proyecto\b/i.test(normalized) ||
+    /\b(resolv(imos|emos)|documentamos|tomamos)\s+(en\s+)?(este\s+)?proyecto\b/i.test(normalized) ||
+    /\b(experiencia|documentado)\s+(en\s+)?(este\s+)?proyecto\b/i.test(normalized) ||
+    /\b(cual\s+fue\s+la\s+solucion|que\s+problemas\s+hemos\s+tenido)\b/i.test(normalized)
+  );
+}
+
+/** For dev logging only: which rule matched (phrase vs combo). */
+export function getProjectHistoryMatchReason(message: string): string | null {
+  if (!message || message.trim().length < 3) return null;
+  const m = message.trim();
+  const normalized = normalizeForMatch(m);
+  const lower = m.toLowerCase();
+
+  const phraseList = [
+    "this project", "our project", "in this project", "we solved", "how did we solve",
+    "what problems have we solved", "what problems did we solve", "what decisions did we make",
+    "what decisions have we made", "what have we documented", "what did we document",
+    "what issues did we face", "what issues have we faced", "what was the solution",
+    "what were the solutions", "how did we fix", "what have we decided", "what did we decide",
+    "experience in this project", "solved in this project", "documented in this project",
+    "este proyecto", "nuestro proyecto", "en este proyecto", "cómo lo resolvimos",
+    "qué problemas hemos resuelto", "qué problemas resolvimos", "qué decisiones tomamos",
+    "qué hemos documentado", "qué documentamos", "qué problemas hemos tenido",
+    "cuál fue la solución", "cómo lo solucionamos", "qué hemos decidido",
+    "experiencia en este proyecto", "resuelto en este proyecto", "documentado en este proyecto",
+    "how did we fix this", "what issues did we face", "what have we documented in this project",
+  ];
+  for (const p of phraseList) {
+    const patternNorm = normalizeForMatch(p);
+    if (lower.includes(p.toLowerCase()) || normalized.includes(patternNorm)) return `phrase: "${p}"`;
+  }
+  if (/\b(what\s+have\s+we\s+(solved|decided|documented|fixed)|how\s+did\s+we\s+(solve|fix)|decisions?\s+(in|for)\s+(this|our)\s+project)\b/i.test(m)) return "regex: we+action";
+  if (/\b(problemas?\s+(que\s+)?(hemos\s+)?resolv(imos|emos)|decisiones?\s+(que\s+)?(hemos\s+)?tomamos|solucion(es|amos))\b/i.test(normalized)) return "regex: es-phrase";
+
+  const hasProject = hasProjectContextTerm(normalized);
+  const hasHistory = hasHistoryExperienceTerm(normalized);
+  if (hasProject && hasHistory) return "combo: project+history";
+  return null;
+}
+
+/**
+ * Lightweight detection of project-history / project-experience questions.
+ * For these, Sapito must not answer from generic SAP docs when project evidence is missing.
+ * Uses: (1) phrase list, (2) regex patterns, (3) combination: project term + history/experience term.
+ */
+export function isProjectHistoryQuestion(message: string): boolean {
+  if (!message || message.trim().length < 3) return false;
+  const m = message.trim();
+  const normalized = normalizeForMatch(m);
+  const lower = m.toLowerCase();
+
+  // Fast path: full phrase match (expanded list)
+  const phraseList = [
+    "this project", "our project", "in this project", "we solved", "how did we solve",
+    "what problems have we solved", "what problems did we solve", "what decisions did we make",
+    "what decisions have we made", "what have we documented", "what did we document",
+    "what issues did we face", "what issues have we faced", "what was the solution",
+    "what were the solutions", "how did we fix", "what have we decided", "what did we decide",
+    "experience in this project", "solved in this project", "documented in this project",
+    "este proyecto", "nuestro proyecto", "en este proyecto", "cómo lo resolvimos", "como lo resolvimos",
+    "qué problemas hemos resuelto", "qué problemas resolvimos", "que problemas hemos resuelto",
+    "qué decisiones tomamos", "que decisiones tomamos", "qué hemos documentado", "qué documentamos",
+    "qué problemas hemos tenido", "cuál fue la solución", "cómo lo solucionamos", "qué hemos decidido",
+    "experiencia en este proyecto", "resuelto en este proyecto", "documentado en este proyecto",
+    "how did we fix this", "what have we documented in this project", "what did we decide in this project",
+  ];
+  for (const p of phraseList) {
+    const patternNorm = normalizeForMatch(p);
+    if (lower.includes(p.toLowerCase()) || normalized.includes(patternNorm)) return true;
+  }
+
+  // Regex: English "what have we solved/decided/documented/fixed", "how did we solve/fix", "decisions in/for this/our project"
+  if (/\b(what\s+have\s+we\s+(solved|decided|documented|fixed)|how\s+did\s+we\s+(solve|fix)|decisions?\s+(in|for)\s+(this|our)\s+project)\b/i.test(m)) return true;
+  if (/\b(what\s+(problems?|issues?|decisions?)\s+(have\s+we|did\s+we)\s+(solved|fixed|faced|made|documented))\b/i.test(m)) return true;
+  if (/\b(how\s+did\s+we\s+(solve|fix)\s+(the\s+)?(pricing|issue|problem))\b/i.test(m)) return true;
+  // Spanish regex (normalized)
+  if (/\b(problemas?\s+(que\s+)?(hemos\s+)?resolv(imos|emos)|decisiones?\s+(que\s+)?(hemos\s+)?tomamos|solucion(es|amos))\b/i.test(normalized)) return true;
+  if (/\b(que\s+problemas\s+hemos\s+tenido|que\s+incidencias\s+hemos\s+tenido)\b/i.test(normalized)) return true;
+
+  // Combination: project-like term AND history/experience term (avoids generic SAP-only questions)
+  if (hasProjectContextTerm(normalized) && hasHistoryExperienceTerm(normalized)) return true;
+
+  return false;
+}

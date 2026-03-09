@@ -56,6 +56,8 @@ export type AgentContext = {
   sapitoContextSummary?: string;
   /** Optional SAP intent (error/transaction/customizing/process/solution_design) for answer format */
   sapIntent?: SapIntentCategory;
+  /** When true, user is asking about this project's own history/decisions/solutions; answer only from project evidence */
+  isProjectHistoryQuestion?: boolean;
   /** Optional retrieval debug (chunk count, document titles); included in response in development only */
   retrievalDebug?: {
     chunkCount: number;
@@ -130,6 +132,7 @@ Formato de respuesta cuando haya contexto útil:
 Reglas:
 - Usa SIEMPRE los datos estructurados proporcionados para responder. No des respuestas genéricas si tienes números concretos.
 - Si no hay información relevante para la pregunta, dilo con claridad y no inventes.
+- Para preguntas sobre la historia del proyecto, decisiones tomadas o problemas resueltos en este proyecto: responde SOLO con evidencia específica del proyecto (experiencia previa, notas, tickets, documentación del proyecto). No presentes documentación SAP genérica como si fuera un hecho de este proyecto. Si no hay evidencia de proyecto para esa pregunta, dilo claramente y sugiere revisar notas, tickets o documentar la solución.
 - Responde en ESPAÑOL. Tono: técnico, conciso, cercano y creíble para consultores SAP.
 - Para errores SAP en notas: Diagnóstico, Causa, Posible solución.
 - Mantén las respuestas cortas. Evita rodeos.`;
@@ -339,7 +342,9 @@ export async function runProjectAgent(params: {
         ? "El usuario pregunta por el enfoque o prioridades de la semana. Usa ÚNICAMENTE los datos estructurados de enfoque semanal del contexto anterior (prioridades y acciones recomendadas). Responde con la estructura: ## Weekly Focus, ### Priority 1, ### Priority 2, etc., ### Recommended next actions. No cites documentación SAP ni des respuestas genéricas. Responde en español."
         : ctx.sapIntent === "project_risk" && isProjectMode
           ? "El usuario pregunta por los riesgos del proyecto. Usa ÚNICAMENTE los datos del Project Risk Radar del contexto anterior (nivel de riesgo, señales, recomendaciones). Responde con la estructura: ## Project Risk Radar, ### Risk level, ### Main signals, ### Recommended actions. No cites documentación SAP. Responde en español."
-          : ctx.sapitoContextSummary?.includes("Contexto SAP Knowledge") ||
+          : ctx.isProjectHistoryQuestion && isProjectMode
+            ? "El usuario pregunta por la historia del proyecto, decisiones tomadas o problemas resueltos en este proyecto. Usa ÚNICAMENTE evidencia específica del proyecto del contexto anterior (experiencia previa, notas, documentos del proyecto, resumen del proyecto). No presentes documentación SAP genérica como si fuera un hecho de este proyecto. Si no hay evidencia de proyecto para la pregunta, dilo claramente y sugiere revisar notas, tickets o documentar la solución. Responde en español."
+            : ctx.sapitoContextSummary?.includes("Contexto SAP Knowledge") ||
         ctx.sapitoContextSummary?.includes("SAP Knowledge Context") ||
         ctx.sapitoContextSummary?.includes("Contexto del proyecto (documentos") ||
         ctx.sapitoContextSummary?.includes("Experiencia previa del proyecto SAP")

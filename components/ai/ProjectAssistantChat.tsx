@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent, useCallback } from "react";
+import { useState, type FormEvent, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { SapitoAvatar } from "./SapitoAvatar";
 import { AssistantSuggestionChips } from "./AssistantSuggestionChips";
@@ -20,16 +20,22 @@ const PROJECT_SUGGESTIONS = [
 type ProjectAssistantChatProps = {
   projectId: string;
   projectName?: string;
+  /** When set, open from another page (e.g. Brain): send this message once and clear */
+  initialMessage?: string;
+  onClearInitialMessage?: () => void;
 };
 
 export function ProjectAssistantChat({
   projectId,
   projectName,
+  initialMessage,
+  onClearInitialMessage,
 }: ProjectAssistantChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const initialMessageSentRef = useRef(false);
 
   const sendMessage = useCallback(async (text: string) => {
     const trimmed = text.trim();
@@ -79,6 +85,20 @@ export function ProjectAssistantChat({
       setLoading(false);
     }
   }, [loading, projectId]);
+
+  // When opened with a prefilled message (e.g. from Brain quick action), send it once
+  useEffect(() => {
+    const msg = initialMessage?.trim();
+    if (!msg || initialMessageSentRef.current || !projectId) return;
+    initialMessageSentRef.current = true;
+    onClearInitialMessage?.();
+    sendMessage(msg);
+  }, [initialMessage, projectId, onClearInitialMessage, sendMessage]);
+
+  // Reset when pending message is cleared (e.g. dock closed) so next open-with-message works
+  useEffect(() => {
+    if (!initialMessage?.trim()) initialMessageSentRef.current = false;
+  }, [initialMessage]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

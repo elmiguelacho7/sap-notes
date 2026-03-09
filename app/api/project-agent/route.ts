@@ -9,14 +9,14 @@ import {
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { resolveGlobalContext, resolveProjectContext } from "@/lib/ai/contextResolvers";
 import { type RetrievalDebug } from "@/lib/ai/sapitoContext";
-import { classifySapIntent, shouldIncludeWorkspaceSummary, isProjectStatusQuestion } from "@/lib/ai/sapitoIntent";
+import { classifySapIntent, shouldIncludeWorkspaceSummary, isProjectStatusQuestion, isProjectHistoryQuestion, hasProjectEvidence, hasStrongProjectHistoryEvidence, getProjectHistoryMatchReason } from "@/lib/ai/sapitoIntent";
 import {
   resolveProjectByName,
   extractProjectNameFromMessage,
   isAmbiguousProjectQuestion,
 } from "@/lib/ai/projectResolution";
 import { getProjectMetrics } from "@/lib/metrics/platformMetrics";
-import { getCurrentUserIdFromRequest } from "@/lib/auth/serverAuth";
+import { getCurrentUserIdFromRequest, getAccessTokenFromRequest } from "@/lib/auth/serverAuth";
 
 /** Human-readable grounding labels for UI. */
 const GROUNDING_LABELS: Record<string, string> = {
@@ -26,6 +26,7 @@ const GROUNDING_LABELS: Record<string, string> = {
   project_memory: "Basado en experiencia previa del proyecto.",
   project_documents: "Según la documentación sincronizada del proyecto.",
   official_sap: "Según la documentación SAP indexada.",
+  fulltext_knowledge_pages: "Según páginas de conocimiento (búsqueda por texto).",
   global_knowledge: "Según la documentación sincronizada.",
   weekly_focus: "Basado en las prioridades y el enfoque semanal del workspace.",
   project_health: "Basado en el análisis de salud del proyecto.",
@@ -47,7 +48,11 @@ function getGroundingLabel(scopes: string[], resolvedProjectTitle?: string | nul
   if (scopes.includes("project_health")) return GROUNDING_LABELS.project_health;
   if (scopes.includes("project_risk")) return GROUNDING_LABELS.project_risk;
   if (scopes.includes("project_memory")) return GROUNDING_LABELS.project_memory;
+  if (scopes.includes("official_sap") && scopes.includes("fulltext_knowledge_pages")) {
+    return "Según documentación SAP y páginas de conocimiento.";
+  }
   if (scopes.includes("official_sap")) return GROUNDING_LABELS.official_sap;
+  if (scopes.includes("fulltext_knowledge_pages")) return GROUNDING_LABELS.fulltext_knowledge_pages;
   if (scopes.some((s) => s.includes("document") || s.includes("knowledge")))
     return GROUNDING_LABELS.project_documents;
   return GROUNDING_LABELS.general;
@@ -96,6 +101,8 @@ export async function POST(req: Request) {
       effectiveUserId = effectiveUserId.trim() || null;
     }
 
+    const accessToken = await getAccessTokenFromRequest(req);
+
     if (!message) {
       return NextResponse.json(
         {
@@ -125,6 +132,15 @@ export async function POST(req: Request) {
 
     const effectiveProjectId = mode === "global" ? null : projectId;
 
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Sapito guard entered]", {
+        endpoint: "/api/project-agent",
+        mode,
+        message: message.slice(0, 100),
+        projectId: effectiveProjectId ?? null,
+      });
+    }
+
     let sapIntent = classifySapIntent(message, effectiveProjectId ?? undefined);
     // Ensure project-status questions in project mode never get generic (so we use PROJECT prompt and inject context).
     if (mode === "project" && effectiveProjectId && sapIntent === "generic" && isProjectStatusQuestion(message)) {
@@ -149,10 +165,12 @@ export async function POST(req: Request) {
               userId,
               message,
               sapIntent,
+              accessToken: accessToken ?? undefined,
             }),
           ]);
         const { contextText: sapitoContextSummary, retrievalDebug, retrievalScopes: scopes } = resolverResult;
         retrievalScopes = scopes;
+        const isProjectHistory = isProjectHistoryQuestion(message);
         context = {
           projectId: effectiveProjectId,
           stats,
@@ -162,7 +180,39 @@ export async function POST(req: Request) {
           sapitoContextSummary: sapitoContextSummary ?? "",
           sapIntent,
           retrievalDebug: retrievalDebug ?? { chunkCount: 0, documentTitles: [], usedRetrieval: false },
+          isProjectHistoryQuestion: isProjectHistory,
         };
+
+        if (process.env.NODE_ENV === "development") {
+          console.log("[Sapito project-history guard]", {
+            message: message.slice(0, 120),
+            isProjectHistoryQuestion: isProjectHistory,
+            matchedRule: getProjectHistoryMatchReason(message) ?? undefined,
+            retrievalScopes,
+            hasProjectEvidence: hasProjectEvidence(retrievalScopes),
+            hasStrongProjectHistoryEvidence: hasStrongProjectHistoryEvidence(retrievalScopes),
+          });
+        }
+
+        if (isProjectHistory && !hasStrongProjectHistoryEvidence(retrievalScopes)) {
+          if (process.env.NODE_ENV === "development") {
+            console.log("[Sapito guard fallback returned]", { message: message.slice(0, 80) });
+          }
+          const hint =
+            stats != null
+              ? `En este proyecto hay ${stats.total_notes ?? 0} notas registradas${(stats.error_notes ?? 0) > 0 ? ` y ${stats.error_notes} notas con error` : ""}. `
+              : "";
+          const reply = `No he encontrado aún evidencia documentada específica del proyecto sobre problemas resueltos, decisiones o soluciones anteriores.
+
+${hint}Te sugiero revisar:
+- Notas del proyecto
+- Tickets
+- Actividades y tareas
+- Entradas de conocimiento
+
+Si documentas la solución o la decisión, Sapito podrá usarla la próxima vez.`;
+          return NextResponse.json({ reply, grounded: false });
+        }
       } catch (err) {
         if (err instanceof ProjectNotFoundError) {
           return NextResponse.json(
@@ -250,6 +300,7 @@ export async function POST(req: Request) {
         sapIntent,
         notesVariant,
         userId: effectiveUserId ?? undefined,
+        accessToken: accessToken ?? undefined,
       });
       const { contextText: sapitoContextSummary, retrievalDebug, retrievalScopes: scopes } = resolverResult;
       retrievalScopes = scopes;
@@ -286,6 +337,16 @@ export async function POST(req: Request) {
     });
 
     if (process.env.NODE_ENV === "development") {
+      console.log("[Sapito retrieval]", {
+        userId: effectiveUserId ?? null,
+        mode,
+        projectId: effectiveProjectId ?? null,
+        retrievalScopes,
+        query: message,
+      });
+    }
+
+    if (process.env.NODE_ENV === "development") {
       console.log("[Sapito diagnostics]", {
         mode,
         detectedIntent: sapIntent,
@@ -299,6 +360,9 @@ export async function POST(req: Request) {
       });
     }
 
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Sapito LLM called]", { mode, message: message.slice(0, 80) });
+    }
     const reply = await runProjectAgent({
       message,
       context,
