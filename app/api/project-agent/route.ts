@@ -16,7 +16,7 @@ import {
   isAmbiguousProjectQuestion,
 } from "@/lib/ai/projectResolution";
 import { getProjectMetrics } from "@/lib/metrics/platformMetrics";
-import { getCurrentUserIdFromRequest, getAccessTokenFromRequest } from "@/lib/auth/serverAuth";
+import { getCurrentUserIdFromRequest, getAccessTokenFromRequest, isProjectMember, requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
 
 /** Human-readable grounding labels for UI. */
 const GROUNDING_LABELS: Record<string, string> = {
@@ -131,6 +131,19 @@ export async function POST(req: Request) {
     }
 
     const effectiveProjectId = mode === "global" ? null : projectId;
+
+    // In project mode, enforce project access (membership or superadmin) before loading any project data.
+    if (mode === "project" && effectiveProjectId) {
+      const userIdForAccess = effectiveUserId ?? (await getCurrentUserIdFromRequest(req));
+      const isSuperadmin = userIdForAccess ? !!(await requireSuperAdminFromRequest(req)) : false;
+      const hasAccess = userIdForAccess && (isSuperadmin || (await isProjectMember(userIdForAccess, effectiveProjectId)));
+      if (!hasAccess) {
+        return NextResponse.json(
+          { error: "No tienes acceso a este proyecto." },
+          { status: 403 }
+        );
+      }
+    }
 
     if (process.env.NODE_ENV === "development") {
       console.log("[Sapito guard entered]", {

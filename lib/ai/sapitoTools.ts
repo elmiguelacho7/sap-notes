@@ -7,6 +7,7 @@
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getPlatformMetrics } from "@/lib/metrics/platformMetrics";
+import { getUserProjectIds } from "@/lib/metrics/platformMetrics";
 import { analyzeProjectHealth, type ProjectHealthSignals } from "@/lib/ai/projectIntelligence";
 import { analyzeProjectRisk } from "@/lib/ai/projectRisk";
 
@@ -262,14 +263,19 @@ export async function getProjectOverview(
 }
 
 // ==========================
-// getNotesInsights
+// getNotesInsights (user-scoped: no global notes for consultants)
 // ==========================
 
 /**
- * Returns a compact insight summary about notes (modules, error codes, transactions).
- * Uses all non-deleted notes; aggregates in memory for top N.
+ * Returns a compact insight summary about notes visible to the user.
+ * - Superadmin: all non-deleted notes (global + project).
+ * - Consultant: only notes from projects they are a member of (no global notes).
+ * When userId is null, returns empty insights.
  */
-export async function getNotesInsights(topN = 10): Promise<NotesInsights> {
+export async function getNotesInsights(
+  userId: string | null,
+  topN = 10
+): Promise<NotesInsights> {
   const fallback: NotesInsights = {
     totalNotes: 0,
     topModules: [],
@@ -277,11 +283,34 @@ export async function getNotesInsights(topN = 10): Promise<NotesInsights> {
     topTransactions: [],
   };
 
+  if (!userId?.trim()) return fallback;
+
   try {
-    const { data: rows, error } = await supabaseAdmin
+    const { data: profileRow, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("app_role")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (profileError || !profileRow) return fallback;
+
+    const isSuperadmin = (profileRow as { app_role?: string }).app_role === "superadmin";
+
+    let query = supabaseAdmin
       .from("notes")
       .select("module, error_code, transaction")
       .is("deleted_at", null);
+
+    if (!isSuperadmin) {
+      const projectIds = await getUserProjectIds(userId);
+      if (projectIds.length === 0) return fallback;
+      query = query.in("project_id", projectIds);
+    } else {
+      // Superadmin: include global (project_id null) and all project notes
+      // So we do not filter by project_id (all rows)
+    }
+
+    const { data: rows, error } = await query;
 
     if (error) {
       console.error("[sapitoTools] getNotesInsights query error", error);

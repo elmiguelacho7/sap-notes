@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getProjectActivityStats } from "@/lib/services/projectService";
+import { requireProjectAccess } from "@/lib/auth/serverAuth";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, { params }: RouteParams) {
+export async function GET(req: Request, { params }: RouteParams) {
   try {
     const { id: projectId } = await params;
 
@@ -11,6 +12,20 @@ export async function GET(_req: Request, { params }: RouteParams) {
       return NextResponse.json(
         { error: "Project ID is required" },
         { status: 400 }
+      );
+    }
+
+    const access = await requireProjectAccess(req, projectId);
+    if ("error" in access) {
+      if (access.error === "unauthorized") {
+        return NextResponse.json(
+          { error: "Authentication required" },
+          { status: 401 }
+        );
+      }
+      return NextResponse.json(
+        { error: "You do not have access to this project" },
+        { status: 403 }
       );
     }
 

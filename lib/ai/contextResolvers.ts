@@ -256,7 +256,7 @@ export async function resolveGlobalContext(
   const includeSummary = shouldIncludeWorkspaceSummary(sapIntent);
   if (includeSummary) {
     if (notesVariant) {
-      const insights = await getNotesInsights(10);
+      const insights = await getNotesInsights(userId ?? null, 10);
       sections.push(formatNotesSummary(insights));
       retrievalScopes.push("notes_insights");
     } else {

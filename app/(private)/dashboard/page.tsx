@@ -54,17 +54,12 @@ export default function DashboardPage() {
     setLoadingStats(true);
     setErrorMsg(null);
     try {
-      const [projResult, noteResult, sessionResult] = await Promise.all([
+      const [sessionResult, projResult] = await Promise.all([
+        supabase.auth.getSession(),
         supabase
           .from("projects")
           .select("id, name, status, created_at")
           .order("created_at", { ascending: false }),
-        supabase
-          .from("notes")
-          .select("id, title, client, module, created_at")
-          .is("deleted_at", null)
-          .order("created_at", { ascending: false }),
-        supabase.auth.getSession(),
       ]);
 
       let projects: ProjectSummary[] = [];
@@ -77,11 +72,44 @@ export default function DashboardPage() {
         projects = (projResult.data ?? []) as ProjectSummary[];
       }
 
-      if (noteResult.error) {
-        handleSupabaseError("dashboard notes", noteResult.error);
-        setErrorMsg("No se pudieron cargar los datos del dashboard.");
+      const userId = sessionResult.data?.session?.user?.id;
+      if (userId) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("app_role")
+          .eq("id", userId)
+          .maybeSingle();
+        if ((profile as { app_role?: string } | null)?.app_role === "consultant") {
+          notes = [];
+        } else {
+          const noteResult = await supabase
+            .from("notes")
+            .select("id, title, client, module, created_at")
+            .is("deleted_at", null)
+            .order("created_at", { ascending: false });
+          if (noteResult.error) {
+            handleSupabaseError("dashboard notes", noteResult.error);
+            setErrorMsg("No se pudieron cargar los datos del dashboard.");
+          } else {
+            notes = (noteResult.data ?? []) as NoteSummary[];
+          }
+        }
       } else {
-        notes = (noteResult.data ?? []) as NoteSummary[];
+        const noteResult = await supabase
+          .from("notes")
+          .select("id, title, client, module, created_at")
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false });
+        if (noteResult.error) {
+          handleSupabaseError("dashboard notes", noteResult.error);
+          setErrorMsg("No se pudieron cargar los datos del dashboard.");
+        } else {
+          notes = (noteResult.data ?? []) as NoteSummary[];
+        }
+      }
+
+      if (process.env.NODE_ENV === "development") {
+        console.debug("[dashboard] recent notes count:", notes.length, "(RLS: project + global for superadmin only)");
       }
 
       setRecentProjects(projects.slice(0, RECENT_COUNT));

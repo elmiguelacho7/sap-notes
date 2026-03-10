@@ -1,21 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireSuperAdminFromRequest, getCurrentUserWithRoleFromRequest, isProjectMember } from "@/lib/auth/serverAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 /**
  * PATCH /api/notes/[id]
- * Update note fields (e.g. is_knowledge_base). Auth: superadmin or project member with edit.
+ * Update note fields (e.g. is_knowledge_base). Auth: superadmin or project member (for project notes); global notes require superadmin.
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
+    const user = await getCurrentUserWithRoleFromRequest(request);
+    if (!user) {
+      return NextResponse.json(
+        { error: "No autorizado. Debes iniciar sesión." },
+        { status: 401 }
+      );
+    }
+
     const { id: noteId } = await params;
     if (!noteId || String(noteId).trim() === "") {
       return NextResponse.json(
         { error: "Se requiere el id de la nota." },
         { status: 400 }
       );
+    }
+
+    const { data: noteRow, error: fetchError } = await supabaseAdmin
+      .from("notes")
+      .select("project_id")
+      .eq("id", noteId)
+      .maybeSingle();
+
+    if (fetchError || !noteRow) {
+      return NextResponse.json(
+        { error: "No se encontró la nota." },
+        { status: 404 }
+      );
+    }
+
+    const projectId = (noteRow as { project_id: string | null }).project_id;
+    if (projectId == null) {
+      if (user.appRole !== "superadmin") {
+        return NextResponse.json(
+          { error: "No autorizado. Solo superadministradores pueden editar notas globales." },
+          { status: 403 }
+        );
+      }
+    } else {
+      if (user.appRole !== "superadmin" && !(await isProjectMember(user.userId, projectId))) {
+        return NextResponse.json(
+          { error: "No autorizado. No eres miembro del proyecto de esta nota." },
+          { status: 403 }
+        );
+      }
     }
 
     let body: { is_knowledge_base?: boolean };

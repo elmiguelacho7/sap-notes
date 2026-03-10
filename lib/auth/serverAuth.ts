@@ -180,3 +180,28 @@ export async function isProjectMember(
 
   return !error && !!data;
 }
+
+export type ProjectAccessResult =
+  | { userId: string }
+  | { error: "unauthorized" }
+  | { error: "forbidden" };
+
+/**
+ * Use in project-scoped API routes. Ensures the request has an authenticated user
+ * and that the user has access to the project (member or superadmin).
+ * Returns { userId } on success; { error: "unauthorized" } when not logged in;
+ * { error: "forbidden" } when user has no access to the project.
+ */
+export async function requireProjectAccess(
+  request: Request,
+  projectId: string
+): Promise<ProjectAccessResult> {
+  const userId = await getCurrentUserIdFromRequest(request);
+  if (!userId?.trim()) return { error: "unauthorized" };
+
+  const isSuperadmin = !!(await requireSuperAdminFromRequest(request));
+  const member = await isProjectMember(userId, projectId);
+  if (!isSuperadmin && !member) return { error: "forbidden" };
+
+  return { userId };
+}

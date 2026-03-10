@@ -75,6 +75,25 @@ export default function NewNotePage() {
     }
   }, [fromQuick, projectIdFromQuery, router]);
 
+  // Block consultants from global note creation: redirect if not superadmin when no projectId
+  useEffect(() => {
+    if (isProjectMode) return;
+    let cancelled = false;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+      const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
+      if (cancelled) return;
+      const data = await res.json().catch(() => ({ appRole: null }));
+      const appRole = (data as { appRole?: string | null }).appRole ?? null;
+      if (appRole !== "superadmin") {
+        router.replace("/notes");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isProjectMode, router]);
+
   // Encabezado
   const [title, setTitle] = useState("");
   const [noteType, setNoteType] = useState<string>("Incidencia / Error");
@@ -290,7 +309,7 @@ export default function NewNotePage() {
         <p className="mt-1 text-sm text-slate-600 max-w-2xl">
           {projectIdFromQuery.trim()
             ? "Crea una nota asociada al proyecto actual. Se guardará en la pestaña Notas del proyecto."
-            : "Registra una nueva nota de implementación, incidencia o decisión. Esta nota será general (no ligada a un proyecto concreto) para que puedas reutilizarla en futuros clientes y proyectos."}
+            : "Nota global: conocimiento transversal reutilizable (patrones SAP, incidencias recurrentes, estándares de configuración, decisiones entre proyectos). No ligada a un proyecto concreto."}
         </p>
 
         <div className="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-7">

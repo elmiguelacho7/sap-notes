@@ -29,6 +29,52 @@ const ROLE_LABELS: Record<string, string> = {
   consultant: "Consultor",
 };
 
+function RoleSelect({
+  user,
+  onUpdated,
+  getAuthHeaders,
+  disabled,
+}: {
+  user: AdminUser;
+  onUpdated: () => void;
+  getAuthHeaders: () => Promise<Record<string, string>>;
+  disabled?: boolean;
+}) {
+  const [loading, setLoading] = useState(false);
+  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const appRoleKey = e.target.value as "superadmin" | "consultant";
+    if (appRoleKey === user.app_role || loading || disabled) return;
+    setLoading(true);
+    try {
+      const headers = await getAuthHeaders();
+      headers["Content-Type"] = "application/json";
+      const res = await fetch(`/api/admin/users/${user.id}/app-role`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ appRoleKey }),
+      });
+      if (res.ok) await onUpdated();
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <select
+      value={user.app_role}
+      onChange={handleChange}
+      disabled={disabled || loading}
+      className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+      aria-label={`Rol de ${user.full_name || user.email}`}
+    >
+      <option value="consultant">{ROLE_LABELS.consultant}</option>
+      <option value="superadmin">{ROLE_LABELS.superadmin}</option>
+      {user.app_role && !(user.app_role in ROLE_LABELS) && (
+        <option value={user.app_role}>{user.app_role}</option>
+      )}
+    </select>
+  );
+}
+
 function ActivationButton({
   user,
   onUpdated,
@@ -401,7 +447,7 @@ export default function AdminUsersPage() {
           <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
             <h2 className="text-sm font-semibold text-slate-900">Usuarios existentes</h2>
             <p className="text-xs text-slate-500 mt-1">
-              Nombre, email, rol global y estado de activación. Activa o desactiva el acceso desde aquí.
+              Nombre, email (identidad de inicio de sesión), rol global y estado de activación. Activa o desactiva el acceso desde aquí.
             </p>
           </div>
           <div className="p-5">
@@ -422,7 +468,7 @@ export default function AdminUsersPage() {
                     <thead>
                       <tr className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                         <th className="py-3 px-4">Nombre</th>
-                        <th className="py-3 px-4">Email</th>
+                        <th className="py-3 px-4">Email (login)</th>
                         <th className="py-3 px-4">Rol global</th>
                         <th className="py-3 px-4">Estado</th>
                         <th className="py-3 px-4 text-right">Acción</th>
@@ -434,9 +480,12 @@ export default function AdminUsersPage() {
                           <td className="py-3 px-4 font-medium text-slate-900">{u.full_name ?? "—"}</td>
                           <td className="py-3 px-4 text-slate-700">{u.email ?? "—"}</td>
                           <td className="py-3 px-4">
-                            <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
-                              {ROLE_LABELS[u.app_role] ?? u.app_role}
-                            </span>
+                            <RoleSelect
+                              user={u}
+                              onUpdated={loadUsers}
+                              getAuthHeaders={getAdminAuthHeaders}
+                              disabled={u.id === currentUserId}
+                            />
                           </td>
                           <td className="py-3 px-4">
                             <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${u.is_active ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>

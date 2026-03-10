@@ -45,20 +45,40 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    const { data: ticketRow, error: fetchErr } = await supabaseAdmin
+      .from("tickets")
+      .select("id, title, description, project_id, assigned_to")
+      .eq("id", ticketId)
+      .single();
+
+    if (fetchErr || !ticketRow) {
+      return NextResponse.json(
+        { error: "Ticket no encontrado." },
+        { status: 404 }
+      );
+    }
+
+    const projectId = (ticketRow.project_id as string | null) ?? null;
+    if (projectId) {
+      const { isProjectMember } = await import("@/lib/auth/serverAuth");
+      const member = await isProjectMember(user.userId, projectId);
+      if (!member && user.appRole !== "superadmin") {
+        return NextResponse.json(
+          { error: "No tienes acceso al proyecto de este ticket." },
+          { status: 403 }
+        );
+      }
+    }
+
     if (status === "closed") {
-      const { data: ticketRow, error: fetchErr } = await supabaseAdmin
-        .from("tickets")
-        .select("id, title, description, project_id, assigned_to")
-        .eq("id", ticketId)
-        .single();
-      if (!fetchErr && ticketRow?.project_id && (ticketRow.title || ticketRow.description)) {
-        const projectId = ticketRow.project_id as string;
-        const userId = (ticketRow.assigned_to as string | null) ?? user.userId ?? null;
+      if (ticketRow.project_id && (ticketRow.title || ticketRow.description)) {
+        const pid = ticketRow.project_id as string;
+        const userIdForMemory = (ticketRow.assigned_to as string | null) ?? user.userId ?? null;
         const record = extractKnowledgeFromTicket(
           (ticketRow.title as string) ?? "Issue resolved",
           (ticketRow.description as string) || null
         );
-        storeProjectMemory(projectId, userId, record, "ticket_closed").catch((err) =>
+        storeProjectMemory(pid, userIdForMemory, record, "ticket_closed").catch((err) =>
           console.error("[tickets] project memory store failed", err)
         );
       }

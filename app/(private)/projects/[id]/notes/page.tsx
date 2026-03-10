@@ -119,7 +119,7 @@ export default function ProjectNotesPage() {
       <ProjectPageHeader
         variant="section"
         title="Notas del proyecto"
-        subtitle="Notas y memoria funcional vinculadas a este proyecto."
+        subtitle="Notas operativas y memoria funcional de este proyecto. No son conocimiento global; solo visibles para miembros del proyecto."
         primaryActionLabel="Nueva nota"
         primaryActionHref={`/notes/new?projectId=${projectId}`}
       />

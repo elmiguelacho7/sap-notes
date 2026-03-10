@@ -75,27 +75,57 @@ export default function NotesPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // ==========================
-  // CARGAR NOTAS GENERALES
+  // CARGAR NOTAS GLOBALES (vía API con JWT para que RLS se aplique en servidor)
   // ==========================
   const fetchNotes = useCallback(async () => {
     setLoadingNotes(true);
     setErrorMsg(null);
+    setNotes([]); // Clear stale state before loading so consultant never sees previous user's notes
 
-    const { data, error } = await supabase
-      .from("notes")
-      .select("*")
-      .is("project_id", null) // Solo notas NO vinculadas a proyecto
-      .is("deleted_at", null) // Excluir notas eliminadas (soft delete)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      handleSupabaseError("notes", error);
-      setErrorMsg("No se pudieron cargar las notas.");
-      setNotes([]);
-    } else {
-      setNotes((data ?? []) as Note[]);
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    const sessionUserId = session?.user?.id ?? null;
+    if (process.env.NODE_ENV === "development") {
+      console.debug("[notes] fetchNotes: before /api/notes", { sessionUserId });
+    }
+    if (!token) {
+      setErrorMsg("Debes iniciar sesión para ver las notas.");
+      setLoadingNotes(false);
+      return;
     }
 
+    try {
+      const res = await fetch("/api/notes", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (process.env.NODE_ENV === "development") {
+        console.debug("[notes] fetchNotes: after response", { status: res.status });
+      }
+      if (!res.ok) {
+        if (res.status === 401) {
+          setErrorMsg("Sesión expirada. Inicia sesión de nuevo.");
+        } else {
+          setErrorMsg("No se pudieron cargar las notas.");
+        }
+        setLoadingNotes(false);
+        return;
+      }
+      const data = (await res.json()) as Note[];
+      const payloadLength = Array.isArray(data) ? data.length : 0;
+      if (process.env.NODE_ENV === "development") {
+        console.debug("[notes] fetchNotes: after JSON parse", { payloadLength });
+      }
+      setNotes(data);
+      if (process.env.NODE_ENV === "development") {
+        console.debug("[notes] fetchNotes: setNotes called with length", payloadLength);
+      }
+    } catch {
+      handleSupabaseError("notes", new Error("Network error"));
+      setErrorMsg("No se pudieron cargar las notas.");
+      setNotes([]);
+      setLoadingNotes(false);
+      return;
+    }
     setLoadingNotes(false);
   }, []);
 
@@ -121,6 +151,10 @@ export default function NotesPage() {
   }, []);
 
   const hasNotes = useMemo(() => notes.length > 0, [notes]);
+
+  if (process.env.NODE_ENV === "development") {
+    console.debug("[notes] render: notes state length =", notes.length);
+  }
 
   // ==========================
   // ENVIAR MENSAJE AL CHAT (Sapito project-agent, scope notes)
@@ -205,13 +239,18 @@ export default function NotesPage() {
         <div className="flex-1 min-w-0 space-y-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
             <div className="min-w-0">
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Notas generales</h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Notas globales</h1>
               <p className="mt-1 text-sm text-slate-600 max-w-2xl">
-                Base de conocimiento global. Errores recurrentes, configuraciones estándar y decisiones funcionales.
+                Conocimiento transversal curado: patrones SAP reutilizables, incidencias recurrentes, estándares de configuración y decisiones entre proyectos.
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500 max-w-2xl">
+                Solo superadministradores pueden ver y crear notas globales.
               </p>
             </div>
             <div className="shrink-0">
-              <Button onClick={() => router.push("/notes/new")}>Nueva nota general</Button>
+              {appRole === "superadmin" && (
+                <Button onClick={() => router.push("/notes/new")}>Nueva nota global</Button>
+              )}
             </div>
           </div>
 
@@ -233,9 +272,11 @@ export default function NotesPage() {
               </div>
             ) : !hasNotes ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <p className="text-sm font-medium text-slate-700">Todavía no hay notas generales</p>
+                <p className="text-sm font-medium text-slate-700">Todavía no hay notas globales</p>
                 <p className="mt-1 text-sm text-slate-500 max-w-sm">
-                  Crea tu primera nota para documentar un error típico, una configuración estándar o una decisión funcional que quieras reutilizar en futuros proyectos.
+                  {appRole === "superadmin"
+                    ? "Crea tu primera nota global para documentar un patrón SAP, una incidencia recurrente, un estándar de configuración o una decisión que quieras reutilizar en otros proyectos."
+                    : "Las notas globales solo son visibles para superadministradores. Crea o consulta notas dentro de un proyecto desde la pestaña Notas del proyecto."}
                 </p>
               </div>
             ) : (
@@ -350,7 +391,7 @@ export default function NotesPage() {
                 <div className="min-w-0">
                   <h2 className="text-sm font-semibold text-slate-900">Sapito de notas</h2>
                   <p className="mt-1 text-xs text-slate-500">
-                    Patrones, errores recurrentes y sugerencias para organizar tu base de conocimiento.
+                    Patrones, errores recurrentes y sugerencias derivadas de tus notas globales.
                   </p>
                 </div>
               </div>
