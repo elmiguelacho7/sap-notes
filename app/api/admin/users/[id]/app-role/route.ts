@@ -4,10 +4,13 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
+/** Allowed app_role values; must match DB constraint profiles_app_role_check. */
+const ALLOWED_APP_ROLES = ["superadmin", "admin", "consultant", "viewer"] as const;
+
 /**
  * PATCH /api/admin/users/:id/app-role
  * Body: { appRoleKey: string }. Updates profiles.app_role for the given profile/user id.
- * Superadmin only. Stored value is the role key from RBAC (e.g. superadmin, consultant).
+ * Superadmin only. Validates appRoleKey against allowed list before update.
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
@@ -30,12 +33,21 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const body = (await request.json()) as { appRoleKey?: string };
     const appRole =
       typeof body.appRoleKey === "string" && body.appRoleKey.trim() !== ""
-        ? body.appRoleKey.trim()
+        ? body.appRoleKey.trim().toLowerCase()
         : null;
 
     if (!appRole) {
       return NextResponse.json(
         { error: "Se requiere appRoleKey (texto)." },
+        { status: 400 }
+      );
+    }
+
+    if (!ALLOWED_APP_ROLES.includes(appRole as (typeof ALLOWED_APP_ROLES)[number])) {
+      return NextResponse.json(
+        {
+          error: `appRoleKey debe ser uno de: ${ALLOWED_APP_ROLES.join(", ")}.`,
+        },
         { status: 400 }
       );
     }

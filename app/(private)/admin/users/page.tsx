@@ -27,7 +27,16 @@ const ROLE_LABELS: Record<string, string> = {
   superadmin: "Superadministrador",
   admin: "Administrador",
   consultant: "Consultor",
+  viewer: "Lector",
 };
+
+/** Stable technical values for DB; labels for display. Must match PATCH allowed list. */
+const APP_ROLE_OPTIONS: { value: string; label: string }[] = [
+  { value: "superadmin", label: ROLE_LABELS.superadmin },
+  { value: "admin", label: ROLE_LABELS.admin },
+  { value: "consultant", label: ROLE_LABELS.consultant },
+  { value: "viewer", label: ROLE_LABELS.viewer },
+];
 
 function RoleSelect({
   user,
@@ -42,7 +51,7 @@ function RoleSelect({
 }) {
   const [loading, setLoading] = useState(false);
   const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const appRoleKey = e.target.value as "superadmin" | "consultant";
+    const appRoleKey = e.target.value;
     if (appRoleKey === user.app_role || loading || disabled) return;
     setLoading(true);
     try {
@@ -66,9 +75,12 @@ function RoleSelect({
       className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
       aria-label={`Rol de ${user.full_name || user.email}`}
     >
-      <option value="consultant">{ROLE_LABELS.consultant}</option>
-      <option value="superadmin">{ROLE_LABELS.superadmin}</option>
-      {user.app_role && !(user.app_role in ROLE_LABELS) && (
+      {APP_ROLE_OPTIONS.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+      {user.app_role && !ROLE_LABELS[user.app_role] && (
         <option value={user.app_role}>{user.app_role}</option>
       )}
     </select>
@@ -229,7 +241,7 @@ export default function AdminUsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
-  const [appRoleNew, setAppRoleNew] = useState<"superadmin" | "consultant">("consultant");
+  const [appRoleNew, setAppRoleNew] = useState<string>("consultant");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
@@ -418,12 +430,15 @@ export default function AdminUsersPage() {
                 <select
                   id="new-role"
                   value={appRoleNew}
-                  onChange={(e) => setAppRoleNew(e.target.value as "superadmin" | "consultant")}
+                  onChange={(e) => setAppRoleNew(e.target.value)}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   disabled={creating}
                 >
-                  <option value="consultant">Consultor</option>
-                  <option value="superadmin">Superadministrador</option>
+                  {APP_ROLE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <button

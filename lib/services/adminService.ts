@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 // Types
 // ==========================
 
-export type AppRole = "superadmin" | "consultant";
+export type AppRole = "superadmin" | "admin" | "consultant" | "viewer";
 
 export type ProjectMemberRole = "owner" | "editor" | "viewer";
 
@@ -79,7 +79,7 @@ export async function createAdminUser(
   if (!email) throw new Error("Email is required");
 
   const appRole: AppRole =
-    input.app_role === "superadmin" || input.app_role === "consultant"
+    input.app_role === "superadmin" || input.app_role === "admin" || input.app_role === "consultant" || input.app_role === "viewer"
       ? input.app_role
       : "consultant";
   const fullName = input.full_name?.trim() ?? null;

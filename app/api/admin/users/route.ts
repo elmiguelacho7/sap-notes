@@ -41,22 +41,24 @@ export async function PATCH(request: NextRequest) {
     const body = (await request.json()) as {
       userId?: string;
       appRole?: string;
+      app_role?: string;
     };
 
     const targetUserId =
       typeof body.userId === "string" && body.userId.trim() !== ""
         ? body.userId.trim()
         : null;
+    const rawRole = body.appRole ?? body.app_role;
     const appRole =
-      body.appRole === "superadmin" || body.appRole === "consultant"
-        ? (body.appRole as AppRole)
+      rawRole === "superadmin" || rawRole === "admin" || rawRole === "consultant" || rawRole === "viewer"
+        ? (rawRole as AppRole)
         : null;
 
     if (!targetUserId || !appRole) {
       return NextResponse.json(
         {
           error:
-            "Se requieren userId y appRole válidos (appRole: 'superadmin' | 'consultant').",
+            "Se requieren userId y appRole válidos (appRole: 'superadmin' | 'admin' | 'consultant' | 'viewer').",
         },
         { status: 400 }
       );
@@ -107,7 +109,7 @@ export async function POST(request: NextRequest) {
     }
 
     const appRole =
-      body.app_role === "superadmin" || body.app_role === "consultant"
+      body.app_role === "superadmin" || body.app_role === "admin" || body.app_role === "consultant" || body.app_role === "viewer"
         ? (body.app_role as AppRole)
         : undefined;
 
