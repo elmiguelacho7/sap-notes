@@ -55,7 +55,7 @@ const SIDEBAR_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: "SYSTEM",
     items: [
-      { label: "Clients", href: "/clients", icon: Building2, roles: ["superadmin"] },
+      { label: "Clients", href: "/clients", icon: Building2, roles: ["superadmin", "admin"] },
       { label: "Admin", href: "/admin", icon: ShieldCheck, roles: ["superadmin"] },
       { label: "Settings", href: "/account", icon: Settings },
     ],

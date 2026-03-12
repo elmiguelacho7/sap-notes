@@ -8,6 +8,7 @@ import { handleSupabaseError } from "@/lib/supabaseError";
 type Client = {
   id: string;
   name: string;
+  display_name?: string | null;
   country: string | null;
 };
 
@@ -133,7 +134,7 @@ export default function NewNotePage() {
         await Promise.all([
           supabase
             .from("clients")
-            .select("id, name, country")
+            .select("id, name, display_name, country")
             .order("name", { ascending: true }),
           supabase
             .from("modules")
@@ -403,7 +404,7 @@ export default function NewNotePage() {
                 <option value="">Nota genérica (sin cliente)</option>
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
-                    {client.name}
+                    {client.display_name || client.name}
                     {client.country ? ` · ${client.country}` : ""}
                   </option>
                 ))}

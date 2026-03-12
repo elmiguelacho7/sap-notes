@@ -9,8 +9,11 @@ import { createDefaultPhasesForProject } from "@/lib/services/projectPhaseServic
 type Client = {
   id: string;
   name: string;
+  display_name?: string | null;
   country: string | null;
   industry?: string | null;
+  account_tier?: string | null;
+  sap_relevance_summary?: string | null;
 };
 
 type Module = {
@@ -98,7 +101,7 @@ export default function NewProjectPage() {
     try {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, name, country, industry")
+        .select("id, name, display_name, country, industry, account_tier, sap_relevance_summary")
         .order("name", { ascending: true });
       if (error) {
         handleSupabaseError("clients", error);
@@ -118,7 +121,7 @@ export default function NewProjectPage() {
           await Promise.all([
             supabase
               .from("clients")
-              .select("id, name, country, industry")
+              .select("id, name, display_name, country, industry")
               .order("name", { ascending: true }),
             supabase
               .from("modules")
@@ -390,7 +393,7 @@ export default function NewProjectPage() {
                       <option value="">Sin cliente asignado todavía</option>
                       {clients.map((client) => (
                         <option key={client.id} value={client.id}>
-                          {client.name}
+                          {client.display_name || client.name}
                           {client.country ? ` · ${client.country}` : ""}
                         </option>
                       ))}
@@ -410,6 +413,23 @@ export default function NewProjectPage() {
                   <p className="text-[11px] text-slate-400">
                     Si es un proyecto interno o aún no está definido, puedes dejarlo vacío.
                   </p>
+                  {clientId && (() => {
+                    const client = clients.find((c) => c.id === clientId);
+                    if (!client) return null;
+                    return (
+                      <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-sm">
+                        <p className="font-medium text-slate-800">{client.display_name || client.name}</p>
+                        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-600">
+                          {client.country && <span>País: {client.country}</span>}
+                          {client.industry && <span>Industria: {client.industry}</span>}
+                          {client.account_tier && <span>Tier: {client.account_tier}</span>}
+                        </div>
+                        {client.sap_relevance_summary && (
+                          <p className="mt-2 text-xs text-slate-600 line-clamp-2">{client.sap_relevance_summary}</p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="space-y-1.5">
