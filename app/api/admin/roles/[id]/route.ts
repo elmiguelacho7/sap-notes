@@ -1,22 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 /**
  * PATCH /api/admin/roles/:id
- * Body: { is_active: boolean }. Toggle role active state. Superadmin only.
+ * Body: { is_active: boolean }. Toggle role active state. Requires manage_global_roles.
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndGlobalPermission(request, "manage_global_roles");
+    if (auth instanceof NextResponse) return auth;
 
     const { id } = await params;
     if (!id) {

@@ -7,8 +7,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCurrentUserIdFromRequest } from "@/lib/auth/serverAuth";
-import { isProjectMember } from "@/lib/auth/serverAuth";
+import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
   getDriveAccessToken,
@@ -117,11 +116,6 @@ async function getProjectDriveSource(projectId: string): Promise<{
 
 export async function POST(req: Request) {
   try {
-    const userId = await getCurrentUserIdFromRequest(req);
-    if (!userId) {
-      return NextResponse.json({ error: "Debes iniciar sesión." }, { status: 401 });
-    }
-
     let body: { projectId?: string };
     try {
       body = (await req.json()) as { projectId?: string };
@@ -140,13 +134,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const isMember = await isProjectMember(userId, projectId);
-    if (!isMember) {
-      return NextResponse.json(
-        { error: "No tienes acceso a este proyecto." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndProjectPermission(req, projectId, "manage_project_knowledge");
+    if (auth instanceof NextResponse) return auth;
+    const userId = auth.userId;
 
     const source = await getProjectDriveSource(projectId);
     if (!source) {

@@ -1,25 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getCurrentUserWithRoleFromRequest,
-  isProjectOwner,
-} from "@/lib/auth/serverAuth";
+import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { revokeInvitation } from "@/lib/services/invitationService";
 
 /**
  * POST /api/invitations/revoke
- * Body: { invitationId: string }. Owner or superadmin only. Sets status = 'revoked'.
+ * Body: { invitationId: string }. Resolves project from invitation, then requires manage_project_members on that project.
  */
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUserWithRoleFromRequest(request);
-    if (!user) {
-      return NextResponse.json(
-        { error: "No autorizado. Inicia sesión." },
-        { status: 401 }
-      );
-    }
-
     const body = (await request.json()) as { invitationId?: string };
     const invitationId =
       typeof body.invitationId === "string" ? body.invitationId.trim() : null;
@@ -43,13 +32,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isOwner = await isProjectOwner(user.userId, (inv as { project_id: string }).project_id);
-    if (user.appRole !== "superadmin" && !isOwner) {
-      return NextResponse.json(
-        { error: "No tienes permiso para revocar esta invitación." },
-        { status: 403 }
-      );
-    }
+    const projectId = (inv as { project_id: string }).project_id;
+    const auth = await requireAuthAndProjectPermission(request, projectId, "manage_project_members");
+    if (auth instanceof NextResponse) return auth;
 
     await revokeInvitation(invitationId);
     return NextResponse.json({ ok: true });

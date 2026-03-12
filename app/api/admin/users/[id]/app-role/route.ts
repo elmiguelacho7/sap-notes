@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -10,17 +10,12 @@ const ALLOWED_APP_ROLES = ["superadmin", "admin", "consultant", "viewer"] as con
 /**
  * PATCH /api/admin/users/:id/app-role
  * Body: { appRoleKey: string }. Updates profiles.app_role for the given profile/user id.
- * Superadmin only. Validates appRoleKey against allowed list before update.
+ * Requires manage_global_roles. Validates appRoleKey against allowed list before update.
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    const currentUserId = await requireSuperAdminFromRequest(request);
-    if (!currentUserId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndGlobalPermission(request, "manage_global_roles");
+    if (auth instanceof NextResponse) return auth;
 
     const { id: targetUserId } = await params;
     if (!targetUserId || String(targetUserId).trim() === "") {

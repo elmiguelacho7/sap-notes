@@ -75,7 +75,7 @@ export default function NewNotePage() {
     }
   }, [fromQuick, projectIdFromQuery, router]);
 
-  // Block consultants from global note creation: redirect if not superadmin when no projectId
+  // Block global note creation for users without manage_global_notes: redirect when no projectId
   useEffect(() => {
     if (isProjectMode) return;
     let cancelled = false;
@@ -85,9 +85,9 @@ export default function NewNotePage() {
       if (!token) return;
       const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
       if (cancelled) return;
-      const data = await res.json().catch(() => ({ appRole: null }));
-      const appRole = (data as { appRole?: string | null }).appRole ?? null;
-      if (appRole !== "superadmin") {
+      const data = await res.json().catch(() => ({ permissions: { manageGlobalNotes: false } }));
+      const perms = (data as { permissions?: { manageGlobalNotes?: boolean } }).permissions;
+      if (!perms?.manageGlobalNotes) {
         router.replace("/notes");
       }
     })();

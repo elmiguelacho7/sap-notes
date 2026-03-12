@@ -30,21 +30,30 @@ export function UserMenu() {
   useEffect(() => {
     async function load() {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) return;
 
       setEmail(user.email ?? null);
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name, app_role")
+        .select("full_name")
         .eq("id", user.id)
         .single();
 
       if (profile) {
         setFullName((profile as { full_name?: string | null }).full_name ?? null);
-        setAppRole((profile as { app_role?: string | null }).app_role ?? null);
+      }
+
+      // Role from /api/me (DB-backed) so it matches admin panel and backend
+      const token = session?.access_token;
+      if (token) {
+        const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json().catch(() => ({}));
+        const role = (data as { appRole?: string | null }).appRole ?? null;
+        setAppRole(role);
       }
     }
     void load();
@@ -70,6 +79,13 @@ export function UserMenu() {
 
   const initials = getInitials(fullName, email);
   const isSuperadmin = appRole === "superadmin";
+  const roleLabelMap: Record<string, string> = {
+    superadmin: "Superadministrador",
+    admin: "Administrador",
+    consultant: "Consultor",
+    viewer: "Lector",
+  };
+  const roleLabel = appRole ? roleLabelMap[appRole] ?? appRole : null;
 
   return (
     <div className="relative" ref={containerRef}>
@@ -98,7 +114,7 @@ export function UserMenu() {
             {email && (
               <p className="text-xs text-slate-500 truncate mt-0.5">{email}</p>
             )}
-            {appRole && (
+            {roleLabel && (
               <span
                 className={`inline-block mt-1.5 text-[11px] font-medium rounded-full px-2 py-0.5 ${
                   appRole === "superadmin"
@@ -106,7 +122,7 @@ export function UserMenu() {
                     : "bg-slate-100 text-slate-600"
                 }`}
               >
-                {appRole === "superadmin" ? "Superadministrador" : "Consultor"}
+                {roleLabel}
               </span>
             )}
           </div>

@@ -227,6 +227,7 @@ export default function ProjectDashboardPage() {
     canEdit: boolean;
     canArchive: boolean;
     canDelete: boolean;
+    canManageMembers?: boolean;
   } | null>(null);
 
   // Quick Actions "Crear" dropdown (UI only)
@@ -375,7 +376,7 @@ export default function ProjectDashboardPage() {
     void run();
   }, [projectId, projectLoadFailed]);
 
-  // Fetch project permissions (canEdit, canArchive, canDelete); fallback to superadmin from /api/me so buttons always show for superadmin
+  // Fetch project permissions (canEdit, canArchive, canDelete, canManageMembers) from API.
   useEffect(() => {
     if (!projectId || projectLoadFailed) return;
     let cancelled = false;
@@ -387,26 +388,17 @@ export default function ProjectDashboardPage() {
         if (token) {
           headers.Authorization = `Bearer ${token}`;
         }
-        const [permRes, meRes] = await Promise.all([
-          fetch(`/api/projects/${projectId}/permissions`, { headers }),
-          fetch("/api/me", { headers }),
-        ]);
+        const permRes = await fetch(`/api/projects/${projectId}/permissions`, { headers });
         if (cancelled) return;
         const permData = await permRes.json().catch(() => ({}));
-        const meData = await meRes.json().catch(() => ({ appRole: null }));
-        const appRole = (meData as { appRole?: string | null }).appRole ?? null;
-        const fromApi = {
+        setPermissions({
           canEdit: (permData as { canEdit?: boolean }).canEdit ?? false,
           canArchive: (permData as { canArchive?: boolean }).canArchive ?? false,
           canDelete: (permData as { canDelete?: boolean }).canDelete ?? false,
-        };
-        if (appRole === "superadmin") {
-          setPermissions({ canEdit: true, canArchive: true, canDelete: true });
-        } else {
-          setPermissions(fromApi);
-        }
+          canManageMembers: (permData as { canManageMembers?: boolean }).canManageMembers ?? false,
+        });
       } catch {
-        if (!cancelled) setPermissions({ canEdit: false, canArchive: false, canDelete: false });
+        if (!cancelled) setPermissions({ canEdit: false, canArchive: false, canDelete: false, canManageMembers: false });
       }
     }
     load();

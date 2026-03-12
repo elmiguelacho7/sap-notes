@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUserIdFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateActivatePlan } from "@/lib/activate/generateActivatePlan";
 
@@ -8,19 +8,10 @@ type RouteParams = { params: Promise<{ id: string }> };
 /**
  * POST /api/projects/[id]/generate-activate-plan
  * Generates project_phases, project_activities, project_tasks from templates.
- * Idempotent: if phases exist, returns skipped.
- * Requires auth and project access (member or service).
+ * Requires manage_project_tasks.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const userId = await getCurrentUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado." },
-        { status: 401 }
-      );
-    }
-
     const { id: projectId } = await params;
     if (!projectId?.trim()) {
       return NextResponse.json(
@@ -29,26 +20,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { data: member } = await supabaseAdmin
-      .from("project_members")
-      .select("project_id")
-      .eq("project_id", projectId)
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("app_role")
-      .eq("id", userId)
-      .single();
-
-    const isSuperAdmin = profile?.app_role === "superadmin";
-    if (!member && !isSuperAdmin) {
-      return NextResponse.json(
-        { error: "No tienes acceso a este proyecto." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndProjectPermission(request, projectId, "manage_project_tasks");
+    if (auth instanceof NextResponse) return auth;
 
     const result = await generateActivatePlan(projectId);
 

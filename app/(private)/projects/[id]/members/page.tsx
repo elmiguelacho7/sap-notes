@@ -89,8 +89,8 @@ export default function ProjectMembersPage() {
       const headers = await getAuthHeaders();
       const res = await fetch(`/api/projects/${projectId}/permissions`, { headers });
       const data = await res.json().catch(() => ({}));
-      const perms = data as { canEdit?: boolean };
-      setCanAdd(perms.canEdit === true);
+      const perms = data as { canManageMembers?: boolean };
+      setCanAdd(perms.canManageMembers === true);
     } catch {
       setCanAdd(false);
     }

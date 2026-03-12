@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getCurrentUserWithRoleFromRequest,
-} from "@/lib/auth/serverAuth";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
   extractKnowledgeFromTicket,
@@ -16,31 +13,14 @@ const ALLOWED_STATUSES = ["open", "in_progress", "resolved", "closed", "cancelle
 /**
  * PATCH /api/tickets/[id]
  * Updates ticket status (e.g. to "closed"). Body: { status: "closed" }.
- * Authorization: authenticated user (refine later with project role).
+ * Requires manage_project_tickets on the ticket's project.
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    const user = await getCurrentUserWithRoleFromRequest(request);
-    if (!user) {
-      return NextResponse.json(
-        { error: "No autorizado. Inicia sesión para continuar." },
-        { status: 403 }
-      );
-    }
-
     const { id: ticketId } = await params;
     if (!ticketId || String(ticketId).trim() === "") {
       return NextResponse.json(
         { error: "Se requiere el id del ticket." },
-        { status: 400 }
-      );
-    }
-
-    const body = (await request.json().catch(() => ({}))) as { status?: string };
-    const status = typeof body.status === "string" ? body.status.trim().toLowerCase() : null;
-    if (!status || !ALLOWED_STATUSES.includes(status as typeof ALLOWED_STATUSES[number])) {
-      return NextResponse.json(
-        { error: "Se requiere status válido: open, in_progress, resolved, closed, cancelled." },
         { status: 400 }
       );
     }
@@ -59,15 +39,24 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const projectId = (ticketRow.project_id as string | null) ?? null;
-    if (projectId) {
-      const { isProjectMember } = await import("@/lib/auth/serverAuth");
-      const member = await isProjectMember(user.userId, projectId);
-      if (!member && user.appRole !== "superadmin") {
-        return NextResponse.json(
-          { error: "No tienes acceso al proyecto de este ticket." },
-          { status: 403 }
-        );
-      }
+    if (!projectId) {
+      return NextResponse.json(
+        { error: "Ticket sin proyecto asociado." },
+        { status: 400 }
+      );
+    }
+
+    const auth = await requireAuthAndProjectPermission(request, projectId, "manage_project_tickets");
+    if (auth instanceof NextResponse) return auth;
+    const user = { userId: auth.userId };
+
+    const body = (await request.json().catch(() => ({}))) as { status?: string };
+    const status = typeof body.status === "string" ? body.status.trim().toLowerCase() : null;
+    if (!status || !ALLOWED_STATUSES.includes(status as (typeof ALLOWED_STATUSES)[number])) {
+      return NextResponse.json(
+        { error: "Se requiere status válido: open, in_progress, resolved, closed, cancelled." },
+        { status: 400 }
+      );
     }
 
     if (status === "closed") {
@@ -109,18 +98,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
 /**
  * DELETE /api/tickets/[id]
- * Hard-deletes a ticket. Authorization: superadmin only.
+ * Hard-deletes a ticket. Requires manage_project_tickets on the ticket's project.
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores pueden eliminar tickets." },
-        { status: 403 }
-      );
-    }
-
     const { id: ticketId } = await params;
     if (!ticketId || String(ticketId).trim() === "") {
       return NextResponse.json(
@@ -128,6 +109,30 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         { status: 400 }
       );
     }
+
+    const { data: ticketRow, error: fetchErr } = await supabaseAdmin
+      .from("tickets")
+      .select("project_id")
+      .eq("id", ticketId)
+      .maybeSingle();
+
+    if (fetchErr || !ticketRow) {
+      return NextResponse.json(
+        { error: "Ticket no encontrado." },
+        { status: 404 }
+      );
+    }
+
+    const projectId = (ticketRow.project_id as string | null) ?? null;
+    if (!projectId) {
+      return NextResponse.json(
+        { error: "Ticket sin proyecto asociado." },
+        { status: 400 }
+      );
+    }
+
+    const auth = await requireAuthAndProjectPermission(request, projectId, "manage_project_tickets");
+    if (auth instanceof NextResponse) return auth;
 
     const { error } = await supabaseAdmin
       .from("tickets")

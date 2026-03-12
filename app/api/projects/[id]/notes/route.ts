@@ -5,7 +5,7 @@ import {
   ProjectNotFoundError,
   type CreateNotePayload,
 } from "@/lib/services/projectService";
-import { getCurrentUserIdFromRequest, requireProjectAccess, requireSuperAdminFromRequest, isProjectMember } from "@/lib/auth/serverAuth";
+import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
 import {
   extractKnowledgeFromNote,
   storeProjectMemory,
@@ -60,22 +60,8 @@ export async function GET(req: Request, { params }: RouteParams) {
       );
     }
 
-    const userId = await getCurrentUserIdFromRequest(req);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
-    }
-
-    const isSuperadmin = await requireSuperAdminFromRequest(req);
-    const member = await isProjectMember(userId, projectId);
-    if (!isSuperadmin && !member) {
-      return NextResponse.json(
-        { error: "You do not have access to this project" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndProjectPermission(req, projectId, "view_project_notes");
+    if (auth instanceof NextResponse) return auth;
 
     const url = new URL(req.url);
     const limit = parseLimit(url.searchParams);
@@ -112,20 +98,9 @@ export async function POST(req: Request, { params }: RouteParams) {
       );
     }
 
-    const access = await requireProjectAccess(req, projectId);
-    if ("error" in access) {
-      if (access.error === "unauthorized") {
-        return NextResponse.json(
-          { error: "Authentication required" },
-          { status: 401 }
-        );
-      }
-      return NextResponse.json(
-        { error: "You do not have access to this project" },
-        { status: 403 }
-      );
-    }
-    const { userId } = access;
+    const auth = await requireAuthAndProjectPermission(req, projectId, "create_project_notes");
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     let body: PostBody;
     try {

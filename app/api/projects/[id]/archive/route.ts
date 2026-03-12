@@ -1,26 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getCurrentUserWithRoleFromRequest,
-  isProjectOwner,
-} from "@/lib/auth/serverAuth";
+import { requireAuthAndProjectOrGlobalPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 /**
  * PATCH /api/projects/[id]/archive
- * Sets project status to 'archived'. Authorization: superadmin or project owner.
+ * Sets project status to 'archived'. Requires edit_project on the project or manage_any_project (global write override).
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    const user = await getCurrentUserWithRoleFromRequest(request);
-    if (!user) {
-      return NextResponse.json(
-        { error: "No autorizado. Inicia sesión para continuar." },
-        { status: 403 }
-      );
-    }
-
     const { id: projectId } = await params;
     if (!projectId || String(projectId).trim() === "") {
       return NextResponse.json(
@@ -29,16 +18,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const canArchive =
-      user.appRole === "superadmin" ||
-      (await isProjectOwner(user.userId, projectId));
-
-    if (!canArchive) {
-      return NextResponse.json(
-        { error: "No tienes permiso para archivar este proyecto." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndProjectOrGlobalPermission(
+      request,
+      projectId,
+      "edit_project",
+      "manage_any_project"
+    );
+    if (auth instanceof NextResponse) return auth;
 
     const { error } = await supabaseAdmin
       .from("projects")

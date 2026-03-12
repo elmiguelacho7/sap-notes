@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export type ClientRow = {
@@ -11,17 +11,12 @@ export type ClientRow = {
 
 /**
  * GET /api/admin/clients
- * List all clients. Superadmin only.
+ * List all clients. Requires manage_clients.
  */
 export async function GET(request: NextRequest) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndGlobalPermission(request, "manage_clients");
+    if (auth instanceof NextResponse) return auth;
 
     const { data, error } = await supabaseAdmin
       .from("clients")
@@ -48,17 +43,13 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/admin/clients
- * Create a client. Body: { name }. Superadmin only.
+ * Create a client. Body: { name }. Requires manage_clients.
  */
 export async function POST(request: NextRequest) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndGlobalPermission(request, "manage_clients");
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     const body = (await request.json()) as { name?: string };
     const name =

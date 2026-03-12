@@ -189,18 +189,12 @@ export default function ProjectLinksPage() {
           headers.Authorization = `Bearer ${token}`;
         }
         
-        const [permRes, meRes] = await Promise.all([
-          fetch(`/api/projects/${projectId}/permissions`, { headers }),
-          fetch("/api/me", { headers }),
-        ]);
-
+        const permRes = await fetch(`/api/projects/${projectId}/permissions`, { headers });
 
         if (cancelled) return;
         const permData = await permRes.json().catch(() => ({}));
-        const meData = await meRes.json().catch(() => ({ appRole: null }));
-        const appRole = (meData as { appRole?: string | null }).appRole ?? null;
         const fromApi = (permData as { canEdit?: boolean }).canEdit ?? false;
-        setCanEdit(appRole === "superadmin" || fromApi);
+        setCanEdit(fromApi);
       } catch {
         if (!cancelled) setCanEdit(false);
       }

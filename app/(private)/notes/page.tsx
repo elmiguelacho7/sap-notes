@@ -65,7 +65,7 @@ export default function NotesPage() {
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(true);
-  const [appRole, setAppRole] = useState<string | null>(null);
+  const [manageGlobalNotes, setManageGlobalNotes] = useState(false);
 
   // Chat
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -133,20 +133,20 @@ export default function NotesPage() {
     fetchNotes();
   }, [fetchNotes]);
 
-  // Rol del usuario para acciones (View siempre; Edit/Delete solo superadmin)
+  // Permission for global notes edit/delete/create (aligned with API manage_global_notes)
   useEffect(() => {
     let cancelled = false;
-    async function loadRole() {
+    async function loadMe() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) return;
       const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
       if (cancelled) return;
-      const data = await res.json().catch(() => ({ appRole: null }));
-      const role = (data as { appRole?: string | null }).appRole ?? null;
-      setAppRole(role);
+      const data = await res.json().catch(() => ({ permissions: { manageGlobalNotes: false } }));
+      const perms = (data as { permissions?: { manageGlobalNotes?: boolean } }).permissions;
+      setManageGlobalNotes(perms?.manageGlobalNotes ?? false);
     }
-    loadRole();
+    loadMe();
     return () => { cancelled = true; };
   }, []);
 
@@ -244,11 +244,11 @@ export default function NotesPage() {
                 Conocimiento transversal curado: patrones SAP reutilizables, incidencias recurrentes, estándares de configuración y decisiones entre proyectos.
               </p>
               <p className="mt-0.5 text-xs text-slate-500 max-w-2xl">
-                Solo superadministradores pueden ver y crear notas globales.
+                Solo usuarios con permiso de notas globales pueden ver y crear notas globales.
               </p>
             </div>
             <div className="shrink-0">
-              {appRole === "superadmin" && (
+              {manageGlobalNotes && (
                 <Button onClick={() => router.push("/notes/new")}>Nueva nota global</Button>
               )}
             </div>
@@ -274,9 +274,9 @@ export default function NotesPage() {
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <p className="text-sm font-medium text-slate-700">Todavía no hay notas globales</p>
                 <p className="mt-1 text-sm text-slate-500 max-w-sm">
-                  {appRole === "superadmin"
+                  {manageGlobalNotes
                     ? "Crea tu primera nota global para documentar un patrón SAP, una incidencia recurrente, un estándar de configuración o una decisión que quieras reutilizar en otros proyectos."
-                    : "Las notas globales solo son visibles para superadministradores. Crea o consulta notas dentro de un proyecto desde la pestaña Notas del proyecto."}
+                    : "Las notas globales solo son visibles para usuarios con permiso. Crea o consulta notas dentro de un proyecto desde la pestaña Notas del proyecto."}
                 </p>
               </div>
             ) : (
@@ -366,9 +366,9 @@ export default function NotesPage() {
                           entity="note"
                           id={note.id}
                           viewHref={`/notes/${note.id}`}
-                          canEdit={appRole === "superadmin"}
-                          canDelete={appRole === "superadmin"}
-                          deleteEndpoint={appRole === "superadmin" ? `/api/notes/${note.id}` : undefined}
+                          canEdit={manageGlobalNotes}
+                          canDelete={manageGlobalNotes}
+                          deleteEndpoint={manageGlobalNotes ? `/api/notes/${note.id}` : undefined}
                           onDeleted={fetchNotes}
                         />
                       </div>

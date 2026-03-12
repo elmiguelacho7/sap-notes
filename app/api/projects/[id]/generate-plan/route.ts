@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUserIdFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateInitialActivatePlan } from "@/lib/services/projectPlanningService";
 
@@ -7,19 +7,10 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 /**
  * POST /api/projects/[id]/generate-plan
- * Generates SAP Activate plan (activities from templates) for the project.
- * Uses project start_date and planned_end_date. Requires auth.
+ * Generates SAP Activate plan (activities from templates). Requires manage_project_tasks.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const userId = await getCurrentUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado." },
-        { status: 401 }
-      );
-    }
-
     const { id: projectId } = await params;
     if (!projectId?.trim()) {
       return NextResponse.json(
@@ -27,6 +18,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         { status: 400 }
       );
     }
+
+    const auth = await requireAuthAndProjectPermission(request, projectId, "manage_project_tasks");
+    if (auth instanceof NextResponse) return auth;
 
     const { data: project, error: projectError } = await supabaseAdmin
       .from("projects")

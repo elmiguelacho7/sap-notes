@@ -81,23 +81,25 @@ export default function ProjectTicketsPage() {
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [appRole, setAppRole] = useState<string | null>(null);
+  const [canManageTickets, setCanManageTickets] = useState(false);
 
   useEffect(() => {
+    if (!projectId) return;
     let cancelled = false;
-    async function loadRole() {
+    async function loadPermissions() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-      if (!token) return;
-      const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(`/api/projects/${projectId}/permissions`, { headers });
       if (cancelled) return;
-      const data = await res.json().catch(() => ({ appRole: null }));
-      const role = (data as { appRole?: string | null }).appRole ?? null;
-      setAppRole(role);
+      const data = await res.json().catch(() => ({}));
+      const perms = data as { canManageProjectTickets?: boolean };
+      setCanManageTickets(perms.canManageProjectTickets ?? false);
     }
-    loadRole();
+    loadPermissions();
     return () => { cancelled = true; };
-  }, []);
+  }, [projectId]);
 
   const loadTickets = useCallback(async () => {
     if (!projectId) return;
@@ -222,9 +224,9 @@ export default function ProjectTicketsPage() {
                         entity="ticket"
                         id={t.id}
                         viewHref={`/tickets/${t.id}`}
-                        canEdit={appRole === "superadmin"}
-                        canDelete={appRole === "superadmin"}
-                        deleteEndpoint={appRole === "superadmin" ? `/api/tickets/${t.id}` : undefined}
+                        canEdit={canManageTickets}
+                        canDelete={canManageTickets}
+                        deleteEndpoint={canManageTickets ? `/api/tickets/${t.id}` : undefined}
                         onDeleted={loadTickets}
                       />
                     </td>

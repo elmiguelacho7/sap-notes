@@ -35,24 +35,28 @@ export default function ProjectNotesPage() {
   const [notes, setNotes] = useState<ProjectNoteSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [appRole, setAppRole] = useState<string | null>(null);
+  const [canEditNotes, setCanEditNotes] = useState(false);
+  const [canDeleteNotes, setCanDeleteNotes] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!projectId) return;
     let cancelled = false;
-    async function loadRole() {
+    async function loadPermissions() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-      if (!token) return;
-      const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(`/api/projects/${projectId}/permissions`, { headers });
       if (cancelled) return;
-      const data = await res.json().catch(() => ({ appRole: null }));
-      const role = (data as { appRole?: string | null }).appRole ?? null;
-      setAppRole(role);
+      const data = await res.json().catch(() => ({}));
+      const perms = data as { canEditProjectNotes?: boolean; canDeleteProjectNotes?: boolean };
+      setCanEditNotes(perms.canEditProjectNotes ?? false);
+      setCanDeleteNotes(perms.canDeleteProjectNotes ?? false);
     }
-    loadRole();
+    loadPermissions();
     return () => { cancelled = true; };
-  }, []);
+  }, [projectId]);
 
   const loadNotes = useCallback(async () => {
     if (!projectId) return;
@@ -194,9 +198,9 @@ export default function ProjectNotesPage() {
                     entity="note"
                     id={note.id}
                     viewHref={`/notes/${note.id}`}
-                    canEdit={appRole === "superadmin"}
-                    canDelete={appRole === "superadmin"}
-                    deleteEndpoint={appRole === "superadmin" ? `/api/notes/${note.id}` : undefined}
+                    canEdit={canEditNotes}
+                    canDelete={canDeleteNotes}
+                    deleteEndpoint={canDeleteNotes ? `/api/notes/${note.id}` : undefined}
                     onDeleted={loadNotes}
                   />
                 </div>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -7,18 +7,10 @@ type RouteParams = { params: Promise<{ id: string }> };
 /**
  * DELETE /api/projects/[id]
  * Hard-deletes a project only if it has no related notes or tickets.
- * Authorization: superadmin only.
+ * Requires edit_project on the project (e.g. project owner).
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores pueden eliminar proyectos." },
-        { status: 403 }
-      );
-    }
-
     const { id: projectId } = await params;
     if (!projectId || String(projectId).trim() === "") {
       return NextResponse.json(
@@ -26,6 +18,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         { status: 400 }
       );
     }
+
+    const auth = await requireAuthAndProjectPermission(request, projectId, "edit_project");
+    if (auth instanceof NextResponse) return auth;
 
     const [notesCount, ticketsCount] = await Promise.all([
       supabaseAdmin

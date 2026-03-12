@@ -4,6 +4,7 @@ import {
   getProjectKnowledgeNotes,
   ProjectNotFoundError,
 } from "@/lib/services/projectService";
+import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -28,6 +29,9 @@ export async function GET(req: Request, { params }: RouteParams) {
         { status: 400 }
       );
     }
+
+    const auth = await requireAuthAndProjectPermission(req, projectId, "view_project_knowledge");
+    if (auth instanceof NextResponse) return auth;
 
     const url = new URL(req.url);
     const limit = parseLimit(url.searchParams);
@@ -78,6 +82,10 @@ export async function POST(req: Request, { params }: RouteParams) {
       );
     }
 
+    const auth = await requireAuthAndProjectPermission(req, projectId, "manage_project_knowledge");
+    if (auth instanceof NextResponse) return auth;
+    const { userId: authUserId } = auth;
+
     let body: PostBody;
     try {
       body = (await req.json()) as PostBody;
@@ -91,18 +99,12 @@ export async function POST(req: Request, { params }: RouteParams) {
       );
     }
 
-    const userId = nonEmptyString(body.userId);
+    const userId = nonEmptyString(body.userId) ?? authUserId;
     const title = nonEmptyString(body.title);
     const content = nonEmptyString(body.content);
     const topicType = nonEmptyString(body.topicType);
     const source = nonEmptyString(body.source);
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: "userId is required and must be a non-empty string." },
-        { status: 400 }
-      );
-    }
     if (!title) {
       return NextResponse.json(
         { error: "title is required and must be a non-empty string." },

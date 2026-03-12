@@ -1,12 +1,10 @@
 /**
  * GET /api/admin/knowledge-sources
- * List knowledge sources. Superadmin only.
+ * List knowledge sources. Requires manage_knowledge_sources.
  * Query: scope=global|project|all (default: global), projectId (optional, for scope=project filter).
- * Returns project_id and project_name for project sources when scope is project or all.
- * Always returns JSON; never throws. Returns { sources: [] } when empty or on error path.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 const ENV_ERROR_MESSAGE = "Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL";
@@ -39,27 +37,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: FALLBACK_ERROR }, { status: 500 });
     }
 
-    let userId: string | null = null;
-    try {
-      userId = await requireSuperAdminFromRequest(request);
-    } catch (authErr) {
-      const msg = authErr instanceof Error ? authErr.message : "Auth check failed";
-      if (msg.includes("Missing SUPABASE") || msg === ENV_ERROR_MESSAGE) {
-        console.error("[admin/knowledge-sources]", ENV_ERROR_MESSAGE);
-        return NextResponse.json({ error: ENV_ERROR_MESSAGE }, { status: 503 });
-      }
-      console.error("[admin/knowledge-sources] GET auth error", msg);
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndGlobalPermission(request, "manage_knowledge_sources");
+    if (auth instanceof NextResponse) return auth;
 
     const url = request.url ? new URL(request.url) : null;
     const scopeParam = url?.searchParams.get("scope") ?? "global";
@@ -153,23 +132,12 @@ const ALLOWED_SOURCE_TYPES = [
 /**
  * POST /api/admin/knowledge-sources
  * Create a global knowledge source. Body: { source_type, source_name (or name), source_url? (or url), external_ref?, integration_id? }.
- * Superadmin only. scope_type = 'global', project_id = null. Always returns JSON; never throws.
+ * Requires manage_knowledge_sources. scope_type = 'global', project_id = null.
  */
 export async function POST(request: NextRequest) {
-  let userId: string | null = null;
-  try {
-    userId = await requireSuperAdminFromRequest(request);
-  } catch (authErr) {
-    const msg = authErr instanceof Error ? authErr.message : "Auth check failed";
-    if (msg.includes("Missing SUPABASE") || msg === ENV_ERROR_MESSAGE) {
-      console.error("[admin/knowledge-sources]", ENV_ERROR_MESSAGE);
-      return NextResponse.json({ error: ENV_ERROR_MESSAGE }, { status: 503 });
-    }
-    return NextResponse.json({ error: "No autorizado. Solo superadministradores." }, { status: 403 });
-  }
-  if (!userId) {
-    return NextResponse.json({ error: "No autorizado. Solo superadministradores." }, { status: 403 });
-  }
+  const auth = await requireAuthAndGlobalPermission(request, "manage_knowledge_sources");
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   let body: {
     source_type?: string;

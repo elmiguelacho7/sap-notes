@@ -15,6 +15,7 @@ type Note = {
   scope_item: string | null;
   error_code: string | null;
   created_at: string;
+  project_id: string | null;
 };
 
 export default function NoteDetailPage() {
@@ -25,7 +26,8 @@ export default function NoteDetailPage() {
   const [note, setNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [appRole, setAppRole] = useState<string | null>(null);
+  const [canEditNote, setCanEditNote] = useState(false);
+  const [canDeleteNote, setCanDeleteNote] = useState(false);
 
   useEffect(() => {
     const fetchNote = async () => {
@@ -60,19 +62,32 @@ export default function NoteDetailPage() {
 
   useEffect(() => {
     let cancelled = false;
-    async function loadRole() {
+    async function loadPermissions() {
+      if (!note) return;
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-      if (!token) return;
-      const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
-      if (cancelled) return;
-      const data = await res.json().catch(() => ({ appRole: null }));
-      const role = (data as { appRole?: string | null }).appRole ?? null;
-      setAppRole(role);
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (note.project_id) {
+        const res = await fetch(`/api/projects/${note.project_id}/permissions`, { headers });
+        if (cancelled) return;
+        const data = await res.json().catch(() => ({}));
+        const perms = data as { canEditProjectNotes?: boolean; canDeleteProjectNotes?: boolean };
+        setCanEditNote(perms.canEditProjectNotes ?? false);
+        setCanDeleteNote(perms.canDeleteProjectNotes ?? false);
+      } else {
+        const res = await fetch("/api/me", { headers });
+        if (cancelled) return;
+        const data = await res.json().catch(() => ({ permissions: { manageGlobalNotes: false } }));
+        const perms = (data as { permissions?: { manageGlobalNotes?: boolean } }).permissions;
+        const manage = perms?.manageGlobalNotes ?? false;
+        setCanEditNote(manage);
+        setCanDeleteNote(manage);
+      }
     }
-    loadRole();
+    loadPermissions();
     return () => { cancelled = true; };
-  }, []);
+  }, [note?.id, note?.project_id]);
 
   return (
     <div className="w-full px-6 py-7">
@@ -121,10 +136,10 @@ export default function NoteDetailPage() {
                   <ObjectActions
                     entity="note"
                     id={note.id}
-                    canEdit={false}
+                    canEdit={canEditNote}
                     canArchive={false}
-                    canDelete={appRole === "superadmin"}
-                    deleteEndpoint={appRole === "superadmin" ? `/api/notes/${note.id}` : undefined}
+                    canDelete={canDeleteNote}
+                    deleteEndpoint={canDeleteNote ? `/api/notes/${note.id}` : undefined}
                   />
                 </div>
               </header>

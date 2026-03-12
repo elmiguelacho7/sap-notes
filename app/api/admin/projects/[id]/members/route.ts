@@ -1,27 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndProjectOrGlobalPermission } from "@/lib/auth/permissions";
 import {
   getProjectMembers,
   setProjectMember,
   removeProjectMember,
   type ProjectMemberRole,
 } from "@/lib/services/adminService";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+/**
+ * GET /api/admin/projects/[id]/members
+ * List members. Requires manage_any_project (global) or manage_project_members (on this project).
+ */
 export async function GET(
   request: NextRequest,
   context: RouteContext
 ) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
-
     const { id: projectId } = await context.params;
     if (!projectId || projectId.trim() === "") {
       return NextResponse.json(
@@ -29,6 +26,13 @@ export async function GET(
         { status: 400 }
       );
     }
+    const auth = await requireAuthAndProjectOrGlobalPermission(
+      request,
+      projectId,
+      "manage_project_members",
+      "manage_any_project"
+    );
+    if (auth instanceof NextResponse) return auth;
 
     const members = await getProjectMembers(projectId);
     return NextResponse.json({ members });
@@ -41,19 +45,15 @@ export async function GET(
   }
 }
 
+/**
+ * POST /api/admin/projects/[id]/members
+ * Add/update member. Requires manage_any_project (global) or manage_project_members (on this project).
+ */
 export async function POST(
   request: NextRequest,
   context: RouteContext
 ) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
-
     const { id: projectId } = await context.params;
     if (!projectId || projectId.trim() === "") {
       return NextResponse.json(
@@ -61,6 +61,13 @@ export async function POST(
         { status: 400 }
       );
     }
+    const auth = await requireAuthAndProjectOrGlobalPermission(
+      request,
+      projectId,
+      "manage_project_members",
+      "manage_any_project"
+    );
+    if (auth instanceof NextResponse) return auth;
 
     const body = (await request.json()) as {
       userId?: string;
@@ -99,16 +106,7 @@ export async function POST(
 
 export async function DELETE(request: NextRequest) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
-
     const body = (await request.json()) as { memberId?: string };
-
     const memberId =
       typeof body.memberId === "string" && body.memberId.trim() !== ""
         ? body.memberId.trim()
@@ -120,6 +118,28 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const { data: memberRow } = await supabaseAdmin
+      .from("project_members")
+      .select("project_id")
+      .eq("id", memberId)
+      .maybeSingle();
+
+    const projectId = (memberRow as { project_id?: string } | null)?.project_id?.trim() ?? null;
+    if (!projectId) {
+      return NextResponse.json(
+        { error: "Miembro no encontrado." },
+        { status: 404 }
+      );
+    }
+
+    const auth = await requireAuthAndProjectOrGlobalPermission(
+      request,
+      projectId,
+      "manage_project_members",
+      "manage_any_project"
+    );
+    if (auth instanceof NextResponse) return auth;
 
     await removeProjectMember(memberId);
     return NextResponse.json({ success: true });

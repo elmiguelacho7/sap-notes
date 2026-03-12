@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getCurrentUserWithRoleFromRequest,
-  isProjectOwner,
-} from "@/lib/auth/serverAuth";
+import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
 import {
   getProjectMembers,
   setProjectMember,
@@ -18,29 +15,17 @@ import { sendInvitationEmail } from "@/lib/email/sendInvitationEmail";
 
 /**
  * Project invitations API.
- *
- * TEST CHECKLIST (manual):
- * - Invite existing user (email already in auth/profiles) -> user is added to project_members, response { added: true }.
- * - Invite new email -> invitation created, email sent (or actionLink returned), response { invited: true }; open /invite?token=... -> sign in -> accept -> user becomes member.
- * - Expired token: GET /api/invitations/lookup?token=expired_token -> 404 or error; invite page shows "Invitación no válida".
- * - Wrong logged-in email: accept with token for A while logged in as B -> 403 with message showing current vs invitation email.
+ * GET: list pending invitations. POST: create invitation or add existing user.
+ * Both require manage_project_members on the project.
  */
 type RouteParams = { params: Promise<{ id: string }> };
 
 /**
  * GET /api/projects/[id]/invitations
- * List pending invitations for the project. Owner or superadmin only.
+ * List pending invitations. Requires manage_project_members on the project.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const user = await getCurrentUserWithRoleFromRequest(request);
-    if (!user) {
-      return NextResponse.json(
-        { error: "No autorizado. Inicia sesión." },
-        { status: 401 }
-      );
-    }
-
     const { id: projectId } = await params;
     if (!projectId?.trim()) {
       return NextResponse.json(
@@ -49,13 +34,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const isOwner = await isProjectOwner(user.userId, projectId);
-    if (user.appRole !== "superadmin" && !isOwner) {
-      return NextResponse.json(
-        { error: "Solo el propietario o un superadmin puede ver las invitaciones." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndProjectPermission(request, projectId, "manage_project_members");
+    if (auth instanceof NextResponse) return auth;
 
     const invitations = await getProjectPendingInvitations(projectId);
     return NextResponse.json({ invitations });
@@ -73,18 +53,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  * Body: { email: string, role: string }.
  * If user exists -> add to project_members, return { added: true }.
  * Else -> create invitation with token, send email, return { invited: true }.
- * Owner or superadmin only.
+ * Requires manage_project_members on the project.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const user = await getCurrentUserWithRoleFromRequest(request);
-    if (!user) {
-      return NextResponse.json(
-        { error: "No autorizado. Inicia sesión." },
-        { status: 401 }
-      );
-    }
-
     const { id: projectId } = await params;
     if (!projectId?.trim()) {
       return NextResponse.json(
@@ -93,13 +65,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const isOwner = await isProjectOwner(user.userId, projectId);
-    if (user.appRole !== "superadmin" && !isOwner) {
-      return NextResponse.json(
-        { error: "No tienes permiso para invitar a este proyecto." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndProjectPermission(request, projectId, "manage_project_members");
+    if (auth instanceof NextResponse) return auth;
+    const user = { userId: auth.userId };
 
     const body = (await request.json()) as { email?: string; role?: string };
     const emailRaw =

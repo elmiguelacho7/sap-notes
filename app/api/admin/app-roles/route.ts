@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export type AppRoleOption = {
@@ -12,18 +12,12 @@ export type AppRoleOption = {
 
 /**
  * GET /api/admin/app-roles
- * Returns active app roles from public.roles (scope='app', is_active=true), ordered by name.
- * Superadmin only.
+ * Returns active app roles from public.roles (scope='app', is_active=true). Requires view_admin_panel.
  */
 export async function GET(request: NextRequest) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndGlobalPermission(request, "view_admin_panel");
+    if (auth instanceof NextResponse) return auth;
 
     const { data, error } = await supabaseAdmin
       .from("roles")

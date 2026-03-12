@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Plus, FolderKanban, CheckSquare, FileText, Ticket } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 export type QuickActionItem = {
   label: string;
@@ -11,7 +12,7 @@ export type QuickActionItem = {
   icon?: ReactNode;
 };
 
-const DEFAULT_ITEMS: QuickActionItem[] = [
+const ALL_ITEMS: QuickActionItem[] = [
   { label: "Create Project", href: "/projects/new", icon: <FolderKanban className="h-[18px] w-[18px]" /> },
   { label: "Create Task", href: "/tasks", icon: <CheckSquare className="h-[18px] w-[18px]" /> },
   { label: "Create Note", href: "/notes/new", icon: <FileText className="h-[18px] w-[18px]" /> },
@@ -20,7 +21,7 @@ const DEFAULT_ITEMS: QuickActionItem[] = [
 
 export function QuickActionMenu({
   label = "+ Create",
-  items = DEFAULT_ITEMS,
+  items: itemsProp,
   className = "",
 }: {
   label?: string;
@@ -28,7 +29,37 @@ export function QuickActionMenu({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [canCreateProject, setCanCreateProject] = useState(false);
+  const [itemsReady, setItemsReady] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        setCanCreateProject(false);
+        setItemsReady(true);
+        return;
+      }
+      const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
+      if (cancelled) return;
+      const data = await res.json().catch(() => ({}));
+      const perms = (data as { permissions?: { createProject?: boolean } }).permissions;
+      setCanCreateProject(perms?.createProject ?? false);
+      setItemsReady(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const defaultItems =
+    itemsReady
+      ? canCreateProject
+        ? ALL_ITEMS
+        : ALL_ITEMS.filter((i) => i.href !== "/projects/new")
+      : ALL_ITEMS;
+  const items = itemsProp ?? defaultItems;
 
   useEffect(() => {
     if (!open) return;

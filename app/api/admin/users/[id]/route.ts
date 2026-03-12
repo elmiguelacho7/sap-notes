@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
 import { canDeleteUser, deleteUser } from "@/lib/services/adminService";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
@@ -13,13 +13,9 @@ type RouteParams = { params: Promise<{ id: string }> };
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const currentUserId = await requireSuperAdminFromRequest(request);
-    if (!currentUserId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndGlobalPermission(request, "manage_users");
+    if (auth instanceof NextResponse) return auth;
+    const currentUserId = auth.userId;
 
     const { id: targetUserId } = await params;
     if (!targetUserId || String(targetUserId).trim() === "") {

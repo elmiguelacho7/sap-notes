@@ -1,23 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest, getCurrentUserWithRoleFromRequest, isProjectMember } from "@/lib/auth/serverAuth";
+import { requireAuthAndProjectPermission, requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 /**
  * PATCH /api/notes/[id]
- * Update note fields (e.g. is_knowledge_base). Auth: superadmin or project member (for project notes); global notes require superadmin.
+ * Update note fields (e.g. is_knowledge_base). Requires edit_project_notes (project notes) or manage_global_notes (global notes).
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    const user = await getCurrentUserWithRoleFromRequest(request);
-    if (!user) {
-      return NextResponse.json(
-        { error: "No autorizado. Debes iniciar sesión." },
-        { status: 401 }
-      );
-    }
-
     const { id: noteId } = await params;
     if (!noteId || String(noteId).trim() === "") {
       return NextResponse.json(
@@ -40,20 +32,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const projectId = (noteRow as { project_id: string | null }).project_id;
-    if (projectId == null) {
-      if (user.appRole !== "superadmin") {
-        return NextResponse.json(
-          { error: "No autorizado. Solo superadministradores pueden editar notas globales." },
-          { status: 403 }
-        );
-      }
+    if (projectId != null && projectId.trim() !== "") {
+      const auth = await requireAuthAndProjectPermission(request, projectId, "edit_project_notes");
+      if (auth instanceof NextResponse) return auth;
     } else {
-      if (user.appRole !== "superadmin" && !(await isProjectMember(user.userId, projectId))) {
-        return NextResponse.json(
-          { error: "No autorizado. No eres miembro del proyecto de esta nota." },
-          { status: 403 }
-        );
-      }
+      const auth = await requireAuthAndGlobalPermission(request, "manage_global_notes");
+      if (auth instanceof NextResponse) return auth;
     }
 
     let body: { is_knowledge_base?: boolean };
@@ -107,25 +91,38 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
 /**
  * DELETE /api/notes/[id]
- * Soft-deletes a note (sets deleted_at). Requires notes.deleted_at column (see migration 20250228200000_notes_add_deleted_at.sql).
- * Authorization: superadmin only.
+ * Soft-deletes a note (sets deleted_at). Requires delete_project_notes (project notes) or manage_global_notes (global notes).
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores pueden eliminar notas." },
-        { status: 403 }
-      );
-    }
-
     const { id: noteId } = await params;
     if (!noteId || String(noteId).trim() === "") {
       return NextResponse.json(
         { error: "Se requiere el id de la nota." },
         { status: 400 }
       );
+    }
+
+    const { data: noteRow, error: fetchError } = await supabaseAdmin
+      .from("notes")
+      .select("project_id")
+      .eq("id", noteId)
+      .maybeSingle();
+
+    if (fetchError || !noteRow) {
+      return NextResponse.json(
+        { error: "No se encontró la nota." },
+        { status: 404 }
+      );
+    }
+
+    const projectId = (noteRow as { project_id: string | null }).project_id;
+    if (projectId != null && projectId.trim() !== "") {
+      const auth = await requireAuthAndProjectPermission(request, projectId, "delete_project_notes");
+      if (auth instanceof NextResponse) return auth;
+    } else {
+      const auth = await requireAuthAndGlobalPermission(request, "manage_global_notes");
+      if (auth instanceof NextResponse) return auth;
     }
 
     const { error } = await supabaseAdmin

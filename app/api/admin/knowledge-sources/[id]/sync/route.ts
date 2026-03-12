@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
   getDriveAccessToken,
@@ -91,23 +91,9 @@ type RouteParams = { params: Promise<{ id: string }> };
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     console.log("[admin/knowledge-sources/sync] route hit");
-    let userId: string | null = null;
-    try {
-      userId = await requireSuperAdminFromRequest(request);
-    } catch (authErr) {
-      const msg = authErr instanceof Error ? authErr.message : "Auth check failed";
-      console.error("[admin/knowledge-sources/sync] auth error", msg);
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndGlobalPermission(request, "manage_knowledge_sources");
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     const { id: sourceId } = await params;
     if (!sourceId?.trim()) {

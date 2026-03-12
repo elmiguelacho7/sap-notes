@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getCurrentUserWithRoleFromRequest,
-  isProjectOwner,
-  isProjectMember,
-} from "@/lib/auth/serverAuth";
+import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
 import {
   getProjectMembers,
   setProjectMember,
@@ -18,19 +14,10 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 /**
  * GET /api/projects/[id]/members
- * Returns project members. Caller must be project member, owner, or superadmin.
- * Uses service role to read. Returns [] with 200 on empty or on read error (no hard-fail).
+ * Returns project members. Requires view_project (any project member can view).
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const user = await getCurrentUserWithRoleFromRequest(request);
-    if (!user) {
-      return NextResponse.json(
-        { error: "No autorizado. Inicia sesión." },
-        { status: 401 }
-      );
-    }
-
     const { id: projectId } = await params;
     if (!projectId || String(projectId).trim() === "") {
       return NextResponse.json(
@@ -39,15 +26,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const isOwner = await isProjectOwner(user.userId, projectId);
-    const isMember = await isProjectMember(user.userId, projectId);
-    const canView = user.appRole === "superadmin" || isOwner || isMember;
-    if (!canView) {
-      return NextResponse.json(
-        { error: "No tienes permiso para ver los miembros de este proyecto." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndProjectPermission(request, projectId, "view_project");
+    if (auth instanceof NextResponse) return auth;
 
     try {
       const members = await getProjectMembers(projectId);
@@ -68,20 +48,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 /**
  * POST /api/projects/[id]/members
  * Add or invite by email. Body: { email, role }.
- * If user exists -> add to project_members, return { status: "added", member, message }.
- * If user does not exist -> store invitation, send invite email, return { status: "invited", message }.
- * Caller must be project owner or superadmin.
+ * Requires manage_project_members on the project.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const user = await getCurrentUserWithRoleFromRequest(request);
-    if (!user) {
-      return NextResponse.json(
-        { error: "No autorizado. Inicia sesión." },
-        { status: 401 }
-      );
-    }
-
     const { id: projectId } = await params;
     if (!projectId || String(projectId).trim() === "") {
       return NextResponse.json(
@@ -90,14 +60,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const isOwner = await isProjectOwner(user.userId, projectId);
-    const canAdd = user.appRole === "superadmin" || isOwner;
-    if (!canAdd) {
-      return NextResponse.json(
-        { error: "No tienes permiso para añadir miembros a este proyecto." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndProjectPermission(request, projectId, "manage_project_members");
+    if (auth instanceof NextResponse) return auth;
+    const user = { userId: auth.userId };
 
     const body = (await request.json()) as { email?: string; role?: string };
     const emailRaw =

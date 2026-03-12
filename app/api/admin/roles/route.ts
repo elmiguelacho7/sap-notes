@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export type RoleWithPermissions = {
@@ -13,17 +13,12 @@ export type RoleWithPermissions = {
 
 /**
  * GET /api/admin/roles
- * Returns all roles with their permissions (grouped). Superadmin only for consistency.
+ * Returns all roles with their permissions (grouped). Requires manage_global_roles.
  */
 export async function GET(request: NextRequest) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndGlobalPermission(request, "manage_global_roles");
+    if (auth instanceof NextResponse) return auth;
 
     const [rolesRes, permsRes, rpRes] = await Promise.all([
       supabaseAdmin.from("roles").select("id, scope, key, name, is_active").order("scope").order("key"),

@@ -1,22 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 /**
  * PUT /api/admin/roles/:id/permissions
- * Body: { permissionIds: string[] }. Replaces the permission set for the role. Superadmin only.
+ * Body: { permissionIds: string[] }. Replaces the permission set for the role. Requires manage_global_roles.
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndGlobalPermission(request, "manage_global_roles");
+    if (auth instanceof NextResponse) return auth;
 
     const { id: roleId } = await params;
     if (!roleId) {

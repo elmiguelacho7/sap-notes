@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUserIdFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -10,16 +10,10 @@ function toISODate(d: Date): string {
 
 /**
  * GET /api/projects/[id]/activate-plan
- * Returns SAP Activate phases with computed date ranges and task counts for the project.
- * Requires auth.
+ * Returns SAP Activate phases with computed date ranges and task counts. Requires view_project_tasks.
  */
 export async function GET(request: Request, { params }: RouteParams) {
   try {
-    const userId = await getCurrentUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json({ error: "No autorizado." }, { status: 401 });
-    }
-
     const { id: projectId } = await params;
     if (!projectId?.trim()) {
       return NextResponse.json(
@@ -27,6 +21,9 @@ export async function GET(request: Request, { params }: RouteParams) {
         { status: 400 }
       );
     }
+
+    const auth = await requireAuthAndProjectPermission(request, projectId, "view_project_tasks");
+    if (auth instanceof NextResponse) return auth;
 
     const { data: project, error: projectError } = await supabaseAdmin
       .from("projects")

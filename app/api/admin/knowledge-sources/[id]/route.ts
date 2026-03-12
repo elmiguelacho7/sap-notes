@@ -1,23 +1,18 @@
 /**
  * DELETE /api/admin/knowledge-sources/[id]
- * Delete a global knowledge source. Superadmin only.
+ * Delete a global knowledge source. Requires manage_knowledge_sources.
  * Only allows deleting scope_type=global sources.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndGlobalPermission(request, "manage_knowledge_sources");
+    if (auth instanceof NextResponse) return auth;
 
     const { id } = await params;
     if (!id?.trim()) {

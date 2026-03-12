@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUserIdFromRequest, isProjectMember } from "@/lib/auth/serverAuth";
+import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
   getDriveAccessToken,
@@ -121,21 +121,9 @@ export async function POST(_req: Request, { params }: RouteParams) {
       );
     }
 
-    const userId = await getCurrentUserIdFromRequest(_req);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Debes iniciar sesión para sincronizar" },
-        { status: 401 }
-      );
-    }
-
-    const isMember = await isProjectMember(userId, projectId);
-    if (!isMember) {
-      return NextResponse.json(
-        { error: "No tienes acceso a este proyecto" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndProjectPermission(_req, projectId, "manage_project_knowledge");
+    if (auth instanceof NextResponse) return auth;
+    const userId = auth.userId;
 
     const { data: sourceRow, error: sourceError } = await supabaseAdmin
       .from("project_sources")

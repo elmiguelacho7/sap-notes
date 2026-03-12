@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdminFromRequest } from "@/lib/auth/serverAuth";
+import { requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
 import {
   getAllUsersWithRoles,
   updateUserAppRole,
@@ -9,13 +9,9 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndGlobalPermission(request, "manage_users");
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     const users = await getAllUsersWithRoles();
     return NextResponse.json({ users });
@@ -30,13 +26,9 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndGlobalPermission(request, "manage_users");
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     const body = (await request.json()) as {
       userId?: string;
@@ -78,17 +70,13 @@ export async function PATCH(request: NextRequest) {
 /**
  * POST /api/admin/users
  * Create/invite a user. Body: { email, full_name?, app_role? }.
- * Superadmin only. Creates auth user and profile.
+ * Requires manage_users. Creates auth user and profile.
  */
 export async function POST(request: NextRequest) {
   try {
-    const userId = await requireSuperAdminFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "No autorizado. Solo superadministradores." },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAuthAndGlobalPermission(request, "manage_users");
+    if (auth instanceof NextResponse) return auth;
+    const { userId: _userId } = auth;
 
     const body = (await request.json()) as {
       email?: string;

@@ -28,6 +28,25 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectCardProject[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [canCreateProject, setCanCreateProject] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        setCanCreateProject(false);
+        return;
+      }
+      const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
+      if (cancelled) return;
+      const data = await res.json().catch(() => ({}));
+      const perms = (data as { permissions?: { createProject?: boolean } }).permissions;
+      setCanCreateProject(perms?.createProject ?? false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -128,7 +147,7 @@ export default function ProjectsPage() {
         <PageHeader
           title="Proyectos"
           description="Registra y organiza aquí tus proyectos. Abre un proyecto para ver su workspace."
-          actions={<Button onClick={() => router.push("/projects/new")}>Nuevo proyecto</Button>}
+          actions={canCreateProject ? <Button onClick={() => router.push("/projects/new")}>Nuevo proyecto</Button> : undefined}
         />
 
       <section>

@@ -6,6 +6,7 @@
  */
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hasGlobalPermission } from "@/lib/auth/permissions";
 import { getPlatformMetrics } from "@/lib/metrics/platformMetrics";
 import { getUserProjectIds } from "@/lib/metrics/platformMetrics";
 import { analyzeProjectHealth, type ProjectHealthSignals } from "@/lib/ai/projectIntelligence";
@@ -268,8 +269,8 @@ export async function getProjectOverview(
 
 /**
  * Returns a compact insight summary about notes visible to the user.
- * - Superadmin: all non-deleted notes (global + project).
- * - Consultant: only notes from projects they are a member of (no global notes).
+ * - Users with view_global_notes: all non-deleted notes (global + all projects).
+ * - Others: only notes from projects they are a member of (no global notes).
  * When userId is null, returns empty insights.
  */
 export async function getNotesInsights(
@@ -286,28 +287,17 @@ export async function getNotesInsights(
   if (!userId?.trim()) return fallback;
 
   try {
-    const { data: profileRow, error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .select("app_role")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (profileError || !profileRow) return fallback;
-
-    const isSuperadmin = (profileRow as { app_role?: string }).app_role === "superadmin";
+    const canViewAllNotes = await hasGlobalPermission(userId, "view_global_notes");
 
     let query = supabaseAdmin
       .from("notes")
       .select("module, error_code, transaction")
       .is("deleted_at", null);
 
-    if (!isSuperadmin) {
+    if (!canViewAllNotes) {
       const projectIds = await getUserProjectIds(userId);
       if (projectIds.length === 0) return fallback;
       query = query.in("project_id", projectIds);
-    } else {
-      // Superadmin: include global (project_id null) and all project notes
-      // So we do not filter by project_id (all rows)
     }
 
     const { data: rows, error } = await query;

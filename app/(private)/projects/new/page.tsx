@@ -64,6 +64,33 @@ export default function NewProjectPage() {
   const [creatingClient, setCreatingClient] = useState(false);
   const [createClientError, setCreateClientError] = useState<string | null>(null);
 
+  // Access guard: only users with create_project may use this page
+  const [createAllowed, setCreateAllowed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        setCreateAllowed(false);
+        return;
+      }
+      const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
+      if (cancelled) return;
+      const data = await res.json().catch(() => ({}));
+      const perms = (data as { permissions?: { createProject?: boolean } }).permissions;
+      setCreateAllowed(perms?.createProject ?? false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (createAllowed === false) {
+      router.replace("/projects");
+    }
+  }, [createAllowed, router]);
+
   // ==========================
   // CARGA DE CLIENTES Y MÓDULOS
   // ==========================
@@ -196,23 +223,34 @@ export default function NewProjectPage() {
         planned_end_date: plannedEndDate || null,
       };
 
-      // 1) Crear proyecto y recuperar su id
-      const { data: project, error: projectError } = await supabase
-        .from("projects")
-        .insert([payload])
-        .select("id")
-        .single();
+      // 1) Create project via API (enforces create_project permission)
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
 
-      if (projectError || !project) {
-        console.error("Project creation error:", projectError);
-        setErrorMsg(
-          "Error creando el proyecto. Revisa los datos del formulario o contacta soporte."
-        );
+      const createRes = await fetch("/api/projects", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      const createData = (await createRes.json().catch(() => ({}))) as {
+        id?: string;
+        error?: string;
+      };
+
+      if (!createRes.ok || !createData.id) {
+        if (createRes.status === 403) {
+          setErrorMsg("No tienes permiso para crear proyectos.");
+        } else {
+          setErrorMsg(createData.error ?? "Error creando el proyecto. Revisa los datos del formulario o contacta soporte.");
+        }
         setSaving(false);
         return;
       }
 
-      const projectId = project.id as string;
+      const projectId = createData.id;
 
       // 2) Phases + activities + tasks: if project has dates, use SAP Activate plan generator; otherwise create phases only
       let planFailed = false;
@@ -277,6 +315,16 @@ export default function NewProjectPage() {
   // ==========================
   // RENDER
   // ==========================
+  if (createAllowed === null) {
+    return (
+      <div className="w-full px-6 py-8">
+        <div className="max-w-4xl mx-auto">
+          <p className="text-sm text-slate-600">Comprobando permisos…</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full px-6 py-8">
       <div className="max-w-4xl mx-auto">
