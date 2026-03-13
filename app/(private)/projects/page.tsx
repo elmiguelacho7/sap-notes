@@ -29,6 +29,7 @@ export default function ProjectsPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [canCreateProject, setCanCreateProject] = useState(false);
+  const [projectsQuota, setProjectsQuota] = useState<{ atLimit?: boolean; current: number; limit: number | null } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,13 +38,16 @@ export default function ProjectsPage() {
       const token = session?.access_token;
       if (!token) {
         setCanCreateProject(false);
+        setProjectsQuota(null);
         return;
       }
       const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
       if (cancelled) return;
       const data = await res.json().catch(() => ({}));
-      const perms = (data as { permissions?: { createProject?: boolean } }).permissions;
+      const perms = (data as { permissions?: { createProject?: boolean }; projectsQuota?: { current: number; limit: number | null } }).permissions;
       setCanCreateProject(perms?.createProject ?? false);
+      const pq = (data as { projectsQuota?: { current: number; limit: number | null } }).projectsQuota;
+      setProjectsQuota(pq ?? null);
     })();
     return () => { cancelled = true; };
   }, []);
@@ -146,9 +150,24 @@ export default function ProjectsPage() {
       <div className="space-y-8">
         <PageHeader
           title="Proyectos"
-          description="Registra y organiza aquí tus proyectos. Abre un proyecto para ver su workspace."
+          description={
+            projectsQuota?.limit != null
+              ? `Registra y organiza aquí tus proyectos. ${projectsQuota.current} / ${projectsQuota.limit} proyectos usados.`
+              : "Registra y organiza aquí tus proyectos. Abre un proyecto para ver su workspace."
+          }
           actions={canCreateProject ? <Button onClick={() => router.push("/projects/new")}>Nuevo proyecto</Button> : undefined}
         />
+
+        {projectsQuota?.limit != null && projectsQuota.atLimit && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            Has alcanzado el máximo de proyectos permitidos ({projectsQuota.current} / {projectsQuota.limit}). No puedes crear más hasta que un administrador aumente el límite.
+          </div>
+        )}
+        {projectsQuota?.limit != null && !projectsQuota.atLimit && projectsQuota.current >= projectsQuota.limit * 0.8 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Te acercas al límite de proyectos ({projectsQuota.current} / {projectsQuota.limit}). Cuando lo alcances no podrás crear más hasta que un administrador aumente la cuota.
+          </div>
+        )}
 
       <section>
         <h2 className="text-sm font-semibold text-slate-800 mb-1">Filtrar</h2>

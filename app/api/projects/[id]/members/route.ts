@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
+import { checkQuota } from "@/lib/auth/quota";
 import {
   getProjectMembers,
   setProjectMember,
@@ -89,6 +90,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const targetUserId = await findUserIdByEmail(email);
 
     if (targetUserId) {
+      const memberQuota = await checkQuota(auth.userId, "max_members_per_project", projectId);
+      if (!memberQuota.allowed) {
+        return NextResponse.json(
+          {
+            error: "Has alcanzado el máximo de miembros permitidos para este proyecto.",
+            quota: { quotaKey: "max_members_per_project", current: memberQuota.current, limit: memberQuota.limit },
+          },
+          { status: 409 }
+        );
+      }
       const member = await setProjectMember(projectId, targetUserId, role);
       return NextResponse.json({
         status: "added",

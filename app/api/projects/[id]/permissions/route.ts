@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserWithRoleFromRequest } from "@/lib/auth/serverAuth";
 import { hasProjectPermission, hasGlobalPermission } from "@/lib/auth/permissions";
+import { checkQuota } from "@/lib/auth/quota";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const user = await getCurrentUserWithRoleFromRequest(request);
     if (!user) {
       return NextResponse.json(
-        { canEdit: false, canArchive: false, canDelete: false, canManageMembers: false, canEditProjectNotes: false, canDeleteProjectNotes: false, canManageProjectTickets: false },
+        { canEdit: false, canArchive: false, canDelete: false, canManageMembers: false, canEditProjectNotes: false, canDeleteProjectNotes: false, canManageProjectTickets: false, memberQuota: null, pendingInvitationsQuota: null },
         { status: 200 }
       );
     }
@@ -42,6 +43,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const canEditProjectNotes = await hasProjectPermission(user.userId, projectId, "edit_project_notes");
     const canDeleteProjectNotes = await hasProjectPermission(user.userId, projectId, "delete_project_notes");
     const canManageProjectTickets = await hasProjectPermission(user.userId, projectId, "manage_project_tickets");
+    const canUseProjectAI = await hasProjectPermission(user.userId, projectId, "use_project_ai");
+
+    let memberQuota: { atLimit: boolean; current: number; limit: number | null } | null = null;
+    let pendingInvitationsQuota: { atLimit: boolean; current: number; limit: number | null } | null = null;
+    if (canManageMembers) {
+      const [memberQ, invQ] = await Promise.all([
+        checkQuota(user.userId, "max_members_per_project", projectId),
+        checkQuota(user.userId, "max_pending_invitations_per_project", projectId),
+      ]);
+      memberQuota = { atLimit: !memberQ.allowed, current: memberQ.current, limit: memberQ.limit };
+      pendingInvitationsQuota = { atLimit: !invQ.allowed, current: invQ.current, limit: invQ.limit };
+    }
 
     return NextResponse.json({
       canEdit,
@@ -51,11 +64,25 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       canEditProjectNotes,
       canDeleteProjectNotes,
       canManageProjectTickets,
+      canUseProjectAI,
+      memberQuota,
+      pendingInvitationsQuota,
     });
   } catch (err) {
     console.error("projects permissions GET error", err);
     return NextResponse.json(
-      { canEdit: false, canArchive: false, canDelete: false, canManageMembers: false, canEditProjectNotes: false, canDeleteProjectNotes: false, canManageProjectTickets: false },
+      {
+        canEdit: false,
+        canArchive: false,
+        canDelete: false,
+        canManageMembers: false,
+        canEditProjectNotes: false,
+        canDeleteProjectNotes: false,
+        canManageProjectTickets: false,
+        canUseProjectAI: false,
+        memberQuota: null,
+        pendingInvitationsQuota: null,
+      },
       { status: 200 }
     );
   }

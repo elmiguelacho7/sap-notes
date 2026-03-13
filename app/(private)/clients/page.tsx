@@ -11,6 +11,13 @@ import {
   OWNERSHIP_TYPE_OPTIONS,
   BUSINESS_MODEL_OPTIONS,
 } from "@/lib/constants/clientOptions";
+import {
+  getAllCountryOptions,
+  getStateOptions,
+  resolveCountryOptionValue,
+  resolveStateOptionValue,
+  getCountryDisplayName,
+} from "@/lib/countryStateCity";
 
 async function getAdminAuthHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
@@ -93,6 +100,7 @@ export default function ClientsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string | boolean>>({ ...EMPTY_FORM });
   const [activeSection, setActiveSection] = useState<"form" | "contacts" | "systems">("form");
+  const [clientsQuota, setClientsQuota] = useState<{ atLimit: boolean; current: number; limit: number | null } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,6 +109,7 @@ export default function ClientsPage() {
       if (cancelled || !user) {
         setAppRole(null);
         setLoading(false);
+        setClientsQuota(null);
         return;
       }
       const { data: profile } = await supabase
@@ -114,6 +123,26 @@ export default function ClientsPage() {
     checkAccess();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (appRole !== "superadmin" && appRole !== "admin") {
+      setClientsQuota(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const headers = await getAdminAuthHeaders();
+        const res = await fetch("/api/me", { headers });
+        if (cancelled || !res.ok) return;
+        const data = (await res.json()) as { clientsQuota?: { atLimit: boolean; current: number; limit: number | null } };
+        if (!cancelled) setClientsQuota(data.clientsQuota ?? null);
+      } catch {
+        if (!cancelled) setClientsQuota(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [appRole]);
 
   const loadClients = useCallback(async () => {
     setLoading(true);
@@ -266,13 +295,22 @@ export default function ClientsPage() {
         setEditingId(null);
       } else {
         const res = await fetch("/api/admin/clients", { method: "POST", headers, body: JSON.stringify(body) });
-        const data = (await res.json().catch(() => ({}))) as { error?: string; client?: ClientRow };
+        const data = (await res.json().catch(() => ({}))) as { error?: string; client?: ClientRow; quota?: { quotaKey?: string; current?: number; limit?: number | null } };
         if (!res.ok) {
-          setFormError(data.error ?? "Error al crear el cliente.");
+          if (res.status === 409 && data.quota?.limit != null) {
+            setFormError(`Has alcanzado el máximo de clientes permitidos (${data.quota.current ?? 0} / ${data.quota.limit}).`);
+          } else {
+            setFormError(data.error ?? "Error al crear el cliente.");
+          }
           return;
         }
         if (data.client) setClients((prev) => [...prev, data.client!].sort((a, b) => (a.display_name || a.name).localeCompare(b.display_name || b.name)));
         setSuccessMessage("Cliente creado correctamente.");
+        const meRes = await fetch("/api/me", { headers });
+        if (meRes.ok) {
+          const meData = (await meRes.json()) as { clientsQuota?: { atLimit: boolean; current: number; limit: number | null } };
+          setClientsQuota(meData.clientsQuota ?? null);
+        }
         setForm({ ...EMPTY_FORM });
       }
       setTimeout(() => setSuccessMessage(null), 4000);
@@ -342,6 +380,17 @@ export default function ClientsPage() {
           </div>
         )}
 
+        {clientsQuota?.limit != null && clientsQuota.atLimit && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            Has alcanzado el máximo de clientes permitidos ({clientsQuota.current} / {clientsQuota.limit}). No puedes crear más hasta que un administrador aumente el límite.
+          </div>
+        )}
+        {clientsQuota?.limit != null && !clientsQuota.atLimit && clientsQuota.current >= clientsQuota.limit * 0.8 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Te acercas al límite de clientes ({clientsQuota.current} / {clientsQuota.limit}). Cuando lo alcances no podrás crear más hasta que un administrador aumente la cuota.
+          </div>
+        )}
+
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50 flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-sm font-semibold text-slate-900">
@@ -355,6 +404,14 @@ export default function ClientsPage() {
               >
                 Cancelar · Crear otro
               </button>
+            )}
+            {!editingId && clientsQuota?.limit != null && (
+              <p className="w-full mt-2 text-sm text-slate-600">
+                {clientsQuota.current} / {clientsQuota.limit} clientes usados
+                {clientsQuota.atLimit && (
+                  <span className="ml-1 font-medium text-amber-700">· Has alcanzado el máximo. No puedes crear más hasta que un administrador aumente el límite.</span>
+                )}
+              </p>
             )}
           </div>
 
@@ -432,8 +489,43 @@ export default function ClientsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Geografía</h3>
-                    {field("country", "País")}
-                    {field("region", "Región")}
+                    <div className="space-y-1">
+                      <label className="block text-xs text-slate-600">País</label>
+                      <select
+                        value={resolveCountryOptionValue(form.country as string)}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setForm((f) => ({ ...f, country: v, region: "" }));
+                        }}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        disabled={saving}
+                      >
+                        <option value="">—</option>
+                        {getAllCountryOptions().map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                        {(form.country as string)?.trim() && !getAllCountryOptions().some((o) => o.value === resolveCountryOptionValue(form.country as string)) && (
+                          <option value={form.country as string}>{(form.country as string)} (actual)</option>
+                        )}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-xs text-slate-600">Región / Estado</label>
+                      <select
+                        value={resolveStateOptionValue(form.country as string, form.region as string)}
+                        onChange={(e) => setForm((f) => ({ ...f, region: e.target.value }))}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        disabled={saving}
+                      >
+                        <option value="">—</option>
+                        {getStateOptions((form.country as string) ?? "").map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                        {(form.region as string) && (form.country as string)?.length === 2 && !getStateOptions(form.country as string).some((o) => o.value === (form.region as string)) && (
+                          <option value={form.region as string}>{(form.region as string)} (actual)</option>
+                        )}
+                      </select>
+                    </div>
                     {field("preferred_language", "Idioma preferido")}
                     {field("timezone", "Zona horaria")}
                   </div>
@@ -542,7 +634,7 @@ export default function ClientsPage() {
                   </label>
                   <button
                     type="submit"
-                    disabled={saving}
+                    disabled={saving || (!editingId && clientsQuota?.atLimit === true)}
                     className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                   >
                     {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Crear cliente"}
@@ -606,7 +698,7 @@ export default function ClientsPage() {
                         className="hover:bg-slate-50 transition-colors cursor-pointer"
                       >
                         <td className="py-3 px-4 text-slate-900 font-medium">{c.display_name || c.name}</td>
-                        <td className="py-3 px-4 text-slate-600">{c.country ?? "—"}</td>
+                        <td className="py-3 px-4 text-slate-600">{getCountryDisplayName(c.country) || "—"}</td>
                         <td className="py-3 px-4 text-slate-600">{c.industry ?? "—"}</td>
                         <td className="py-3 px-4 text-slate-600">{c.account_tier ?? "—"}</td>
                         <td className="py-3 px-4">

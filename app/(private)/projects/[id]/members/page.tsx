@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
-import { ChevronLeft, Users } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { Users } from "lucide-react";
 
 type ProjectMember = {
   id: string;
@@ -12,6 +11,7 @@ type ProjectMember = {
   project_id: string;
   role: string;
   user_full_name: string | null;
+  user_email?: string | null;
   user_app_role: string | null;
 };
 
@@ -27,7 +27,7 @@ type PendingInvitation = {
   role: string;
   status: string;
   expires_at: string;
-  created_at: string;
+  updated_at: string;
 };
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
@@ -40,25 +40,30 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-export default function ProjectMembersPage() {
+export default function ProjectTeamPage() {
   const params = useParams<{ id: string }>();
   const projectId = params?.id ?? "";
 
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [canAdd, setCanAdd] = useState(false);
+  const [canManageMembers, setCanManageMembers] = useState(false);
+  const [memberQuota, setMemberQuota] = useState<{ atLimit: boolean; current: number; limit: number | null } | null>(null);
+  const [pendingInvitationsQuota, setPendingInvitationsQuota] = useState<{ atLimit: boolean; current: number; limit: number | null } | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const [addEmail, setAddEmail] = useState("");
   const [addRole, setAddRole] = useState<"owner" | "editor" | "viewer">("editor");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [actionLink, setActionLink] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
   const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
   const [invitationsLoading, setInvitationsLoading] = useState(false);
+
+  const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const loadMembers = useCallback(async () => {
     if (!projectId) return;
@@ -69,7 +74,7 @@ export default function ProjectMembersPage() {
       const res = await fetch(`/api/projects/${projectId}/members`, { headers });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setErrorMsg((data as { error?: string }).error ?? "Error al cargar los miembros.");
+        setErrorMsg((data as { error?: string }).error ?? "Error al cargar el equipo.");
         setMembers([]);
         return;
       }
@@ -89,15 +94,21 @@ export default function ProjectMembersPage() {
       const headers = await getAuthHeaders();
       const res = await fetch(`/api/projects/${projectId}/permissions`, { headers });
       const data = await res.json().catch(() => ({}));
-      const perms = data as { canManageMembers?: boolean };
-      setCanAdd(perms.canManageMembers === true);
+      const perms = data as {
+        canManageMembers?: boolean;
+        memberQuota?: { atLimit: boolean; current: number; limit: number | null };
+        pendingInvitationsQuota?: { atLimit: boolean; current: number; limit: number | null };
+      };
+      setCanManageMembers(perms.canManageMembers === true);
+      setMemberQuota(perms.memberQuota ?? null);
+      setPendingInvitationsQuota(perms.pendingInvitationsQuota ?? null);
     } catch {
-      setCanAdd(false);
+      setCanManageMembers(false);
     }
   }, [projectId]);
 
   const loadInvitations = useCallback(async () => {
-    if (!projectId || !canAdd) return;
+    if (!projectId || !canManageMembers) return;
     setInvitationsLoading(true);
     try {
       const headers = await getAuthHeaders();
@@ -109,7 +120,7 @@ export default function ProjectMembersPage() {
     } finally {
       setInvitationsLoading(false);
     }
-  }, [projectId, canAdd]);
+  }, [projectId, canManageMembers]);
 
   useEffect(() => {
     loadMembers();
@@ -117,16 +128,28 @@ export default function ProjectMembersPage() {
   }, [loadMembers, loadPermissions]);
 
   useEffect(() => {
-    if (canAdd) loadInvitations();
+    if (canManageMembers) loadInvitations();
     else setInvitations([]);
-  }, [canAdd, loadInvitations]);
+  }, [canManageMembers, loadInvitations]);
+
+  useEffect(() => {
+    if (!successMsg) return;
+    const t = setTimeout(() => setSuccessMsg(null), 4000);
+    return () => clearTimeout(t);
+  }, [successMsg]);
 
   const handleAddMember = async (e: FormEvent) => {
     e.preventDefault();
-    if (!projectId || !addEmail.trim()) return;
+    const trimmedEmail = addEmail.trim();
+    if (!projectId || !trimmedEmail) return;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setSubmitError("Introduce una dirección de correo válida.");
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
-    setSubmitSuccess(null);
+    setSuccessMsg(null);
     setActionLink(null);
     setLinkCopied(false);
     try {
@@ -135,7 +158,7 @@ export default function ProjectMembersPage() {
       const res = await fetch(`/api/projects/${projectId}/invitations`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ email: addEmail.trim(), role: addRole }),
+        body: JSON.stringify({ email: trimmedEmail, role: addRole }),
       });
       const data = await res.json().catch(() => ({})) as {
         error?: string;
@@ -143,28 +166,127 @@ export default function ProjectMembersPage() {
         invited?: boolean;
         actionLink?: string;
         message?: string;
+        emailSent?: boolean;
+        success?: boolean;
+        mode?: "already_member" | "direct_member_add" | "pending_invitation";
+        alreadyMember?: boolean;
+        invitationCreated?: boolean;
+        quota?: { quotaKey?: string; current?: number; limit?: number | null };
       };
       if (!res.ok) {
-        setSubmitError(data.error ?? "Error al añadir el miembro.");
+        if (res.status === 403) {
+          setSubmitError("No tiene permiso para gestionar miembros.");
+        } else if (res.status === 409 && data.quota?.limit != null) {
+          setSubmitError(`Has alcanzado el máximo permitido para este proyecto (${data.quota.current ?? 0} / ${data.quota.limit}).`);
+        } else {
+          setSubmitError(data.error ?? "No se pudo añadir al miembro.");
+        }
+        return;
+      }
+      if (data.mode === "already_member") {
+        setSuccessMsg(data.message ?? "El usuario ya pertenece a este proyecto.");
+        setAddEmail("");
+        setAddRole("editor");
+        // Light refresh to ensure UI is in sync, without extra side effects.
+        await loadMembers();
         return;
       }
       if (data.added) {
-        setSubmitSuccess("Miembro agregado.");
+        if (data.mode === "direct_member_add") {
+          setSuccessMsg(
+            data.message ??
+              "El usuario ya existía en la plataforma y se añadió directamente al equipo. No aparecerá en «Invitaciones pendientes»."
+          );
+        } else {
+          setSuccessMsg(data.message ?? "Usuario añadido al proyecto correctamente.");
+        }
         setAddEmail("");
         setAddRole("editor");
         await loadMembers();
       } else if (data.invited) {
-        setSubmitSuccess("Invitación enviada.");
-        setAddEmail("");
-        if (data.actionLink) {
-          setActionLink(data.actionLink);
+        if (data.mode === "pending_invitation") {
+          if (data.emailSent === true) {
+            setSuccessMsg("Se creó una invitación pendiente y se envió el correo.");
+          } else if (data.actionLink) {
+            setSuccessMsg("Se creó la invitación pendiente, pero no se pudo enviar el correo. Usa el enlace de invitación disponible.");
+          } else {
+            setSuccessMsg("Se creó la invitación pendiente, pero no se pudo enviar el correo.");
+          }
+        } else {
+          setSuccessMsg(data.message ?? "Invitación creada. El usuario aparecerá en el equipo cuando acepte la invitación.");
         }
+        setAddEmail("");
+        if (data.actionLink) setActionLink(data.actionLink);
         await loadInvitations();
+      } else {
+        setSubmitError("Respuesta inesperada del servidor. Inténtalo de nuevo.");
       }
     } catch {
       setSubmitError("Error de conexión.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleChangeRole = async (memberId: string, userId: string, newRole: "owner" | "editor" | "viewer") => {
+    if (!projectId || !canManageMembers) return;
+    setChangingRoleId(memberId);
+    setSuccessMsg(null);
+    try {
+      const headers = await getAuthHeaders();
+      headers["Content-Type"] = "application/json";
+      const res = await fetch(`/api/admin/projects/${projectId}/members`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ userId, role: newRole }),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string; quota?: { current?: number; limit?: number | null } };
+      if (!res.ok) {
+        if (res.status === 409 && data.quota?.limit != null) {
+          setErrorMsg(`Este proyecto ha alcanzado el máximo de miembros permitidos (${data.quota.current ?? 0} / ${data.quota.limit}).`);
+        } else {
+          setErrorMsg(data.error ?? "Error al cambiar el rol.");
+        }
+        return;
+      }
+      setSuccessMsg("Rol actualizado.");
+      await loadMembers();
+    } catch {
+      setErrorMsg("Error de conexión.");
+    } finally {
+      setChangingRoleId(null);
+    }
+  };
+
+  const handleRemoveMember = async (member: ProjectMember) => {
+    if (!projectId || !canManageMembers) return;
+    const owners = members.filter((m) => m.role === "owner");
+    if (member.role === "owner" && owners.length <= 1) {
+      setErrorMsg("No se puede eliminar al último propietario del proyecto.");
+      return;
+    }
+    setRemovingId(member.id);
+    setSuccessMsg(null);
+    setErrorMsg(null);
+    try {
+      const headers = await getAuthHeaders();
+      headers["Content-Type"] = "application/json";
+      const res = await fetch(`/api/admin/projects/${projectId}/members`, {
+        method: "DELETE",
+        headers,
+        body: JSON.stringify({ memberId: member.id }),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) {
+        setErrorMsg(data.error ?? "Error al eliminar del equipo.");
+        return;
+      }
+      setSuccessMsg("Miembro eliminado del equipo.");
+      await loadMembers();
+    } catch {
+      setErrorMsg("Error de conexión.");
+    } finally {
+      setRemovingId(null);
     }
   };
 
@@ -194,211 +316,206 @@ export default function ProjectMembersPage() {
     }
   };
 
+  const ownerCount = members.filter((m) => m.role === "owner").length;
+  const isLastOwner = (m: ProjectMember) => m.role === "owner" && ownerCount <= 1;
+
   if (!projectId) {
     return (
-      <main className="min-h-screen bg-slate-50">
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <p className="text-sm text-slate-600">No se ha encontrado el identificador del proyecto.</p>
-        </div>
-      </main>
+      <div className="space-y-4">
+        <p className="text-sm text-slate-600">No se ha encontrado el identificador del proyecto.</p>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        <Link
-          href={`/projects/${projectId}`}
-          className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-indigo-600"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Volver al proyecto
-        </Link>
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
+          <Users className="h-5 w-5 text-slate-500" />
+          Equipo
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Miembros del proyecto y sus roles. Quienes tengan permiso pueden añadir miembros, cambiar roles o eliminar del equipo.
+        </p>
+      </header>
 
-        <header>
-          <h1 className="text-2xl font-semibold text-slate-900 flex items-center gap-2">
-            <Users className="h-6 w-6 text-slate-500" />
-            Miembros del proyecto
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Gestiona quién tiene acceso a este proyecto. Solo propietarios y superadministradores pueden añadir miembros.
-          </p>
-        </header>
+      {successMsg && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {successMsg}
+        </div>
+      )}
 
-        {errorMsg && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {errorMsg}
-          </div>
-        )}
+      {errorMsg && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {errorMsg}
+        </div>
+      )}
 
-        {canAdd && (
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
-              <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Añadir miembro
-              </h2>
-              <p className="mt-0.5 text-sm text-slate-600">
-                Introduce el email y el rol. Si el usuario ya existe se añadirá al proyecto; si no, recibirá una invitación por correo y se añadirá al registrarse.
-              </p>
-            </div>
-            <div className="p-5">
-              <form onSubmit={handleAddMember} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="member-email" className="block text-xs font-medium text-slate-600 mb-1">
-                      Email
-                    </label>
-                    <input
-                      id="member-email"
-                      type="email"
-                      value={addEmail}
-                      onChange={(e) => setAddEmail(e.target.value)}
-                      placeholder="usuario@ejemplo.com"
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      disabled={submitting}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="member-role" className="block text-xs font-medium text-slate-600 mb-1">
-                      Rol
-                    </label>
-                    <select
-                      id="member-role"
-                      value={addRole}
-                      onChange={(e) => setAddRole(e.target.value as "owner" | "editor" | "viewer")}
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      disabled={submitting}
-                    >
-                      <option value="owner">Propietario</option>
-                      <option value="editor">Editor</option>
-                      <option value="viewer">Lector</option>
-                    </select>
-                  </div>
-                </div>
-                {submitError && (
-                  <p className="text-sm text-red-600">{submitError}</p>
-                )}
-                {submitSuccess && !actionLink && (
-                  <p className="text-sm text-green-700">{submitSuccess}</p>
-                )}
-                {actionLink && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-                    <p className="text-sm text-amber-800">
-                      No se pudo enviar el correo. Copia este enlace y compártelo con el usuario para que acepte la invitación.
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={actionLink}
-                        className="flex-1 min-w-[200px] rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-slate-700 font-mono"
-                      />
-                      <button
-                        type="button"
-                        onClick={copyActionLink}
-                        className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      >
-                        {linkCopied ? "Copiado" : "Copiar enlace"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submitting ? "Añadiendo…" : "Añadir miembro"}
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {canAdd && (invitations.length > 0 || invitationsLoading) && (
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
-              <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Invitaciones pendientes
-              </h2>
-              <p className="mt-0.5 text-sm text-slate-600">
-                Invitaciones enviadas que aún no han sido aceptadas. Puedes revocarlas.
-              </p>
-            </div>
-            <div className="p-5">
-              {invitationsLoading ? (
-                <p className="text-sm text-slate-500">Cargando…</p>
-              ) : invitations.length === 0 ? (
-                <p className="text-sm text-slate-500">No hay invitaciones pendientes.</p>
-              ) : (
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        <th className="py-3 px-4">Email</th>
-                        <th className="py-3 px-4">Rol</th>
-                        <th className="py-3 px-4 text-right">Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {invitations.map((inv) => (
-                        <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-3 px-4 text-slate-900">{inv.email}</td>
-                          <td className="py-3 px-4">
-                            <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                              {ROLE_LABELS[inv.role] ?? inv.role}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleRevokeInvitation(inv.id)}
-                              className="text-xs font-medium text-red-600 hover:text-red-700"
-                            >
-                              Revocar
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
+      {canManageMembers && (
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
             <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Miembros actuales
+              Añadir miembro
             </h2>
+            <p className="mt-0.5 text-sm text-slate-600">
+              Introduce el email y el rol.
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Si el usuario ya existe en la plataforma, se añadirá al equipo al instante. Si no existe, se creará una invitación pendiente y aparecerá abajo hasta que la acepte.
+            </p>
+            {memberQuota?.atLimit && (
+              <p className="mt-2 text-sm text-red-700 font-medium">
+                Has alcanzado el máximo de miembros permitidos para este proyecto ({memberQuota.current} / {memberQuota.limit}). No puedes añadir más hasta que un administrador aumente el límite.
+              </p>
+            )}
+            {memberQuota?.limit != null && !memberQuota.atLimit && memberQuota.current >= memberQuota.limit * 0.8 && (
+              <p className="mt-2 text-sm text-amber-700 font-medium">
+                Te acercas al límite de miembros ({memberQuota.current} / {memberQuota.limit}). Cuando lo alcances no podrás añadir más hasta que un administrador aumente la cuota.
+              </p>
+            )}
           </div>
           <div className="p-5">
-            {loading ? (
-              <p className="text-sm text-slate-500">Cargando miembros…</p>
-            ) : members.length === 0 ? (
-              <p className="text-sm text-slate-500">Aún no hay miembros asignados a este proyecto.</p>
+            <form onSubmit={handleAddMember} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="member-email" className="block text-xs font-medium text-slate-600 mb-1">
+                    Email
+                  </label>
+                  <input
+                    id="member-email"
+                    type="email"
+                    value={addEmail}
+                    onChange={(e) => setAddEmail(e.target.value)}
+                    placeholder="usuario@ejemplo.com"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    disabled={submitting}
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="member-role" className="block text-xs font-medium text-slate-600 mb-1">
+                    Rol
+                  </label>
+                  <select
+                    id="member-role"
+                    value={addRole}
+                    onChange={(e) => setAddRole(e.target.value as "owner" | "editor" | "viewer")}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    disabled={submitting}
+                  >
+                    <option value="owner">Propietario</option>
+                    <option value="editor">Editor</option>
+                    <option value="viewer">Lector</option>
+                  </select>
+                </div>
+              </div>
+              {submitError && <p className="text-sm text-red-600">{submitError}</p>}
+              {actionLink && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+                  <p className="text-sm text-amber-800">
+                    Copia o abre el enlace para que el usuario pueda aceptar la invitación.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={actionLink}
+                      className="flex-1 min-w-[200px] rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-slate-700 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={copyActionLink}
+                      className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      {linkCopied ? "Copiado" : "Copiar enlace de invitación"}
+                    </button>
+                    <a
+                      href={actionLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      Abrir enlace
+                    </a>
+                  </div>
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={submitting || memberQuota?.atLimit === true}
+                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? "Añadiendo…" : "Añadir al equipo"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {canManageMembers && (
+        <div className="rounded-2xl border border-amber-200 bg-white shadow-sm overflow-hidden">
+          <div className="border-b border-amber-200 px-5 py-4 bg-amber-50/50">
+            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+              Invitaciones pendientes
+            </h2>
+            <p className="mt-0.5 text-xs text-amber-700/90">
+              Usuarios invitados que aún no han aceptado. Aparecerán en «Miembros del equipo» cuando acepten.
+            </p>
+            {pendingInvitationsQuota?.limit != null && (
+              <p className="mt-1 text-xs font-medium text-amber-800">
+                {pendingInvitationsQuota.current} / {pendingInvitationsQuota.limit} invitaciones pendientes
+                {pendingInvitationsQuota.atLimit && " · Has alcanzado el máximo. No puedes crear más invitaciones hasta que un administrador aumente el límite."}
+                {!pendingInvitationsQuota.atLimit && pendingInvitationsQuota.current >= (pendingInvitationsQuota.limit ?? 0) * 0.8 && " · Te acercas al límite."}
+              </p>
+            )}
+          </div>
+          <div className="p-5">
+            {invitationsLoading ? (
+              <p className="text-sm text-slate-500">Cargando invitaciones…</p>
+            ) : invitations.length === 0 ? (
+              <div className="text-sm text-slate-500 space-y-1">
+                <p>No hay invitaciones pendientes.</p>
+                <p className="text-xs text-slate-500">
+                  Si el email pertenece a un usuario ya registrado, se añadirá directamente al equipo y no aparecerá aquí.
+                </p>
+              </div>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-slate-200">
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      <th className="py-3 px-4">Usuario</th>
+                      <th className="py-3 px-4">Email</th>
                       <th className="py-3 px-4">Rol</th>
+                      <th className="py-3 px-4">Estado</th>
+                      <th className="py-3 px-4">Creada</th>
+                      <th className="py-3 px-4 text-right">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {members.map((member) => (
-                      <tr key={member.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="py-3 px-4 text-slate-900">
-                          {member.user_full_name || "Usuario sin nombre"}
+                    {invitations.map((inv) => (
+                      <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3 px-4 text-slate-900">{inv.email}</td>
+                        <td className="py-3 px-4">
+                          <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                            {ROLE_LABELS[inv.role] ?? inv.role}
+                          </span>
                         </td>
                         <td className="py-3 px-4">
-                          <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
-                            {ROLE_LABELS[member.role] ?? member.role}
+                          <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                            Pendiente
                           </span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-600">
+                          {inv.updated_at ? new Date(inv.updated_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeInvitation(inv.id)}
+                            className="text-xs font-medium text-red-600 hover:text-red-700"
+                          >
+                            Revocar
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -408,7 +525,94 @@ export default function ProjectMembersPage() {
             )}
           </div>
         </div>
+      )}
+
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
+          <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Miembros del equipo
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Usuarios que ya forman parte del proyecto.
+          </p>
+          {memberQuota?.limit != null && (
+            <p className="mt-1 text-xs font-medium text-slate-600">
+              {memberQuota.current} / {memberQuota.limit} miembros en este proyecto
+            </p>
+          )}
+        </div>
+        <div className="p-5">
+          {loading ? (
+            <p className="text-sm text-slate-500">Cargando equipo…</p>
+          ) : members.length === 0 ? (
+            <div className="py-8 text-center text-sm text-slate-500">
+              Aún no hay miembros en este proyecto. Añade al primer miembro arriba si tienes permiso.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="py-3 px-4">Nombre</th>
+                    <th className="py-3 px-4">Email</th>
+                    <th className="py-3 px-4">Rol</th>
+                    <th className="py-3 px-4">Estado</th>
+                    {canManageMembers && <th className="py-3 px-4 text-right">Acciones</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {members.map((member) => (
+                    <tr key={member.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-4 text-slate-900 font-medium">
+                        {member.user_full_name || "—"}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600">
+                        {member.user_email || "—"}
+                      </td>
+                      <td className="py-3 px-4">
+                        {canManageMembers ? (
+                          <select
+                            value={member.role}
+                            onChange={(e) => handleChangeRole(member.id, member.user_id, e.target.value as "owner" | "editor" | "viewer")}
+                            disabled={changingRoleId === member.id}
+                            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                          >
+                            <option value="owner">{ROLE_LABELS.owner}</option>
+                            <option value="editor">{ROLE_LABELS.editor}</option>
+                            <option value="viewer">{ROLE_LABELS.viewer}</option>
+                          </select>
+                        ) : (
+                          <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                            {ROLE_LABELS[member.role] ?? member.role}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600">
+                        <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                          Activo
+                        </span>
+                      </td>
+                      {canManageMembers && (
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMember(member)}
+                            disabled={removingId === member.id || isLastOwner(member)}
+                            title={isLastOwner(member) ? "No se puede eliminar al último propietario" : "Eliminar del equipo"}
+                            className="text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {removingId === member.id ? "Eliminando…" : "Eliminar"}
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
-    </main>
+    </div>
   );
 }

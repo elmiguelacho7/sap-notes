@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
+import { checkQuota } from "@/lib/auth/quota";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 /**
@@ -13,6 +14,17 @@ export async function POST(request: NextRequest) {
     const auth = await requireAuthAndGlobalPermission(request, "create_project");
     if (auth instanceof NextResponse) return auth;
     const { userId } = auth;
+
+    const quota = await checkQuota(userId, "max_projects_created");
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          error: "Has alcanzado el máximo de proyectos permitidos.",
+          quota: { quotaKey: "max_projects_created", current: quota.current, limit: quota.limit },
+        },
+        { status: 409 }
+      );
+    }
 
     let body: {
       name?: string;

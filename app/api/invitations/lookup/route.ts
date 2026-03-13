@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findInvitationByToken } from "@/lib/services/invitationService";
+import {
+  findInvitationByToken,
+  getInvitationByTokenHash,
+  markInvitationExpired,
+} from "@/lib/services/invitationService";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 /**
  * GET /api/invitations/lookup?token=...
  * Hash token, fetch pending non-expired invitation. Return projectId, projectName, email, role, expiresAt.
+ * Enforces expiration and status; returns specific error reason (invalid / expired / already used).
  * No auth required (so invitee can see details before logging in).
  */
 export async function GET(request: NextRequest) {
@@ -17,10 +22,45 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const inv = await findInvitationByToken(token);
-    if (!inv) {
+    let inv = await findInvitationByToken(token);
+    if (inv) {
+      // Valid pending, non-expired — continue to return project details below.
+    } else {
+      const row = await getInvitationByTokenHash(token);
+      if (!row) {
+        return NextResponse.json(
+          { error: "Invitación no encontrada o token no válido.", reason: "invalid" },
+          { status: 404 }
+        );
+      }
+      if (row.status !== "pending") {
+        return NextResponse.json(
+          {
+            error:
+              row.status === "accepted"
+                ? "Esta invitación ya fue aceptada."
+                : row.status === "revoked"
+                  ? "Esta invitación fue revocada."
+                  : "Esta invitación ya no está disponible.",
+            reason: "not_pending",
+          },
+          { status: 404 }
+        );
+      }
+      const now = new Date();
+      if (new Date(row.expires_at) <= now) {
+        try {
+          await markInvitationExpired(row.id);
+        } catch {
+          // Best-effort; still return expired to the user.
+        }
+        return NextResponse.json(
+          { error: "Esta invitación ha expirado.", reason: "expired" },
+          { status: 404 }
+        );
+      }
       return NextResponse.json(
-        { error: "Invitación no encontrada, expirada o ya utilizada." },
+        { error: "Invitación no encontrada o no válida." },
         { status: 404 }
       );
     }

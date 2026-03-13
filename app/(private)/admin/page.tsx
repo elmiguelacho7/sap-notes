@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -13,6 +14,13 @@ import {
   OWNERSHIP_TYPE_OPTIONS,
   BUSINESS_MODEL_OPTIONS,
 } from "@/lib/constants/clientOptions";
+import {
+  getAllCountryOptions,
+  getStateOptions,
+  resolveCountryOptionValue,
+  resolveStateOptionValue,
+  getCountryDisplayName,
+} from "@/lib/countryStateCity";
 
 /** Returns headers with Bearer token for admin API calls (session is in localStorage). */
 async function getAdminAuthHeaders(): Promise<Record<string, string>> {
@@ -25,7 +33,7 @@ async function getAdminAuthHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-type TabId = "users" | "activations" | "knowledge";
+type TabId = "users" | "activations" | "knowledge" | "limits" | "userLimits" | "capacity";
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -150,13 +158,927 @@ function AdminPanel() {
           >
             Roles globales
           </a>
+          <button
+            type="button"
+            onClick={() => setActiveTab("limits")}
+            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === "limits"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            Límites por rol
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("userLimits")}
+            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === "userLimits"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            Límites por usuario
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("capacity")}
+            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === "capacity"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            Capacidad
+          </button>
         </div>
 
         {activeTab === "users" && <UsersRolesPanel />}
         {activeTab === "activations" && <ActivationsPanel />}
         {activeTab === "knowledge" && <GlobalKnowledgeSourcesPanel />}
+        {activeTab === "limits" && <RoleLimitsPanel />}
+        {activeTab === "userLimits" && <UserLimitsPanel />}
+        {activeTab === "capacity" && <CapacityDashboard />}
       </div>
     </PageShell>
+  );
+}
+
+type RoleLimitsEntry = {
+  roleId: string;
+  roleKey: string;
+  roleName: string;
+  limits: Record<string, number>;
+};
+
+function RoleLimitsPanel() {
+  const [roleLimits, setRoleLimits] = useState<RoleLimitsEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingRoleKey, setSavingRoleKey] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const headers = await getAdminAuthHeaders();
+      const res = await fetch("/api/admin/quotas", { headers });
+      if (!res.ok) return;
+      const data = (await res.json()) as { roleLimits?: RoleLimitsEntry[] };
+      setRoleLimits(data.roleLimits ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const handleSave = async (roleKey: string, limits: Record<string, number>) => {
+    setSavingRoleKey(roleKey);
+    setMessage(null);
+    try {
+      const headers = await getAdminAuthHeaders();
+      headers["Content-Type"] = "application/json";
+      const res = await fetch("/api/admin/quotas", {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ roleKey, limits }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setMessage(data.error ?? "Error al guardar.");
+        return;
+      }
+      setMessage("Límites guardados.");
+      void load();
+    } finally {
+      setSavingRoleKey(null);
+    }
+  };
+
+  const appRoles = roleLimits.filter((r) => r.roleKey !== "superadmin");
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
+        <h2 className="text-sm font-semibold text-slate-900">Límites por rol</h2>
+        <p className="text-xs text-slate-500 mt-1">
+          Cuotas por defecto para cada rol (superadmin no tiene límite). Vacío = sin límite.
+        </p>
+      </div>
+      <div className="p-5 space-y-6">
+        {message && (
+          <p className="text-sm text-emerald-600">{message}</p>
+        )}
+        {loading ? (
+          <p className="text-sm text-slate-500">Cargando…</p>
+        ) : (
+          appRoles.map((entry) => (
+            <RoleLimitForm
+              key={entry.roleKey}
+              entry={entry}
+              saving={savingRoleKey === entry.roleKey}
+              onSave={handleSave}
+            />
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+function RoleLimitForm({
+  entry,
+  saving,
+  onSave,
+}: {
+  entry: RoleLimitsEntry;
+  saving: boolean;
+  onSave: (roleKey: string, limits: Record<string, number>) => Promise<void>;
+}) {
+  const [maxProjects, setMaxProjects] = useState<string>(String(entry.limits.max_projects_created ?? ""));
+  const [maxInvitations, setMaxInvitations] = useState<string>(String(entry.limits.max_pending_invitations_per_project ?? ""));
+  const [maxMembers, setMaxMembers] = useState<string>(String(entry.limits.max_members_per_project ?? ""));
+  const [maxClients, setMaxClients] = useState<string>(String(entry.limits.max_clients_created ?? ""));
+
+  useEffect(() => {
+    setMaxProjects(String(entry.limits.max_projects_created ?? ""));
+    setMaxInvitations(String(entry.limits.max_pending_invitations_per_project ?? ""));
+    setMaxMembers(String(entry.limits.max_members_per_project ?? ""));
+    setMaxClients(String(entry.limits.max_clients_created ?? ""));
+  }, [entry.roleKey, entry.limits.max_projects_created, entry.limits.max_pending_invitations_per_project, entry.limits.max_members_per_project, entry.limits.max_clients_created]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const limits: Record<string, number> = {};
+    const p = parseInt(maxProjects.trim(), 10);
+    const i = parseInt(maxInvitations.trim(), 10);
+    const m = parseInt(maxMembers.trim(), 10);
+    const c = parseInt(maxClients.trim(), 10);
+    if (!Number.isNaN(p) && p > 0) limits.max_projects_created = p;
+    if (!Number.isNaN(i) && i > 0) limits.max_pending_invitations_per_project = i;
+    if (!Number.isNaN(m) && m > 0) limits.max_members_per_project = m;
+    if (!Number.isNaN(c) && c > 0) limits.max_clients_created = c;
+    void onSave(entry.roleKey, limits);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded-xl border border-slate-200 p-4 space-y-4">
+      <h3 className="text-sm font-medium text-slate-900">{entry.roleName}</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs text-slate-600 mb-1">Máx. proyectos creados</label>
+          <input
+            type="number"
+            min={1}
+            value={maxProjects}
+            onChange={(e) => setMaxProjects(e.target.value)}
+            placeholder="Sin límite"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            disabled={saving}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-slate-600 mb-1">Máx. invitaciones pendientes por proyecto</label>
+          <input
+            type="number"
+            min={1}
+            value={maxInvitations}
+            onChange={(e) => setMaxInvitations(e.target.value)}
+            placeholder="Sin límite"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            disabled={saving}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-slate-600 mb-1">Máx. miembros por proyecto</label>
+          <input
+            type="number"
+            min={1}
+            value={maxMembers}
+            onChange={(e) => setMaxMembers(e.target.value)}
+            placeholder="Sin límite"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            disabled={saving}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-slate-600 mb-1">Máx. clientes creados</label>
+          <input
+            type="number"
+            min={1}
+            value={maxClients}
+            onChange={(e) => setMaxClients(e.target.value)}
+            placeholder="Sin límite"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            disabled={saving}
+          />
+        </div>
+      </div>
+      <button
+        type="submit"
+        disabled={saving}
+        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+      >
+        {saving ? "Guardando…" : "Guardar"}
+      </button>
+    </form>
+  );
+}
+
+type UserQuotaConfig = {
+  userId: string;
+  appRole: string | null;
+  roleLimits: Record<string, number>;
+  userOverrides: Record<string, number>;
+  effectiveLimits: Record<string, number | null>;
+};
+
+const USER_QUOTA_LABELS: Record<string, string> = {
+  max_projects_created: "Máx. proyectos creados",
+  max_pending_invitations_per_project: "Máx. invitaciones pendientes por proyecto",
+  max_members_per_project: "Máx. miembros por proyecto",
+  max_clients_created: "Máx. clientes creados",
+};
+
+function UserLimitsPanel() {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modalUserId, setModalUserId] = useState<string | null>(null);
+  const [quotaData, setQuotaData] = useState<UserQuotaConfig | null>(null);
+  const [quotaLoading, setQuotaLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchUsers() {
+      try {
+        const headers = await getAdminAuthHeaders();
+        const res = await fetch("/api/admin/users", { headers });
+        if (cancelled) return;
+        if (!res.ok) return;
+        const data = (await res.json()) as { users?: AdminUser[] };
+        if (cancelled) return;
+        setUsers(data.users ?? []);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchUsers();
+    return () => { cancelled = true; };
+  }, []);
+
+  const openModal = useCallback(async (userId: string) => {
+    setModalUserId(userId);
+    setQuotaData(null);
+    setQuotaLoading(true);
+    setMessage(null);
+    try {
+      const headers = await getAdminAuthHeaders();
+      const res = await fetch(`/api/admin/quotas/user/${userId}`, { headers });
+      const data = (await res.json()) as UserQuotaConfig | { error?: string };
+      if (res.ok && "userId" in data) setQuotaData(data as UserQuotaConfig);
+      else setMessage((data as { error?: string }).error ?? "Error al cargar.");
+    } finally {
+      setQuotaLoading(false);
+    }
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setModalUserId(null);
+    setQuotaData(null);
+    setMessage(null);
+  }, []);
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
+        <h2 className="text-sm font-semibold text-slate-900">Límites por usuario</h2>
+        <p className="text-xs text-slate-500 mt-1">
+          Overrides por usuario (vacío = usar límite del rol). Solo superadmin.
+        </p>
+      </div>
+      <div className="p-5">
+        {loading ? (
+          <p className="text-sm text-slate-500">Cargando usuarios…</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-slate-600">
+                  <th className="py-2 pr-4">Nombre</th>
+                  <th className="py-2 pr-4">Email</th>
+                  <th className="py-2 pr-4">Rol</th>
+                  <th className="py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className="border-b border-slate-100">
+                    <td className="py-2 pr-4">{u.full_name ?? "—"}</td>
+                    <td className="py-2 pr-4">{u.email ?? "—"}</td>
+                    <td className="py-2 pr-4">{u.app_role}</td>
+                    <td className="py-2">
+                      <button
+                        type="button"
+                        onClick={() => openModal(u.id)}
+                        className="text-indigo-600 hover:underline text-xs font-medium"
+                      >
+                        Configurar límites
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {modalUserId && (
+        <UserQuotaModal
+          userId={modalUserId}
+          user={users.find((u) => u.id === modalUserId) ?? null}
+          quotaData={quotaData}
+          loading={quotaLoading}
+          saving={saving}
+          message={message}
+          onClose={closeModal}
+          onSave={async (overrides) => {
+            setSaving(true);
+            setMessage(null);
+            try {
+              const headers = await getAdminAuthHeaders();
+              (headers as Record<string, string>)["Content-Type"] = "application/json";
+              const res = await fetch(`/api/admin/quotas/user/${modalUserId}`, {
+                method: "PUT",
+                headers,
+                body: JSON.stringify({ overrides }),
+              });
+              const data = (await res.json()) as { error?: string };
+              if (res.ok) {
+                setMessage("Límites guardados.");
+                const getRes = await fetch(`/api/admin/quotas/user/${modalUserId}`, { headers });
+                if (getRes.ok) {
+                  const updated = (await getRes.json()) as UserQuotaConfig;
+                  setQuotaData(updated);
+                }
+              } else setMessage(data.error ?? "Error al guardar.");
+            } finally {
+              setSaving(false);
+            }
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+function UserQuotaModal({
+  userId,
+  user,
+  quotaData,
+  loading,
+  saving,
+  message,
+  onClose,
+  onSave,
+}: {
+  userId: string;
+  user: AdminUser | null;
+  quotaData: UserQuotaConfig | null;
+  loading: boolean;
+  saving: boolean;
+  message: string | null;
+  onClose: () => void;
+  onSave: (overrides: Record<string, number>) => Promise<void>;
+}) {
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!quotaData) return;
+    const o: Record<string, string> = {};
+    for (const key of Object.keys(USER_QUOTA_LABELS)) {
+      o[key] = String(quotaData.userOverrides[key] ?? "");
+    }
+    setOverrides(o);
+  }, [quotaData]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const out: Record<string, number> = {};
+    for (const [key, val] of Object.entries(overrides)) {
+      const n = parseInt(String(val).trim(), 10);
+      if (!Number.isNaN(n) && n > 0) out[key] = n;
+    }
+    void onSave(out);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-slate-900">
+            Límites: {user?.full_name || user?.email || userId}
+          </h3>
+          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-700 text-xl leading-none">&times;</button>
+        </div>
+        <div className="p-5">
+          {loading ? (
+            <p className="text-sm text-slate-500">Cargando…</p>
+          ) : quotaData ? (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <p className="text-xs text-slate-600">Rol: <strong>{quotaData.appRole ?? "—"}</strong></p>
+              <div className="rounded-lg border border-slate-200 p-3 bg-slate-50/50">
+                <p className="text-xs font-medium text-slate-600 mb-2">Límites por defecto del rol</p>
+                <ul className="text-xs text-slate-700 space-y-1">
+                  {Object.entries(USER_QUOTA_LABELS).map(([key, label]) => (
+                    <li key={key}>{label}: {quotaData.roleLimits[key] ?? "sin límite"}</li>
+                  ))}
+                </ul>
+              </div>
+              <p className="text-xs text-slate-600">Override por usuario (vacío = usar valor del rol):</p>
+              <div className="grid grid-cols-1 gap-3">
+                {Object.entries(USER_QUOTA_LABELS).map(([key, label]) => (
+                  <div key={key}>
+                    <label className="block text-xs text-slate-600 mb-0.5">{label}</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={overrides[key] ?? ""}
+                      onChange={(e) => setOverrides((o) => ({ ...o, [key]: e.target.value }))}
+                      placeholder={quotaData.roleLimits[key] != null ? String(quotaData.roleLimits[key]) : "Sin límite"}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                      disabled={saving}
+                    />
+                    {quotaData.effectiveLimits[key] != null && (
+                      <p className="text-xs text-slate-500 mt-0.5">Efectivo: {quotaData.effectiveLimits[key]}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {message && <p className="text-sm text-emerald-600">{message}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {saving ? "Guardando…" : "Guardar"}
+                </button>
+                <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                  Cerrar
+                </button>
+              </div>
+            </form>
+          ) : (
+            <p className="text-sm text-slate-500">No se pudo cargar la configuración.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type CapacitySummary = {
+  usersAtLimit: number;
+  usersNearLimit: number;
+  usersWithOverrides: number;
+  projectsAtMemberLimit: number;
+  projectsNearMemberLimit: number;
+  projectsAtInvitationLimit: number;
+  projectsNearInvitationLimit: number;
+};
+
+type UserCapacityRow = {
+  userId: string;
+  email: string | null;
+  fullName: string | null;
+  appRole: string;
+  projectsUsed: number;
+  projectsLimit: number | null;
+  clientsUsed: number;
+  clientsLimit: number | null;
+  hasOverrides: boolean;
+  status: string;
+};
+
+type ProjectCapacityRow = {
+  projectId: string;
+  projectName: string;
+  clientName: string | null;
+  clientId: string | null;
+  membersCurrent: number;
+  membersLimit: number | null;
+  invitationsCurrent: number;
+  invitationsLimit: number | null;
+  status: string;
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  unlimited: "Sin límite",
+  normal: "Normal",
+  near_limit: "Cerca del límite",
+  at_limit: "Al límite",
+};
+
+function CapacityDashboard() {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<{
+    summary: CapacitySummary;
+    userUsage: UserCapacityRow[];
+    projectUsage: ProjectCapacityRow[];
+  } | null>(null);
+  const [filterRole, setFilterRole] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("");
+  const [overridesOnly, setOverridesOnly] = useState(false);
+  const [projectsWithLimitsOnly, setProjectsWithLimitsOnly] = useState(false);
+  const [quotaModalUserId, setQuotaModalUserId] = useState<string | null>(null);
+  const [quotaModalData, setQuotaModalData] = useState<UserQuotaConfig | null>(null);
+  const [quotaModalLoading, setQuotaModalLoading] = useState(false);
+  const [quotaModalSaving, setQuotaModalSaving] = useState(false);
+  const [quotaModalMessage, setQuotaModalMessage] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const headers = await getAdminAuthHeaders();
+      const params = new URLSearchParams();
+      if (filterRole) params.set("role", filterRole);
+      if (filterStatus) params.set("status", filterStatus);
+      if (overridesOnly) params.set("overridesOnly", "true");
+      if (projectsWithLimitsOnly) params.set("projectsWithLimitsOnly", "true");
+      const url = `/api/admin/quotas/capacity${params.toString() ? `?${params.toString()}` : ""}`;
+      const res = await fetch(url, { headers });
+      if (!res.ok) return;
+      const json = (await res.json()) as { summary: CapacitySummary; userUsage: UserCapacityRow[]; projectUsage: ProjectCapacityRow[] };
+      setData(json);
+    } finally {
+      setLoading(false);
+    }
+  }, [filterRole, filterStatus, overridesOnly, projectsWithLimitsOnly]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!quotaModalUserId) {
+      setQuotaModalData(null);
+      setQuotaModalMessage(null);
+      return;
+    }
+    let cancelled = false;
+    setQuotaModalLoading(true);
+    (async () => {
+      try {
+        const headers = await getAdminAuthHeaders();
+        const res = await fetch(`/api/admin/quotas/user/${quotaModalUserId}`, { headers });
+        if (cancelled) return;
+        const data = (await res.json()) as UserQuotaConfig | { error?: string };
+        if (res.ok && "userId" in data) setQuotaModalData(data as UserQuotaConfig);
+        else setQuotaModalMessage((data as { error?: string }).error ?? "Error al cargar.");
+      } finally {
+        if (!cancelled) setQuotaModalLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [quotaModalUserId]);
+
+  const handleSaveQuotaFromCapacity = useCallback(async (overrides: Record<string, number>) => {
+    if (!quotaModalUserId) return;
+    setQuotaModalSaving(true);
+    setQuotaModalMessage(null);
+    try {
+      const headers = await getAdminAuthHeaders();
+      (headers as Record<string, string>)["Content-Type"] = "application/json";
+      const res = await fetch(`/api/admin/quotas/user/${quotaModalUserId}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ overrides }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (res.ok) {
+        setQuotaModalMessage("Límites guardados.");
+        const getRes = await fetch(`/api/admin/quotas/user/${quotaModalUserId}`, { headers });
+        if (getRes.ok) setQuotaModalData((await getRes.json()) as UserQuotaConfig);
+      } else setQuotaModalMessage(data.error ?? "Error al guardar.");
+    } finally {
+      setQuotaModalSaving(false);
+    }
+  }, [quotaModalUserId]);
+
+  return (
+    <section className="space-y-6">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
+          <h2 className="text-sm font-semibold text-slate-900">Uso y límites</h2>
+          <p className="text-xs text-slate-500 mt-1">
+            Resumen de uso de cuotas por usuario y por proyecto. Umbral: ≥80% cerca del límite, ≥100% al límite.
+          </p>
+        </div>
+        <div className="p-5">
+          {loading ? (
+            <p className="text-sm text-slate-500">Cargando…</p>
+          ) : data ? (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-6">
+                <div className="rounded-xl border border-red-200 bg-red-50/50 p-3">
+                  <p className="text-lg font-semibold text-red-800">{data.summary.usersAtLimit}</p>
+                  <p className="text-xs text-red-700">Usuarios al límite</p>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3">
+                  <p className="text-lg font-semibold text-amber-800">{data.summary.usersNearLimit}</p>
+                  <p className="text-xs text-amber-700">Usuarios cerca del límite</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+                  <p className="text-lg font-semibold text-slate-800">{data.summary.usersWithOverrides}</p>
+                  <p className="text-xs text-slate-600">Con overrides</p>
+                </div>
+                <div className="rounded-xl border border-red-200 bg-red-50/50 p-3">
+                  <p className="text-lg font-semibold text-red-800">{data.summary.projectsAtMemberLimit}</p>
+                  <p className="text-xs text-red-700">Proyectos al límite (miembros)</p>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3">
+                  <p className="text-lg font-semibold text-amber-800">{data.summary.projectsNearMemberLimit}</p>
+                  <p className="text-xs text-amber-700">Cerca (miembros)</p>
+                </div>
+                <div className="rounded-xl border border-red-200 bg-red-50/50 p-3">
+                  <p className="text-lg font-semibold text-red-800">{data.summary.projectsAtInvitationLimit}</p>
+                  <p className="text-xs text-red-700">Al límite (invit.)</p>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3">
+                  <p className="text-lg font-semibold text-amber-800">{data.summary.projectsNearInvitationLimit}</p>
+                  <p className="text-xs text-amber-700">Cerca (invit.)</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mb-4 items-center">
+                <span className="text-xs font-medium text-slate-500 mr-1">Vistas:</span>
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus("at_limit")}
+                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100"
+                >
+                  Solo al límite
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus("near_limit")}
+                  className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                >
+                  Solo cerca del límite
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus("")}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+                >
+                  Todos
+                </button>
+                <span className="w-px h-5 bg-slate-200 mx-1" />
+                <select
+                  value={filterRole}
+                  onChange={(e) => setFilterRole(e.target.value)}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+                >
+                  <option value="">Todos los roles</option>
+                  <option value="admin">admin</option>
+                  <option value="consultant">consultant</option>
+                  <option value="viewer">viewer</option>
+                  <option value="superadmin">superadmin</option>
+                </select>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+                >
+                  <option value="">Todos los estados</option>
+                  <option value="at_limit">Al límite</option>
+                  <option value="near_limit">Cerca del límite</option>
+                  <option value="normal">Normal</option>
+                  <option value="unlimited">Sin límite</option>
+                </select>
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input type="checkbox" checked={overridesOnly} onChange={(e) => setOverridesOnly(e.target.checked)} className="rounded border-slate-300" />
+                  Solo con overrides
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input type="checkbox" checked={projectsWithLimitsOnly} onChange={(e) => setProjectsWithLimitsOnly(e.target.checked)} className="rounded border-slate-300" />
+                  Solo proyectos con límite
+                </label>
+              </div>
+
+              <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mt-6 mb-2">Por usuario</h3>
+              <div className="overflow-x-auto rounded-xl border border-slate-200 mb-6">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="py-2 px-3">Usuario</th>
+                      <th className="py-2 px-3">Email</th>
+                      <th className="py-2 px-3">Rol</th>
+                      <th className="py-2 px-3">Proyectos</th>
+                      <th className="py-2 px-3">Clientes</th>
+                      <th className="py-2 px-3">Overrides</th>
+                      <th className="py-2 px-3">Estado</th>
+                      <th className="py-2 px-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {data.userUsage.map((u) => (
+                      <tr key={u.userId} className="hover:bg-slate-50">
+                        <td className="py-2 px-3 text-slate-900">{u.fullName ?? "—"}</td>
+                        <td className="py-2 px-3 text-slate-600">{u.email ?? "—"}</td>
+                        <td className="py-2 px-3">{u.appRole}</td>
+                        <td className="py-2 px-3">{u.projectsLimit != null ? `${u.projectsUsed} / ${u.projectsLimit}` : `${u.projectsUsed} (sin límite)`}</td>
+                        <td className="py-2 px-3">{u.clientsLimit != null ? `${u.clientsUsed} / ${u.clientsLimit}` : `${u.clientsUsed} (sin límite)`}</td>
+                        <td className="py-2 px-3">{u.hasOverrides ? "Sí" : "—"}</td>
+                        <td className="py-2 px-3">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                            u.status === "at_limit" ? "bg-red-100 text-red-800" :
+                            u.status === "near_limit" ? "bg-amber-100 text-amber-800" :
+                            u.status === "unlimited" ? "bg-slate-100 text-slate-600" : "bg-slate-100 text-slate-700"
+                          }`}>
+                            {STATUS_LABELS[u.status] ?? u.status}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setQuotaModalUserId(u.userId)}
+                            className="text-indigo-600 hover:underline text-xs font-medium"
+                          >
+                            Configurar límites
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mt-6 mb-2">Por proyecto</h3>
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="py-2 px-3">Proyecto</th>
+                      <th className="py-2 px-3">Cliente</th>
+                      <th className="py-2 px-3">Miembros</th>
+                      <th className="py-2 px-3">Invit. pend.</th>
+                      <th className="py-2 px-3">Estado</th>
+                      <th className="py-2 px-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {data.projectUsage.map((p) => (
+                      <tr key={p.projectId} className="hover:bg-slate-50">
+                        <td className="py-2 px-3 text-slate-900">{p.projectName}</td>
+                        <td className="py-2 px-3 text-slate-600">{p.clientName ?? "—"}</td>
+                        <td className="py-2 px-3">{p.membersLimit != null ? `${p.membersCurrent} / ${p.membersLimit}` : `${p.membersCurrent} (sin límite)`}</td>
+                        <td className="py-2 px-3">{p.invitationsLimit != null ? `${p.invitationsCurrent} / ${p.invitationsLimit}` : `${p.invitationsCurrent} (sin límite)`}</td>
+                        <td className="py-2 px-3">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                            p.status === "at_limit" ? "bg-red-100 text-red-800" :
+                            p.status === "near_limit" ? "bg-amber-100 text-amber-800" :
+                            p.status === "unlimited" ? "bg-slate-100 text-slate-600" : "bg-slate-100 text-slate-700"
+                          }`}>
+                            {STATUS_LABELS[p.status] ?? p.status}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <Link href={`/projects/${p.projectId}`} className="text-indigo-600 hover:underline text-xs font-medium mr-2">
+                            Ver proyecto
+                          </Link>
+                          <Link href={`/projects/${p.projectId}/members`} className="text-indigo-600 hover:underline text-xs font-medium">
+                            Ver equipo
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-slate-500">No se pudieron cargar los datos.</p>
+          )}
+        </div>
+      </div>
+
+      {quotaModalUserId && (
+        <CapacityQuotaModal
+          userId={quotaModalUserId}
+          userLabel={data?.userUsage.find((u) => u.userId === quotaModalUserId)?.fullName ?? data?.userUsage.find((u) => u.userId === quotaModalUserId)?.email ?? quotaModalUserId}
+          quotaData={quotaModalData}
+          loading={quotaModalLoading}
+          saving={quotaModalSaving}
+          message={quotaModalMessage}
+          onClose={() => setQuotaModalUserId(null)}
+          onSave={handleSaveQuotaFromCapacity}
+        />
+      )}
+    </section>
+  );
+}
+
+function CapacityQuotaModal({
+  userId,
+  userLabel,
+  quotaData,
+  loading,
+  saving,
+  message,
+  onClose,
+  onSave,
+}: {
+  userId: string;
+  userLabel: string;
+  quotaData: UserQuotaConfig | null;
+  loading: boolean;
+  saving: boolean;
+  message: string | null;
+  onClose: () => void;
+  onSave: (overrides: Record<string, number>) => Promise<void>;
+}) {
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!quotaData) return;
+    const o: Record<string, string> = {};
+    for (const key of Object.keys(USER_QUOTA_LABELS)) {
+      o[key] = String(quotaData.userOverrides[key] ?? "");
+    }
+    setOverrides(o);
+  }, [quotaData]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const out: Record<string, number> = {};
+    for (const [key, val] of Object.entries(overrides)) {
+      const n = parseInt(String(val).trim(), 10);
+      if (!Number.isNaN(n) && n > 0) out[key] = n;
+    }
+    void onSave(out);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-slate-900">Límites: {userLabel}</h3>
+          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-700 text-xl leading-none">&times;</button>
+        </div>
+        <div className="p-5">
+          {loading ? (
+            <p className="text-sm text-slate-500">Cargando…</p>
+          ) : quotaData ? (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <p className="text-xs text-slate-600">Rol: <strong>{quotaData.appRole ?? "—"}</strong></p>
+              <div className="rounded-lg border border-slate-200 p-3 bg-slate-50/50">
+                <p className="text-xs font-medium text-slate-600 mb-2">Límites por defecto del rol</p>
+                <ul className="text-xs text-slate-700 space-y-1">
+                  {Object.entries(USER_QUOTA_LABELS).map(([key, label]) => (
+                    <li key={key}>{label}: {quotaData.roleLimits[key] ?? "sin límite"}</li>
+                  ))}
+                </ul>
+              </div>
+              <p className="text-xs text-slate-600">Override por usuario (vacío = usar valor del rol):</p>
+              <div className="grid grid-cols-1 gap-3">
+                {Object.entries(USER_QUOTA_LABELS).map(([key, label]) => (
+                  <div key={key}>
+                    <label className="block text-xs text-slate-600 mb-0.5">{label}</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={overrides[key] ?? ""}
+                      onChange={(e) => setOverrides((o) => ({ ...o, [key]: e.target.value }))}
+                      placeholder={quotaData.roleLimits[key] != null ? String(quotaData.roleLimits[key]) : "Sin límite"}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                      disabled={saving}
+                    />
+                    {quotaData.effectiveLimits[key] != null && (
+                      <p className="text-xs text-slate-500 mt-0.5">Efectivo: {quotaData.effectiveLimits[key]}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {message && <p className="text-sm text-emerald-600">{message}</p>}
+              <div className="flex gap-2">
+                <button type="submit" disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+                  {saving ? "Guardando…" : "Guardar"}
+                </button>
+                <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cerrar</button>
+              </div>
+            </form>
+          ) : (
+            <p className="text-sm text-slate-500">No se pudo cargar la configuración.</p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -944,6 +1866,7 @@ function GlobalKnowledgeSourcesPanel() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [canManageKnowledgeSources, setCanManageKnowledgeSources] = useState(false);
 
   const canSyncSource = (s: GlobalKnowledgeSourceRow) =>
     (isDriveSource(s) && !!s.integration_id && !!s.external_ref) ||
@@ -1059,6 +1982,32 @@ function GlobalKnowledgeSourcesPanel() {
   useEffect(() => {
     void loadIntegrations();
   }, [loadIntegrations]);
+
+  // Permission for managing knowledge sources (manage_knowledge_sources)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) return;
+        const res = await fetch("/api/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (cancelled) return;
+        const data = await res.json().catch(() => ({ permissions: { manageKnowledgeSources: false } }));
+        const perms = (data as { permissions?: { manageKnowledgeSources?: boolean } }).permissions;
+        setCanManageKnowledgeSources(perms?.manageKnowledgeSources ?? false);
+      } catch {
+        if (!cancelled) setCanManageKnowledgeSources(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1186,7 +2135,7 @@ function GlobalKnowledgeSourcesPanel() {
           <button
             type="button"
             onClick={handleConnectGoogleDrive}
-            disabled={googleConnectPending}
+            disabled={googleConnectPending || !canManageKnowledgeSources}
             className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 transition-colors shrink-0"
           >
             {googleConnectPending ? "Redirigiendo…" : hasGoogleIntegration ? "Reconectar Google Drive" : "Connect Google Drive"}
@@ -1423,7 +2372,7 @@ function GlobalKnowledgeSourcesPanel() {
                           <button
                             type="button"
                             onClick={() => handleSync(s.id)}
-                            disabled={syncingSourceId !== null || !canSyncSource(s)}
+                            disabled={syncingSourceId !== null || !canSyncSource(s) || !canManageKnowledgeSources}
                             title={!canSyncSource(s) ? (isCuratedSapSource(s) ? "Añade la URL de la página SAP en la fuente" : "Configura cuenta de Google Drive y Ref externa (ID carpeta) en la fuente") : "Sincronizar ahora"}
                             className="text-xs font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
                           >
@@ -1434,7 +2383,7 @@ function GlobalKnowledgeSourcesPanel() {
                             —
                           </span>
                         )}
-                        {s.scope_type === "global" && (
+                        {s.scope_type === "global" && canManageKnowledgeSources && (
                           <button
                             type="button"
                             onClick={() => handleDelete(s.id)}
@@ -1771,8 +2720,40 @@ function ClientsPanel() {
                 ))}
               </select>
             </div>
-            {field("country", "País")}
-            {field("region", "Región")}
+            <div className="space-y-1">
+              <label className="block text-xs text-slate-600">País</label>
+              <select
+                value={resolveCountryOptionValue(form.country as string)}
+                onChange={(e) => { const v = e.target.value; setForm((f) => ({ ...f, country: v, region: "" })); }}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                disabled={saving}
+              >
+                <option value="">—</option>
+                {getAllCountryOptions().map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+                {(form.country as string)?.trim() && !getAllCountryOptions().some((o) => o.value === resolveCountryOptionValue(form.country as string)) && (
+                  <option value={form.country as string}>{form.country} (actual)</option>
+                )}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="block text-xs text-slate-600">Región / Estado</label>
+              <select
+                value={resolveStateOptionValue(form.country as string, form.region as string)}
+                onChange={(e) => setForm((f) => ({ ...f, region: e.target.value }))}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                disabled={saving}
+              >
+                <option value="">—</option>
+                {getStateOptions((form.country as string) ?? "").map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+                {(form.region as string) && (form.country as string)?.length === 2 && !getStateOptions(form.country as string).some((o) => o.value === (form.region as string)) && (
+                  <option value={form.region as string}>{form.region} (actual)</option>
+                )}
+              </select>
+            </div>
             {field("account_group", "Grupo de cuenta")}
             <div className="space-y-1">
               <label className="block text-xs text-slate-600">Tier</label>
@@ -1876,7 +2857,7 @@ function ClientsPanel() {
                     className="hover:bg-slate-50 transition-colors cursor-pointer"
                   >
                     <td className="py-3 px-4 text-slate-900 font-medium">{c.display_name || c.name}</td>
-                    <td className="py-3 px-4 text-slate-600">{c.country ?? "—"}</td>
+                    <td className="py-3 px-4 text-slate-600">{getCountryDisplayName(c.country) || "—"}</td>
                     <td className="py-3 px-4 text-slate-600">{c.industry ?? "—"}</td>
                     <td className="py-3 px-4 text-slate-600">{c.account_tier ?? "—"}</td>
                   </tr>

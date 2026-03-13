@@ -4,6 +4,7 @@ import {
   getProjectMembers,
   setProjectMember,
   findUserIdByEmail,
+  isUserProjectMember,
   type ProjectMemberRole,
 } from "@/lib/services/adminService";
 import {
@@ -12,6 +13,7 @@ import {
   type ProjectMemberRole as InvitationRole,
 } from "@/lib/services/invitationService";
 import { sendInvitationEmail } from "@/lib/email/sendInvitationEmail";
+import { checkQuota } from "@/lib/auth/quota";
 
 /**
  * Project invitations API.
@@ -90,8 +92,56 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const targetUserId = await findUserIdByEmail(email);
     if (targetUserId) {
+      const alreadyMember = await isUserProjectMember(projectId, targetUserId);
+      if (alreadyMember) {
+        return NextResponse.json({
+          success: true,
+          mode: "already_member",
+          added: false,
+          invited: false,
+          alreadyMember: true,
+          message: "El usuario ya pertenece a este proyecto.",
+        });
+      }
+
+      const memberQuota = await checkQuota(auth.userId, "max_members_per_project", projectId);
+      if (!memberQuota.allowed) {
+        return NextResponse.json(
+          {
+            error: "Has alcanzado el máximo de miembros permitidos para este proyecto.",
+            quota: { quotaKey: "max_members_per_project", current: memberQuota.current, limit: memberQuota.limit },
+          },
+          { status: 409 }
+        );
+      }
       await setProjectMember(projectId, targetUserId, role as ProjectMemberRole);
-      return NextResponse.json({ added: true });
+      return NextResponse.json({
+        success: true,
+        mode: "direct_member_add",
+        added: true,
+        invited: false,
+        message: "El usuario ya existía y fue añadido directamente al equipo.",
+      });
+    }
+
+    const pending = await getProjectPendingInvitations(projectId);
+    const alreadyInvited = pending.some((inv) => inv.email.toLowerCase() === email);
+    if (alreadyInvited) {
+      return NextResponse.json(
+        { error: "Ya existe una invitación pendiente para este correo. Revoca la anterior en «Invitaciones pendientes» si quieres reenviar." },
+        { status: 400 }
+      );
+    }
+
+    const quota = await checkQuota(auth.userId, "max_pending_invitations_per_project", projectId);
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          error: "Has alcanzado el máximo de invitaciones pendientes para este proyecto.",
+          quota: { quotaKey: "max_pending_invitations_per_project", current: quota.current, limit: quota.limit },
+        },
+        { status: 409 }
+      );
     }
 
     const { rawToken, invitationId } = await createProjectInvitation(
@@ -104,9 +154,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const appUrl =
       process.env.NEXT_PUBLIC_SITE_URL ||
       process.env.NEXT_PUBLIC_APP_URL ||
-      (request.nextUrl?.origin && !request.nextUrl.origin.includes("localhost")
-        ? request.nextUrl.origin
-        : undefined) ||
+      request.nextUrl?.origin ||
       (typeof process.env.VERCEL_URL === "string"
         ? `https://${process.env.VERCEL_URL}`
         : undefined);
@@ -116,23 +164,60 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       : "";
 
     let emailSent = false;
+    let emailDebugReason: string | null = null;
     if (inviteLink) {
-      try {
-        await sendInvitationEmail(email, inviteLink, projectId);
-        emailSent = true;
-      } catch (err) {
-        console.warn("sendInvitationEmail failed", err);
+      const result = await sendInvitationEmail(email, inviteLink, projectId);
+      emailSent = result.sent;
+      emailDebugReason = result.error ?? null;
+      if (!result.sent) {
+        console.error("Invitation email send failed", {
+          projectId,
+          email,
+          from: result.from,
+          reason: result.error,
+        });
       }
     }
 
+    const isDev = process.env.NODE_ENV !== "production";
+
     if (emailSent) {
-      return NextResponse.json({ invited: true, invitationId });
+      return NextResponse.json({
+        success: true,
+        mode: "pending_invitation",
+        invited: true,
+        added: false,
+        invitationCreated: true,
+        invitationId,
+        emailSent: true,
+        message: "Se creó una invitación pendiente y se envió el correo.",
+        ...(isDev && { emailDebug: null }),
+      });
+    }
+    if (inviteLink) {
+      return NextResponse.json({
+        success: true,
+        mode: "pending_invitation",
+        invited: true,
+        added: false,
+        invitationCreated: true,
+        invitationId,
+        emailSent: false,
+        actionLink: inviteLink,
+        message: "Se creó una invitación pendiente; no se pudo enviar el correo. Usa el enlace de abajo para invitar al usuario.",
+        ...(isDev && { emailDebug: emailDebugReason }),
+      });
     }
     return NextResponse.json({
+      success: true,
+      mode: "pending_invitation",
       invited: true,
+      added: false,
+      invitationCreated: true,
       invitationId,
-      actionLink: inviteLink || undefined,
-      message: "Invitación creada. No se pudo enviar el correo; comparte el enlace con el usuario.",
+      emailSent: false,
+      message: "Se creó una invitación pendiente pero no se pudo generar el enlace (configura NEXT_PUBLIC_SITE_URL o NEXT_PUBLIC_APP_URL). Revisa la sección «Invitaciones pendientes».",
+      ...(isDev && { emailDebug: emailDebugReason }),
     });
   } catch (err) {
     const message =

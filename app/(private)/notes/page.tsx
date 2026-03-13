@@ -66,6 +66,7 @@ export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(true);
   const [manageGlobalNotes, setManageGlobalNotes] = useState(false);
+  const [canUseGlobalAI, setCanUseGlobalAI] = useState(false);
 
   // Chat
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -133,7 +134,7 @@ export default function NotesPage() {
     fetchNotes();
   }, [fetchNotes]);
 
-  // Permission for global notes edit/delete/create (aligned with API manage_global_notes)
+  // Permission for global notes edit/delete/create (manage_global_notes) and Sapito global AI (use_global_ai)
   useEffect(() => {
     let cancelled = false;
     async function loadMe() {
@@ -142,9 +143,10 @@ export default function NotesPage() {
       if (!token) return;
       const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
       if (cancelled) return;
-      const data = await res.json().catch(() => ({ permissions: { manageGlobalNotes: false } }));
-      const perms = (data as { permissions?: { manageGlobalNotes?: boolean } }).permissions;
+      const data = await res.json().catch(() => ({ permissions: { manageGlobalNotes: false, useGlobalAI: false } }));
+      const perms = (data as { permissions?: { manageGlobalNotes?: boolean; useGlobalAI?: boolean } }).permissions;
       setManageGlobalNotes(perms?.manageGlobalNotes ?? false);
+      setCanUseGlobalAI(perms?.useGlobalAI ?? false);
     }
     loadMe();
     return () => { cancelled = true; };
@@ -382,7 +384,8 @@ export default function NotesPage() {
           </section>
         </div>
 
-        {/* Intelligence panel — contextual companion */}
+        {/* Intelligence panel — contextual companion (Sapito). Hidden if user lacks global AI permission. */}
+        {canUseGlobalAI && (
         <aside className="w-full xl:w-[320px] xl:min-w-[280px] xl:sticky xl:top-4 shrink-0">
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-[400px]">
             <div className="shrink-0 px-5 py-4 border-b border-slate-200 bg-slate-50/80">
@@ -457,6 +460,7 @@ export default function NotesPage() {
             </form>
           </div>
         </aside>
+        )}
       </div>
     </PageShell>
   );

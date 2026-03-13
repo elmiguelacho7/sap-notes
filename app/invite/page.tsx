@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
@@ -24,10 +24,15 @@ function InvitePageContent() {
   const [user, setUser] = useState<{ id: string } | null>(null);
   const [accepting, setAccepting] = useState(false);
   const [acceptError, setAcceptError] = useState<string | null>(null);
+  const [lookupReason, setLookupReason] = useState<string | null>(null);
+  const attemptedAutoAccept = useRef(false);
 
-  const signInUrl = token
-    ? `/?next=${encodeURIComponent(`/invite?token=${encodeURIComponent(token)}`)}`
-    : "/";
+  const signInUrl =
+    token && lookup
+      ? `/?next=${encodeURIComponent(`/invite?token=${encodeURIComponent(token)}`)}&email=${encodeURIComponent(lookup.email)}`
+      : token
+        ? `/?next=${encodeURIComponent(`/invite?token=${encodeURIComponent(token)}`)}`
+        : "/";
 
   const loadLookup = useCallback(async () => {
     if (!token.trim()) {
@@ -42,12 +47,15 @@ function InvitePageContent() {
       const res = await fetch(
         `/api/invitations/lookup?token=${encodeURIComponent(token)}`
       );
-      const data = await res.json().catch(() => ({})) as LookupPayload & { error?: string };
+      const data = await res.json().catch(() => ({})) as LookupPayload & { error?: string; reason?: string };
       if (!res.ok) {
         setLookupError(data.error ?? "Invitación no encontrada o no válida.");
+        setLookupReason(data.reason ?? null);
         setLoading(false);
         return;
       }
+      setLookupReason(null);
+      attemptedAutoAccept.current = false;
       setLookup({
         projectId: data.projectId,
         projectName: data.projectName,
@@ -74,8 +82,8 @@ function InvitePageContent() {
     checkUser();
   }, []);
 
-  const handleAccept = async () => {
-    if (!token.trim() || !user) return;
+  const performAccept = useCallback(async (): Promise<boolean> => {
+    if (!token.trim() || !user) return false;
     setAccepting(true);
     setAcceptError(null);
     try {
@@ -100,20 +108,32 @@ function InvitePageContent() {
         } else {
           setAcceptError(data.error ?? "No se pudo aceptar la invitación.");
         }
-        setAccepting(false);
-        return;
+        return false;
       }
       if (data.ok && data.projectId) {
         router.replace(`/projects/${data.projectId}/members`);
-      } else {
-        router.replace("/projects");
+        return true;
       }
+      router.replace("/projects");
+      return true;
     } catch {
       setAcceptError("Error de conexión.");
+      return false;
     } finally {
       setAccepting(false);
     }
+  }, [token, user, router]);
+
+  const handleAccept = () => {
+    void performAccept();
   };
+
+  // Automatic acceptance: when user is authenticated and invitation is valid, accept once and redirect.
+  useEffect(() => {
+    if (!lookup || !user || attemptedAutoAccept.current) return;
+    attemptedAutoAccept.current = true;
+    void performAccept();
+  }, [lookup, user, performAccept]);
 
   if (loading) {
     return (
@@ -128,14 +148,21 @@ function InvitePageContent() {
       <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
           <h1 className="text-lg font-semibold text-slate-900">
-            Invitación no válida
+            {lookupReason === "expired" ? "Invitación expirada" : "Invitación no válida"}
           </h1>
           <p className="text-sm text-slate-600">
             {lookupError}
           </p>
-          <p className="text-xs text-slate-500">
-            Puede que el enlace haya expirado, ya se haya utilizado o haya sido revocado.
-          </p>
+          {lookupReason === "expired" && (
+            <p className="text-xs text-slate-500">
+              Pide una nueva invitación al propietario del proyecto.
+            </p>
+          )}
+          {lookupReason !== "expired" && (
+            <p className="text-xs text-slate-500">
+              Puede que el enlace ya se haya utilizado o haya sido revocado.
+            </p>
+          )}
           <Link
             href="/"
             className="inline-block rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
@@ -183,8 +210,14 @@ function InvitePageContent() {
         {!user ? (
           <div className="space-y-3">
             <p className="text-sm text-slate-600">
-              Inicia sesión con la cuenta <strong>{lookup.email}</strong> para aceptar la invitación.
+              Inicia sesión con la cuenta <strong>{lookup.email}</strong> para aceptar la invitación. El correo de tu cuenta debe coincidir con el de la invitación.
             </p>
+            <div className="rounded-xl border border-amber-100 bg-amber-50/80 p-3 text-sm text-amber-900">
+              <p className="font-medium mb-1">¿No tienes cuenta todavía?</p>
+              <p className="text-amber-800">
+                Pulsa &quot;Crear cuenta&quot; en la pantalla de acceso y regístrate con <strong>este mismo correo</strong> ({lookup.email}) para definir tu contraseña y aceptar la invitación.
+              </p>
+            </div>
             <Link
               href={signInUrl}
               className="block w-full text-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"

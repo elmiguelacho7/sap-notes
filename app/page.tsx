@@ -10,7 +10,9 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
   const nextUrl = searchParams.get("next");
   const resetSuccess = searchParams.get("reset") === "success";
-  const [email, setEmail] = useState("");
+  const inviteEmail = searchParams.get("email");
+  const isInviteContext = Boolean(nextUrl?.includes("/invite"));
+  const [email, setEmail] = useState(inviteEmail ?? "");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -135,6 +137,12 @@ function LoginPageContent() {
               <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
                 Contraseña restablecida correctamente. Inicia sesión con tu nueva contraseña.
               </div>
+            )}
+
+            {isInviteContext && (
+              <p className="mb-4 text-sm text-slate-600 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                Si no tienes cuenta todavía, crea una para definir tu contraseña y acceder al proyecto invitado.
+              </p>
             )}
 
             <form onSubmit={handleLogin} className="space-y-4">

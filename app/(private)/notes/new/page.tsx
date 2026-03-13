@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useRef, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
+import { getCountryDisplayName } from "@/lib/countryStateCity";
 
 type Client = {
   id: string;
@@ -405,7 +406,7 @@ export default function NewNotePage() {
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
                     {client.display_name || client.name}
-                    {client.country ? ` · ${client.country}` : ""}
+                    {client.country ? ` · ${getCountryDisplayName(client.country)}` : ""}
                   </option>
                 ))}
               </select>

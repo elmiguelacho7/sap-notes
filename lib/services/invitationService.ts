@@ -53,28 +53,52 @@ export async function createProjectInvitation(
   return { rawToken: raw, invitationId: (data as { id: string }).id };
 }
 
-/**
- * Find a pending, non-expired invitation by token (hash match).
- */
-export async function findInvitationByToken(rawToken: string): Promise<{
+/** Row shape when looking up by token (any status). */
+export type InvitationByTokenRow = {
   id: string;
   project_id: string;
   email: string;
   role: string;
   status: string;
   expires_at: string;
-} | null> {
+  invited_by: string | null;
+};
+
+/**
+ * Find invitation by token hash only (any status). Used to distinguish invalid vs expired vs not-pending.
+ */
+export async function getInvitationByTokenHash(rawToken: string): Promise<InvitationByTokenRow | null> {
   const hash = hashToken(rawToken);
   const { data, error } = await supabaseAdmin
     .from("project_invitations")
-    .select("id, project_id, email, role, status, expires_at")
+    .select("id, project_id, email, role, status, expires_at, invited_by")
     .eq("token_hash", hash)
     .maybeSingle();
 
   if (error || !data) return null;
-  const row = data as { id: string; project_id: string; email: string; role: string; status: string; expires_at: string };
-  if (row.status !== "pending" || new Date(row.expires_at) <= new Date()) return null;
+  return data as InvitationByTokenRow;
+}
+
+/**
+ * Find a pending, non-expired invitation by token (hash match).
+ * Returns invited_by for quota checks on accept (inviter's limit applies).
+ */
+export async function findInvitationByToken(rawToken: string): Promise<InvitationByTokenRow | null> {
+  const row = await getInvitationByTokenHash(rawToken);
+  if (!row || row.status !== "pending" || new Date(row.expires_at) <= new Date()) return null;
   return row;
+}
+
+/**
+ * Mark an invitation as expired (status = 'expired'). Used when we detect expires_at <= now() on a pending row.
+ */
+export async function markInvitationExpired(invitationId: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("project_invitations")
+    .update({ status: "expired", updated_at: new Date().toISOString() })
+    .eq("id", invitationId);
+
+  if (error) throw new Error(error.message || "Error al actualizar la invitación.");
 }
 
 /**
@@ -119,17 +143,24 @@ export async function getProjectPendingInvitations(projectId: string): Promise<
     role: string;
     status: string;
     expires_at: string;
-    created_at: string;
+    updated_at: string;
   }>
 > {
+  const nowIso = new Date().toISOString();
+
   const { data, error } = await supabaseAdmin
     .from("project_invitations")
-    .select("id, email, role, status, expires_at, created_at")
+    .select("id, email, role, status, expires_at, updated_at")
     .eq("project_id", projectId)
     .in("status", ["pending"])
-    .gt("expires_at", new Date().toISOString())
-    .order("created_at", { ascending: false });
+    .gt("expires_at", nowIso)
+    .order("updated_at", { ascending: false });
 
-  if (error) return [];
-  return (data ?? []) as Array<{ id: string; email: string; role: string; status: string; expires_at: string; created_at: string }>;
+  if (error) {
+    console.error("getProjectPendingInvitations failed", error);
+    return [];
+  }
+
+  const rows = (data ?? []) as Array<{ id: string; email: string; role: string; status: string; expires_at: string; updated_at: string }>;
+  return rows;
 }

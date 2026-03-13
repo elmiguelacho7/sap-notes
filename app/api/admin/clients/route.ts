@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
+import { checkQuota } from "@/lib/auth/quota";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 /** Extended client row for admin (all fields from clients table). */
@@ -176,6 +177,17 @@ export async function POST(request: NextRequest) {
     const auth = await requireAuthAndGlobalPermission(request, "manage_clients");
     if (auth instanceof NextResponse) return auth;
     const { userId } = auth;
+
+    const quota = await checkQuota(userId, "max_clients_created");
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          error: "Has alcanzado el máximo de clientes permitidos.",
+          quota: { quotaKey: "max_clients_created", current: quota.current, limit: quota.limit },
+        },
+        { status: 409 }
+      );
+    }
 
     const body = (await request.json()) as Record<string, unknown>;
     const name =

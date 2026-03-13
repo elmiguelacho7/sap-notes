@@ -1,5 +1,5 @@
 import { TabsNav } from "@/components/ui/TabsNav";
-import { LayoutDashboard, CalendarDays, ListTodo, CheckSquare, FileText, Link as LinkIcon, BookOpen, Ticket, Brain } from "lucide-react";
+import { LayoutDashboard, CalendarDays, ListTodo, CheckSquare, FileText, Link as LinkIcon, BookOpen, Ticket, Brain, Users } from "lucide-react";
 
 export function ProjectTabsNav({
   projectId,
@@ -27,6 +27,7 @@ export function ProjectTabsNav({
         { label: "Links", href: `${base}/links`, icon: <LinkIcon className={iconClass} /> },
         { label: "Knowledge", href: `${base}/knowledge`, icon: <BookOpen className={iconClass} /> },
         { label: "Tickets", href: `${base}/tickets`, icon: <Ticket className={iconClass} /> },
+        { label: "Equipo", href: `${base}/members`, icon: <Users className={iconClass} /> },
       ]}
     />
   );

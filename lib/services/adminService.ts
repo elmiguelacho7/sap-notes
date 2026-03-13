@@ -23,6 +23,8 @@ export type ProjectMemberRow = {
   role: ProjectMemberRole;
   /** Name from profiles.full_name; can be null. */
   user_full_name: string | null;
+  /** Email from profiles; can be null. */
+  user_email: string | null;
   /** app_role from profiles join; can be null or undefined. */
   user_app_role: string | null | undefined;
 };
@@ -228,6 +230,7 @@ type SupabaseProjectMemberRow = {
   role: string;
   profiles: {
     full_name: string | null;
+    email: string | null;
     app_role: string | null;
   } | null;
 };
@@ -243,8 +246,9 @@ export async function getProjectMembers(
       user_id,
       project_id,
       role,
-      profiles (
+      profiles!project_members_user_id_fkey (
         full_name,
+        email,
         app_role
       )
     `
@@ -265,10 +269,31 @@ export async function getProjectMembers(
     project_id: row.project_id,
     role: row.role as ProjectMemberRole,
     user_full_name: row.profiles?.full_name ?? null,
+    user_email: row.profiles?.email ?? null,
     user_app_role: row.profiles?.app_role ?? null,
   }));
 
   return members;
+}
+
+// ==========================
+// isUserProjectMember
+// ==========================
+
+export async function isUserProjectMember(
+  projectId: string,
+  userId: string
+): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from("project_members")
+    .select("id")
+    .eq("project_id", projectId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) return false;
+
+  return !!data;
 }
 
 // ==========================
@@ -292,8 +317,9 @@ export async function setProjectMember(
       user_id,
       project_id,
       role,
-      profiles (
+      profiles!project_members_user_id_fkey (
         full_name,
+        email,
         app_role
       )
     `
@@ -313,6 +339,7 @@ export async function setProjectMember(
     project_id: row.project_id,
     role: row.role as ProjectMemberRole,
     user_full_name: row.profiles?.full_name ?? null,
+    user_email: row.profiles?.email ?? null,
     user_app_role: row.profiles?.app_role ?? null,
   };
 }

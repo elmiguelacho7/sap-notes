@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
 import { useProjectWorkspace } from "@/components/projects/ProjectWorkspaceContext";
 import type { ProjectMemoryRow } from "@/lib/services/projectService";
+import { supabase } from "@/lib/supabaseClient";
 
 const MEMORY_TYPE_LABELS: Record<string, string> = {
   problem: "Problemas resueltos",
@@ -56,6 +57,7 @@ export default function ProjectBrainPage() {
   const [memories, setMemories] = useState<ProjectMemoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [canUseProjectAI, setCanUseProjectAI] = useState(false);
 
   const loadBrain = useCallback(async () => {
     if (!projectId) return;
@@ -82,6 +84,30 @@ export default function ProjectBrainPage() {
   useEffect(() => {
     void loadBrain();
   }, [loadBrain]);
+
+  // Permission for project-level Sapito (use_project_ai)
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const headers: Record<string, string> = {};
+        if (token) headers.Authorization = `Bearer ${token}`;
+        const res = await fetch(`/api/projects/${projectId}/permissions`, { headers });
+        if (cancelled) return;
+        const data = await res.json().catch(() => ({}));
+        const perms = data as { canUseProjectAI?: boolean };
+        setCanUseProjectAI(perms.canUseProjectAI ?? false);
+      } catch {
+        if (!cancelled) setCanUseProjectAI(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   const grouped = useMemo(() => {
     const byType: Record<string, ProjectMemoryRow[]> = {};
@@ -191,22 +217,24 @@ export default function ProjectBrainPage() {
         <p className="text-xs text-slate-500 -mt-2">Última actualización: {lastUpdated}</p>
       )}
 
-      {/* Ask Sapito quick actions */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-4 py-3">
-        <p className="text-xs font-medium text-slate-600 mb-2">Preguntar a Sapito</p>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Sugerencias de consulta">
-          {SAPITO_BRAIN_SUGGESTIONS.map((text) => (
-            <button
-              key={text}
-              type="button"
-              onClick={() => openProjectCopilotWithMessage(text)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors"
-            >
-              {text}
-            </button>
-          ))}
+      {/* Ask Sapito quick actions (visible only if user can use project AI) */}
+      {canUseProjectAI && (
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-4 py-3">
+          <p className="text-xs font-medium text-slate-600 mb-2">Preguntar a Sapito</p>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Sugerencias de consulta">
+            {SAPITO_BRAIN_SUGGESTIONS.map((text) => (
+              <button
+                key={text}
+                type="button"
+                onClick={() => openProjectCopilotWithMessage(text)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors"
+              >
+                {text}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {errorMsg && (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

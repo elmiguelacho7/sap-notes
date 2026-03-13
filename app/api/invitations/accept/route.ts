@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserIdFromRequest } from "@/lib/auth/serverAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { checkQuota } from "@/lib/auth/quota";
 import {
   findInvitationByToken,
   markInvitationAccepted,
@@ -58,6 +59,18 @@ export async function POST(request: NextRequest) {
           invitationEmail: inv.email,
         },
         { status: 403 }
+      );
+    }
+
+    const quotaUserId = inv.invited_by ?? userId;
+    const memberQuota = await checkQuota(quotaUserId, "max_members_per_project", inv.project_id);
+    if (!memberQuota.allowed) {
+      return NextResponse.json(
+        {
+          error: "Has alcanzado el máximo de miembros permitidos para este proyecto.",
+          quota: { quotaKey: "max_members_per_project", current: memberQuota.current, limit: memberQuota.limit },
+        },
+        { status: 409 }
       );
     }
 

@@ -80,7 +80,20 @@ After the fix:
 
 ---
 
-## 5. RBAC
+## 5. Quick client creation (project flow)
+
+The "Crear cliente rápido" modal during project creation now includes:
+
+- **Required:** name.
+- **Optional:** industry (select from `clientOptions`), country (text), account_tier (select from `clientOptions`).
+- **UX:** Title "Crear cliente rápido"; helper text: "Puedes completar más información del cliente más adelante en la sección Clientes."
+- **Flow:** On success, the new client is appended to local state (no full reload), the dropdown selection is set to the new client, and the modal is closed.
+
+**Source tracking (proposal only):** The `clients` table does not currently have a `source` or `creation_source` column. To record that a client was created from the quick-create modal (e.g. `source = 'quick_create_project'`) for analytics or UX, a future migration could add a nullable column such as `creation_source text` and set it in `POST /api/admin/clients` when the request includes e.g. `creation_source: 'quick_create_project'`. No schema change was made in this pass.
+
+---
+
+## 6. RBAC
 
 - **Clients**: superadmin and admin can create/edit (RLS and API use `manage_clients`; sidebar and `/clients` page allow both roles). Consultant and viewer have read/select only (e.g. dropdowns); they do not see the Clients nav item and get "Acceso restringido" if they open `/clients` directly.
 - **RLS**: Still uses `app_role IN ('superadmin', 'admin')` for clients and related tables; no change in this pass. A future permission-based RLS (e.g. `has_global_permission(auth.uid(), 'manage_clients')`) can be documented and implemented later.

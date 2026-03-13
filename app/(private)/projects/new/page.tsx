@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import { createDefaultPhasesForProject } from "@/lib/services/projectPhaseService";
+import { INDUSTRY_OPTIONS, ACCOUNT_TIER_OPTIONS } from "@/lib/constants/clientOptions";
+import { getAllCountryOptions, getStateOptions, getCountryDisplayName } from "@/lib/countryStateCity";
 
 type Client = {
   id: string;
@@ -61,9 +63,13 @@ export default function NewProjectPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [planWarning, setPlanWarning] = useState<string | null>(null);
 
-  // Modal crear cliente
+  // Modal crear cliente rápido
   const [createClientModalOpen, setCreateClientModalOpen] = useState(false);
   const [newClientName, setNewClientName] = useState("");
+  const [newClientIndustry, setNewClientIndustry] = useState("");
+  const [newClientCountry, setNewClientCountry] = useState("");
+  const [newClientRegion, setNewClientRegion] = useState("");
+  const [newClientAccountTier, setNewClientAccountTier] = useState("");
   const [creatingClient, setCreatingClient] = useState(false);
   const [createClientError, setCreateClientError] = useState<string | null>(null);
 
@@ -171,21 +177,35 @@ export default function NewProjectPage() {
       const token = session?.session?.access_token;
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers.Authorization = `Bearer ${token}`;
+      const body: Record<string, unknown> = { name: newClientName.trim() };
+      if (newClientIndustry.trim()) body.industry = newClientIndustry.trim();
+      if (newClientCountry.trim()) body.country = newClientCountry.trim();
+      if (newClientAccountTier.trim()) body.account_tier = newClientAccountTier.trim();
       const res = await fetch("/api/admin/clients", {
         method: "POST",
         headers,
-        body: JSON.stringify({ name: newClientName.trim() }),
+        body: JSON.stringify(body),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string; client?: { id: string; name: string } };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        client?: { id: string; name: string; display_name?: string | null; country?: string | null; industry?: string | null; account_tier?: string | null; sap_relevance_summary?: string | null };
+      };
       if (!res.ok) {
         setCreateClientError(data.error ?? "Error al crear el cliente.");
         return;
       }
       if (data.client) {
+        const c = data.client;
         setNewClientName("");
+        setNewClientIndustry("");
+        setNewClientCountry("");
+        setNewClientRegion("");
+        setNewClientAccountTier("");
         setCreateClientModalOpen(false);
-        await loadClients();
-        setClientId(data.client.id);
+        setClients((prev) =>
+          [...prev, { id: c.id, name: c.name, display_name: c.display_name ?? null, country: c.country ?? null, industry: c.industry ?? null, account_tier: c.account_tier ?? null, sap_relevance_summary: c.sap_relevance_summary ?? null }].sort((a, b) => (a.display_name || a.name).localeCompare(b.display_name || b.name))
+        );
+        setClientId(c.id);
       }
     } catch {
       setCreateClientError("Error de conexión.");
@@ -241,11 +261,14 @@ export default function NewProjectPage() {
       const createData = (await createRes.json().catch(() => ({}))) as {
         id?: string;
         error?: string;
+        quota?: { quotaKey?: string; current?: number; limit?: number | null };
       };
 
       if (!createRes.ok || !createData.id) {
         if (createRes.status === 403) {
           setErrorMsg("No tienes permiso para crear proyectos.");
+        } else if (createRes.status === 409 && createData.quota?.limit != null) {
+          setErrorMsg(`Has alcanzado el máximo de proyectos permitidos (${createData.quota.current ?? 0} / ${createData.quota.limit}).`);
         } else {
           setErrorMsg(createData.error ?? "Error creando el proyecto. Revisa los datos del formulario o contacta soporte.");
         }
@@ -394,7 +417,7 @@ export default function NewProjectPage() {
                       {clients.map((client) => (
                         <option key={client.id} value={client.id}>
                           {client.display_name || client.name}
-                          {client.country ? ` · ${client.country}` : ""}
+                          {client.country ? ` · ${getCountryDisplayName(client.country)}` : ""}
                         </option>
                       ))}
                     </select>
@@ -420,7 +443,7 @@ export default function NewProjectPage() {
                       <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-sm">
                         <p className="font-medium text-slate-800">{client.display_name || client.name}</p>
                         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-600">
-                          {client.country && <span>País: {client.country}</span>}
+                          {client.country && <span>País: {getCountryDisplayName(client.country)}</span>}
                           {client.industry && <span>Industria: {client.industry}</span>}
                           {client.account_tier && <span>Tier: {client.account_tier}</span>}
                         </div>
@@ -606,7 +629,7 @@ export default function NewProjectPage() {
           </form>
         </div>
 
-        {/* Modal Crear cliente */}
+        {/* Modal Crear cliente rápido */}
         {createClientModalOpen && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
@@ -616,13 +639,16 @@ export default function NewProjectPage() {
               className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-6"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                Crear cliente
+              <h3 className="text-lg font-semibold text-slate-900 mb-1">
+                Crear cliente rápido
               </h3>
+              <p className="text-xs text-slate-500 mb-4">
+                Puedes completar más información del cliente más adelante en la sección Clientes.
+              </p>
               <form onSubmit={handleCreateClient} className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Nombre del cliente
+                    Nombre del cliente <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -633,6 +659,68 @@ export default function NewProjectPage() {
                     disabled={creatingClient}
                     autoFocus
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Industria
+                  </label>
+                  <select
+                    value={newClientIndustry}
+                    onChange={(e) => setNewClientIndustry(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    disabled={creatingClient}
+                  >
+                    {INDUSTRY_OPTIONS.map((o) => (
+                      <option key={o.value || "_"} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    País
+                  </label>
+                  <select
+                    value={newClientCountry}
+                    onChange={(e) => { setNewClientCountry(e.target.value); setNewClientRegion(""); }}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    disabled={creatingClient}
+                  >
+                    <option value="">—</option>
+                    {getAllCountryOptions().map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Región / Estado
+                  </label>
+                  <select
+                    value={newClientRegion}
+                    onChange={(e) => setNewClientRegion(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    disabled={creatingClient}
+                  >
+                    <option value="">—</option>
+                    {getStateOptions(newClientCountry).map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Tier
+                  </label>
+                  <select
+                    value={newClientAccountTier}
+                    onChange={(e) => setNewClientAccountTier(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    disabled={creatingClient}
+                  >
+                    {ACCOUNT_TIER_OPTIONS.map((o) => (
+                      <option key={o.value || "_"} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
                 </div>
                 {createClientError && (
                   <p className="text-sm text-red-600">{createClientError}</p>
