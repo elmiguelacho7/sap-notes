@@ -1,15 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { FileText, Link2, AlertCircle, Calendar, Search, Eye, MoreVertical, Pencil, BookMarked, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
-import { RowActions } from "@/components/RowActions";
+import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
 
 type ProjectNoteSummary = {
   id: string;
   title: string | null;
+  body?: string | null;
   module: string | null;
   scope_item: string | null;
   error_code: string | null;
@@ -19,6 +21,145 @@ type ProjectNoteSummary = {
   created_at: string;
   is_knowledge_base?: boolean;
 };
+
+const SORT_OPTIONS = [
+  { value: "recent", label: "Más recientes" },
+  { value: "oldest", label: "Más antiguas" },
+  { value: "title", label: "Título A-Z" },
+] as const;
+type SortValue = (typeof SORT_OPTIONS)[number]["value"];
+
+/** Safe row actions: Ver (primary) + overflow menu (Editar, KB, Eliminar). */
+function NoteRowActions({
+  note,
+  viewHref,
+  editHref,
+  canEdit,
+  canDelete,
+  deleteEndpoint,
+  onDeleted,
+  onToggleKnowledge,
+  togglingId,
+}: {
+  note: ProjectNoteSummary;
+  viewHref: string;
+  editHref?: string;
+  canEdit: boolean;
+  canDelete: boolean;
+  deleteEndpoint?: string;
+  onDeleted?: () => void;
+  onToggleKnowledge: (e: React.MouseEvent) => void;
+  togglingId: string | null;
+}) {
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handle = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("click", handle);
+    return () => document.removeEventListener("click", handle);
+  }, [menuOpen]);
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteEndpoint) return;
+    setDeleteLoading(true);
+    setDeleteError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(deleteEndpoint, { method: "DELETE", headers });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setDeleteError(data?.error ?? "No se pudo completar la acción.");
+        return;
+      }
+      setDeleteOpen(false);
+      onDeleted?.();
+    } catch {
+      setDeleteError("Error de conexión. Inténtalo de nuevo.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const showEdit = canEdit && editHref;
+  const showDelete = canDelete && deleteEndpoint;
+
+  return (
+    <div className="flex items-center gap-2 shrink-0" ref={menuRef}>
+      <Link
+        href={viewHref}
+        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-600/80 bg-slate-800/60 px-3 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:border-slate-500 hover:text-slate-100 transition-colors"
+      >
+        <Eye className="h-3.5 w-3.5" />
+        Ver
+      </Link>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-600/80 bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
+          aria-label="Más opciones"
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
+        {menuOpen && (
+          <div className="absolute right-0 top-full z-20 mt-1 min-w-[160px] rounded-xl border border-slate-600/80 bg-slate-800 shadow-lg ring-1 ring-slate-700/50 py-1">
+            {showEdit && (
+              <button
+                type="button"
+                onClick={() => { setMenuOpen(false); router.push(editHref!); }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-200 hover:bg-slate-700"
+              >
+                <Pencil className="h-3.5 w-3.5" /> Editar
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => { setMenuOpen(false); onToggleKnowledge(e); }}
+              disabled={!!togglingId}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+            >
+              <BookMarked className="h-3.5 w-3.5" />
+              {togglingId === note.id ? "…" : note.is_knowledge_base ? "Quitar de KB" : "Añadir a KB"}
+            </button>
+            {showDelete && (
+              <button
+                type="button"
+                onClick={() => { setMenuOpen(false); setDeleteOpen(true); }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-rose-300 hover:bg-slate-700 hover:bg-rose-500/10"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Eliminar
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {deleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !deleteLoading && setDeleteOpen(false)}>
+          <div className="rounded-2xl border border-slate-700/80 bg-slate-800 p-6 shadow-xl ring-1 ring-slate-700/50 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-slate-100">Eliminar nota</h3>
+            <p className="mt-2 text-sm text-slate-400">¿Seguro que quieres eliminar esta nota? Esta acción no se puede deshacer.</p>
+            {deleteError && <p className="mt-3 text-sm text-rose-400 bg-rose-950/30 rounded-lg px-3 py-2">{deleteError}</p>}
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" onClick={() => !deleteLoading && setDeleteOpen(false)} disabled={deleteLoading} className="rounded-xl border border-slate-600 bg-slate-700 px-3 h-9 text-sm font-medium text-slate-200 hover:bg-slate-600 disabled:opacity-60">Cancelar</button>
+              <button type="button" onClick={handleDeleteConfirm} disabled={deleteLoading} className="rounded-xl bg-rose-600 px-3 h-9 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-60">{deleteLoading ? "Eliminando…" : "Eliminar"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ProjectNotesPage() {
   const params = useParams<{ id: string }>();
@@ -38,6 +179,9 @@ export default function ProjectNotesPage() {
   const [canEditNotes, setCanEditNotes] = useState(false);
   const [canDeleteNotes, setCanDeleteNotes] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [moduleFilter, setModuleFilter] = useState("");
+  const [sortBy, setSortBy] = useState<SortValue>("recent");
 
   useEffect(() => {
     if (!projectId) return;
@@ -84,6 +228,63 @@ export default function ProjectNotesPage() {
     void loadNotes();
   }, [loadNotes]);
 
+  const summary = useMemo(() => {
+    const total = notes.length;
+    const withErrorCode = notes.filter((n) => n.error_code && n.error_code.trim() !== "").length;
+    const withLinks = notes.filter(
+      (n) =>
+        (n.web_link_1 && n.web_link_1.trim() !== "") ||
+        (n.web_link_2 && n.web_link_2.trim() !== "")
+    ).length;
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recentlyAdded = notes.filter((n) => new Date(n.created_at) >= sevenDaysAgo).length;
+    return { total, withErrorCode, withLinks, recentlyAdded };
+  }, [notes]);
+
+  const uniqueModules = useMemo(
+    () => Array.from(new Set(notes.map((n) => n.module).filter(Boolean))) as string[],
+    [notes]
+  );
+
+  const filteredAndSortedNotes = useMemo(() => {
+    let list = notes;
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((n) => {
+        const title = (n.title ?? "").toLowerCase();
+        const body = (n.body ?? "").toLowerCase();
+        const extra = (n.extra_info ?? "").toLowerCase();
+        const module = (n.module ?? "").toLowerCase();
+        const scope = (n.scope_item ?? "").toLowerCase();
+        const err = (n.error_code ?? "").toLowerCase();
+        return (
+          title.includes(q) ||
+          body.includes(q) ||
+          extra.includes(q) ||
+          module.includes(q) ||
+          scope.includes(q) ||
+          err.includes(q)
+        );
+      });
+    }
+    if (moduleFilter) {
+      list = list.filter((n) => n.module === moduleFilter);
+    }
+    const sorted = [...list].sort((a, b) => {
+      if (sortBy === "recent") {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+      if (sortBy === "oldest") {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      }
+      const ta = (a.title ?? "").toLowerCase();
+      const tb = (b.title ?? "").toLowerCase();
+      return ta.localeCompare(tb);
+    });
+    return sorted;
+  }, [notes, searchQuery, moduleFilter, sortBy]);
+
   const toggleKnowledge = async (note: ProjectNoteSummary, e: React.MouseEvent) => {
     e.stopPropagation();
     if (togglingId) return;
@@ -113,102 +314,208 @@ export default function ProjectNotesPage() {
   if (!projectId) {
     return (
       <div className="space-y-6">
-        <p className="text-sm text-slate-600">Identificador de proyecto no válido.</p>
+        <p className="text-sm text-slate-400">Identificador de proyecto no válido.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <ProjectPageHeader
-        variant="section"
-        title="Notas del proyecto"
-        subtitle="Notas operativas y memoria funcional de este proyecto. No son conocimiento global; solo visibles para miembros del proyecto."
-        primaryActionLabel="Nueva nota"
-        primaryActionHref={`/notes/new?projectId=${projectId}`}
-      />
+    <div className="w-full min-w-0 space-y-8">
+      <header className="space-y-1">
+        <ProjectPageHeader
+          variant="section"
+          dark
+          title="Notas del proyecto"
+          subtitle="Notas operativas y memoria funcional de este proyecto. No son conocimiento global; solo visibles para miembros del proyecto."
+          primaryActionLabel="Nueva nota"
+          primaryActionHref={`/notes/new?projectId=${projectId}`}
+        />
+      </header>
 
       {errorMsg && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
           {errorMsg}
         </div>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="px-6 py-10 text-sm text-slate-500">Cargando notas…</div>
-        ) : notes.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <p className="text-sm font-medium text-slate-700">No hay notas en este proyecto</p>
-            <p className="mt-1 text-sm text-slate-500">Crea una desde el botón «Nueva nota».</p>
+      {loading ? (
+        <section className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+          <div className="px-6 py-6">
+            <TableSkeleton rows={6} colCount={5} />
           </div>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {notes.map((note) => (
-              <li
-                key={note.id}
-                className="flex items-start justify-between gap-3 px-4 py-3 hover:bg-slate-50/50 transition"
+        </section>
+      ) : (
+        <>
+          {/* Summary strip */}
+          <div className="flex flex-wrap gap-3">
+            <div className="inline-flex items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-800/50 px-3.5 py-2 text-slate-200">
+              <FileText className="h-4 w-4 text-slate-400" />
+              <span className="text-sm font-medium">{summary.total}</span>
+              <span className="text-xs text-slate-400">Total</span>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-800/50 px-3.5 py-2 text-slate-200">
+              <AlertCircle className="h-4 w-4 text-slate-400" />
+              <span className="text-sm font-medium">{summary.withErrorCode}</span>
+              <span className="text-xs text-slate-400">Con código error</span>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-800/50 px-3.5 py-2 text-slate-200">
+              <Link2 className="h-4 w-4 text-slate-400" />
+              <span className="text-sm font-medium">{summary.withLinks}</span>
+              <span className="text-xs text-slate-400">Con enlaces</span>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-800/50 px-3.5 py-2 text-slate-200">
+              <Calendar className="h-4 w-4 text-slate-400" />
+              <span className="text-sm font-medium">{summary.recentlyAdded}</span>
+              <span className="text-xs text-slate-400">Recientes (7 d)</span>
+            </div>
+          </div>
+
+          {/* Filter / search bar */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar en notas..."
+                className="w-full rounded-xl border border-slate-600/80 bg-slate-800/60 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+              />
+            </div>
+            {uniqueModules.length > 0 && (
+              <select
+                value={moduleFilter}
+                onChange={(e) => setModuleFilter(e.target.value)}
+                className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
               >
-                <div
-                  className="min-w-0 flex-1 cursor-pointer"
-                  onClick={() => router.push(`/notes/${note.id}`)}
+                <option value="">Todos los módulos</option>
+                {uniqueModules.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            )}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortValue)}
+              className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <section className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+            {notes.length === 0 ? (
+              <div className="px-6 py-16 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-600/60 bg-slate-800/50 text-slate-500">
+                  <FileText className="h-7 w-7" />
+                </div>
+                <h2 className="mt-4 text-lg font-semibold text-slate-200">
+                  Aún no hay notas en este proyecto
+                </h2>
+                <p className="mt-2 max-w-md mx-auto text-sm text-slate-400">
+                  Estas notas pueden capturar incidencias, soluciones, decisiones, enlaces y contexto operativo del proyecto. Crea la primera para empezar a construir la memoria del proyecto.
+                </p>
+                <Link
+                  href={`/notes/new?projectId=${projectId}`}
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-medium text-slate-900">
-                      {note.title ?? "Sin título"}
-                    </p>
-                    <span className="text-xs text-slate-400">
-                      {new Date(note.created_at).toLocaleString("es-ES")}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {note.module && (
-                      <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-700">
-                        {note.module}
-                      </span>
-                    )}
-                    {note.scope_item && (
-                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">
-                        {note.scope_item}
-                      </span>
-                    )}
-                    {note.error_code && (
-                      <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] text-red-700">
-                        Error {note.error_code}
-                      </span>
-                    )}
-                  </div>
-                  {note.extra_info != null && note.extra_info.trim() !== "" && (
-                    <p className="mt-1 line-clamp-2 text-xs text-slate-600">
-                      {note.extra_info}
-                    </p>
-                  )}
-                </div>
-                <div className="shrink-0 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    onClick={(e) => toggleKnowledge(note, e)}
-                    disabled={!!togglingId}
-                    className="rounded-full border border-slate-200 px-2 py-1 text-[10px] font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60"
-                    title={note.is_knowledge_base ? "Quitar de base de conocimiento" : "Añadir a base de conocimiento"}
-                  >
-                    {togglingId === note.id ? "…" : note.is_knowledge_base ? "Quitar de KB" : "Añadir a KB"}
-                  </button>
-                  <RowActions
-                    entity="note"
-                    id={note.id}
-                    viewHref={`/notes/${note.id}`}
-                    canEdit={canEditNotes}
-                    canDelete={canDeleteNotes}
-                    deleteEndpoint={canDeleteNotes ? `/api/notes/${note.id}` : undefined}
-                    onDeleted={loadNotes}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                  Crear primera nota
+                </Link>
+              </div>
+            ) : filteredAndSortedNotes.length === 0 ? (
+              <div className="px-6 py-12 text-center">
+                <p className="text-sm font-medium text-slate-300">Ninguna nota coincide con los filtros</p>
+                <p className="mt-1 text-sm text-slate-500">Prueba a cambiar la búsqueda o el módulo.</p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-slate-700/50">
+                {filteredAndSortedNotes.map((note) => {
+                  const excerpt =
+                    (note.body && note.body.trim() !== ""
+                      ? note.body
+                      : note.extra_info && note.extra_info.trim() !== ""
+                        ? note.extra_info
+                        : null) ?? "";
+                  const hasLinks =
+                    (note.web_link_1 && note.web_link_1.trim() !== "") ||
+                    (note.web_link_2 && note.web_link_2.trim() !== "");
+                  return (
+                    <li
+                      key={note.id}
+                      className="flex items-start justify-between gap-3 px-5 py-4 hover:bg-slate-800/40 transition-colors rounded-xl mx-2 my-1.5 first:mt-2 last:mb-2"
+                    >
+                      <div
+                        className="min-w-0 flex-1 cursor-pointer"
+                        onClick={() => router.push(`/notes/${note.id}`)}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-medium text-slate-100">
+                            {note.title ?? "Sin título"}
+                          </p>
+                          <span className="text-xs text-slate-500 shrink-0">
+                            {new Date(note.created_at).toLocaleString("es-ES", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                        {excerpt && (
+                          <p className="mt-1.5 line-clamp-2 text-xs text-slate-400">
+                            {excerpt}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {note.module && (
+                            <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2 py-0.5 text-[10px] text-slate-300">
+                              {note.module}
+                            </span>
+                          )}
+                          {note.scope_item && (
+                            <span className="inline-flex items-center rounded-lg bg-indigo-500/20 px-2 py-0.5 text-[10px] text-indigo-300">
+                              {note.scope_item}
+                            </span>
+                          )}
+                          {note.error_code && (
+                            <span className="inline-flex items-center rounded-lg bg-red-500/20 px-2 py-0.5 text-[10px] text-red-400">
+                              Error {note.error_code}
+                            </span>
+                          )}
+                          {hasLinks && (
+                            <span className="inline-flex items-center gap-0.5 rounded-lg bg-slate-600/50 px-2 py-0.5 text-[10px] text-slate-400">
+                              <Link2 className="h-3 w-3" /> Enlaces
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <NoteRowActions
+                          note={note}
+                          viewHref={`/notes/${note.id}`}
+                          canEdit={canEditNotes}
+                          canDelete={canDeleteNotes}
+                          deleteEndpoint={canDeleteNotes ? `/api/notes/${note.id}` : undefined}
+                          onDeleted={loadNotes}
+                          onToggleKnowledge={(e) => toggleKnowledge(note, e)}
+                          togglingId={togglingId}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }

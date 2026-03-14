@@ -200,16 +200,17 @@ export default function ProjectBrainPage() {
 
   if (!projectId) {
     return (
-      <div className="space-y-6">
-        <p className="text-sm text-slate-600">Identificador de proyecto no válido.</p>
+      <div className="w-full min-w-0 space-y-6">
+        <p className="text-sm text-slate-400">Identificador de proyecto no válido.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 space-y-6">
       <ProjectPageHeader
         variant="section"
+        dark
         title="Project Brain"
         subtitle="Resumen del conocimiento aprendido por el proyecto a partir de las notas: problemas resueltos, soluciones aplicadas, lecciones y decisiones."
       />
@@ -219,15 +220,15 @@ export default function ProjectBrainPage() {
 
       {/* Ask Sapito quick actions (visible only if user can use project AI) */}
       {canUseProjectAI && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-4 py-3">
-          <p className="text-xs font-medium text-slate-600 mb-2">Preguntar a Sapito</p>
+        <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 px-5 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-2">Preguntar a Sapito</p>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Sugerencias de consulta">
             {SAPITO_BRAIN_SUGGESTIONS.map((text) => (
               <button
                 key={text}
                 type="button"
                 onClick={() => openProjectCopilotWithMessage(text)}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-300 hover:border-indigo-500/50 hover:bg-indigo-500/10 hover:text-indigo-200 transition-colors"
               >
                 {text}
               </button>
@@ -237,25 +238,25 @@ export default function ProjectBrainPage() {
       )}
 
       {errorMsg && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
           {errorMsg}
         </div>
       )}
 
       {loading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-6 py-10 text-sm text-slate-500">
+        <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 px-6 py-10 text-sm text-slate-500">
           Cargando…
         </div>
       ) : memories.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-6 py-12 text-center">
-          <p className="text-sm font-medium text-slate-700">Aún no hay memoria en el Project Brain</p>
+        <div className="rounded-2xl border border-dashed border-slate-700/60 bg-slate-800/30 px-6 py-12 text-center">
+          <p className="text-sm font-medium text-slate-300">Aún no hay memoria en el Project Brain</p>
           <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
             El Project Brain se irá llenando automáticamente cuando documentes en las notas del proyecto problemas, soluciones, decisiones o lecciones aprendidas.
           </p>
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-xs text-slate-500">
             Crea notas en la pestaña Notas del proyecto para que el sistema extraiga y muestre aquí el conocimiento.
           </p>
-          <p className="mt-3 text-xs text-slate-400">
+          <p className="mt-3 text-xs text-slate-500">
             El Brain será más útil a medida que añadas más notas al proyecto.
           </p>
         </div>
@@ -263,46 +264,46 @@ export default function ProjectBrainPage() {
         <>
           {/* Stats row: only chips for groups that exist */}
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700 font-medium">
+            <span className="rounded-full bg-slate-700/60 px-3 py-1.5 text-slate-300 font-medium">
               {stats.total} {stats.total === 1 ? "conocimiento" : "conocimientos"}
             </span>
             {stats.problem > 0 && (
-              <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-800">
+              <span className="rounded-full bg-amber-500/20 px-3 py-1.5 text-amber-400">
                 {stats.problem} {stats.problem === 1 ? "problema" : "problemas"}
               </span>
             )}
             {stats.solution > 0 && (
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-800">
+              <span className="rounded-full bg-emerald-500/20 px-3 py-1.5 text-emerald-400">
                 {stats.solution} {stats.solution === 1 ? "solución" : "soluciones"}
               </span>
             )}
             {stats.lesson > 0 && (
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-800">
+              <span className="rounded-full bg-indigo-500/20 px-3 py-1.5 text-indigo-300">
                 {stats.lesson} {stats.lesson === 1 ? "lección" : "lecciones"}
               </span>
             )}
             {stats.decision > 0 && (
-              <span className="rounded-full bg-violet-50 px-3 py-1 text-violet-800">
+              <span className="rounded-full bg-violet-500/20 px-3 py-1.5 text-violet-300">
                 {stats.decision} {stats.decision === 1 ? "decisión" : "decisiones"}
               </span>
             )}
             {stats.workaround > 0 && (
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+              <span className="rounded-full bg-slate-700/60 px-3 py-1.5 text-slate-400">
                 {stats.workaround} workaround{stats.workaround !== 1 ? "s" : ""}
               </span>
             )}
             {stats.configuration > 0 && (
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+              <span className="rounded-full bg-slate-700/60 px-3 py-1.5 text-slate-400">
                 configuración
               </span>
             )}
           </div>
 
-          {/* AI Insights: deterministic summary from counts/types */}
+          {/* AI Insights */}
           {insights.length > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 shadow-sm px-4 py-4">
-              <h3 className="text-sm font-semibold text-slate-800 mb-2">Insights del proyecto</h3>
-              <ul className="list-disc list-inside space-y-1 text-sm text-slate-600">
+            <div className="rounded-2xl border border-slate-700/80 bg-slate-800/50 shadow-lg shadow-black/5 px-5 py-4">
+              <h3 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-2">Insights del proyecto</h3>
+              <ul className="list-disc list-inside space-y-1 text-sm text-slate-400">
                 {insights.map((line, idx) => (
                   <li key={idx}>{line}</li>
                 ))}
@@ -313,26 +314,26 @@ export default function ProjectBrainPage() {
           {grouped.map((section) => (
             <section
               key={section.type}
-              className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden"
+              className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden"
             >
-              <h2 className="border-b border-slate-100 bg-slate-50/80 px-4 py-3 text-sm font-semibold text-slate-800">
+              <h2 className="border-b border-slate-700/60 bg-slate-800/50 px-5 py-3.5 text-[11px] font-semibold uppercase tracking-widest text-slate-500">
                 {section.label}
               </h2>
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-slate-700/40">
                 {section.items.map((item) => (
-                  <li key={item.id} className="px-4 py-3">
+                  <li key={item.id} className="px-5 py-4 hover:bg-slate-800/30 transition">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         {item.title?.trim() && (
-                          <p className="font-medium text-slate-900">{item.title}</p>
+                          <p className="font-medium text-slate-100">{item.title}</p>
                         )}
-                        <p className={`text-sm text-slate-600 ${item.title?.trim() ? "mt-0.5" : ""}`}>
+                        <p className={`text-sm text-slate-400 ${item.title?.trim() ? "mt-0.5" : ""}`}>
                           {item.summary || "—"}
                         </p>
-                        <p className="mt-1.5 text-xs text-slate-400">
+                        <p className="mt-1.5 text-xs text-slate-500">
                           {item.created_at ? formatDate(item.created_at) : ""}
                           {item.source_type ? (
-                            <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-slate-500">
+                            <span className="ml-2 rounded-md bg-slate-700/60 px-1.5 py-0.5 text-slate-400">
                               {item.source_type}
                             </span>
                           ) : null}

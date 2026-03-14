@@ -9,6 +9,7 @@ import type { Ticket, TicketPriority, TicketStatus } from "@/lib/types/ticketTyp
 import { RowActions } from "@/components/RowActions";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
 
 const PRIORITY_LABELS: Record<TicketPriority, string> = {
   low: "Baja",
@@ -135,9 +136,8 @@ export default function TicketsPage() {
         <p className="text-xs text-slate-500 mb-5">Listado de tickets no asignados a ningún proyecto.</p>
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           {loading ? (
-            <div className="px-5 py-12 text-center">
-              <p className="text-sm font-medium text-slate-700">Cargando tickets…</p>
-              <p className="mt-1 text-sm text-slate-500">Un momento.</p>
+            <div className="px-5 py-6">
+              <TableSkeleton rows={6} colCount={6} />
             </div>
           ) : tickets.length === 0 ? (
             <div className="px-5 py-12 text-center">

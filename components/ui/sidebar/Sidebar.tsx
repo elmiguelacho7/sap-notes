@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   FolderKanban,
   CheckSquare,
-  Activity,
   Ticket,
   BookOpen,
   FileText,
@@ -40,7 +39,6 @@ const SIDEBAR_SECTIONS: { label: string; items: NavItem[] }[] = [
     label: "WORK",
     items: [
       { label: "Tasks", href: "/tasks", icon: CheckSquare },
-      { label: "Activities", href: "/activities", icon: Activity },
       { label: "Tickets", href: "/tickets", icon: Ticket },
     ],
   },
@@ -121,7 +119,6 @@ export function Sidebar({
       return pathname === "/knowledge" || (pathname.startsWith("/knowledge/") && !pathname.startsWith("/knowledge/search"));
     if (path === "/tickets") return pathname.startsWith("/tickets");
     if (path === "/tasks") return pathname === "/tasks" || pathname.startsWith("/tasks/");
-    if (path === "/activities") return pathname === "/activities" || pathname.startsWith("/activities/");
     if (path === "/projects") return pathname === "/projects" || pathname.startsWith("/projects/");
     return pathname === path || (path !== "/dashboard" && pathname.startsWith(path + "/"));
   };

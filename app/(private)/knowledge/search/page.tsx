@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ContentSkeleton } from "@/components/skeletons/ContentSkeleton";
 
 const PAGE_TYPE_LABELS: Record<string, string> = {
   how_to: "How-to",
@@ -116,10 +117,7 @@ export default function KnowledgeSearchPage() {
               icon={<FileText className="h-5 w-5" />}
             />
           ) : loading ? (
-            <div className="py-12 text-center">
-              <p className="text-sm font-medium text-slate-700">Cargando resultados…</p>
-              <p className="mt-1 text-sm text-slate-500">Un momento.</p>
-            </div>
+            <ContentSkeleton title={false} lines={5} />
           ) : results.length === 0 ? (
             <EmptyState
               title="Sin resultados"

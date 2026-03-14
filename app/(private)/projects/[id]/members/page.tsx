@@ -88,6 +88,9 @@ export default function ProjectTeamPage() {
     }
   }, [projectId]);
 
+  const [hasGlobalOverride, setHasGlobalOverride] = useState(false);
+  const [isExplicitMember, setIsExplicitMember] = useState(false);
+
   const loadPermissions = useCallback(async () => {
     if (!projectId) return;
     try {
@@ -96,14 +99,20 @@ export default function ProjectTeamPage() {
       const data = await res.json().catch(() => ({}));
       const perms = data as {
         canManageMembers?: boolean;
+        hasGlobalOverride?: boolean;
+        isExplicitMember?: boolean;
         memberQuota?: { atLimit: boolean; current: number; limit: number | null };
         pendingInvitationsQuota?: { atLimit: boolean; current: number; limit: number | null };
       };
       setCanManageMembers(perms.canManageMembers === true);
+      setHasGlobalOverride(perms.hasGlobalOverride === true);
+      setIsExplicitMember(perms.isExplicitMember === true);
       setMemberQuota(perms.memberQuota ?? null);
       setPendingInvitationsQuota(perms.pendingInvitationsQuota ?? null);
     } catch {
       setCanManageMembers(false);
+      setHasGlobalOverride(false);
+      setIsExplicitMember(false);
     }
   }, [projectId]);
 
@@ -322,7 +331,7 @@ export default function ProjectTeamPage() {
   if (!projectId) {
     return (
       <div className="space-y-4">
-        <p className="text-sm text-slate-600">No se ha encontrado el identificador del proyecto.</p>
+        <p className="text-sm text-slate-400">No se ha encontrado el identificador del proyecto.</p>
       </div>
     );
   }
@@ -330,46 +339,51 @@ export default function ProjectTeamPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
+        <h1 className="text-xl font-semibold text-slate-100 flex items-center gap-2">
           <Users className="h-5 w-5 text-slate-500" />
           Equipo
         </h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-0.5 text-sm text-slate-500">
           Miembros del proyecto y sus roles. Quienes tengan permiso pueden añadir miembros, cambiar roles o eliminar del equipo.
         </p>
+        {hasGlobalOverride && !isExplicitMember && (
+          <p className="mt-2 text-sm text-amber-300 bg-amber-500/15 border border-amber-500/40 rounded-xl px-3 py-2">
+            <strong>Acceso global por rol.</strong> Tienes permisos de administrador sobre este proyecto sin ser miembro del equipo. Para aparecer en la lista, un propietario puede añadirte como miembro del proyecto.
+          </p>
+        )}
       </header>
 
       {successMsg && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-4 py-3 text-sm text-emerald-300">
           {successMsg}
         </div>
       )}
 
       {errorMsg && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
           {errorMsg}
         </div>
       )}
 
       {canManageMembers && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+          <div className="border-b border-slate-700/60 px-5 py-4 bg-slate-800/50">
+            <h2 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
               Añadir miembro
             </h2>
-            <p className="mt-0.5 text-sm text-slate-600">
+            <p className="mt-0.5 text-sm text-slate-400">
               Introduce el email y el rol.
             </p>
             <p className="mt-1 text-xs text-slate-500">
               Si el usuario ya existe en la plataforma, se añadirá al equipo al instante. Si no existe, se creará una invitación pendiente y aparecerá abajo hasta que la acepte.
             </p>
             {memberQuota?.atLimit && (
-              <p className="mt-2 text-sm text-red-700 font-medium">
+              <p className="mt-2 text-sm text-red-400 font-medium">
                 Has alcanzado el máximo de miembros permitidos para este proyecto ({memberQuota.current} / {memberQuota.limit}). No puedes añadir más hasta que un administrador aumente el límite.
               </p>
             )}
             {memberQuota?.limit != null && !memberQuota.atLimit && memberQuota.current >= memberQuota.limit * 0.8 && (
-              <p className="mt-2 text-sm text-amber-700 font-medium">
+              <p className="mt-2 text-sm text-amber-400 font-medium">
                 Te acercas al límite de miembros ({memberQuota.current} / {memberQuota.limit}). Cuando lo alcances no podrás añadir más hasta que un administrador aumente la cuota.
               </p>
             )}
@@ -378,7 +392,7 @@ export default function ProjectTeamPage() {
             <form onSubmit={handleAddMember} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="member-email" className="block text-xs font-medium text-slate-600 mb-1">
+                  <label htmlFor="member-email" className="block text-xs font-medium text-slate-500 mb-1">
                     Email
                   </label>
                   <input
@@ -409,10 +423,10 @@ export default function ProjectTeamPage() {
                   </select>
                 </div>
               </div>
-              {submitError && <p className="text-sm text-red-600">{submitError}</p>}
+              {submitError && <p className="text-sm text-red-400">{submitError}</p>}
               {actionLink && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-                  <p className="text-sm text-amber-800">
+                <div className="rounded-xl border border-amber-500/40 bg-amber-500/15 p-4 space-y-3">
+                  <p className="text-sm text-amber-200">
                     Copia o abre el enlace para que el usuario pueda aceptar la invitación.
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
@@ -420,12 +434,12 @@ export default function ProjectTeamPage() {
                       type="text"
                       readOnly
                       value={actionLink}
-                      className="flex-1 min-w-[200px] rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-slate-700 font-mono"
+                      className="flex-1 min-w-[200px] rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-xs text-slate-300 font-mono"
                     />
                     <button
                       type="button"
                       onClick={copyActionLink}
-                      className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="rounded-xl border border-amber-500/50 bg-amber-500/20 px-3 py-2 text-sm font-medium text-amber-200 hover:bg-amber-500/30"
                     >
                       {linkCopied ? "Copiado" : "Copiar enlace de invitación"}
                     </button>
@@ -433,7 +447,7 @@ export default function ProjectTeamPage() {
                       href={actionLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="rounded-xl border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700"
                     >
                       Abrir enlace
                     </a>
@@ -443,7 +457,7 @@ export default function ProjectTeamPage() {
               <button
                 type="submit"
                 disabled={submitting || memberQuota?.atLimit === true}
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? "Añadiendo…" : "Añadir al equipo"}
               </button>
@@ -453,16 +467,16 @@ export default function ProjectTeamPage() {
       )}
 
       {canManageMembers && (
-        <div className="rounded-2xl border border-amber-200 bg-white shadow-sm overflow-hidden">
-          <div className="border-b border-amber-200 px-5 py-4 bg-amber-50/50">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+        <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+          <div className="border-b border-amber-500/30 px-5 py-4 bg-amber-500/10">
+            <h2 className="text-[11px] font-semibold uppercase tracking-widest text-amber-400/90">
               Invitaciones pendientes
             </h2>
-            <p className="mt-0.5 text-xs text-amber-700/90">
+            <p className="mt-0.5 text-xs text-amber-300/80">
               Usuarios invitados que aún no han aceptado. Aparecerán en «Miembros del equipo» cuando acepten.
             </p>
             {pendingInvitationsQuota?.limit != null && (
-              <p className="mt-1 text-xs font-medium text-amber-800">
+              <p className="mt-1 text-xs font-medium text-amber-300">
                 {pendingInvitationsQuota.current} / {pendingInvitationsQuota.limit} invitaciones pendientes
                 {pendingInvitationsQuota.atLimit && " · Has alcanzado el máximo. No puedes crear más invitaciones hasta que un administrador aumente el límite."}
                 {!pendingInvitationsQuota.atLimit && pendingInvitationsQuota.current >= (pendingInvitationsQuota.limit ?? 0) * 0.8 && " · Te acercas al límite."}
@@ -480,10 +494,10 @@ export default function ProjectTeamPage() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <div className="overflow-x-auto rounded-xl border border-slate-700/50">
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    <tr className="bg-slate-800/50 border-b border-slate-700/60 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                       <th className="py-3 px-4">Email</th>
                       <th className="py-3 px-4">Rol</th>
                       <th className="py-3 px-4">Estado</th>
@@ -491,28 +505,28 @@ export default function ProjectTeamPage() {
                       <th className="py-3 px-4 text-right">Acción</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-700/40">
                     {invitations.map((inv) => (
-                      <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="py-3 px-4 text-slate-900">{inv.email}</td>
+                      <tr key={inv.id} className="hover:bg-slate-800/30 transition-colors">
+                        <td className="py-3 px-4 text-slate-200">{inv.email}</td>
                         <td className="py-3 px-4">
-                          <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          <span className="inline-flex rounded-md bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-400">
                             {ROLE_LABELS[inv.role] ?? inv.role}
                           </span>
                         </td>
                         <td className="py-3 px-4">
-                          <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                          <span className="inline-flex rounded-md bg-slate-700/60 px-2 py-0.5 text-xs font-medium text-slate-400">
                             Pendiente
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-slate-600">
+                        <td className="py-3 px-4 text-slate-400">
                           {inv.updated_at ? new Date(inv.updated_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—"}
                         </td>
                         <td className="py-3 px-4 text-right">
                           <button
                             type="button"
                             onClick={() => handleRevokeInvitation(inv.id)}
-                            className="text-xs font-medium text-red-600 hover:text-red-700"
+                            className="text-xs font-medium text-red-400 hover:text-red-300"
                           >
                             Revocar
                           </button>
@@ -527,16 +541,16 @@ export default function ProjectTeamPage() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
-          <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+      <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+        <div className="border-b border-slate-700/60 px-5 py-4 bg-slate-800/50">
+          <h2 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
             Miembros del equipo
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Usuarios que ya forman parte del proyecto.
+            Solo aparecen aquí los usuarios con membresía explícita en el proyecto (tabla de miembros). Quien tenga acceso por rol global no figura en esta lista.
           </p>
           {memberQuota?.limit != null && (
-            <p className="mt-1 text-xs font-medium text-slate-600">
+            <p className="mt-1 text-xs font-medium text-slate-400">
               {memberQuota.current} / {memberQuota.limit} miembros en este proyecto
             </p>
           )}
@@ -549,10 +563,10 @@ export default function ProjectTeamPage() {
               Aún no hay miembros en este proyecto. Añade al primer miembro arriba si tienes permiso.
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <div className="overflow-x-auto rounded-xl border border-slate-700/50">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  <tr className="bg-slate-800/50 border-b border-slate-700/60 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                     <th className="py-3 px-4">Nombre</th>
                     <th className="py-3 px-4">Email</th>
                     <th className="py-3 px-4">Rol</th>
@@ -560,13 +574,13 @@ export default function ProjectTeamPage() {
                     {canManageMembers && <th className="py-3 px-4 text-right">Acciones</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-700/40">
                   {members.map((member) => (
-                    <tr key={member.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-4 text-slate-900 font-medium">
+                    <tr key={member.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="py-3 px-4 text-slate-100 font-medium">
                         {member.user_full_name || "—"}
                       </td>
-                      <td className="py-3 px-4 text-slate-600">
+                      <td className="py-3 px-4 text-slate-400">
                         {member.user_email || "—"}
                       </td>
                       <td className="py-3 px-4">
@@ -575,20 +589,20 @@ export default function ProjectTeamPage() {
                             value={member.role}
                             onChange={(e) => handleChangeRole(member.id, member.user_id, e.target.value as "owner" | "editor" | "viewer")}
                             disabled={changingRoleId === member.id}
-                            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                            className="rounded-xl border border-slate-600/80 bg-slate-800/80 px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
                           >
                             <option value="owner">{ROLE_LABELS.owner}</option>
                             <option value="editor">{ROLE_LABELS.editor}</option>
                             <option value="viewer">{ROLE_LABELS.viewer}</option>
                           </select>
                         ) : (
-                          <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                          <span className="inline-flex rounded-md bg-indigo-500/20 px-2 py-0.5 text-xs font-medium text-indigo-300">
                             {ROLE_LABELS[member.role] ?? member.role}
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-slate-600">
-                        <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                      <td className="py-3 px-4 text-slate-400">
+                        <span className="inline-flex rounded-md bg-slate-700/60 px-2 py-0.5 text-xs text-slate-400">
                           Activo
                         </span>
                       </td>
@@ -599,7 +613,7 @@ export default function ProjectTeamPage() {
                             onClick={() => handleRemoveMember(member)}
                             disabled={removingId === member.id || isLastOwner(member)}
                             title={isLastOwner(member) ? "No se puede eliminar al último propietario" : "Eliminar del equipo"}
-                            className="text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="text-xs font-medium text-red-400 hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {removingId === member.id ? "Eliminando…" : "Eliminar"}
                           </button>

@@ -24,40 +24,40 @@ export function TaskSummary({
   const gridCols = showReview ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6" : "grid-cols-2 sm:grid-cols-5";
 
   return (
-    <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
+    <div className="rounded-2xl border border-slate-700 bg-slate-900/90 p-4">
       <div className={`grid ${gridCols} gap-3`}>
-        <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total</p>
-          <p className="text-lg font-semibold text-slate-900 mt-0.5">{total}</p>
+        <div className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm">
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Total</p>
+          <p className="text-lg font-semibold text-slate-100 mt-0.5">{total}</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Activas</p>
-          <p className="text-lg font-semibold text-slate-900 mt-0.5">{active}</p>
+        <div className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm">
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Activas</p>
+          <p className="text-lg font-semibold text-slate-100 mt-0.5">{active}</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Bloqueadas</p>
-          <p className={`text-lg font-semibold mt-0.5 ${blocked > 0 ? "text-rose-600" : "text-slate-900"}`}>
+        <div className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm">
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Bloqueadas</p>
+          <p className={`text-lg font-semibold mt-0.5 ${blocked > 0 ? "text-red-400" : "text-slate-100"}`}>
             {blocked}
           </p>
         </div>
         {showReview && (
-          <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">En revisión</p>
-            <p className="text-lg font-semibold text-slate-900 mt-0.5">{review}</p>
+          <div className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm">
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">En revisión</p>
+            <p className="text-lg font-semibold text-slate-100 mt-0.5">{review}</p>
           </div>
         )}
-        <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Vencidas</p>
-          <p className={`text-lg font-semibold mt-0.5 ${overdue > 0 ? "text-amber-600" : "text-slate-900"}`}>
+        <div className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm">
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Vencidas</p>
+          <p className={`text-lg font-semibold mt-0.5 ${overdue > 0 ? "text-amber-400" : "text-slate-100"}`}>
             {overdue}
           </p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Completado</p>
-          <p className="text-lg font-semibold text-slate-900 mt-0.5">{completedPercent}%</p>
-          <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+        <div className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm">
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Completado</p>
+          <p className="text-lg font-semibold text-slate-100 mt-0.5">{completedPercent}%</p>
+          <div className="mt-1.5 h-1.5 rounded-full bg-slate-700 overflow-hidden">
             <div
-              className="h-1.5 rounded-full bg-violet-500 transition-all duration-300"
+              className="h-1.5 rounded-full bg-indigo-500 transition-all duration-300"
               style={{ width: `${Math.min(100, completedPercent)}%` }}
             />
           </div>
@@ -68,10 +68,10 @@ export function TaskSummary({
           <span
             className={`rounded-full px-3 py-1 text-xs font-medium ${
               riskLevel === "Alto"
-                ? "bg-rose-100 text-rose-600"
+                ? "bg-red-500/20 text-red-400"
                 : riskLevel === "Medio"
-                  ? "bg-amber-100 text-amber-600"
-                  : "bg-emerald-100 text-emerald-600"
+                  ? "bg-amber-500/20 text-amber-400"
+                  : "bg-emerald-500/20 text-emerald-400"
             }`}
           >
             Riesgo {riskLevel}

@@ -296,204 +296,220 @@ export default function NewNotePage() {
   // ==========================
   // RENDER (manteniendo estilo)
   // ==========================
+  const isProject = isProjectMode && projectIdFromQuery.trim().length > 0;
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8 flex justify-center">
-      <div className="w-full max-w-3xl">
+    <div className="min-h-screen w-full min-w-0 bg-slate-950 px-6 py-10 xl:px-8 2xl:px-10">
+      <div className="w-full max-w-2xl mx-auto">
         {showCreandoBanner && (
-          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 transition-opacity duration-300">
+          <div className="mb-4 rounded-xl border border-slate-600/60 bg-slate-800/50 px-3 py-2 text-xs text-slate-400 transition-opacity duration-300">
             Creando...
           </div>
         )}
-        {/* Título y descripción (igual estilo que tenías) */}
-        <h1 className="text-2xl font-semibold text-slate-900">
-          Nueva nota
-        </h1>
-        <p className="mt-1 text-sm text-slate-600 max-w-2xl">
-          {projectIdFromQuery.trim()
-            ? "Crea una nota asociada al proyecto actual. Se guardará en la pestaña Notas del proyecto."
-            : "Nota global: conocimiento transversal reutilizable (patrones SAP, incidencias recurrentes, estándares de configuración, decisiones entre proyectos). No ligada a un proyecto concreto."}
-        </p>
+        <header className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-100">
+              Nueva nota
+            </h1>
+            {isProject && (
+              <span className="inline-flex items-center rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-2.5 py-0.5 text-xs font-medium text-indigo-300">
+                Nota de proyecto
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-slate-400 max-w-xl">
+            {isProject
+              ? "Crea una nota asociada al proyecto actual. Se guardará en la pestaña Notas del proyecto."
+              : "Nota global: conocimiento transversal reutilizable (patrones SAP, incidencias recurrentes, estándares de configuración, decisiones entre proyectos). No ligada a un proyecto concreto."}
+          </p>
+        </header>
 
-        <div className="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-7">
+        <div className="mt-8 rounded-2xl border border-slate-700/80 bg-slate-800/60 shadow-xl shadow-black/10 ring-1 ring-slate-700/30 p-6 md:p-8">
           {errorMsg && (
-            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <div className="mb-6 rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
               {errorMsg}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* TÍTULO */}
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Título <span className="text-red-500">*</span>
-              </label>
-              <input
-                ref={titleInputRef}
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ejemplo: Error KI100 al contabilizar en ES25"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
-              />
-            </div>
-
-            {/* DESCRIPCIÓN / DETALLE */}
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Descripción / detalle
-              </label>
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                rows={4}
-                placeholder="Describe el problema, el análisis (causa raíz) y la solución aplicada, incluyendo transacciones, customizing, condiciones, etc."
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500 resize-y"
-              />
-            </div>
-
-            {/* TIPO DE NOTA Y SISTEMA (solo modo global) */}
-            {!isProjectMode && (
-            <div className="grid gap-4 md:grid-cols-2">
+          <form onSubmit={handleSubmit} className="space-y-0">
+            {/* Section 1 — Información principal */}
+            <section className="space-y-4 pb-6 border-b border-slate-600/50">
+              <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+                Información principal
+              </h2>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Tipo de nota
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  Título <span className="text-red-400">*</span>
                 </label>
-                <select
-                  value={noteType}
-                  onChange={(e) => setNoteType(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
-                >
-                  {NOTE_TYPES.map((nt) => (
-                    <option key={nt} value={nt}>
-                      {nt}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  ref={titleInputRef}
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Ejemplo: Error KI100 al contabilizar en ES25"
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                />
               </div>
-
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Sistema / entorno (opcional)
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  Descripción / detalle
                 </label>
-                <select
-                  value={systemType}
-                  onChange={(e) => setSystemType(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
-                >
-                  <option value="">No especificar</option>
-                  {SYSTEM_TYPES.map((st) => (
-                    <option key={st} value={st}>
-                      {st}
-                    </option>
-                  ))}
-                </select>
+                <textarea
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  rows={5}
+                  placeholder="Describe el problema, el análisis (causa raíz) y la solución aplicada, incluyendo transacciones, customizing, condiciones, etc."
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 resize-y min-h-[100px]"
+                />
+                <p className="mt-1.5 text-xs text-slate-500">
+                  Documenta aquí problemas, decisiones, soluciones y contexto útil del proyecto.
+                </p>
+                {isProject && (
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Las notas bien documentadas refuerzan el conocimiento del proyecto.
+                  </p>
+                )}
               </div>
-            </div>
-            )}
+            </section>
 
-            {/* CLIENTE (solo modo global) */}
-            {!isProjectMode && (
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Cliente (opcional)
-              </label>
-              <select
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
-              >
-                <option value="">Nota genérica (sin cliente)</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.display_name || client.name}
-                    {client.country ? ` · ${getCountryDisplayName(client.country)}` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-            )}
-
-            {/* MÓDULO Y SCOPE ITEM */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Módulo (opcional)
-                </label>
-                <select
-                  value={moduleId}
-                  onChange={(e) => {
-                    setModuleId(e.target.value);
-                    setScopeItemId("");
-                  }}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
-                >
-                  <option value="">No especificar</option>
-                  {modules.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.code} · {m.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Scope item / proceso (opcional)
-                </label>
-                <select
-                  value={scopeItemId}
-                  onChange={(e) => setScopeItemId(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
-                >
-                  <option value="">No especificar</option>
-                  {filteredScopeItems.map((si) => (
-                    <option key={si.id} value={si.id}>
-                      {si.code} · {si.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* TRANSACCIÓN Y CÓDIGO DE ERROR: en proyecto solo código de error */}
-            <div className="grid gap-4 md:grid-cols-2">
+            {/* Section 2 — Clasificación SAP */}
+            <section className="space-y-4 py-6 border-b border-slate-600/50">
+              <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+                Clasificación SAP
+              </h2>
               {!isProjectMode && (
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Transacción / App (opcional)
-                </label>
-                <input
-                  type="text"
-                  value={transactionCode}
-                  onChange={(e) => setTransactionCode(e.target.value)}
-                  placeholder="Ejemplo: VA01, VK11, app Fiori..."
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
-                />
-              </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                      Tipo de nota
+                    </label>
+                    <select
+                      value={noteType}
+                      onChange={(e) => setNoteType(e.target.value)}
+                      className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                    >
+                      {NOTE_TYPES.map((nt) => (
+                        <option key={nt} value={nt}>
+                          {nt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                      Sistema / entorno (opcional)
+                    </label>
+                    <select
+                      value={systemType}
+                      onChange={(e) => setSystemType(e.target.value)}
+                      className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                    >
+                      <option value="">No especificar</option>
+                      {SYSTEM_TYPES.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               )}
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Código de error (opcional)
-                </label>
-                <input
-                  type="text"
-                  value={errorCode}
-                  onChange={(e) => setErrorCode(e.target.value)}
-                  placeholder="Ejemplo: KI100, CK701, M7064..."
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* ENLACES Y CONTEXTO ADICIONAL */}
-            <div className="pt-2 border-t border-slate-100 mt-4 space-y-3">
-              <p className="text-xs font-medium text-slate-700">
-                Enlaces y contexto adicional (opcional)
-              </p>
-
+              {!isProjectMode && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    Cliente (opcional)
+                  </label>
+                  <select
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                  >
+                    <option value="">Nota genérica (sin cliente)</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.display_name || client.name}
+                        {client.country ? ` · ${getCountryDisplayName(client.country)}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    Módulo (opcional)
+                  </label>
+                  <select
+                    value={moduleId}
+                    onChange={(e) => {
+                      setModuleId(e.target.value);
+                      setScopeItemId("");
+                    }}
+                    className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                  >
+                    <option value="">No especificar</option>
+                    {modules.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.code} · {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    Scope item / proceso (opcional)
+                  </label>
+                  <select
+                    value={scopeItemId}
+                    onChange={(e) => setScopeItemId(e.target.value)}
+                    className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                  >
+                    <option value="">No especificar</option>
+                    {filteredScopeItems.map((si) => (
+                      <option key={si.id} value={si.id}>
+                        {si.code} · {si.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {!isProjectMode && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                      Transacción / App (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={transactionCode}
+                      onChange={(e) => setTransactionCode(e.target.value)}
+                      placeholder="Ejemplo: VA01, VK11, app Fiori..."
+                      className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    Código de error (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={errorCode}
+                    onChange={(e) => setErrorCode(e.target.value)}
+                    placeholder="Ejemplo: KI100, CK701, M7064..."
+                    className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                  />
+                </div>
+              </div>
+            </section>
+
+            {/* Section 3 — Referencias y contexto */}
+            <section className="space-y-4 py-6">
+              <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+                Referencias y contexto
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
                     Enlace 1
                   </label>
                   <input
@@ -501,11 +517,11 @@ export default function NewNotePage() {
                     value={webLink1}
                     onChange={(e) => setWebLink1(e.target.value)}
                     placeholder="https://... (SAP Note, Jira, Confluence...)"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
                     Enlace 2
                   </label>
                   <input
@@ -513,13 +529,12 @@ export default function NewNotePage() {
                     value={webLink2}
                     onChange={(e) => setWebLink2(e.target.value)}
                     placeholder="https://..."
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
                   />
                 </div>
               </div>
-
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Información adicional
                 </label>
                 <textarea
@@ -527,24 +542,24 @@ export default function NewNotePage() {
                   onChange={(e) => setExtraInfo(e.target.value)}
                   rows={3}
                   placeholder="Notas internas, referencias a comités, dependencias con otros flujos, etc."
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500 resize-y"
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 resize-y min-h-[72px]"
                 />
               </div>
-            </div>
+            </section>
 
-            {/* BOTONES */}
-            <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
+            {/* Footer actions */}
+            <div className="pt-6 flex items-center justify-end gap-3 border-t border-slate-600/50">
               <button
                 type="button"
                 onClick={() => router.push(projectIdFromQuery.trim() ? `/projects/${projectIdFromQuery.trim()}/notes` : "/notes")}
-                className="text-sm text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-100"
+                className="text-sm font-medium text-slate-400 px-4 py-2.5 rounded-xl hover:bg-slate-700/50 hover:text-slate-200 transition-colors"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="rounded-xl bg-indigo-500/90 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
               >
                 {saving ? "Guardando..." : "Guardar nota"}
               </button>

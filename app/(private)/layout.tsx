@@ -19,10 +19,10 @@ const PAGE_TITLES: Record<string, string> = {
   "/my-work": "My Work",
   "/notes": "Notas",
   "/tasks": "Tareas",
-  "/activities": "Actividades",
   "/projects": "Proyectos",
   "/knowledge": "Knowledge",
   "/knowledge/search": "Search",
+  "/search": "Búsqueda",
   "/tickets": "Tickets",
   "/process-flows": "Flujos de proceso",
   "/account": "Settings",
@@ -36,13 +36,16 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/knowledge/")) return "Knowledge";
   if (pathname.startsWith("/tickets")) return "Tickets";
   if (pathname.startsWith("/tasks")) return "Tareas";
-  if (pathname.startsWith("/activities")) return "Actividades";
   if (pathname.startsWith("/my-work")) return "My Work";
   return "Project Hub";
 }
 
 function buildBreadcrumbs(pathname: string): BreadcrumbItem[] {
   if (!pathname || pathname === "/") return [{ label: "Dashboard", href: "/dashboard" }];
+  // Project workspace: show only "Proyectos" — project name lives in the workspace header
+  if (pathname.startsWith("/projects/") && pathname !== "/projects") {
+    return [{ label: "Proyectos", href: "/projects" }];
+  }
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length === 0) return [{ label: getPageTitle(pathname) }];
   const items: BreadcrumbItem[] = [];
@@ -183,7 +186,18 @@ export default function PrivateLayout({
         />
       }
     >
-      <PageContainer wide={isWideWorkspacePage(pathname ?? "")}>{children}</PageContainer>
+      <PageContainer
+        wide={isWideWorkspacePage(pathname ?? "")}
+        fullWidth={
+          pathname === "/dashboard" ||
+          (typeof pathname === "string" &&
+            pathname.startsWith("/projects/") &&
+            pathname.split("/")[2] !== "new") ||
+          (typeof pathname === "string" && pathname.startsWith("/notes"))
+        }
+      >
+        {children}
+      </PageContainer>
       <GlobalAssistantBubble />
     </AppShell>
   );

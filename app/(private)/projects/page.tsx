@@ -1,14 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
+import Link from "next/link";
 import { ProjectCard, type ProjectCardProject } from "@/components/projects/ProjectCard";
-import { PageShell } from "@/components/layout/PageShell";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { ContentSkeleton } from "@/components/skeletons/ContentSkeleton";
+import {
+  FolderOpen,
+  Search,
+  LayoutGrid,
+  CalendarClock,
+  Ticket,
+  Archive,
+} from "lucide-react";
 
 type ProjectRow = {
   id: string;
@@ -19,15 +24,19 @@ type ProjectRow = {
   planned_end_date: string | null;
   current_phase_key: string | null;
   created_at: string;
+  client_id: string | null;
 };
 
-export default function ProjectsPage() {
-  const router = useRouter();
+type StatusFilter = "" | "planned" | "in_progress" | "completed" | "archived";
+type SortOption = "priority" | "newest" | "recently_updated" | "name";
 
+export default function ProjectsPage() {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [projects, setProjects] = useState<ProjectCardProject[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
+  const [sortBy, setSortBy] = useState<SortOption>("priority");
   const [canCreateProject, setCanCreateProject] = useState(false);
   const [projectsQuota, setProjectsQuota] = useState<{ atLimit?: boolean; current: number; limit: number | null } | null>(null);
 
@@ -59,7 +68,7 @@ export default function ProjectsPage() {
 
       const { data: projData, error } = await supabase
         .from("projects")
-        .select("id, name, description, status, start_date, planned_end_date, current_phase_key, created_at")
+        .select("id, name, description, status, start_date, planned_end_date, current_phase_key, created_at, client_id")
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -71,6 +80,18 @@ export default function ProjectsPage() {
       }
 
       const rows = (projData ?? []) as ProjectRow[];
+
+      const clientIds = Array.from(new Set(rows.map((p) => p.client_id).filter(Boolean))) as string[];
+      let clientNames = new Map<string, string>();
+      if (clientIds.length > 0) {
+        const { data: clients } = await supabase
+          .from("clients")
+          .select("id, name, display_name")
+          .in("id", clientIds);
+        for (const c of (clients ?? []) as { id: string; name: string; display_name?: string | null }[]) {
+          clientNames.set(c.id, (c.display_name || c.name) ?? "");
+        }
+      }
 
       const { data: doneStatusRows } = await supabase
         .from("task_statuses")
@@ -120,6 +141,8 @@ export default function ProjectsPage() {
             notes_count,
             open_tickets_count,
             open_tasks_count,
+            client_name: p.client_id ? clientNames.get(p.client_id) ?? null : null,
+            created_at: p.created_at,
           } satisfies ProjectCardProject;
         })
       );
@@ -131,84 +154,201 @@ export default function ProjectsPage() {
     void load();
   }, []);
 
-  const filteredProjects = projects.filter((project) => {
+  const normalizedStatus = (s: string | null) => (s ?? "").toLowerCase().trim();
+
+  const summary = useMemo(() => {
+    const active = projects.filter(
+      (p) =>
+        normalizedStatus(p.status) !== "completed" &&
+        normalizedStatus(p.status) !== "archived" &&
+        !normalizedStatus(p.status).includes("cerrado") &&
+        !normalizedStatus(p.status).includes("closed")
+    ).length;
+    const planned = projects.filter((p) => normalizedStatus(p.status) === "planned").length;
+    const inProgress = projects.filter((p) => normalizedStatus(p.status) === "in_progress").length;
+    const closed = projects.filter(
+      (p) =>
+        normalizedStatus(p.status) === "completed" ||
+        normalizedStatus(p.status) === "archived" ||
+        normalizedStatus(p.status).includes("cerrado") ||
+        normalizedStatus(p.status).includes("closed")
+    ).length;
+    const totalOpenTickets = projects.reduce((acc, p) => acc + p.open_tickets_count, 0);
+    return { active, planned, inProgress, closed, totalOpenTickets };
+  }, [projects]);
+
+  const filteredAndSortedProjects = useMemo(() => {
+    let list = projects;
+
     const q = search.trim().toLowerCase();
-    if (!q) return true;
+    if (q) {
+      list = list.filter((project) => {
+        const fields = [
+          project.name,
+          project.description ?? "",
+          project.status ?? "",
+          project.current_phase_key ?? "",
+          project.client_name ?? "",
+        ].join(" ");
+        return fields.toLowerCase().includes(q);
+      });
+    }
 
-    const fields = [
-      project.name,
-      project.description ?? "",
-      project.status ?? "",
-      project.current_phase_key ?? "",
-    ].join(" ");
+    if (statusFilter) {
+      list = list.filter((p) => normalizedStatus(p.status) === statusFilter);
+    }
 
-    return fields.toLowerCase().includes(q);
-  });
+    list = [...list].sort((a, b) => {
+      if (sortBy === "name") return (a.name || "").localeCompare(b.name || "");
+      if (sortBy === "priority") {
+        const order = (s: string | null) => {
+          const n = normalizedStatus(s);
+          if (n === "in_progress") return 0;
+          if (n === "planned") return 1;
+          if (n === "completed" || n === "archived" || n.includes("closed") || n.includes("cerrado")) return 2;
+          return 1;
+        };
+        const ao = order(a.status);
+        const bo = order(b.status);
+        if (ao !== bo) return ao - bo;
+        return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+      }
+      if (sortBy === "recently_updated") {
+        const aTime = new Date((a as ProjectCardProject & { updated_at?: string }).updated_at ?? a.created_at ?? 0).getTime();
+        const bTime = new Date((b as ProjectCardProject & { updated_at?: string }).updated_at ?? b.created_at ?? 0).getTime();
+        return bTime - aTime;
+      }
+      return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+    });
+
+    return list;
+  }, [projects, search, statusFilter, sortBy]);
 
   return (
-    <PageShell wide>
-      <div className="space-y-8">
-        <PageHeader
-          title="Proyectos"
-          description={
-            projectsQuota?.limit != null
-              ? `Registra y organiza aquí tus proyectos. ${projectsQuota.current} / ${projectsQuota.limit} proyectos usados.`
-              : "Registra y organiza aquí tus proyectos. Abre un proyecto para ver su workspace."
-          }
-          actions={canCreateProject ? <Button onClick={() => router.push("/projects/new")}>Nuevo proyecto</Button> : undefined}
-        />
-
-        {projectsQuota?.limit != null && projectsQuota.atLimit && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            Has alcanzado el máximo de proyectos permitidos ({projectsQuota.current} / {projectsQuota.limit}). No puedes crear más hasta que un administrador aumente el límite.
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-100">Proyectos</h1>
+          <p className="mt-1 text-sm text-slate-400">
+            {projectsQuota?.limit != null
+              ? `Portafolio de proyectos. ${projectsQuota.current} / ${projectsQuota.limit} en uso.`
+              : "Gestiona y abre el workspace de cada proyecto. Crea uno nuevo para empezar."}
+          </p>
+        </div>
+        {canCreateProject && (
+          <Link
+            href="/projects/new"
+            className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-500/40 bg-slate-200/90 px-4 py-2.5 text-sm font-medium text-slate-900 transition-colors hover:bg-white hover:border-slate-400/50 focus:outline-none focus:ring-2 focus:ring-slate-400/50 focus:ring-offset-2 focus:ring-offset-slate-950"
+          >
+            Nuevo proyecto
+          </Link>
         )}
-        {projectsQuota?.limit != null && !projectsQuota.atLimit && projectsQuota.current >= projectsQuota.limit * 0.8 && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Te acercas al límite de proyectos ({projectsQuota.current} / {projectsQuota.limit}). Cuando lo alcances no podrás crear más hasta que un administrador aumente la cuota.
-          </div>
-        )}
+      </header>
 
-      <section>
-        <h2 className="text-sm font-semibold text-slate-800 mb-1">Filtrar</h2>
-        <p className="text-xs text-slate-500 mb-5">Busca por nombre, descripción o estado.</p>
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-          <Input
-            type="text"
+      {/* Quota alerts (dark style) */}
+      {projectsQuota?.limit != null && projectsQuota.atLimit && (
+        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+          Has alcanzado el máximo de proyectos permitidos ({projectsQuota.current} / {projectsQuota.limit}). No puedes crear más hasta que un administrador aumente el límite.
+        </div>
+      )}
+      {projectsQuota?.limit != null && !projectsQuota.atLimit && projectsQuota.current >= (projectsQuota.limit ?? 0) * 0.8 && (
+        <div className="rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+          Te acercas al límite de proyectos ({projectsQuota.current} / {projectsQuota.limit}). Cuando lo alcances no podrás crear más hasta que un administrador aumente la cuota.
+        </div>
+      )}
+
+      {/* Portfolio summary strip */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2">
+          <LayoutGrid className="h-4 w-4 text-slate-400" />
+          <span className="text-xs text-slate-400">Activos</span>
+          <span className="text-sm font-semibold text-slate-200">{loadingProjects ? "—" : summary.active}</span>
+        </div>
+        <div className="flex items-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 py-2">
+          <CalendarClock className="h-4 w-4 text-sky-400" />
+          <span className="text-xs text-slate-400">Planned</span>
+          <span className="text-sm font-semibold text-sky-300">{loadingProjects ? "—" : summary.planned}</span>
+        </div>
+        <div className="flex items-center gap-2 rounded-xl border border-indigo-500/25 bg-indigo-500/10 px-3 py-2">
+          <FolderOpen className="h-4 w-4 text-indigo-400" />
+          <span className="text-xs text-slate-400">In progress</span>
+          <span className="text-sm font-semibold text-indigo-300">{loadingProjects ? "—" : summary.inProgress}</span>
+        </div>
+        <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/50 px-3 py-2">
+          <Archive className="h-4 w-4 text-slate-400" />
+          <span className="text-xs text-slate-400">Closed</span>
+          <span className="text-sm font-semibold text-slate-300">{loadingProjects ? "—" : summary.closed}</span>
+        </div>
+        <div className="flex items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2">
+          <Ticket className="h-4 w-4 text-violet-400" />
+          <span className="text-xs text-slate-400">Tickets abiertos</span>
+          <span className="text-sm font-semibold text-violet-300">{loadingProjects ? "—" : summary.totalOpenTickets}</span>
+        </div>
+      </div>
+
+      {/* Compact filter bar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <input
+            type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Escribe para filtrar..."
-            className="max-w-sm"
+            placeholder="Buscar por nombre, cliente o estado..."
+            className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500 focus:border-slate-600 focus:outline-none"
           />
         </div>
-      </section>
+        <div className="flex items-center gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-200 focus:border-slate-600 focus:outline-none"
+          >
+            <option value="">Todos los estados</option>
+            <option value="planned">Planificado</option>
+            <option value="in_progress">En progreso</option>
+            <option value="completed">Completado</option>
+            <option value="archived">Archivado</option>
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-200 focus:border-slate-600 focus:outline-none"
+          >
+            <option value="priority">Activos primero</option>
+            <option value="newest">Más recientes</option>
+            <option value="name">Por nombre</option>
+            <option value="recently_updated">Recientemente actualizados</option>
+          </select>
+        </div>
+      </div>
 
+      {/* Project grid */}
       <section>
-        <h2 className="text-sm font-semibold text-slate-800 mb-1">Proyectos</h2>
-        <p className="text-xs text-slate-500 mb-5">Listado de proyectos. Haz clic en un proyecto para abrir su workspace.</p>
         {loadingProjects ? (
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-5 py-12 text-center">
-            <p className="text-sm font-medium text-slate-700">Cargando proyectos…</p>
-            <p className="mt-1 text-sm text-slate-500">Un momento.</p>
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-6 py-8">
+            <ContentSkeleton title={false} lines={0} cards={6} />
           </div>
         ) : errorMsg ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+          <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-5 py-4 text-sm text-red-200">
             {errorMsg}
           </div>
-        ) : filteredProjects.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-5 py-12 text-center">
-            <p className="text-sm font-medium text-slate-700">No se han encontrado proyectos</p>
-            <p className="mt-1 text-sm text-slate-500">Ajusta el filtro o crea un nuevo proyecto.</p>
+        ) : filteredAndSortedProjects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-slate-800 bg-slate-900/60 py-16 text-center">
+            <p className="text-base font-medium text-slate-300">No se han encontrado proyectos</p>
+            <p className="mt-2 max-w-sm text-sm text-slate-500">
+              Ajusta el filtro o crea un nuevo proyecto para empezar.
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
-            {filteredProjects.map((project) => (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {filteredAndSortedProjects.map((project) => (
               <ProjectCard key={project.id} project={project} />
             ))}
           </div>
         )}
       </section>
-      </div>
-    </PageShell>
+    </div>
   );
 }

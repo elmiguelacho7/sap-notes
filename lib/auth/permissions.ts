@@ -224,6 +224,24 @@ export async function hasProjectPermission(
   return !rpError && !!rp;
 }
 
+/**
+ * Returns true if the user has a row in project_members for the given project (explicit membership).
+ * Use to distinguish "member of team" from "access via global role only".
+ */
+export async function isExplicitProjectMember(
+  userId: string,
+  projectId: string
+): Promise<boolean> {
+  if (!userId?.trim() || !projectId?.trim()) return false;
+  const { data, error } = await supabaseAdmin
+    .from("project_members")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("project_id", projectId)
+    .maybeSingle();
+  return !error && !!data;
+}
+
 /** Global permission keys (app scope). Use with hasGlobalPermission. */
 export const GLOBAL_PERMISSION_KEYS = [
   "view_dashboard",

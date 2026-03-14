@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, FolderOpen, FileText, Search } from "lucide-react";
+import { Plus, FolderOpen, FileText, Search, MessageCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { logSupabaseError } from "@/lib/logSupabaseError";
 import {
@@ -18,6 +18,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from "@/components/ui/Modal";
+import { ContentSkeleton } from "@/components/skeletons/ContentSkeleton";
 
 export default function KnowledgePage() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function KnowledgePage() {
   const [newPageTitle, setNewPageTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [askSapitoOpen, setAskSapitoOpen] = useState(false);
 
   const loadSpaces = useCallback(async () => {
     setLoading(true);
@@ -142,6 +144,10 @@ export default function KnowledgePage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <Button variant="secondary" onClick={() => setAskSapitoOpen(true)}>
+            <MessageCircle className="h-4 w-4" />
+            Preguntar a Sapito
+          </Button>
           <Link href="/knowledge/search">
             <Button variant="secondary">
               <Search className="h-4 w-4" />
@@ -180,10 +186,7 @@ export default function KnowledgePage() {
           </CardHeader>
           <CardContent className="p-4 flex-1 min-h-0 flex flex-col">
             {loading ? (
-              <div className="py-12 text-center">
-                <p className="text-sm font-medium text-slate-700">Cargando espacios…</p>
-                <p className="mt-1 text-sm text-slate-500">Un momento.</p>
-              </div>
+              <ContentSkeleton title lines={4} />
             ) : spaces.length === 0 ? (
               <div className="py-12 text-center">
                 <p className="text-sm font-medium text-slate-700">No hay espacios</p>
@@ -251,6 +254,33 @@ export default function KnowledgePage() {
       </div>
       </section>
       </div>
+
+      {askSapitoOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setAskSapitoOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                <MessageCircle className="h-5 w-5 text-indigo-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Preguntar a Sapito</h2>
+                <p className="text-xs text-slate-500">Asistente de conocimiento</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 mb-6">
+              Pregunta a Sapito sobre tus fuentes de conocimiento ya integradas (Google Drive, fuentes web). Podrás consultar documentos y páginas desde aquí.
+            </p>
+            <p className="text-xs text-slate-500 mb-6">
+              La implementación del asistente de IA llegará en una próxima fase. Por ahora puedes usar la búsqueda para encontrar contenido en Knowledge.
+            </p>
+            <div className="flex justify-end">
+              <Button variant="secondary" onClick={() => setAskSapitoOpen(false)}>
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalSpace && (
         <Modal onClose={() => !saving && setModalSpace(false)}>

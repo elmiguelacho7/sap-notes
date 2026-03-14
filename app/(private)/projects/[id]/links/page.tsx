@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
-import { Pencil, Trash2, Database } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
 import { getSapitoProject } from "@/lib/agents/agentRegistry";
@@ -452,74 +452,81 @@ export default function ProjectLinksPage() {
 
   if (!projectId) {
     return (
-      <div className="space-y-6">
-        <p className="text-sm text-slate-600">Identificador de proyecto no válido.</p>
+      <div className="w-full min-w-0 space-y-6">
+        <p className="text-sm text-slate-400">Identificador de proyecto no válido.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <ProjectPageHeader
-        variant="section"
-        title="Enlaces y fuentes de conocimiento"
-        subtitle="Enlaces operativos (Jira, Confluence, etc.) y fuentes de conocimiento del proyecto para Sapito. Google Drive se gestiona desde Admin."
-        primaryActionLabel={canEdit ? "Nuevo enlace" : undefined}
-        primaryActionOnClick={canEdit ? openCreateModal : undefined}
-      />
+    <div className="w-full min-w-0 space-y-8">
+      <header className="space-y-1">
+        <ProjectPageHeader
+          variant="section"
+          dark
+          title="Enlaces y fuentes de conocimiento"
+          subtitle="Enlaces operativos del proyecto (Jira, Confluence, documentación) y fuentes de conocimiento para Sapito. Las cuentas de Google Drive se gestionan desde Admin."
+          primaryActionLabel={canEdit ? "Nuevo enlace" : undefined}
+          primaryActionOnClick={canEdit ? openCreateModal : undefined}
+        />
+      </header>
 
       {errorMsg && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
           {errorMsg}
         </div>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
-          <h2 className="text-sm font-semibold text-slate-800">Enlaces del proyecto</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Enlaces operativos de navegación: Jira, tableros, Confluence, carpeta principal, etc.</p>
-          <p className="text-xs text-slate-500 mt-0.5">Accesos rápidos a documentación y herramientas.</p>
+      {/* Operational project links */}
+      <section className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-700/60 bg-slate-800/50">
+          <h2 className="text-sm font-semibold text-slate-200">Enlaces del proyecto</h2>
+          <p className="mt-1 text-xs text-slate-400 max-w-2xl">
+            Enlaces operativos de navegación: Jira, Confluence, carpeta principal, tableros y accesos rápidos a documentación y herramientas.
+          </p>
         </div>
         {loading ? (
           <div className="px-6 py-10 text-sm text-slate-500">Cargando enlaces…</div>
         ) : links.length === 0 ? (
           <div className="px-6 py-12 text-center">
-            <p className="text-sm font-medium text-slate-700">No hay enlaces registrados</p>
-            <p className="mt-1 text-sm text-slate-500">Crea uno con «Nuevo enlace».</p>
+            <p className="text-sm font-medium text-slate-300">No hay enlaces registrados</p>
+            <p className="mt-1.5 text-sm text-slate-500">Añade enlaces operativos con el botón «Nuevo enlace» para accesos rápidos desde el proyecto.</p>
           </div>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-slate-700/50">
             {links.map((link) => (
               <li
                 key={link.id}
-                className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50/50 transition"
+                className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-slate-800/40 transition-colors"
               >
-                <div className="min-w-0 flex-1">
-                  <a
-                    href={link.url ?? "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
-                  >
-                    {link.name ?? "Sin nombre"}
-                  </a>
-                  {link.link_type && (
-                    <span className="ml-2 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
-                      {link.link_type}
-                    </span>
-                  )}
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <a
+                      href={link.url ?? "#"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-indigo-300 hover:text-indigo-200 hover:underline"
+                    >
+                      {link.name ?? "Sin nombre"}
+                    </a>
+                    {link.link_type && (
+                      <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2 py-0.5 text-[11px] font-medium text-slate-400">
+                        {link.link_type}
+                      </span>
+                    )}
+                  </div>
                   {link.url && (
-                    <p className="mt-1 text-xs text-slate-500 truncate max-w-2xl">
+                    <p className="text-xs text-slate-500 truncate max-w-2xl">
                       {link.url}
                     </p>
                   )}
                 </div>
                 {canEdit && (
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     <button
                       type="button"
                       onClick={() => openEditModal(link)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-600/80 bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
                       title="Editar"
                       aria-label="Editar"
                     >
@@ -528,7 +535,7 @@ export default function ProjectLinksPage() {
                     <button
                       type="button"
                       onClick={() => setDeleteTarget(link)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 transition"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-600/80 bg-slate-800/60 text-slate-400 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/30 transition-colors"
                       title="Eliminar"
                       aria-label="Eliminar"
                     >
@@ -542,11 +549,11 @@ export default function ProjectLinksPage() {
         )}
       </section>
 
-      {/* Fuentes de conocimiento (Sapito del Proyecto) */}
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <div className="relative h-10 w-10 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+      {/* Project knowledge sources (Sapito) */}
+      <section className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-700/60 bg-slate-800/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative h-10 w-10 rounded-xl overflow-hidden bg-slate-700 shrink-0 ring-1 ring-slate-600/50">
               <Image
                 src={getSapitoProject().avatarImage}
                 alt=""
@@ -555,9 +562,11 @@ export default function ProjectLinksPage() {
                 sizes="40px"
               />
             </div>
-            <div>
-              <h2 className="text-sm font-semibold text-slate-800">Project knowledge sources</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Fuentes de conocimiento de este proyecto. Google Drive y fuentes globales se gestionan desde Admin → Knowledge Sources.</p>
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-slate-200">Fuentes de conocimiento</h2>
+              <p className="mt-0.5 text-xs text-slate-400 max-w-2xl">
+                Fuentes conectadas a este proyecto para que Sapito las use como contexto. Las cuentas de Google Drive y fuentes globales se gestionan en Admin → Knowledge Sources.
+              </p>
             </div>
           </div>
           {canEdit && (
@@ -567,15 +576,15 @@ export default function ProjectLinksPage() {
                   type="button"
                   onClick={handleSyncGoogleDrive}
                   disabled={syncDriveLoading}
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60 transition"
+                  className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 hover:border-slate-500 disabled:opacity-60 transition-colors"
                 >
-                  {syncDriveLoading ? "Sincronizando…" : "Sync Google Drive"}
+                  {syncDriveLoading ? "Sincronizando…" : "Sincronizar Drive"}
                 </button>
               )}
               <button
                 type="button"
                 onClick={openSourceModal}
-                className="rounded-full bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 transition-colors shrink-0"
+                className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors shrink-0"
               >
                 Nueva fuente
               </button>
@@ -583,45 +592,47 @@ export default function ProjectLinksPage() {
           )}
         </div>
         {errorSources && (
-          <div className="px-4 py-2 border-b border-red-100 bg-red-50 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-red-700">{errorSources}</span>
+          <div className="px-6 py-3 border-b border-red-800/50 bg-red-950/30 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-red-200">{errorSources}</span>
             <button
               type="button"
               onClick={() => void loadSources()}
-              className="rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
+              className="rounded-lg border border-red-600/60 bg-red-900/30 px-2.5 py-1 text-xs font-medium text-red-200 hover:bg-red-800/40 transition-colors"
             >
               Reintentar
             </button>
           </div>
         )}
         {syncError && (
-          <div className="px-4 py-2 border-b border-amber-200 bg-amber-50 text-sm text-amber-800">
+          <div className="px-6 py-3 border-b border-amber-800/50 bg-amber-950/20 text-sm text-amber-200">
             {syncError}
           </div>
         )}
         {syncDriveMessage && (
-          <div className={`px-4 py-2 border-b text-sm ${syncDriveMessage.startsWith("Sync") || syncDriveMessage.includes("completad") ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+          <div className={`px-6 py-3 border-b text-sm ${syncDriveMessage.startsWith("Sync") || syncDriveMessage.includes("completad") ? "border-emerald-800/50 bg-emerald-950/20 text-emerald-200" : "border-amber-800/50 bg-amber-950/20 text-amber-200"}`}>
             {syncDriveMessage}
           </div>
         )}
         {loadingSources ? (
           <div className="px-6 py-10 text-sm text-slate-500">Cargando fuentes…</div>
         ) : sources.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <p className="text-sm font-medium text-slate-700">Este proyecto aún no tiene fuentes de conocimiento</p>
-            <p className="mt-1 text-sm text-slate-500">Las fuentes de Google Drive y el conocimiento global se gestionan desde Admin. Añade aquí fuentes ya conectadas o enlaza otras fuentes.</p>
+          <div className="px-6 py-14 text-center">
+            <h3 className="text-base font-semibold text-slate-200">Aún no hay fuentes de conocimiento</h3>
+            <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto">
+              Las fuentes de Google Drive y el conocimiento global se configuran en Admin. Aquí puedes registrar fuentes ya conectadas o enlazar otras para que Sapito las use en este proyecto.
+            </p>
             <a
               href="/admin"
-              className="mt-3 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-800"
+              className="mt-4 inline-block text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
             >
               Ir a Admin → Knowledge Sources
             </a>
             {canEdit && (
-              <div className="mt-4">
+              <div className="mt-6">
                 <button
                   type="button"
                   onClick={openSourceModal}
-                  className="rounded-full bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                  className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors"
                 >
                   Nueva fuente
                 </button>
@@ -629,43 +640,43 @@ export default function ProjectLinksPage() {
             )}
           </div>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-slate-700/50">
             {sources.map((src) => (
               <li
                 key={src.id}
-                className="flex items-start justify-between gap-3 px-4 py-3 hover:bg-slate-50/50 transition"
+                className="flex items-start justify-between gap-4 px-6 py-4 hover:bg-slate-800/40 transition-colors"
               >
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-slate-900">{src.name}</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-slate-700">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <p className="font-medium text-slate-100">{src.name}</p>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                    <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2 py-0.5 text-slate-300">
                       {SOURCE_TYPE_OPTIONS.find((o) => o.value === src.source_type)?.label ?? src.source_type}
                     </span>
                     <span>
-                      Estado de sincronización: {syncingSourceId === src.id
+                      Sincronización: {syncingSourceId === src.id
                         ? SYNC_STATUS_LABELS.running
                         : SYNC_STATUS_LABELS[src.last_sync_status] ?? src.last_sync_status}
                     </span>
                     {src.last_synced_at && (
-                      <span>Última sincronización: {formatSyncDate(src.last_synced_at)}</span>
+                      <span>Última: {formatSyncDate(src.last_synced_at)}</span>
                     )}
                     {src.sync_enabled && (
-                      <span className="text-emerald-600">Sync activada</span>
+                      <span className="text-emerald-400">Sync activada</span>
                     )}
                     {src.integration_id && (
-                      <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] text-indigo-700">
+                      <span className="inline-flex items-center rounded-lg bg-indigo-500/20 px-2 py-0.5 text-indigo-300">
                         Cuenta vinculada
                       </span>
                     )}
                   </div>
                   {src.description && (
-                    <p className="mt-1 text-xs text-slate-600 line-clamp-2">{src.description}</p>
+                    <p className="text-xs text-slate-400 line-clamp-2">{src.description}</p>
                   )}
                   {src.source_url && (
-                    <p className="mt-1 text-xs text-slate-500 truncate max-w-2xl">{src.source_url}</p>
+                    <p className="text-xs text-slate-500 truncate max-w-2xl">{src.source_url}</p>
                   )}
                   {src.last_sync_status === "success" && (
-                    <p className="mt-1 text-xs text-emerald-600">Esta fuente ya puede ser utilizada por Sapito</p>
+                    <p className="text-xs text-emerald-400">Disponible para Sapito</p>
                   )}
                 </div>
                 {canEdit && canSyncSource(src) && (
@@ -674,7 +685,7 @@ export default function ProjectLinksPage() {
                       type="button"
                       onClick={() => handleSyncSource(src)}
                       disabled={syncingSourceId !== null}
-                      className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60 transition"
+                      className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors"
                     >
                       {syncingSourceId === src.id ? "Sincronizando…" : "Sincronizar"}
                     </button>
@@ -689,43 +700,48 @@ export default function ProjectLinksPage() {
       {/* Create/Edit link modal */}
       {modalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
           onClick={closeModal}
         >
           <div
-            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg max-w-md w-full"
+            className="w-full max-w-md rounded-2xl border border-slate-700/80 bg-slate-800/95 shadow-xl ring-1 ring-slate-700/50 p-6 md:p-8"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-slate-900">
-              {modalMode === "create" ? "Nuevo enlace" : "Editar enlace"}
-            </h2>
-            <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-slate-100">
+                {modalMode === "create" ? "Nuevo enlace" : "Editar enlace"}
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Enlace operativo del proyecto: Jira, Confluence, documentación o herramientas. Acceso rápido para el equipo.
+              </p>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Nombre *</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">Nombre *</label>
                 <input
                   type="text"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
                   placeholder="Ej: Documentación SAP"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">URL *</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">URL *</label>
                 <input
                   type="url"
                   value={formUrl}
                   onChange={(e) => setFormUrl(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
                   placeholder="https://..."
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">Tipo</label>
                 <select
                   value={formType}
                   onChange={(e) => setFormType(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
                 >
                   {LINK_TYPE_OPTIONS.map((opt) => (
                     <option key={opt.value || "empty"} value={opt.value}>
@@ -735,21 +751,21 @@ export default function ProjectLinksPage() {
                 </select>
               </div>
               {formError && (
-                <p className="text-xs text-red-600">{formError}</p>
+                <p className="text-sm text-red-400">{formError}</p>
               )}
-              <div className="flex gap-2 pt-2">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-700/60">
                 <button
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  className="rounded-xl border border-slate-600 bg-slate-700/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                  className="rounded-xl bg-indigo-500/90 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60 transition-colors"
                 >
                   {saving ? "Guardando…" : modalMode === "create" ? "Crear" : "Guardar"}
                 </button>
@@ -762,26 +778,26 @@ export default function ProjectLinksPage() {
       {/* Delete confirm modal */}
       {deleteTarget && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
           onClick={() => !deleting && setDeleteTarget(null)}
         >
           <div
-            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg max-w-md w-full"
+            className="w-full max-w-md rounded-2xl border border-slate-700/80 bg-slate-800/95 p-6 shadow-xl ring-1 ring-slate-700/50"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-slate-900">Eliminar enlace</h3>
-            <p className="mt-2 text-sm text-slate-600">
+            <h3 className="text-lg font-semibold text-slate-100">Eliminar enlace</h3>
+            <p className="mt-2 text-sm text-slate-400">
               ¿Eliminar «{deleteTarget.name ?? "Sin nombre"}»? Esta acción no se puede deshacer.
             </p>
             {deleteError && (
-              <p className="mt-2 text-sm text-red-600">{deleteError}</p>
+              <p className="mt-2 text-sm text-red-400">{deleteError}</p>
             )}
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setDeleteTarget(null)}
                 disabled={deleting}
-                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                className="rounded-xl border border-slate-600 bg-slate-700/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors"
               >
                 Cancelar
               </button>
@@ -789,7 +805,7 @@ export default function ProjectLinksPage() {
                 type="button"
                 onClick={handleDeleteConfirm}
                 disabled={deleting}
-                className="rounded-full bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60"
+                className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-60 transition-colors"
               >
                 {deleting ? "Eliminando…" : "Eliminar"}
               </button>
@@ -801,128 +817,148 @@ export default function ProjectLinksPage() {
       {/* Create source modal */}
       {sourceModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 overflow-y-auto"
           onClick={closeSourceModal}
         >
           <div
-            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg max-w-md w-full"
+            className="w-full max-w-lg my-8 rounded-2xl border border-slate-700/80 bg-slate-800/95 shadow-xl ring-1 ring-slate-700/50 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-slate-900">Nueva fuente</h2>
-            <p className="mt-1 text-xs text-slate-500">Registra una fuente externa. Esta fuente podrá sincronizarse con Sapito en el siguiente paso.</p>
-            <form onSubmit={handleCreateSource} className="mt-4 space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Nombre *</label>
-                <input
-                  type="text"
-                  value={sourceFormName}
-                  onChange={(e) => setSourceFormName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  placeholder="Ej: Documentación Drive del proyecto"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Tipo de fuente *</label>
-                <select
-                  value={sourceFormType}
-                  onChange={(e) => setSourceFormType(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                >
-                  {SOURCE_TYPE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {(sourceFormType === "google_drive_folder" || sourceFormType === "google_drive_file") && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Cuenta de Google Drive</label>
-                  <select
-                    value={sourceFormIntegrationId}
-                    onChange={(e) => setSourceFormIntegrationId(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="">Seleccionar cuenta conectada</option>
-                    {googleIntegrations.map((int) => (
-                      <option key={int.id} value={int.id}>
-                        {int.account_email || int.display_name || int.id}
-                      </option>
-                    ))}
-                  </select>
-                  {googleIntegrations.length === 0 && (
-                    <p className="mt-1 text-xs text-slate-500">
-                      Google Drive se gestiona desde Admin. Conecta una cuenta en Admin → Knowledge Sources y vuelve aquí para elegir la fuente del proyecto.
-                    </p>
-                  )}
+            <div className="p-6 md:p-8 border-b border-slate-700/60">
+              <h2 className="text-lg font-semibold text-slate-100">Nueva fuente de conocimiento</h2>
+              <p className="mt-1.5 text-sm text-slate-400">
+                Registra una fuente externa para que Sapito la use como contexto en este proyecto. Podrás activar la sincronización después.
+              </p>
+            </div>
+            <form onSubmit={handleCreateSource} className="p-6 md:p-8 max-h-[min(70vh,520px)] overflow-y-auto">
+              <div className="space-y-6">
+                {/* Section 1 — Identificación */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Identificación</h3>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1.5">Nombre *</label>
+                    <input
+                      type="text"
+                      value={sourceFormName}
+                      onChange={(e) => setSourceFormName(e.target.value)}
+                      className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                      placeholder="Ej: Documentación Drive del proyecto"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1.5">Tipo de fuente *</label>
+                    <select
+                      value={sourceFormType}
+                      onChange={(e) => setSourceFormType(e.target.value)}
+                      className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                    >
+                      {SOURCE_TYPE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              )}
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  {(sourceFormType === "google_drive_folder" || sourceFormType === "google_drive_file")
-                    ? "ID de carpeta o archivo (opcional)"
-                    : "ID externo (opcional)"}
-                </label>
-                <input
-                  type="text"
-                  value={sourceFormExternalId}
-                  onChange={(e) => setSourceFormExternalId(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  placeholder={
-                    sourceFormType === "google_drive_folder" || sourceFormType === "google_drive_file"
-                      ? "ID de la carpeta o archivo en Drive"
-                      : "Ej: ID de espacio Confluence"
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">URL (opcional)</label>
-                <input
-                  type="url"
-                  value={sourceFormUrl}
-                  onChange={(e) => setSourceFormUrl(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  placeholder="https://..."
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Descripción (opcional)</label>
-                <textarea
-                  value={sourceFormDescription}
-                  onChange={(e) => setSourceFormDescription(e.target.value)}
-                  rows={2}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  placeholder="Breve descripción de la fuente"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="source-sync-enabled"
-                  checked={sourceFormSyncEnabled}
-                  onChange={(e) => setSourceFormSyncEnabled(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <label htmlFor="source-sync-enabled" className="text-sm text-slate-700">
-                  Sincronización activada (esta fuente podrá sincronizarse con Sapito en el siguiente paso)
-                </label>
+
+                {/* Section 2 — Conexión */}
+                <div className="space-y-4 pt-4 border-t border-slate-700/50">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Conexión</h3>
+                  {(sourceFormType === "google_drive_folder" || sourceFormType === "google_drive_file") && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1.5">Cuenta de Google Drive</label>
+                      <select
+                        value={sourceFormIntegrationId}
+                        onChange={(e) => setSourceFormIntegrationId(e.target.value)}
+                        className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                      >
+                        <option value="">Seleccionar cuenta conectada</option>
+                        {googleIntegrations.map((int) => (
+                          <option key={int.id} value={int.id}>
+                            {int.account_email || int.display_name || int.id}
+                          </option>
+                        ))}
+                      </select>
+                      {googleIntegrations.length === 0 && (
+                        <p className="mt-1.5 text-xs text-slate-500">
+                          Conecta una cuenta en Admin → Knowledge Sources y vuelve aquí para elegir la fuente del proyecto.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                      {(sourceFormType === "google_drive_folder" || sourceFormType === "google_drive_file")
+                        ? "ID de carpeta o archivo (opcional)"
+                        : "ID externo (opcional)"}
+                    </label>
+                    <input
+                      type="text"
+                      value={sourceFormExternalId}
+                      onChange={(e) => setSourceFormExternalId(e.target.value)}
+                      className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                      placeholder={
+                        sourceFormType === "google_drive_folder" || sourceFormType === "google_drive_file"
+                          ? "ID de la carpeta o archivo en Drive"
+                          : "Ej: ID de espacio Confluence"
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1.5">URL (opcional)</label>
+                    <input
+                      type="url"
+                      value={sourceFormUrl}
+                      onChange={(e) => setSourceFormUrl(e.target.value)}
+                      className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
+
+                {/* Section 3 — Contexto adicional */}
+                <div className="space-y-4 pt-4 border-t border-slate-700/50">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Contexto adicional</h3>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1.5">Descripción (opcional)</label>
+                    <textarea
+                      value={sourceFormDescription}
+                      onChange={(e) => setSourceFormDescription(e.target.value)}
+                      rows={3}
+                      className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 resize-y"
+                      placeholder="Breve descripción de la fuente"
+                    />
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="source-sync-enabled"
+                      checked={sourceFormSyncEnabled}
+                      onChange={(e) => setSourceFormSyncEnabled(e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-slate-500 bg-slate-700 text-indigo-500 focus:ring-indigo-500/50"
+                    />
+                    <label htmlFor="source-sync-enabled" className="text-sm text-slate-300">
+                      Sincronización activada. Esta fuente podrá sincronizarse con Sapito en un siguiente paso.
+                    </label>
+                  </div>
+                </div>
               </div>
               {sourceFormError && (
-                <p className="text-xs text-red-600">{sourceFormError}</p>
+                <p className="mt-4 text-sm text-red-400">{sourceFormError}</p>
               )}
-              <div className="flex gap-2 pt-2">
+              <div className="flex items-center justify-end gap-3 pt-6 mt-6 border-t border-slate-700/60">
                 <button
                   type="button"
                   onClick={closeSourceModal}
                   disabled={savingSource}
-                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  className="rounded-xl border border-slate-600 bg-slate-700/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingSource}
-                  className="rounded-full bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60"
+                  className="rounded-xl bg-indigo-500/90 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60 transition-colors"
                 >
                   {savingSource ? "Guardando…" : "Crear fuente"}
                 </button>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserWithRoleFromRequest } from "@/lib/auth/serverAuth";
-import { hasProjectPermission, hasGlobalPermission } from "@/lib/auth/permissions";
+import { hasProjectPermission, hasGlobalPermission, isExplicitProjectMember } from "@/lib/auth/permissions";
 import { checkQuota } from "@/lib/auth/quota";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -13,13 +13,15 @@ type RouteParams = { params: Promise<{ id: string }> };
  * - canManageMembers: manage_project_members on this project OR manage_any_project (global).
  * - canEditProjectNotes / canDeleteProjectNotes: edit_project_notes / delete_project_notes on this project (for notes UI).
  * - canManageProjectTickets: manage_project_tickets on this project (for tickets UI).
+ * - hasGlobalOverride: true if user can access this project via global role (e.g. view_all_projects, manage_any_project) without being in project_members.
+ * - isExplicitMember: true if user has a row in project_members for this project.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const user = await getCurrentUserWithRoleFromRequest(request);
     if (!user) {
       return NextResponse.json(
-        { canEdit: false, canArchive: false, canDelete: false, canManageMembers: false, canEditProjectNotes: false, canDeleteProjectNotes: false, canManageProjectTickets: false, memberQuota: null, pendingInvitationsQuota: null },
+        { canEdit: false, canArchive: false, canDelete: false, canManageMembers: false, canEditProjectNotes: false, canDeleteProjectNotes: false, canManageProjectTickets: false, canUseProjectAI: false, hasGlobalOverride: false, isExplicitMember: false, memberQuota: null, pendingInvitationsQuota: null },
         { status: 200 }
       );
     }
@@ -45,6 +47,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const canManageProjectTickets = await hasProjectPermission(user.userId, projectId, "manage_project_tickets");
     const canUseProjectAI = await hasProjectPermission(user.userId, projectId, "use_project_ai");
 
+    const [hasGlobalOverride, isExplicitMember] = await Promise.all([
+      Promise.all([
+        hasGlobalPermission(user.userId, "view_all_projects"),
+        hasGlobalPermission(user.userId, "manage_any_project"),
+        hasGlobalPermission(user.userId, "delete_any_project"),
+      ]).then(([v, m, d]) => v || m || d),
+      isExplicitProjectMember(user.userId, projectId),
+    ]);
+
     let memberQuota: { atLimit: boolean; current: number; limit: number | null } | null = null;
     let pendingInvitationsQuota: { atLimit: boolean; current: number; limit: number | null } | null = null;
     if (canManageMembers) {
@@ -65,6 +76,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       canDeleteProjectNotes,
       canManageProjectTickets,
       canUseProjectAI,
+      hasGlobalOverride,
+      isExplicitMember,
       memberQuota,
       pendingInvitationsQuota,
     });
@@ -80,6 +93,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         canDeleteProjectNotes: false,
         canManageProjectTickets: false,
         canUseProjectAI: false,
+        hasGlobalOverride: false,
+        isExplicitMember: false,
         memberQuota: null,
         pendingInvitationsQuota: null,
       },

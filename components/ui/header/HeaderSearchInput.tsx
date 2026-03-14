@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
 /**
- * Dark-theme search input for header. Submits to knowledge search.
+ * Dark-theme search input for header. Submits to global search (projects, tasks, tickets, notes, knowledge, clients).
  */
 export function HeaderSearchInput({
-  placeholder = "Search...",
+  placeholder = "Buscar proyectos, tickets, notas…",
   className = "",
 }: {
   placeholder?: string;
@@ -21,7 +21,7 @@ export function HeaderSearchInput({
         e.preventDefault();
         const q = new FormData(e.currentTarget).get("q");
         if (typeof q === "string" && q.trim()) {
-          router.push(`/knowledge/search?q=${encodeURIComponent(q.trim())}`);
+          router.push(`/search?q=${encodeURIComponent(q.trim())}`);
         }
       }}
     >

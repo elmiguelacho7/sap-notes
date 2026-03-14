@@ -1,16 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import { RowActions } from "@/components/RowActions";
 import { PageShell } from "@/components/layout/PageShell";
-import { SapitoAvatar } from "@/components/ai/SapitoAvatar";
-import { AssistantSuggestionChips } from "@/components/ai/AssistantSuggestionChips";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Badge } from "@/components/ui/Badge";
+import { ContentSkeleton } from "@/components/skeletons/ContentSkeleton";
 
 type Note = {
   id: string;
@@ -41,38 +38,12 @@ type Note = {
   created_at: string;
 };
 
-// ======================
-// CHAT — Sapito Brain v1 (project-agent with scope notes)
-// ======================
-
-const PROJECT_AGENT_URL = "/api/project-agent";
-
-const NOTES_SUGGESTIONS = [
-  "¿Qué errores se repiten?",
-  "¿Qué módulos aparecen más?",
-  "¿Qué transacciones se mencionan?",
-  "¿Qué patrones ves en mis notas?",
-];
-
-type ChatMessage = {
-  id: number;
-  from: "user" | "bot";
-  text: string;
-};
-
 export default function NotesPage() {
   const router = useRouter();
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(true);
   const [manageGlobalNotes, setManageGlobalNotes] = useState(false);
-  const [canUseGlobalAI, setCanUseGlobalAI] = useState(false);
-
-  // Chat
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [sending, setSending] = useState(false);
-
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // ==========================
@@ -134,7 +105,7 @@ export default function NotesPage() {
     fetchNotes();
   }, [fetchNotes]);
 
-  // Permission for global notes edit/delete/create (manage_global_notes) and Sapito global AI (use_global_ai)
+  // Permission for global notes edit/delete/create (manage_global_notes)
   useEffect(() => {
     let cancelled = false;
     async function loadMe() {
@@ -143,10 +114,9 @@ export default function NotesPage() {
       if (!token) return;
       const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
       if (cancelled) return;
-      const data = await res.json().catch(() => ({ permissions: { manageGlobalNotes: false, useGlobalAI: false } }));
-      const perms = (data as { permissions?: { manageGlobalNotes?: boolean; useGlobalAI?: boolean } }).permissions;
+      const data = await res.json().catch(() => ({ permissions: { manageGlobalNotes: false } }));
+      const perms = (data as { permissions?: { manageGlobalNotes?: boolean } }).permissions;
       setManageGlobalNotes(perms?.manageGlobalNotes ?? false);
-      setCanUseGlobalAI(perms?.useGlobalAI ?? false);
     }
     loadMe();
     return () => { cancelled = true; };
@@ -157,59 +127,6 @@ export default function NotesPage() {
   if (process.env.NODE_ENV === "development") {
     console.debug("[notes] render: notes state length =", notes.length);
   }
-
-  // ==========================
-  // ENVIAR MENSAJE AL CHAT (Sapito project-agent, scope notes)
-  // ==========================
-  const sendMessage = async (userText: string) => {
-    const trimmed = userText.trim();
-    if (!trimmed || sending) return;
-
-    setChatMessages((prev) => [
-      ...prev,
-      { id: Date.now(), from: "user", text: trimmed },
-    ]);
-    setChatInput("");
-    setSending(true);
-
-    try {
-      const res = await fetch(PROJECT_AGENT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: trimmed,
-          scope: "notes",
-        }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      const botText: string = res.ok
-        ? (data?.reply ?? "No he recibido una respuesta válida de Sapito.")
-        : (data?.error ?? "Ha ocurrido un error al contactar con Sapito.");
-
-      setChatMessages((prev) => [
-        ...prev,
-        { id: Date.now() + 1, from: "bot", text: botText },
-      ]);
-    } catch (error) {
-      handleSupabaseError("notes chat Sapito", error);
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 2,
-          from: "bot",
-          text: "Ha ocurrido un error al contactar con Sapito.",
-        },
-      ]);
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const handleSendMessage = async (e: FormEvent) => {
-    e.preventDefault();
-    await sendMessage(chatInput);
-  };
 
   // ==========================
   // HELPERS UI
@@ -268,10 +185,7 @@ export default function NotesPage() {
             )}
 
             {loadingNotes ? (
-              <div className="py-12 text-center">
-                <p className="text-sm font-medium text-slate-700">Cargando notas…</p>
-                <p className="mt-1 text-sm text-slate-500">Un momento.</p>
-              </div>
+              <ContentSkeleton title lines={2} cards={4} />
             ) : !hasNotes ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <p className="text-sm font-medium text-slate-700">Todavía no hay notas globales</p>
@@ -383,84 +297,6 @@ export default function NotesPage() {
           </div>
           </section>
         </div>
-
-        {/* Intelligence panel — contextual companion (Sapito). Hidden if user lacks global AI permission. */}
-        {canUseGlobalAI && (
-        <aside className="w-full xl:w-[320px] xl:min-w-[280px] xl:sticky xl:top-4 shrink-0">
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-[400px]">
-            <div className="shrink-0 px-5 py-4 border-b border-slate-200 bg-slate-50/80">
-              <div className="flex items-start gap-3">
-                <SapitoAvatar size="md" className="mt-0.5" />
-                <div className="min-w-0">
-                  <h2 className="text-sm font-semibold text-slate-900">Sapito de notas</h2>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Patrones, errores recurrentes y sugerencias derivadas de tus notas globales.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
-              <div className="space-y-3 text-sm">
-                {chatMessages.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-5 text-center">
-                    <p className="text-sm font-medium text-slate-700">Pregúntame lo que necesites</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Patrones, módulos, errores recurrentes y transacciones. Elige una sugerencia o escribe.
-                    </p>
-                    <p className="mt-3 text-[11px] text-slate-500">Sugerencias:</p>
-                    <div className="mt-2">
-                      <AssistantSuggestionChips
-                        suggestions={NOTES_SUGGESTIONS}
-                        onSelect={sendMessage}
-                        disabled={sending}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {chatMessages.map((msg) => (
-                      <div
-                        key={msg.id}
-                        className={`flex ${
-                          msg.from === "user"
-                            ? "justify-end"
-                            : "justify-start"
-                        }`}
-                      >
-                        <div
-                          className={`max-w-[80%] rounded-2xl px-3.5 py-2 ${
-                            msg.from === "user"
-                              ? "bg-indigo-600 text-white"
-                              : "bg-white text-slate-800 border border-slate-200 shadow-sm"
-                          } text-sm`}
-                        >
-                          {msg.text}
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            </div>
-            <form onSubmit={handleSendMessage} className="shrink-0 p-4 border-t border-slate-200 flex gap-2 bg-white">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Pregunta sobre patrones, errores o estructura de notas…"
-                className="flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-60"
-              />
-              <button
-                type="submit"
-                disabled={sending || !chatInput.trim()}
-                className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed shrink-0"
-              >
-                {sending ? "Enviando…" : "Enviar"}
-              </button>
-            </form>
-          </div>
-        </aside>
-        )}
       </div>
     </PageShell>
   );

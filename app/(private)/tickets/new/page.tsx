@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
+import { ClientSelector } from "./ClientSelector";
 import type { TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
 
 const PRIORITY_OPTIONS: { value: TicketPriority; label: string }[] = [
@@ -31,6 +32,7 @@ export default function NewTicketPage() {
   const [priority, setPriority] = useState<TicketPriority>("medium");
   const [status, setStatus] = useState<TicketStatus>("open");
   const [projectId, setProjectId] = useState("");
+  const [clientId, setClientId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -38,8 +40,24 @@ export default function NewTicketPage() {
   useEffect(() => {
     if (projectIdFromQuery) {
       setProjectId(projectIdFromQuery);
+      setClientId("");
     }
   }, [projectIdFromQuery]);
+
+  const effectiveProjectId = (projectIdFromQuery?.trim() || projectId.trim()) || null;
+  const effectiveClientId = clientId.trim() || null;
+  const hasProject = effectiveProjectId != null && effectiveProjectId !== "";
+  const hasClient = effectiveClientId != null && effectiveClientId !== "";
+
+  const handleProjectChange = (v: string) => {
+    setProjectId(v);
+    if (v.trim()) setClientId("");
+  };
+
+  const handleClientChange = (id: string | null) => {
+    setClientId(id ?? "");
+    if (id) setProjectId("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,18 +69,25 @@ export default function NewTicketPage() {
       return;
     }
 
+    const proj = (projectIdFromQuery?.trim() || projectId.trim()) || null;
+    const cli = clientId.trim() || null;
+
+    if (proj && cli) {
+      setErrorMsg("El ticket solo puede asociarse a un proyecto o a un cliente, pero no a ambos.");
+      return;
+    }
+
     setSubmitting(true);
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       title: titleTrim,
       description: description.trim() || null,
       priority,
       status,
-      project_id: (projectIdFromQuery?.trim() || projectId.trim()) || null,
       due_date: dueDate.trim() || null,
+      project_id: proj ?? null,
+      client_id: cli ?? null,
     };
-
-    const effectiveProjectId = (projectIdFromQuery?.trim() || projectId.trim()) || null;
 
     const { data, error } = await supabase
       .from("tickets")
@@ -72,8 +97,13 @@ export default function NewTicketPage() {
 
     if (error) {
       handleSupabaseError("tickets insert", error);
-      console.error("Error creating ticket:", error);
-      setErrorMsg("No se pudo crear el ticket. Inténtalo de nuevo más tarde.");
+      const code = (error as { code?: string }).code;
+      const msg = String((error as { message?: string }).message ?? "");
+      if (code === "23514" || msg.includes("tickets_client_or_project_chk")) {
+        setErrorMsg("El ticket no puede estar asociado a un proyecto y a un cliente al mismo tiempo.");
+      } else {
+        setErrorMsg("No se pudo crear el ticket. Inténtalo de nuevo más tarde.");
+      }
       setSubmitting(false);
       return;
     }
@@ -172,6 +202,9 @@ export default function NewTicketPage() {
             </div>
           </div>
 
+          <p className="text-[11px] text-slate-500 mb-2">
+            Un ticket puede ser global (sin proyecto ni cliente), de proyecto o de cliente. No se puede asociar a proyecto y cliente a la vez.
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
@@ -179,13 +212,38 @@ export default function NewTicketPage() {
               </label>
               <input
                 type="text"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0 disabled:opacity-60 disabled:cursor-not-allowed"
                 placeholder="ID del proyecto"
                 value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
+                onChange={(e) => handleProjectChange(e.target.value)}
+                disabled={hasClient}
               />
+              {hasClient && (
+                <p className="mt-0.5 text-[11px] text-amber-600">
+                  Deselecciona el cliente para elegir un proyecto.
+                </p>
+              )}
             </div>
 
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Cliente (opcional)
+              </label>
+              <ClientSelector
+                value={clientId}
+                onChange={handleClientChange}
+                disabled={hasProject}
+                placeholder="Buscar cliente…"
+              />
+              {hasProject && (
+                <p className="mt-0.5 text-[11px] text-amber-600">
+                  Deselecciona el proyecto para elegir un cliente.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
                 Fecha límite (opcional)
@@ -197,6 +255,7 @@ export default function NewTicketPage() {
                 onChange={(e) => setDueDate(e.target.value)}
               />
             </div>
+            <div />
           </div>
 
           <div className="flex items-center gap-3 pt-2">

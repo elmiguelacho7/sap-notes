@@ -11,11 +11,7 @@ import {
   type ProjectPhase,
 } from "@/lib/services/projectPhaseService";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import ProjectGanttPro from "@/app/components/ProjectGanttPro";
-import { PageShell } from "@/components/layout/PageShell";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { ProjectPlanningGantt } from "@/components/projects/ProjectPlanningGantt";
 
 type Project = {
   id: string;
@@ -44,6 +40,22 @@ function getMinMaxDates(phases: ProjectPhase[]): {
   );
 
   return { minStartDate, maxEndDate };
+}
+
+function getCurrentPhase(phases: ProjectPhase[]): ProjectPhase | null {
+  const today = new Date().toISOString().slice(0, 10);
+  const withDates = phases.filter((p) => p.start_date && p.end_date);
+  for (const p of withDates) {
+    if (today >= p.start_date! && today <= p.end_date!) return p;
+  }
+  return null;
+}
+
+function getDurationDays(start: string | null, end: string | null): number | null {
+  if (!start || !end) return null;
+  const a = new Date(start).getTime();
+  const b = new Date(end).getTime();
+  return Math.round((b - a) / (24 * 60 * 60 * 1000)) + 1;
 }
 
 export default function ProjectPlanningPage() {
@@ -293,13 +305,16 @@ export default function ProjectPlanningPage() {
 
   if (!projectId) {
     return (
-      <PageShell>
-        <p className="text-sm text-slate-600">No se ha encontrado el identificador del proyecto.</p>
-      </PageShell>
+      <div className="w-full min-w-0 bg-slate-950">
+        <p className="text-sm text-slate-400">No se ha encontrado el identificador del proyecto.</p>
+      </div>
     );
   }
 
   const { minStartDate, maxEndDate } = getMinMaxDates(phases);
+  const currentPhase = getCurrentPhase(phases);
+  const totalDurationDays =
+    minStartDate && maxEndDate ? getDurationDays(minStartDate, maxEndDate) : null;
   const projectDateRange =
     minStartDate && maxEndDate
       ? `${new Date(minStartDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })} – ${new Date(maxEndDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}`
@@ -309,169 +324,173 @@ export default function ProjectPlanningPage() {
   const ganttProjectEnd = maxEndDate ?? project?.planned_end_date ?? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   return (
-    <PageShell>
-      <PageHeader
-        variant="section"
-        title="Planificación"
-        description="Define el orden y las fechas de las fases SAP Activate de este proyecto."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {phases.length > 0 ? (
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-emerald-700">
-                Plan generado
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                Plan pendiente
-              </span>
-            )}
-            {projectDateRange && (
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                {projectDateRange}
-              </span>
-            )}
+    <div className="w-full min-w-0 space-y-8 bg-slate-950">
+        {/* Planning summary header */}
+        <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 p-5 md:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-100">Planning</h1>
+              <p className="mt-0.5 text-sm text-slate-500">SAP Activate phases and project timeline.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {phases.length > 0 ? (
+                <span className="inline-flex items-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-emerald-400">
+                  Plan configured
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-lg border border-slate-600/80 bg-slate-800/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                  Plan pending
+                </span>
+              )}
+              {projectDateRange && (
+                <span className="inline-flex items-center rounded-lg border border-slate-600/80 bg-slate-800/60 px-3 py-1.5 text-[11px] font-medium text-slate-300">
+                  {projectDateRange}
+                </span>
+              )}
+            </div>
           </div>
-        }
-      />
-
-      {errorMsg && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
-          {errorMsg}
+          {phases.length > 0 && (
+            <div className="mt-5 pt-5 border-t border-slate-700/60 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Current phase</p>
+                <p className="mt-0.5 text-sm font-semibold text-slate-200">{currentPhase?.name ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Planned start</p>
+                <p className="mt-0.5 text-sm font-medium text-slate-300">{minStartDate ? new Date(minStartDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) : "—"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Planned end</p>
+                <p className="mt-0.5 text-sm font-medium text-slate-300">{maxEndDate ? new Date(maxEndDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) : "—"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Duration</p>
+                <p className="mt-0.5 text-sm font-medium text-slate-300">{totalDurationDays != null ? `${totalDurationDays} days` : "—"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Phases</p>
+                <p className="mt-0.5 text-sm font-medium text-slate-300">{phases.length}</p>
+              </div>
+            </div>
+          )}
         </div>
-      )}
 
-      {loading ? (
-        <p className="text-sm text-slate-500">Cargando fases…</p>
-      ) : phases.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Este proyecto no tiene fases de planificación</CardTitle>
-            <p className="text-sm text-slate-600 mt-0.5">
-              Puedes generar solo las fases o el plan completo (fases, actividades y tareas) si el proyecto tiene fechas.
+        {errorMsg && (
+          <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-5 py-3 text-sm text-red-200">
+            {errorMsg}
+          </div>
+        )}
+
+        {loading ? (
+          <p className="text-sm text-slate-500">Loading phases…</p>
+        ) : phases.length === 0 ? (
+          <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 p-6 md:p-8">
+            <h2 className="text-lg font-semibold text-slate-100">No planning phases yet</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Generate SAP Activate phases only, or the full plan (phases, activities, tasks) when the project has start and end dates.
             </p>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap gap-3">
               {project?.start_date && project?.planned_end_date && (
-                <Button
+                <button
+                  type="button"
                   onClick={generateActivatePlanFromTemplate}
                   disabled={generatingPlan}
+                  className="inline-flex items-center justify-center rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
                 >
-                  {generatingPlan ? "Generando…" : "Generar plan desde plantilla"}
-                </Button>
+                  {generatingPlan ? "Generating…" : "Generate plan from template"}
+                </button>
               )}
-              <Button
-                variant="secondary"
+              <button
+                type="button"
                 onClick={generateDefaultPhases}
                 disabled={generatingPhases}
+                className="inline-flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors disabled:opacity-50"
               >
-                {generatingPhases ? "Generando…" : "Generar solo fases"}
-              </Button>
-              <Link href={`/projects/${projectId}`}>
-                <Button variant="secondary">Ir al dashboard del proyecto</Button>
+                {generatingPhases ? "Generating…" : "Generate phases only"}
+              </button>
+              <Link
+                href={`/projects/${projectId}`}
+                className="inline-flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors"
+              >
+                Back to project overview
               </Link>
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <Card className="overflow-hidden">
-            <CardHeader className="border-b border-slate-200 bg-slate-50/50">
-              <CardTitle className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Plan visual
-              </CardTitle>
-              <p className="text-sm text-slate-600 mt-0.5">Vista rápida por fases</p>
-            </CardHeader>
-            <CardContent>
-              <ProjectGanttPro
-                phases={phases.map((p) => ({
-                  id: p.id,
-                  name: p.name,
-                  start_date: p.start_date,
-                  end_date: p.end_date,
-                  sort_order: p.sort_order ?? 0,
-                  phase_key: p.phase_key ?? null,
-                }))}
+          </div>
+        ) : (
+          <>
+            {/* Timeline hero */}
+            <section className="w-full min-w-0">
+              <ProjectPlanningGantt
+                phases={phases}
                 projectStart={ganttProjectStart}
                 projectEnd={ganttProjectEnd}
-                title="Vista rápida por fases"
-                showLegend={false}
-                height={280}
+                height={420}
               />
-            </CardContent>
-          </Card>
+            </section>
 
-          <Card className="overflow-hidden">
-            <CardHeader className="border-b border-slate-200 bg-slate-50/50">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <CardTitle className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Fases del proyecto
-                </CardTitle>
-                <div className="flex items-center gap-3">
-                  {saveAllMessage && (
-                    <span
-                      className={
-                        saveAllMessage.startsWith("Error")
-                          ? "text-xs text-rose-600"
-                          : "text-xs text-emerald-600"
-                      }
+            {/* Phase editor — control panel for timeline */}
+            <section>
+              <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+                <div className="border-b border-slate-700/60 px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-800/40">
+                  <div>
+                    <h2 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Phase editor</h2>
+                    <p className="mt-0.5 text-sm text-slate-400">Edit phase names and dates. Changes update the timeline above.</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {saveAllMessage && (
+                      <span
+                        className={
+                          saveAllMessage.startsWith("Error")
+                            ? "text-xs text-rose-400"
+                            : "text-xs text-emerald-400"
+                        }
+                      >
+                        {saveAllMessage}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleSaveAll}
+                      disabled={savingAll}
+                      className="inline-flex items-center justify-center rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
                     >
-                      {saveAllMessage}
-                    </span>
-                  )}
-                  <Button
-                    onClick={handleSaveAll}
-                    disabled={savingAll}
-                  >
-                    {savingAll ? "Guardando…" : "Guardar planificación"}
-                  </Button>
+                      {savingAll ? "Saving…" : "Save planning"}
+                    </button>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left min-w-[540px]">
+                    <thead className="bg-slate-800/50 border-b border-slate-700/50">
+                      <tr>
+                        <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-20 whitespace-nowrap">Order</th>
+                        <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[200px]">Phase</th>
+                        <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-40">Start</th>
+                        <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-40">End</th>
+                        <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-24 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {phases.map((phase, index) => (
+                        <PhaseRow
+                          key={phase.id}
+                          phase={phase}
+                          index={index}
+                          total={phases.length}
+                          onMove={movePhase}
+                          onSave={handleSavePhase}
+                          onPhaseDateChange={handlePhaseDateChange}
+                          onPhaseNameChange={handlePhaseNameChange}
+                          saving={savingId === phase.id}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent className="p-0 overflow-x-auto">
-            <div className="overflow-x-auto min-w-0">
-              <table className="w-full text-left min-w-[520px]">
-                <thead className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200 shadow-sm">
-                  <tr>
-                    <th className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 w-20 whitespace-nowrap">
-                      Orden
-                    </th>
-                    <th className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 min-w-[180px]">
-                      Nombre
-                    </th>
-                    <th className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 w-36">
-                      Inicio
-                    </th>
-                    <th className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 w-36">
-                      Fin
-                    </th>
-                    <th className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 w-24 text-right">
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-              <tbody>
-                {phases.map((phase, index) => (
-                  <PhaseRow
-                    key={phase.id}
-                    phase={phase}
-                    index={index}
-                    total={phases.length}
-                    onMove={movePhase}
-                    onSave={handleSavePhase}
-                    onPhaseDateChange={handlePhaseDateChange}
-                    onPhaseNameChange={handlePhaseNameChange}
-                    saving={savingId === phase.id}
-                  />
-                ))}
-              </tbody>
-            </table>
-            </div>
-            </CardContent>
-        </Card>
-        </>
+            </section>
+          </>
         )}
-    </PageShell>
+    </div>
   );
 }
 
@@ -509,17 +528,22 @@ function PhaseRow({
     });
   };
 
+  const textInputClass =
+    "w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 transition-colors";
+  const dateInputClass =
+    "w-full rounded-xl border border-slate-500 bg-slate-800/80 px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-400 transition-colors";
+
   return (
-    <tr className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
-      <td className="px-4 py-2 align-middle">
-        <div className="flex items-center gap-1">
-          <div className="inline-flex flex-col rounded-lg border border-slate-200 bg-slate-50/80 p-0.5 shrink-0">
+    <tr className="border-b border-slate-700/40 hover:bg-slate-800/30 transition-colors">
+      <td className="px-5 py-4 align-middle">
+        <div className="flex items-center gap-2">
+          <div className="inline-flex flex-col rounded-lg border border-slate-600/50 bg-slate-800/40 p-0.5 shrink-0">
             <button
               type="button"
               onClick={() => onMove(index, "up")}
               disabled={index === 0}
-              className="rounded-md p-1 text-slate-500 hover:bg-slate-200 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
-              aria-label="Subir"
+              className="rounded-md p-1 text-slate-500 hover:bg-slate-700/60 hover:text-slate-300 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              aria-label="Move up"
             >
               <ChevronUp className="h-3.5 w-3.5" />
             </button>
@@ -527,47 +551,48 @@ function PhaseRow({
               type="button"
               onClick={() => onMove(index, "down")}
               disabled={index === total - 1}
-              className="rounded-md p-1 text-slate-500 hover:bg-slate-200 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
-              aria-label="Bajar"
+              className="rounded-md p-1 text-slate-500 hover:bg-slate-700/60 hover:text-slate-300 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              aria-label="Move down"
             >
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
           </div>
-          <span className="text-xs font-medium text-slate-600 tabular-nums">{phase.sort_order}</span>
+          <span className="text-xs font-medium text-slate-500 tabular-nums">{phase.sort_order}</span>
         </div>
       </td>
-      <td className="px-4 py-2 align-middle">
+      <td className="px-5 py-4 align-middle">
         <input
           type="text"
           value={name}
           onChange={(e) => onPhaseNameChange(phase.id, e.target.value)}
-          className="w-full max-w-xs rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className={`${textInputClass} max-w-[220px]`}
+          placeholder="Phase name"
         />
       </td>
-      <td className="px-4 py-2 align-middle">
+      <td className="px-5 py-4 align-middle">
         <input
           type="date"
           value={startDate}
           onChange={(e) => onPhaseDateChange(phase.id, "start_date", e.target.value)}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className={dateInputClass}
         />
       </td>
-      <td className="px-4 py-2 align-middle">
+      <td className="px-5 py-4 align-middle">
         <input
           type="date"
           value={endDate}
           onChange={(e) => onPhaseDateChange(phase.id, "end_date", e.target.value)}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className={dateInputClass}
         />
       </td>
-      <td className="px-4 py-2 align-middle text-right">
+      <td className="px-5 py-4 align-middle text-right w-24">
         <button
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="rounded-lg border border-indigo-500/50 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {saving ? "Guardando…" : "Guardar"}
+          {saving ? "…" : "Save"}
         </button>
       </td>
     </tr>

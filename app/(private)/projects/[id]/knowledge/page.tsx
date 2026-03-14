@@ -13,6 +13,7 @@ import {
 } from "@/lib/knowledgeService";
 import type { KnowledgeSpace, KnowledgePage } from "@/lib/types/knowledge";
 import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function ProjectKnowledgePage() {
   const params = useParams<{ id: string }>();
@@ -119,56 +120,75 @@ export default function ProjectKnowledgePage() {
   if (!projectId) {
     return (
       <div className="space-y-6">
-        <p className="text-sm text-slate-600">Identificador de proyecto no válido.</p>
+        <p className="text-sm text-slate-400">Identificador de proyecto no válido.</p>
       </div>
     );
   }
 
+  const lastUpdatedPage = pages.length > 0
+    ? pages.reduce((a, b) => (new Date(b.updated_at) > new Date(a.updated_at) ? b : a))
+    : null;
+
   return (
-    <div className="space-y-6">
-      <ProjectPageHeader
-        variant="section"
-        title="Knowledge"
-        subtitle="Espacios y páginas de conocimiento vinculados a este proyecto."
-        primaryActionLabel="Nuevo espacio"
-        primaryActionOnClick={() => { setSaveError(null); setModalSpace(true); }}
-      />
+    <div className="w-full min-w-0 space-y-8">
+      <header className="space-y-1">
+        <ProjectPageHeader
+          variant="section"
+          dark
+          title="Knowledge"
+          subtitle="Espacios y páginas de conocimiento vinculados a este proyecto."
+          primaryActionLabel="Nuevo espacio"
+          primaryActionOnClick={() => { setSaveError(null); setModalSpace(true); }}
+        />
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-slate-500">
+          <span>{spaces.length} {spaces.length === 1 ? "espacio" : "espacios"}</span>
+          <span>{pages.length} {pages.length === 1 ? "página" : "páginas"}</span>
+          {lastUpdatedPage && (
+            <span>Última actualización: {new Date(lastUpdatedPage.updated_at).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}</span>
+          )}
+        </div>
+      </header>
 
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
           {error}
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="border-b border-slate-200 px-4 py-3 bg-slate-50/50">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+          <div className="border-b border-slate-700/60 px-5 py-4 bg-slate-800/50">
+            <h2 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
               Espacios
             </h2>
           </div>
-          <div className="p-2">
+          <div className="p-3">
             {loading ? (
-              <p className="text-sm text-slate-500 px-2 py-4">Cargando…</p>
+              <div className="space-y-2">
+                <Skeleton className="h-11 w-full rounded-xl" />
+                <Skeleton className="h-11 w-full rounded-xl" />
+                <Skeleton className="h-11 w-4/5 rounded-xl" />
+              </div>
             ) : spaces.length === 0 ? (
-              <div className="px-4 py-10 text-center">
-                <p className="text-sm font-medium text-slate-700">No hay espacios</p>
-                <p className="mt-1 text-sm text-slate-500">Crea uno con «Nuevo espacio».</p>
+              <div className="rounded-xl border border-dashed border-slate-700/60 bg-slate-800/20 py-12 text-center">
+                <FolderOpen className="mx-auto h-10 w-10 text-slate-600" />
+                <p className="mt-3 text-sm font-medium text-slate-300">No hay espacios</p>
+                <p className="mt-1 text-xs text-slate-500">Crea uno con «Nuevo espacio» para organizar tus páginas.</p>
               </div>
             ) : (
-              <ul className="space-y-0.5">
+              <ul className="space-y-1">
                 {spaces.map((space) => (
                   <li key={space.id}>
                     <button
                       type="button"
                       onClick={() => setSelectedSpaceId(space.id)}
-                      className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
+                      className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-medium transition-colors ${
                         selectedSpaceId === space.id
-                          ? "bg-indigo-600 text-white"
-                          : "text-slate-700 hover:bg-slate-100"
+                          ? "bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-500/40"
+                          : "text-slate-300 hover:bg-slate-800/70 border border-transparent"
                       }`}
                     >
-                      <FolderOpen className="h-4 w-4 shrink-0" />
+                      <FolderOpen className={`h-4 w-4 shrink-0 ${selectedSpaceId === space.id ? "text-indigo-400" : "text-slate-500"}`} />
                       <span className="truncate">{space.name}</span>
                     </button>
                   </li>
@@ -178,40 +198,47 @@ export default function ProjectKnowledgePage() {
           </div>
         </div>
 
-        <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="border-b border-slate-200 px-4 py-3 bg-slate-50/50 flex items-center justify-between">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <div className="md:col-span-2 rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+          <div className="border-b border-slate-700/60 px-5 py-4 bg-slate-800/50 flex items-center justify-between gap-3">
+            <h2 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
               Páginas
             </h2>
             <button
               type="button"
               onClick={() => { setSaveError(null); setModalPage(true); }}
               disabled={!selectedSpaceId}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-3.5 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50 transition-colors"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
               Nueva página
             </button>
           </div>
           <div className="p-4">
             {!selectedSpaceId ? (
-              <p className="text-sm text-slate-500">
-                Selecciona un espacio para ver sus páginas.
-              </p>
+              <div className="rounded-xl border border-dashed border-slate-700/60 bg-slate-800/20 py-12 text-center">
+                <FileText className="mx-auto h-10 w-10 text-slate-600" />
+                <p className="mt-3 text-sm font-medium text-slate-300">Selecciona un espacio</p>
+                <p className="mt-1 text-xs text-slate-500">Elige un espacio a la izquierda para ver y crear páginas.</p>
+              </div>
             ) : pages.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                No hay páginas en este espacio. Crea una con «Nueva página».
-              </p>
+              <div className="rounded-xl border border-dashed border-slate-700/60 bg-slate-800/20 py-12 text-center">
+                <FileText className="mx-auto h-10 w-10 text-slate-600" />
+                <p className="mt-3 text-sm font-medium text-slate-300">No hay páginas en este espacio</p>
+                <p className="mt-1 text-xs text-slate-500">Crea la primera con «Nueva página».</p>
+              </div>
             ) : (
               <ul className="space-y-1">
                 {pages.map((page) => (
                   <li key={page.id}>
                     <Link
                       href={`/knowledge/${page.id}`}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      className="flex items-center gap-3 rounded-xl px-3.5 py-3 text-slate-200 hover:bg-slate-800/70 hover:text-slate-100 transition-colors group"
                     >
-                      <FileText className="h-4 w-4 shrink-0 text-slate-400" />
-                      <span className="font-medium">{page.title}</span>
+                      <FileText className="h-4 w-4 shrink-0 text-slate-500 group-hover:text-slate-400" />
+                      <span className="flex-1 min-w-0 font-medium truncate">{page.title}</span>
+                      <span className="shrink-0 text-xs text-slate-500">
+                        {new Date(page.updated_at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
+                      </span>
                     </Link>
                   </li>
                 ))}
@@ -223,51 +250,51 @@ export default function ProjectKnowledgePage() {
 
       {modalSpace && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
           onClick={() => !saving && setModalSpace(false)}
         >
           <div
-            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg max-w-md w-full"
+            className="rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-xl max-w-md w-full ring-1 ring-slate-700/50"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-slate-900">Nuevo espacio</h2>
+            <h2 className="text-lg font-semibold text-slate-100">Nuevo espacio</h2>
             <form onSubmit={handleCreateSpace} className="mt-4 space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Nombre *</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Nombre *</label>
                 <input
                   type="text"
                   value={newSpaceName}
                   onChange={(e) => setNewSpaceName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50"
                   placeholder="Ej: Configuración SAP"
                   disabled={saving}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Descripción (opcional)</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Descripción (opcional)</label>
                 <textarea
                   value={newSpaceDesc}
                   onChange={(e) => setNewSpaceDesc(e.target.value)}
                   rows={2}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50"
                   placeholder="Breve descripción"
                   disabled={saving}
                 />
               </div>
-              {saveError && <p className="text-sm text-red-600">{saveError}</p>}
+              {saveError && <p className="text-sm text-red-400">{saveError}</p>}
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setModalSpace(false)}
                   disabled={saving}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving || !newSpaceName.trim()}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50"
                 >
                   {saving ? "Creando…" : "Crear"}
                 </button>
@@ -279,40 +306,40 @@ export default function ProjectKnowledgePage() {
 
       {modalPage && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
           onClick={() => !saving && setModalPage(false)}
         >
           <div
-            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg max-w-md w-full"
+            className="rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-xl max-w-md w-full ring-1 ring-slate-700/50"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-slate-900">Nueva página</h2>
+            <h2 className="text-lg font-semibold text-slate-100">Nueva página</h2>
             <form onSubmit={handleCreatePage} className="mt-4 space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Título *</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Título *</label>
                 <input
                   type="text"
                   value={newPageTitle}
                   onChange={(e) => setNewPageTitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50"
                   placeholder="Ej: Cómo configurar variante de valoración"
                   disabled={saving}
                 />
               </div>
-              {saveError && <p className="text-sm text-red-600">{saveError}</p>}
+              {saveError && <p className="text-sm text-red-400">{saveError}</p>}
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setModalPage(false)}
                   disabled={saving}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving || !newPageTitle.trim()}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50"
                 >
                   {saving ? "Creando…" : "Crear"}
                 </button>

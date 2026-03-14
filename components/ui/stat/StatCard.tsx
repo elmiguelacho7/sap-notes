@@ -1,24 +1,54 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
+
+const cardBase =
+  "rounded-2xl border border-slate-700/80 bg-slate-800/40 px-5 py-4 shadow-sm transition-[border-color,background-color,box-shadow] duration-200";
+
+const cardInteractive =
+  "cursor-pointer hover:border-slate-600 hover:bg-slate-800/70 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900";
 
 /**
  * Stat card for KPIs. Design system v1 — dark.
+ * Optional icon, optional href for clickable navigation tiles.
  */
 export function StatCard({
   label,
   value,
   trend,
+  icon,
+  href,
   className = "",
 }: {
   label: string;
   value: ReactNode;
   trend?: ReactNode;
+  icon?: ReactNode;
+  /** When set, the whole card becomes a link with hover/focus styles. */
+  href?: string;
   className?: string;
 }) {
-  return (
-    <div className={`rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4 ${className}`}>
-      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <div className="mt-2 text-2xl font-semibold text-white tracking-tight">{value}</div>
-      {trend != null ? <div className="mt-1 text-xs text-slate-400">{trend}</div> : null}
-    </div>
+  const content = (
+    <>
+      <div className="flex items-center gap-2">
+        {icon != null ? <span className="text-slate-500">{icon}</span> : null}
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      </div>
+      <div className="mt-3 text-2xl font-bold text-slate-100 tracking-tight">{value}</div>
+      {trend != null ? <div className="mt-1.5 text-xs text-slate-500">{trend}</div> : null}
+    </>
   );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className={`block ${cardBase} ${cardInteractive} ${className}`}
+        aria-label={`${label}: ${typeof value === "string" || typeof value === "number" ? value : "ver más"}`}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className={`${cardBase} ${className}`}>{content}</div>;
 }

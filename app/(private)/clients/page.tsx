@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ContentSkeleton } from "@/components/skeletons/ContentSkeleton";
+import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
 import {
   INDUSTRY_OPTIONS,
   COMPANY_SIZE_OPTIONS,
@@ -326,9 +328,7 @@ export default function ClientsPage() {
   if (loading && appRole === null) {
     return (
       <PageShell wide={false}>
-        <div className="py-12 text-center">
-          <p className="text-sm text-slate-500">Cargando…</p>
-        </div>
+        <ContentSkeleton title lines={3} cards={4} />
       </PageShell>
     );
   }
@@ -673,7 +673,7 @@ export default function ClientsPage() {
           </div>
           <div className="p-5">
             {loading ? (
-              <p className="text-sm text-slate-500">Cargando clientes…</p>
+              <TableSkeleton rows={5} colCount={5} />
             ) : error ? (
               <p className="text-sm text-red-600">{error}</p>
             ) : clients.length === 0 ? (

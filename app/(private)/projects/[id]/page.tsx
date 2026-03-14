@@ -16,21 +16,13 @@ import {
 import { ObjectActions } from "@/components/ObjectActions";
 import { useProjectWorkspace } from "@/components/projects/ProjectWorkspaceContext";
 import type { TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
-import { FileText, BookOpen, Link as LinkIcon, Ticket, CalendarDays, AlertTriangle, CalendarClock, User, Ban, Plus, CheckSquare, ListTodo } from "lucide-react";
+import { FileText, BookOpen, Link as LinkIcon, Ticket, CalendarDays, AlertTriangle, CalendarClock, User, Ban, Plus, CheckSquare, ListTodo, BarChart3 } from "lucide-react";
 import { getSuggestedKnowledgeForProject } from "@/lib/knowledgeService";
 import type { KnowledgePage } from "@/lib/types/knowledge";
-import { PageShell } from "@/components/layout/PageShell";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
+import { ProjectOverviewSkeleton } from "@/components/skeletons/ProjectOverviewSkeleton";
+import { Skeleton } from "@/components/ui/Skeleton";
+import type { EChartsOption } from "echarts";
+import ReactECharts from "echarts-for-react";
 
 // ==========================
 // Tipos
@@ -44,6 +36,7 @@ type Project = {
   start_date: string | null;
   planned_end_date: string | null;
   created_at: string;
+  client_id?: string | null;
 };
 
 type NoteRow = {
@@ -161,6 +154,8 @@ export default function ProjectDashboardPage() {
   const [errorLinks, setErrorLinks] = useState<string | null>(null);
 
   const [openTicketsCount, setOpenTicketsCount] = useState<number>(0);
+  const [overdueTicketsCount, setOverdueTicketsCount] = useState<number>(0);
+  const [unassignedTicketsCount, setUnassignedTicketsCount] = useState<number>(0);
   const [todayTickets, setTodayTickets] = useState<TicketSummary[]>([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
 
@@ -254,22 +249,43 @@ export default function ProjectDashboardPage() {
     };
   }, [createMenuOpen]);
 
+  const [clientName, setClientName] = useState<string | null>(null);
+
   const loadProject = useCallback(async (): Promise<boolean> => {
     const { data, error } = await supabase
       .from("projects")
-      .select("id, name, description, status, start_date, planned_end_date, created_at")
+      .select("id, name, description, status, start_date, planned_end_date, created_at, client_id")
       .eq("id", projectId)
       .single();
 
     if (error) {
       handleSupabaseError("projects", error);
       setProject(null);
+      setClientName(null);
       setProjectLoadFailed(true);
       return false;
     }
 
-    setProject(data as Project);
+    const row = data as Project & { client_id?: string | null };
+    setProject(row);
     setProjectLoadFailed(false);
+
+    if (row.client_id) {
+      const { data: clientRow } = await supabase
+        .from("clients")
+        .select("name, display_name")
+        .eq("id", row.client_id)
+        .single();
+      setClientName(
+        clientRow
+          ? ((clientRow as { display_name?: string | null; name?: string }).display_name ||
+            (clientRow as { name?: string }).name) ??
+            null
+          : null
+      );
+    } else {
+      setClientName(null);
+    }
     return true;
   }, [projectId]);
 
@@ -277,62 +293,65 @@ export default function ProjectDashboardPage() {
   useEffect(() => {
     if (!project) return;
     setHeaderActions(
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <div className="relative" ref={createMenuRef}>
           <button
             type="button"
             onClick={() => setCreateMenuOpen((o) => !o)}
-            className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 text-sm font-medium text-slate-200 shadow-sm hover:bg-slate-700 hover:text-white transition-colors"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-600/80 bg-slate-800/80 px-2.5 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:border-slate-500 hover:text-white transition-colors"
             aria-expanded={createMenuOpen}
             aria-haspopup="true"
           >
-            <Plus className="h-4 w-4 shrink-0" />
-            <span>+ Crear</span>
+            <Plus className="h-3.5 w-3.5 shrink-0" />
+            <span>Create</span>
           </button>
           {createMenuOpen && (
             <div
-              className="absolute right-0 top-full z-50 mt-1 min-w-[200px] rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+              className="absolute right-0 top-full z-50 mt-1.5 min-w-[180px] rounded-xl border border-slate-700 bg-slate-800 py-1 shadow-xl shadow-black/20"
               role="menu"
             >
               <Link
                 href={`/projects/${projectId}/tasks?new=1`}
                 role="menuitem"
-                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700/80 transition-colors"
                 onClick={() => setCreateMenuOpen(false)}
               >
-                <CheckSquare className="h-4 w-4 shrink-0" />
-                Nueva tarea
+                <CheckSquare className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                New task
               </Link>
               <Link
                 href={`/projects/${projectId}/notes?new=1`}
                 role="menuitem"
-                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700/80 transition-colors"
                 onClick={() => setCreateMenuOpen(false)}
               >
-                <FileText className="h-4 w-4 shrink-0" />
-                Nueva nota
+                <FileText className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                New note
               </Link>
               <Link
                 href={`/projects/${projectId}/tickets?new=1`}
                 role="menuitem"
-                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700/80 transition-colors"
                 onClick={() => setCreateMenuOpen(false)}
               >
-                <Ticket className="h-4 w-4 shrink-0" />
-                Nuevo ticket
+                <Ticket className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                New ticket
               </Link>
               <Link
                 href={`/projects/${projectId}/planning/activities?new=1`}
                 role="menuitem"
-                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700/80 transition-colors"
                 onClick={() => setCreateMenuOpen(false)}
               >
-                <ListTodo className="h-4 w-4 shrink-0" />
-                Nueva actividad
+                <ListTodo className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                New activity
               </Link>
             </div>
           )}
         </div>
+        {permissions && (
+          <span className="inline-block h-4 w-px bg-slate-700" aria-hidden />
+        )}
         {permissions && (
           <ObjectActions
             entity="project"
@@ -494,7 +513,7 @@ export default function ProjectDashboardPage() {
   }, [projectId, projectLoadFailed]);
 
   // ==========================
-  // Fetch project tickets (open count + today list)
+  // Fetch project tickets (open count, overdue/unassigned counts, recent list)
   // ==========================
 
   useEffect(() => {
@@ -509,19 +528,23 @@ export default function ProjectDashboardPage() {
           .from("tickets")
           .select("id", { count: "exact", head: true })
           .eq("project_id", projectId)
-          .eq("status", "open"),
+          .neq("status", "closed"),
         supabase
           .from("tickets")
-          .select("id, title, priority, status, created_at")
+          .select("id, title, priority, status, created_at, due_date, assigned_to")
           .eq("project_id", projectId)
           .neq("status", "closed")
           .order("created_at", { ascending: false })
-          .limit(5),
+          .limit(30),
       ]);
 
       if (cancelled) return;
+      const list = (listRes.data ?? []) as (TicketSummary & { due_date?: string | null; assigned_to?: string | null })[];
       setOpenTicketsCount(countRes.count ?? 0);
-      setTodayTickets((listRes.data ?? []) as TicketSummary[]);
+      const today = new Date().toISOString().slice(0, 10);
+      setOverdueTicketsCount(list.filter((t) => t.due_date && t.due_date < today).length);
+      setUnassignedTicketsCount(list.filter((t) => !t.assigned_to).length);
+      setTodayTickets(list.slice(0, 5));
       setLoadingTickets(false);
     };
 
@@ -1120,644 +1143,546 @@ export default function ProjectDashboardPage() {
     }));
   }, [projectPhases, dashboardActivities]);
 
+  // ECharts options: Tasks by status (donut) — aligned with Dashboard quality
+  const tasksByStatusEChartsOption = useMemo((): EChartsOption | null => {
+    if (tasksByStatusChartData.length === 0) return null;
+    const total = tasksByStatusChartData.reduce((acc, d) => acc + d.count, 0);
+    const TOOLTIP = {
+      backgroundColor: "#1e293b",
+      borderColor: "#334155",
+      textStyle: { color: "#e2e8f0", fontSize: 12 },
+      padding: [10, 12],
+      extraCssText: "line-height: 1.5;",
+    };
+    return {
+      tooltip: {
+        ...TOOLTIP,
+        trigger: "item",
+        formatter: (params: unknown) => {
+          const p = params as { name: string; value: number; percent?: number };
+          const pc = typeof p.percent === "number" ? p.percent.toFixed(1) : "0";
+          return `<span style="color:#94a3b8">Status</span><br/><span style="color:#f1f5f9;font-weight:600">${p.name}</span><br/><span style="color:#94a3b8">Tasks</span><br/><span style="color:#e2e8f0;font-weight:600">${p.value}</span><br/><span style="color:#94a3b8">% of total</span><br/><span style="color:#e2e8f0;font-weight:600">${pc}%</span>`;
+        },
+      },
+      legend: { show: false },
+      graphic: [
+        {
+          type: "text",
+          left: "50%",
+          top: "46%",
+          style: {
+            text: total.toString(),
+            textAlign: "center",
+            fill: "#e2e8f0",
+            fontSize: 20,
+            fontWeight: 600,
+            lineHeight: 24,
+          } as Record<string, unknown>,
+          z: 10,
+        },
+        {
+          type: "text",
+          left: "50%",
+          top: "58%",
+          style: {
+            text: "Tasks",
+            textAlign: "center",
+            fill: "#94a3b8",
+            fontSize: 11,
+            fontWeight: 500,
+          } as Record<string, unknown>,
+          z: 10,
+        },
+      ] as EChartsOption["graphic"],
+      series: [
+        {
+          type: "pie",
+          radius: ["54%", "78%"],
+          center: ["50%", "52%"],
+          avoidLabelOverlap: true,
+          itemStyle: { borderColor: "#1e293b", borderWidth: 2 },
+          label: { show: false },
+          emphasis: { scale: false, itemStyle: { shadowBlur: 8, shadowColor: "rgba(0,0,0,0.2)" } },
+          data: tasksByStatusChartData.map((d) => ({
+            name: d.name,
+            value: d.count,
+            itemStyle: { color: d.fill },
+          })),
+        },
+      ],
+    };
+  }, [tasksByStatusChartData]);
+
+  // ECharts options: Activities by phase (horizontal bar)
+  const activitiesByPhaseEChartsOption = useMemo((): EChartsOption | null => {
+    if (activitiesByPhaseChartData.length === 0) return null;
+    const GRID = { left: "0%", right: "8%", top: "8%", bottom: "8%", containLabel: true };
+    const AXIS_LABEL = { color: "#94a3b8", fontSize: 11 };
+    const SPLIT_LINE = { lineStyle: { color: "#334155", type: "dashed" as const } };
+    const TOOLTIP = {
+      backgroundColor: "#1e293b",
+      borderColor: "#334155",
+      textStyle: { color: "#e2e8f0", fontSize: 12 },
+      padding: [10, 12],
+      extraCssText: "line-height: 1.5;",
+    };
+    return {
+      color: ["#6366f1"],
+      tooltip: {
+        ...TOOLTIP,
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter: (params: unknown) => {
+          const p = Array.isArray(params) ? params[0] : params;
+          const payload = p as { name?: string; value?: number };
+          const name = payload.name ?? "";
+          const count = payload.value ?? 0;
+          return `<span style="color:#94a3b8">Phase</span><br/><span style="color:#f1f5f9;font-weight:600">${name}</span><br/><span style="color:#94a3b8">Activities</span><br/><span style="color:#e2e8f0;font-weight:600">${count}</span>`;
+        },
+      },
+      grid: { ...GRID, left: "22%" },
+      xAxis: {
+        type: "value",
+        axisLabel: AXIS_LABEL,
+        splitLine: SPLIT_LINE,
+        axisLine: { show: true, lineStyle: { color: "#334155" } },
+      },
+      yAxis: {
+        type: "category",
+        data: activitiesByPhaseChartData.map((d) => d.name),
+        axisLabel: { ...AXIS_LABEL, width: 76, overflow: "truncate" },
+        axisLine: { show: false },
+        axisTick: { show: false },
+      },
+      series: [
+        {
+          type: "bar",
+          barWidth: "58%",
+          barMaxWidth: 20,
+          data: activitiesByPhaseChartData.map((d) => d.count),
+          itemStyle: { borderRadius: [0, 4, 4, 0] },
+        },
+      ],
+    };
+  }, [activitiesByPhaseChartData]);
+
   // ==========================
   // Render
   // ==========================
 
   if (loading) {
-    return (
-      <PageShell>
-        <p className="text-sm text-slate-500">Cargando proyecto…</p>
-      </PageShell>
-    );
+    return <ProjectOverviewSkeleton />;
   }
 
   if (projectLoadFailed || !project) {
     return (
-      <PageShell>
-        <div className="flex items-center justify-center min-h-[40vh]">
-          <div className="max-w-md w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm text-center">
-            <h1 className="text-lg font-semibold text-slate-900 mb-2">
-              Proyecto no encontrado
-            </h1>
-            <p className="text-sm text-slate-600 mb-4">
-              No hemos podido cargar la información de este proyecto. Es
-              posible que haya sido eliminado o que la URL no sea correcta.
+      <div className="w-full min-w-0 bg-slate-950">
+        <div className="flex items-center justify-center min-h-[40vh] w-full min-w-0">
+          <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900/60 p-6 text-center">
+            <h1 className="text-lg font-semibold text-slate-100 mb-2">Proyecto no encontrado</h1>
+            <p className="text-sm text-slate-500 mb-4">
+              No hemos podido cargar la información de este proyecto. Es posible que haya sido eliminado o que la URL no sea correcta.
             </p>
             <button
               type="button"
               onClick={() => router.push("/projects")}
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+              className="rounded-xl border border-slate-600 bg-slate-700 px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-600 transition-colors"
             >
               Volver a proyectos
             </button>
           </div>
         </div>
-      </PageShell>
+      </div>
     );
   }
 
   return (
-    <PageShell>
-      <div className="space-y-8">
+    <div className="w-full min-w-0 space-y-12 bg-slate-950">
         {errorMsg && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-[11px] text-red-700">
+          <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
             {errorMsg}
           </div>
         )}
 
         {planGeneratedFailed && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            No se pudo generar el plan inicial de actividades SAP Activate. El proyecto se creó correctamente; puedes añadir actividades manualmente o volver a intentar generar el plan más tarde.
+          <div className="rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+            No se pudo generar el plan inicial de actividades SAP Activate. El proyecto se creó correctamente; puedes añadir actividades manualmente o volver a intentar más tarde.
           </div>
         )}
 
-        {/* 1) Project Health — hero block first for hierarchy */}
-        <section>
-          <h2 className="text-sm font-semibold text-slate-800 mb-1">Salud del proyecto</h2>
-          <p className="text-xs text-slate-500 mb-5">
-            Estado general, progreso y fase actual.
-          </p>
-          {projectTasksLoading ? (
-            <p className="text-xs text-slate-500 py-6">Cargando indicadores…</p>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                  Puntuación
-                </p>
-                <p
-                  className={`mt-2 text-4xl font-semibold tracking-tight ${
-                    projectHealthScore.label === "Healthy"
-                      ? "text-emerald-700"
-                      : projectHealthScore.label === "Attention"
-                        ? "text-amber-700"
-                        : "text-red-700"
-                  }`}
-                >
-                  {projectHealthScore.score}
-                </p>
-                <p
-                  className={`text-sm font-medium mt-1 ${
-                    projectHealthScore.label === "Healthy"
-                      ? "text-emerald-600"
-                      : projectHealthScore.label === "Attention"
-                        ? "text-amber-600"
-                        : "text-red-600"
-                  }`}
-                >
-                  {projectHealthScore.label}
-                </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Progreso, vencidas, bloqueadas y riesgo.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                  Progreso general
-                </p>
-                <p className="mt-2 text-3xl font-semibold text-slate-900">
-                  {healthMetrics.progressGeneral}%
-                </p>
-                <div className="mt-3 h-3 w-full rounded-full bg-slate-100 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-indigo-500 transition-all"
-                    style={{ width: `${healthMetrics.progressGeneral}%` }}
-                  />
+        {/* Hero: project identity + metrics + quick actions — strongest visual block */}
+        <header className="relative overflow-hidden rounded-2xl border border-slate-700/90 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-900/95 shadow-xl shadow-black/20 ring-1 ring-slate-700/50">
+          <div className="relative p-8 md:p-10">
+            <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
+              <div className="min-w-0 flex-1 space-y-4">
+                <div>
+                  <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">{project?.name ?? "—"}</h1>
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-slate-400">
+                    {clientName && <span className="font-medium text-slate-300">{clientName}</span>}
+                    {project?.status && (
+                      <span className="inline-flex items-center rounded-lg border border-slate-600/80 bg-slate-800/90 px-3 py-1 text-xs font-medium text-slate-200">
+                        {STATUS_LABELS[project.status] ?? project.status}
+                      </span>
+                    )}
+                    {project?.start_date && project?.planned_end_date && (
+                      <span className="text-slate-500">
+                        {new Date(project.start_date).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+                        {" – "}
+                        {new Date(project.planned_end_date).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs font-medium uppercase tracking-wider text-slate-500">Project workspace · Overview</p>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  {dashboardActivities.length > 0
-                    ? "Promedio de avance de actividades"
-                    : "Tareas hechas / total"}
-                </p>
+                <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3 border-t border-slate-700/80 pt-5">
+                  <span className="flex flex-col gap-0.5">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Health</span>
+                    <span className={`text-xl font-bold tabular-nums ${projectHealthScore.label === "Healthy" ? "text-emerald-400" : projectHealthScore.label === "Attention" ? "text-amber-400" : "text-red-400"}`}>
+                      {projectTasksLoading ? "—" : projectHealthScore.score}
+                    </span>
+                  </span>
+                  <span className="flex flex-col gap-0.5">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Progress</span>
+                    <span className="text-xl font-bold tabular-nums text-slate-100">{healthMetrics.progressGeneral}%</span>
+                  </span>
+                  <span className="flex flex-col gap-0.5">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Open tickets</span>
+                    <span className="text-xl font-bold tabular-nums text-slate-100">{loadingTickets ? "—" : openTicketsCount}</span>
+                  </span>
+                  <span className="flex flex-col gap-0.5">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Overdue</span>
+                    <span className="text-xl font-bold tabular-nums text-slate-100">{projectTasksLoading ? "—" : healthMetrics.overdueTasks}</span>
+                  </span>
+                </div>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                  Fase actual
-                </p>
-                <p className="mt-2 text-xl font-semibold text-slate-900">
-                  {planningSummary.currentPhase?.name ?? "—"}
-                </p>
-                {planningSummary.currentPhase?.end_date && (
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Fin previsto:{" "}
-                    {new Date(planningSummary.currentPhase.end_date).toLocaleDateString("es-ES", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                    {(() => {
-                      const end = new Date(planningSummary.currentPhase!.end_date!);
-                      end.setHours(0, 0, 0, 0);
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      const days = Math.ceil((end.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
-                      if (days > 0) return ` · ${days} días restantes`;
-                      if (days === 0) return " · Hoy";
-                      return ` · Hace ${-days} días`;
-                    })()}
+              <div className="flex flex-wrap items-center gap-3 shrink-0 md:mt-0">
+                <Link href={`/projects/${projectId}/planning`} className="inline-flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-3 text-sm font-medium text-slate-100 hover:bg-slate-700 hover:border-slate-500 transition-colors shadow-sm">
+                  <CalendarDays className="h-4 w-4 shrink-0" /> Planning
+                </Link>
+                <Link href={`/projects/${projectId}/tasks`} className="inline-flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-3 text-sm font-medium text-slate-100 hover:bg-slate-700 hover:border-slate-500 transition-colors shadow-sm">
+                  <CheckSquare className="h-4 w-4 shrink-0" /> Tasks
+                </Link>
+                <Link href={`/projects/${projectId}/tickets`} className="inline-flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-3 text-sm font-medium text-slate-100 hover:bg-slate-700 hover:border-slate-500 transition-colors shadow-sm">
+                  <Ticket className="h-4 w-4 shrink-0" /> Tickets
+                </Link>
+                <Link href={`/projects/${projectId}/notes?new=1`} className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-3 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 hover:border-indigo-400/50 transition-colors shadow-sm">
+                  <FileText className="h-4 w-4 shrink-0" /> Add note
+                </Link>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Executive overview: single unified panel */}
+        <section>
+          <h2 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-widest">Executive overview</h2>
+          {projectTasksLoading ? (
+            <p className="text-sm text-slate-500 py-8">Cargando indicadores…</p>
+          ) : (
+            <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 p-6 md:p-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10">
+                <div className="space-y-1">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Health score</p>
+                  <p className="text-3xl font-bold tabular-nums text-slate-100 md:text-4xl">{projectHealthScore.score}</p>
+                  <p className={`text-sm font-medium ${projectHealthScore.label === "Healthy" ? "text-emerald-400" : projectHealthScore.label === "Attention" ? "text-amber-400" : "text-red-400"}`}>
+                    {projectHealthScore.label}
                   </p>
-                )}
-                {!planningSummary.currentPhase?.end_date && planningSummary.currentPhase && (
-                  <p className="text-[11px] text-slate-500 mt-0.5">Sin fecha de fin</p>
-                )}
+                </div>
+                <div className="space-y-3">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Progress</p>
+                  <p className="text-3xl font-bold tabular-nums text-slate-100 md:text-4xl">{healthMetrics.progressGeneral}%</p>
+                  <div className="h-2.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                    <div className="h-full rounded-full bg-indigo-500/90 transition-all duration-300" style={{ width: `${healthMetrics.progressGeneral}%` }} />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Current phase</p>
+                  <p className="text-lg font-semibold text-slate-100">{planningSummary.currentPhase?.name ?? "—"}</p>
+                  {planningSummary.currentPhase?.end_date && (
+                    <p className="text-xs text-slate-500">
+                      End: {new Date(planningSummary.currentPhase.end_date).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Operational snapshot</p>
+                  <p className="text-sm leading-relaxed text-slate-300">
+                    {openTicketsCount} open tickets · {healthMetrics.overdueTasks} overdue · {healthMetrics.blockedTasks} blocked
+                  </p>
+                </div>
               </div>
             </div>
           )}
         </section>
 
-        {/* 2) KPI summary */}
+        {/* Project tickets: operational block */}
         <section>
-          <h2 className="text-sm font-semibold text-slate-800 mb-1">Indicadores</h2>
-          <p className="text-xs text-slate-500 mb-5">
-            Resumen de notas, tickets y actividades del proyecto.
-          </p>
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-5">
-            <KpiCard
-              title="Notas totales"
-              value={loadingStats ? "..." : (stats != null ? String(stats.total_notes) : "—")}
-              subtitle="Memoria funcional acumulada."
-              error={errorStats ?? undefined}
-            />
-            <KpiCard
-              title="Notas con error"
-              value={loadingStats ? "..." : (stats != null ? String(stats.error_notes) : "—")}
-              subtitle="Incidencias detectadas."
-            />
-            <KpiCard
-              title="Módulos impactados"
-              value={loadingStats ? "..." : (stats != null ? String(stats.modules_impacted) : "—")}
-              subtitle="Módulos SAP con notas asociadas."
-            />
-            <KpiCard
-              title="Tickets abiertos"
-              value={loadingTickets ? "..." : String(openTicketsCount)}
-              subtitle="Tickets en estado abierto."
-            />
-            <section className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                Actividades del proyecto
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">
-                {activityStats ? activityStats.total : "—"}
-              </p>
-              <p className="mt-1 text-[11px] text-slate-500">
-                {activityStats
-                  ? `${activityStats.active} activas · ${activityStats.blocked} bloqueadas · ${activityStats.overdue} vencidas`
-                  : loadingActivityStats
-                    ? "Cargando resumen de actividades…"
-                    : "—"}
-              </p>
-              {activityStats && (
-                <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-indigo-500 transition-all"
-                    style={{ width: `${activityStats.completionRate}%` }}
-                  />
+          <h2 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-widest">Tickets</h2>
+          <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+            <div className="p-6 md:p-8">
+              {loadingTickets ? (
+                <div className="flex flex-wrap gap-4 items-center text-slate-500">
+                  <span>—</span> <span>—</span> <span>—</span>
                 </div>
-              )}
-            </section>
-          </div>
-        </section>
-
-        {/* 3) Visual Insights */}
-        <section>
-          <h2 className="text-sm font-semibold text-slate-800 mb-1">Visual Insights</h2>
-          <p className="text-xs text-slate-500 mb-5">
-            Resumen visual a partir de tareas y actividades ya cargadas.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden min-h-[280px] flex flex-col">
-              <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50 shrink-0">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Tareas por estado
-                </h3>
-              </div>
-              <div className="p-5 flex-1 flex flex-col justify-center">
-                {projectTasksLoading ? (
-                  <p className="text-sm text-slate-500">Cargando…</p>
-                ) : tasksByStatusChartData.length === 0 ? (
-                  <p className="text-sm text-slate-500 py-10 text-center">Sin datos suficientes</p>
-                ) : (
-                  <div className="h-[220px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-                        <Pie
-                          data={tasksByStatusChartData}
-                          dataKey="count"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={80}
-                          paddingAngle={2}
-                          label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                        >
-                          {tasksByStatusChartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value: number | undefined) => [value ?? 0, "Tareas"]}
-                          contentStyle={{ fontSize: "12px", borderRadius: "8px", border: "1px solid #e2e8f0" }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                    <span className="text-slate-300"><strong className="text-slate-100 tabular-nums">{openTicketsCount}</strong> abiertos</span>
+                    <span className="text-slate-300"><strong className="text-slate-100 tabular-nums">{overdueTicketsCount}</strong> vencidos</span>
+                    <span className="text-slate-300"><strong className="text-slate-100 tabular-nums">{unassignedTicketsCount}</strong> sin asignar</span>
                   </div>
-                )}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden min-h-[280px] flex flex-col">
-              <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50 shrink-0">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Actividades por fase
-                </h3>
-              </div>
-              <div className="p-5 flex-1 flex flex-col justify-center">
-                {activitiesLoading || loadingProjectPhases ? (
-                  <p className="text-sm text-slate-500">Cargando…</p>
-                ) : activitiesByPhaseChartData.length === 0 ? (
-                  <p className="text-sm text-slate-500 py-10 text-center">Sin datos suficientes</p>
-                ) : (
-                  <div className="h-[220px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={activitiesByPhaseChartData}
-                        margin={{ top: 8, right: 8, left: 0, bottom: 4 }}
-                        layout="vertical"
-                      >
-                        <XAxis type="number" tick={{ fontSize: 11 }} stroke="#64748b" />
-                        <YAxis
-                          type="category"
-                          dataKey="name"
-                          width={90}
-                          tick={{ fontSize: 11 }}
-                          stroke="#64748b"
-                        />
-                        <Tooltip
-                          formatter={(value: number | undefined) => [value ?? 0, "Actividades"]}
-                          contentStyle={{ fontSize: "12px", borderRadius: "8px", border: "1px solid #e2e8f0" }}
-                        />
-                        <Bar dataKey="count" fill="#6366f1" name="count" radius={[0, 4, 4, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* 4) Contexto operativo: alertas, riesgo, próximas tareas */}
-        <section>
-          <h2 className="text-sm font-semibold text-slate-800 mb-1">
-            Contexto operativo
-          </h2>
-          <p className="text-xs text-slate-500 mb-5">
-            Alertas, riesgo por fase, próximas tareas y estados.
-          </p>
-
-          {projectTasksLoading ? (
-            <p className="text-xs text-slate-500">Cargando indicadores…</p>
-          ) : (
-            <>
-              {/* KPI row: Vencidas, Bloqueadas, Riesgo alto */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-6">
-                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Vencidas</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-900">{healthMetrics.overdueTasks}</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Tareas con fecha límite pasada</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Bloqueadas</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-900">{healthMetrics.blockedTasks}</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Tareas en estado bloqueado</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Riesgo alto</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-900">{healthMetrics.highRiskActivitiesCount}</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Actividades con riesgo alto</p>
-                </div>
-              </div>
-
-              {/* Row A: Hoy | Riesgo por fase | Project Intelligence */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
-                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm h-full flex flex-col">
-                  <h3 className="text-xs font-semibold text-slate-800 mb-0.5">Hoy</h3>
-                  <p className="text-[11px] text-slate-500 mb-2">Alertas y enlaces rápidos.</p>
-                  <ul className="space-y-0.5 text-sm flex-1">
-                    <Link href={`/projects/${projectId}/planning/activities`} className="flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 transition-colors">
-                      <span className="text-red-500 shrink-0"><AlertTriangle className="h-3.5 w-3.5" /></span>
-                      <span>Actividades riesgo alto</span>
-                      <span className="ml-auto font-semibold text-slate-900">{healthMetrics.highRiskActivitiesCount}</span>
-                    </Link>
-                    <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 transition-colors">
-                      <span className="text-amber-500 shrink-0"><CalendarClock className="h-3.5 w-3.5" /></span>
-                      <span>Tareas vencidas</span>
-                      <span className="ml-auto font-semibold text-slate-900">{healthMetrics.overdueTasks}</span>
-                    </Link>
-                    <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 transition-colors">
-                      <span className="text-amber-500 shrink-0"><User className="h-3.5 w-3.5" /></span>
-                      <span>Tareas sin asignar</span>
-                      <span className="ml-auto font-semibold text-slate-900">{healthMetrics.unassignedTasks}</span>
-                    </Link>
-                    <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 transition-colors">
-                      <span
-                        className={`shrink-0 ${
-                          healthMetrics.blockedTasks > 0 ? "text-red-500" : "text-emerald-500"
-                        }`}
-                      ><Ban className="h-3.5 w-3.5" /></span>
-                      <span>Tareas bloqueadas</span>
-                      <span className="ml-auto font-semibold text-slate-900">{healthMetrics.blockedTasks}</span>
-                    </Link>
-                  </ul>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm h-full flex flex-col">
-                  <h3 className="text-xs font-semibold text-slate-800 mb-0.5">Riesgo por fase</h3>
-                  <p className="text-[11px] text-slate-500 mb-2">
-                    Actividades por nivel de riesgo por fase.
-                  </p>
-                  {riskByPhase.length === 0 ? (
-                    <p className="text-xs text-slate-500">Sin fases o actividades.</p>
-                  ) : (
-                    <ul className="space-y-2 flex-1">
-                      {riskByPhase.map(({ phaseId, phaseName, high, medium, low }) => (
-                        <li key={phaseId} className="flex items-center justify-between gap-2 text-xs">
-                          <span className="font-medium text-slate-800 truncate">{phaseName}</span>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {high > 0 && (
-                              <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">
-                                Alto {high}
-                              </span>
-                            )}
-                            {medium > 0 && (
-                              <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                                Med {medium}
-                              </span>
-                            )}
-                            {low > 0 && (
-                              <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-                                Bajo {low}
-                              </span>
-                            )}
-                            {high === 0 && medium === 0 && low === 0 && (
-                              <span className="text-slate-400 text-[10px]">—</span>
-                            )}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm h-full flex flex-col">
-                  <h3 className="text-xs font-semibold text-slate-800 mb-0.5">Inteligencia del proyecto</h3>
-                  <p className="text-[11px] text-slate-500 mb-2">
-                    Señales derivadas de actividades, tareas y estado actual del proyecto.
-                  </p>
-                  {projectInsights.length === 0 ? (
-                    <p className="text-sm text-slate-500">Sin señales relevantes en este momento.</p>
-                  ) : (
-                    <ul className="space-y-2 flex-1">
-                      {projectInsights.map((insight, i) => (
-                        <li key={`${insight.type}-${i}`} className="flex items-start gap-2 text-sm">
-                          {insight.type === "high_risk_activity" && (
-                            <AlertTriangle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
-                          )}
-                          {insight.type === "overdue_tasks" && (
-                            <CalendarClock className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
-                          )}
-                          {insight.type === "blocked_tasks" && (
-                            <Ban className="h-4 w-4 shrink-0 text-orange-500 mt-0.5" />
-                          )}
-                          <span className="text-slate-700">
-                            {insight.text}
-                            {insight.details != null && (
-                              <span className="block text-xs text-slate-500 mt-0.5 truncate">{insight.details}</span>
-                            )}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-
-              {/* Row B: Próximas tareas (left) | Estados de tareas (right) */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm h-full flex flex-col">
-                  <h3 className="text-xs font-semibold text-slate-800 mb-0.5">
-                    Próximas tareas
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mb-2">
-                    Próximas 8 por fecha límite (abiertas o en progreso).
-                  </p>
-                  {healthMetrics.upcomingTasks.length === 0 ? (
-                    <p className="text-xs text-slate-500">No hay tareas próximas con fecha.</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {healthMetrics.upcomingTasks.map((t) => (
-                        <li
-                          key={t.id}
-                          className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs hover:bg-slate-50 transition-colors"
-                        >
-                          <span className="font-medium text-slate-800 truncate">
-                            {t.title}
-                          </span>
-                          <span className="shrink-0 text-slate-500">
-                            {t.due_date
-                              ? new Date(t.due_date).toLocaleDateString("es-ES", {
-                                  day: "2-digit",
-                                  month: "short",
-                                })
-                              : "—"}
-                          </span>
-                          <span
-                            className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                              String((t.status ?? "").toLowerCase().trim()) === "blocked"
-                                ? "bg-red-100 text-red-700"
-                                : String((t.status ?? "").toLowerCase().trim()) === "in_progress"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : String((t.status ?? "").toLowerCase().trim()) === "review"
-                                    ? "bg-violet-100 text-violet-700"
-                                    : "bg-slate-100 text-slate-600"
-                            }`}
-                          >
-                            {getTaskStatusLabel(t.status)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <Link
-                    href={`/projects/${projectId}/tasks`}
-                    className="mt-3 inline-block text-[11px] font-medium text-indigo-600 hover:text-indigo-700"
-                  >
-                    Ver tablero de tareas →
-                  </Link>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm h-full flex flex-col">
-                  <h3 className="text-xs font-semibold text-slate-800 mb-0.5">
-                    Estados de tareas
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mb-2">
-                    Desglose por estado.
-                  </p>
-                  {healthMetrics.totalTasks === 0 ? (
-                    <p className="text-xs text-slate-500">Sin tareas aún.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {[
-                        {
-                          label: getTaskStatusLabel("pending"),
-                          count: healthMetrics.openOrPending,
-                          bar: "bg-slate-400",
-                        },
-                        {
-                          label: getTaskStatusLabel("in_progress"),
-                          count: healthMetrics.inProgressTasks,
-                          bar: "bg-blue-500",
-                        },
-                        ...(healthMetrics.reviewTasks > 0
-                          ? [
-                              {
-                                label: getTaskStatusLabel("review"),
-                                count: healthMetrics.reviewTasks,
-                                bar: "bg-violet-500",
-                              },
-                            ]
-                          : []),
-                        {
-                          label: getTaskStatusLabel("blocked"),
-                          count: healthMetrics.blockedTasks,
-                          bar: "bg-red-500",
-                        },
-                        {
-                          label: getTaskStatusLabel("done"),
-                          count: healthMetrics.doneTasks,
-                          bar: "bg-emerald-500",
-                        },
-                      ].map(({ label, count, bar }) => (
-                        <div key={label} className="flex items-center gap-2">
-                          <span className="w-24 text-[11px] text-slate-600 shrink-0">
-                            {label}
-                          </span>
-                          <div className="h-2 flex-1 min-w-0 rounded-full bg-slate-100 overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${bar} transition-all`}
-                              style={{
-                                width: `${
-                                  healthMetrics.totalTasks > 0
-                                    ? (count / healthMetrics.totalTasks) * 100
-                                    : 0
-                                }%`,
-                              }}
-                            />
-                          </div>
-                          <span className="text-[11px] font-medium text-slate-700 w-6 text-right">
-                            {count}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Suggested Knowledge — elevated as distinct capability */}
-              <div className="mt-8 pt-8 border-t border-slate-200">
-                <h3 className="text-sm font-semibold text-slate-800 mb-0.5">
-                  Knowledge del proyecto
-                </h3>
-                <p className="text-xs text-slate-500 mb-4">
-                  Páginas de conocimiento vinculadas a este proyecto.
-                </p>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/50 px-5 py-5">
-                  {suggestedKnowledge.length === 0 ? (
-                    <p className="text-sm text-slate-500">Ninguna página vinculada aún.</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {suggestedKnowledge.map((page) => (
-                        <li key={page.id}>
-                          <Link
-                            href={`/knowledge/${page.id}`}
-                            className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-white hover:shadow-sm transition-colors"
-                          >
-                            <BookOpen className="h-[18px] w-[18px] shrink-0 text-slate-400" />
-                            <span className="truncate">{page.title}</span>
+                  {todayTickets.length > 0 && (
+                    <ul className="mt-4 space-y-1">
+                      {todayTickets.slice(0, 5).map((t) => (
+                        <li key={t.id}>
+                          <Link href={`/tickets/${t.id}`} className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-slate-800/60 hover:text-slate-100 transition-colors">
+                            <span className="font-medium truncate">{t.title}</span>
+                            <span className="shrink-0 text-xs text-slate-500">{new Date(t.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}</span>
                           </Link>
                         </li>
                       ))}
                     </ul>
                   )}
-                  <Link
-                    href={`/projects/${projectId}/knowledge`}
-                    className="mt-4 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-700"
-                  >
-                    Ver Knowledge del proyecto →
-                  </Link>
+                  <div className="mt-4">
+                    <Link href={`/projects/${projectId}/tickets`} className="text-sm font-medium text-indigo-400 hover:text-indigo-300">
+                      Ver todos los tickets
+                    </Link>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Operational intelligence: charts + focus + risk + insights in one panel */}
+        <section>
+          <h2 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-widest">Operational intelligence</h2>
+          {projectTasksLoading ? (
+            <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <Skeleton className="h-48 rounded-xl" />
+                <Skeleton className="h-48 rounded-xl" />
+                <Skeleton className="h-48 rounded-xl" />
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
+                <div className="lg:col-span-2 flex flex-col border-b lg:border-b-0 lg:border-r border-slate-700/60">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0 border-b md:border-b-0 md:border-r border-slate-700/60">
+                    <div className="p-6 bg-slate-800/30 flex flex-col">
+                      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-3">Tasks by status</h3>
+                      <div className="flex-1 min-h-[200px] flex items-center justify-center">
+                        {tasksByStatusEChartsOption == null ? (
+                          <div className="flex flex-col items-center justify-center gap-2 text-center px-4 py-6">
+                            <BarChart3 className="h-9 w-9 text-slate-600" aria-hidden />
+                            <p className="text-sm font-medium text-slate-400">No task status data yet.</p>
+                            <p className="text-xs text-slate-500 max-w-[180px]">Create tasks to see the breakdown by status.</p>
+                          </div>
+                        ) : (
+                          <div className="h-[200px] w-full">
+                            <ReactECharts option={tasksByStatusEChartsOption} style={{ height: "100%", width: "100%" }} opts={{ renderer: "canvas" }} notMerge />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="p-6 bg-slate-800/20 flex flex-col">
+                      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-3">Activities by phase</h3>
+                      <div className="flex-1 min-h-[200px] flex items-center justify-center">
+                        {activitiesLoading || loadingProjectPhases ? (
+                          <Skeleton className="h-full min-h-[200px] w-full rounded-xl" />
+                        ) : activitiesByPhaseEChartsOption == null ? (
+                          <div className="flex flex-col items-center justify-center gap-2 text-center px-4 py-6">
+                            <BarChart3 className="h-9 w-9 text-slate-600" aria-hidden />
+                            <p className="text-sm font-medium text-slate-400">Phase activity will appear here</p>
+                            <p className="text-xs text-slate-500 max-w-[200px]">once planning and activities are configured.</p>
+                          </div>
+                        ) : (
+                          <div className="h-[200px] w-full">
+                            <ReactECharts option={activitiesByPhaseEChartsOption} style={{ height: "100%", width: "100%" }} opts={{ renderer: "canvas" }} notMerge />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6 md:p-6 flex flex-col gap-6 bg-slate-900/50">
+                  <div>
+                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-3">Today / immediate focus</h3>
+                    <ul className="space-y-0.5 text-sm">
+                      <Link href={`/projects/${projectId}/planning/activities`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800/70 transition-colors">
+                        <AlertTriangle className="h-3.5 w-3.5 text-red-400 shrink-0" />
+                        <span>High-risk activities</span>
+                        <span className="ml-auto font-semibold tabular-nums text-slate-100">{healthMetrics.highRiskActivitiesCount}</span>
+                      </Link>
+                      <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800/70 transition-colors">
+                        <CalendarClock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                        <span>Overdue tasks</span>
+                        <span className="ml-auto font-semibold tabular-nums text-slate-100">{healthMetrics.overdueTasks}</span>
+                      </Link>
+                      <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800/70 transition-colors">
+                        <User className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span>Unassigned tasks</span>
+                        <span className="ml-auto font-semibold tabular-nums text-slate-100">{healthMetrics.unassignedTasks}</span>
+                      </Link>
+                      <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800/70 transition-colors">
+                        <Ban className={`h-3.5 w-3.5 shrink-0 ${healthMetrics.blockedTasks > 0 ? "text-red-400" : "text-emerald-400"}`} />
+                        <span>Blocked tasks</span>
+                        <span className="ml-auto font-semibold tabular-nums text-slate-100">{healthMetrics.blockedTasks}</span>
+                      </Link>
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-3">Phase risk</h3>
+                    {riskByPhase.length === 0 ? (
+                      <p className="text-sm text-slate-500">No phases or activities yet.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {riskByPhase.map(({ phaseId, phaseName, high, medium, low }) => (
+                          <li key={phaseId} className="flex items-center justify-between gap-2 text-xs">
+                            <span className="font-medium text-slate-300 truncate">{phaseName}</span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {high > 0 && <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-medium text-red-300">High {high}</span>}
+                              {medium > 0 && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300">Med {medium}</span>}
+                              {low > 0 && <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300">Low {low}</span>}
+                              {high === 0 && medium === 0 && low === 0 && <span className="text-slate-500 text-[10px]">—</span>}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-3">Insights</h3>
+                    {projectInsights.length === 0 ? (
+                      <p className="text-sm text-slate-500">No signals requiring attention right now.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {projectInsights.map((insight, i) => (
+                          <li key={`${insight.type}-${i}`} className="flex items-start gap-2 text-sm">
+                            {insight.type === "high_risk_activity" && <AlertTriangle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />}
+                            {insight.type === "overdue_tasks" && <CalendarClock className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />}
+                            {insight.type === "blocked_tasks" && <Ban className="h-4 w-4 shrink-0 text-orange-400 mt-0.5" />}
+                            <span className="text-slate-300">{insight.text}{insight.details != null && <span className="block text-xs text-slate-500 mt-0.5 truncate">{insight.details}</span>}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
               </div>
-            </>
+            </div>
           )}
         </section>
 
-        {/* Resumen de planificación */}
+        {/* Current work context: what needs attention now */}
         <section>
-          <h2 className="text-sm font-semibold text-slate-800 mb-1">Resumen de planificación</h2>
-          <p className="text-xs text-slate-500 mb-5">Vista rápida de las fases SAP Activate de este proyecto.</p>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-widest">Current work context</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 p-6">
+              <h3 className="text-sm font-semibold text-slate-200 mb-1">Upcoming tasks</h3>
+              <p className="text-xs text-slate-500 mb-4">Next 8 by due date (open or in progress).</p>
+              {healthMetrics.upcomingTasks.length === 0 ? (
+                <p className="text-sm text-slate-500 py-4">No upcoming tasks for now. Add tasks with due dates to see them here.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {healthMetrics.upcomingTasks.map((t) => (
+                    <li key={t.id} className="flex items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-xs hover:bg-slate-800/60 transition-colors">
+                      <span className="font-medium text-slate-200 truncate">{t.title}</span>
+                      <span className="shrink-0 text-slate-500 tabular-nums">{t.due_date ? new Date(t.due_date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) : "—"}</span>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${String((t.status ?? "").toLowerCase().trim()) === "blocked" ? "bg-red-500/20 text-red-300" : String((t.status ?? "").toLowerCase().trim()) === "in_progress" ? "bg-indigo-500/20 text-indigo-300" : String((t.status ?? "").toLowerCase().trim()) === "review" ? "bg-violet-500/20 text-violet-300" : "bg-slate-500/20 text-slate-400"}`}>
+                        {getTaskStatusLabel(t.status)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <Link href={`/projects/${projectId}/tasks`} className="mt-4 inline-block text-xs font-medium text-indigo-400 hover:text-indigo-300">View task board →</Link>
+            </div>
+            <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 p-6">
+              <h3 className="text-sm font-semibold text-slate-200 mb-1">Task status summary</h3>
+              <p className="text-xs text-slate-500 mb-4">Breakdown by status.</p>
+              {healthMetrics.totalTasks === 0 ? (
+                <p className="text-sm text-slate-500 py-4">No tasks yet. Create the first task in Tasks.</p>
+              ) : (
+                <div className="space-y-4">
+                  {[
+                    { label: getTaskStatusLabel("pending"), count: healthMetrics.openOrPending, bar: "bg-slate-400" },
+                    { label: getTaskStatusLabel("in_progress"), count: healthMetrics.inProgressTasks, bar: "bg-indigo-500" },
+                    ...(healthMetrics.reviewTasks > 0 ? [{ label: getTaskStatusLabel("review"), count: healthMetrics.reviewTasks, bar: "bg-violet-500" }] : []),
+                    { label: getTaskStatusLabel("blocked"), count: healthMetrics.blockedTasks, bar: "bg-red-500" },
+                    { label: getTaskStatusLabel("done"), count: healthMetrics.doneTasks, bar: "bg-emerald-500" },
+                  ].map(({ label, count, bar }) => (
+                    <div key={label} className="flex items-center gap-3">
+                      <span className="w-24 text-xs text-slate-500 shrink-0">{label}</span>
+                      <div className="h-2 flex-1 min-w-0 rounded-full bg-slate-800 overflow-hidden">
+                        <div className={`h-full rounded-full ${bar} transition-all duration-300`} style={{ width: `${healthMetrics.totalTasks > 0 ? (count / healthMetrics.totalTasks) * 100 : 0}%` }} />
+                      </div>
+                      <span className="text-xs font-medium tabular-nums text-slate-300 w-6 text-right">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Knowledge & planning: project knowledge */}
+        <section>
+          <h2 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-widest">Project knowledge</h2>
+          <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 px-6 py-5">
+            {suggestedKnowledge.length === 0 ? (
+              <p className="text-sm text-slate-500 py-4">No recent project knowledge yet. Link pages from Project Knowledge.</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {suggestedKnowledge.map((page) => (
+                  <li key={page.id}>
+                    <Link href={`/knowledge/${page.id}`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-slate-800/60 transition-colors">
+                      <BookOpen className="h-4 w-4 shrink-0 text-slate-500" />
+                      <span className="truncate">{page.title}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Link href={`/projects/${projectId}/knowledge`} className="mt-4 inline-block text-sm font-medium text-indigo-400 hover:text-indigo-300">View project knowledge →</Link>
+          </div>
+        </section>
+
+        {/* Planning summary */}
+        <section>
+          <h2 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-widest">Planning summary</h2>
+          <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 p-6">
             <div className="flex justify-end mb-4">
-              <button
-                type="button"
-                onClick={() => router.push(`/projects/${projectId}/planning`)}
-                className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-              >
-                Ver planificación
-              </button>
+              <Link href={`/projects/${projectId}/planning`} className="text-sm font-medium text-indigo-400 hover:text-indigo-300">
+                View planning
+              </Link>
             </div>
 
             {loadingProjectPhases ? (
-              <p className="text-xs text-slate-500">Cargando fases…</p>
+              <p className="text-sm text-slate-500">Loading phases…</p>
             ) : projectPhases.length === 0 ? (
-              <p className="text-xs text-slate-500">
-                Este proyecto aún no tiene fases configuradas. Configúralas en la pestaña de Planificación.
-              </p>
+              <p className="text-sm text-slate-500 py-2">Planning details will appear here once phases and activities are configured.</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div>
-                  <span className="text-xs text-slate-500">Fase actual</span>
-                  <div className="text-sm font-semibold text-slate-900">
-                    {planningSummary.currentPhase?.name ?? "Sin definir"}
-                  </div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Current phase</span>
+                  <div className="mt-1 text-sm font-semibold text-slate-100">{planningSummary.currentPhase?.name ?? "—"}</div>
                 </div>
-
                 {planningSummary.projectTimeProgress != null && (
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-slate-500">
-                        Progreso temporal del proyecto
-                      </span>
-                      <span className="text-xs font-medium text-slate-700">
-                        {planningSummary.projectTimeProgress}%
-                      </span>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Project time progress</span>
+                      <span className="text-xs font-medium tabular-nums text-slate-300">{planningSummary.projectTimeProgress}%</span>
                     </div>
-                    <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                      <div
-                        className="h-full bg-indigo-500 rounded-full transition-all"
-                        style={{ width: `${planningSummary.projectTimeProgress}%` }}
-                      />
+                    <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                      <div className="h-full bg-indigo-500/90 rounded-full transition-all duration-300" style={{ width: `${planningSummary.projectTimeProgress}%` }} />
                     </div>
                   </div>
                 )}
-
                 {planningSummary.nextPhaseStart && (
                   <div className="text-xs text-slate-500">
-                    Próxima fase:{" "}
-                    <span className="font-medium text-slate-800">
-                      {planningSummary.nextPhaseStart.name}
-                    </span>{" "}
-                    (inicio previsto {new Date(planningSummary.nextPhaseStart.start_date).toLocaleDateString("es-ES", { dateStyle: "short" })})
+                    Next phase: <span className="font-medium text-slate-300">{planningSummary.nextPhaseStart.name}</span> (expected start {new Date(planningSummary.nextPhaseStart.start_date).toLocaleDateString("es-ES", { dateStyle: "short" })})
                   </div>
                 )}
               </div>
@@ -1765,107 +1690,72 @@ export default function ProjectDashboardPage() {
           </div>
         </section>
 
-        {/* Estado de actividades */}
+        {/* Activity status */}
         <section>
-          <h2 className="text-sm font-semibold text-slate-800 mb-1">Estado de actividades</h2>
-          <p className="text-xs text-slate-500 mb-5">Resumen del plan de trabajo del proyecto.</p>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-widest">Activity status</h2>
+          <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 p-6">
             <div className="flex justify-end mb-4">
-              <button
-                type="button"
-                onClick={() => router.push(`/projects/${projectId}/planning/activities`)}
-                className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-              >
-                Ver todas
-              </button>
+              <Link href={`/projects/${projectId}/planning/activities`} className="text-sm font-medium text-indigo-400 hover:text-indigo-300">
+                View all
+              </Link>
             </div>
 
             {activitiesLoading ? (
-              <p className="text-xs text-slate-500">Cargando actividades…</p>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-20 rounded-xl" />
+                ))}
+              </div>
             ) : projectActivityStats.total === 0 ? (
-              <p className="text-xs text-slate-500">
-                Este proyecto aún no tiene actividades definidas.
-              </p>
+              <p className="text-sm text-slate-500 py-2">No activities yet. Create activities in Planning.</p>
             ) : (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  <div className="bg-slate-50 rounded-xl p-3">
-                    <div className="text-[11px] text-slate-500">Total</div>
-                    <div className="text-lg font-semibold text-slate-900">
-                      {projectActivityStats.total}
-                    </div>
+                  <div className="rounded-xl border border-slate-700/50 bg-slate-800/60 p-4">
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Total</div>
+                    <div className="mt-1 text-xl font-bold tabular-nums text-slate-100">{projectActivityStats.total}</div>
                   </div>
-                  <div className="bg-slate-50 rounded-xl p-3">
-                    <div className="text-[11px] text-slate-500">En progreso</div>
-                    <div className="text-lg font-semibold text-slate-900">
-                      {projectActivityStats.inProgress}
-                    </div>
+                  <div className="rounded-xl border border-slate-700/50 bg-slate-800/60 p-4">
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">In progress</div>
+                    <div className="mt-1 text-xl font-bold tabular-nums text-slate-100">{projectActivityStats.inProgress}</div>
                   </div>
-                  <div className="bg-slate-50 rounded-xl p-3">
-                    <div className="text-[11px] text-slate-500">Bloqueadas</div>
-                    <div className="text-lg font-semibold text-slate-900">
-                      {projectActivityStats.blocked}
-                    </div>
+                  <div className="rounded-xl border border-slate-700/50 bg-slate-800/60 p-4">
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Blocked</div>
+                    <div className="mt-1 text-xl font-bold tabular-nums text-slate-100">{projectActivityStats.blocked}</div>
                   </div>
-                  <div className="bg-slate-50 rounded-xl p-3">
-                    <div className="text-[11px] text-slate-500">Retrasadas</div>
-                    <div className="text-lg font-semibold text-slate-900">
-                      {projectActivityStats.delayed}
-                    </div>
+                  <div className="rounded-xl border border-slate-700/50 bg-slate-800/60 p-4">
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Delayed</div>
+                    <div className="mt-1 text-xl font-bold tabular-nums text-slate-100">{projectActivityStats.delayed}</div>
                   </div>
-                  <div className="bg-slate-50 rounded-xl p-3">
-                    <div className="text-[11px] text-slate-500">% avance medio</div>
-                    <div className="text-lg font-semibold text-slate-900">
-                      {projectActivityStats.avgProgress !== null
-                        ? `${projectActivityStats.avgProgress}%`
-                        : "—"}
-                    </div>
+                  <div className="rounded-xl border border-slate-700/50 bg-slate-800/60 p-4">
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Avg. progress</div>
+                    <div className="mt-1 text-xl font-bold tabular-nums text-slate-100">{projectActivityStats.avgProgress !== null ? `${projectActivityStats.avgProgress}%` : "—"}</div>
                   </div>
                 </div>
 
-                {(projectActivityStats.blockedList.length > 0 ||
-                  projectActivityStats.delayedList.length > 0) && (
+                {(projectActivityStats.blockedList.length > 0 || projectActivityStats.delayedList.length > 0) && (
                   <div className="grid gap-4 md:grid-cols-2">
                     {projectActivityStats.blockedList.length > 0 && (
-                      <div>
-                        <div className="text-xs font-semibold text-slate-800 mb-1">
-                          Actividades bloqueadas
-                        </div>
-                        <ul className="space-y-1">
+                      <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Blocked activities</div>
+                        <ul className="space-y-1.5">
                           {projectActivityStats.blockedList.map((act) => (
-                            <li
-                              key={act.id}
-                              className="text-xs text-slate-700 flex justify-between gap-3"
-                            >
+                            <li key={act.id} className="text-xs text-slate-400 flex justify-between gap-3">
                               <span className="truncate">{act.name}</span>
-                              {act.due_date && (
-                                <span className="shrink-0 text-slate-500">
-                                  Fin {act.due_date}
-                                </span>
-                              )}
+                              {act.due_date && <span className="shrink-0 text-slate-500 tabular-nums">Due {act.due_date}</span>}
                             </li>
                           ))}
                         </ul>
                       </div>
                     )}
-
                     {projectActivityStats.delayedList.length > 0 && (
-                      <div>
-                        <div className="text-xs font-semibold text-slate-800 mb-1">
-                          Actividades retrasadas
-                        </div>
-                        <ul className="space-y-1">
+                      <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Delayed activities</div>
+                        <ul className="space-y-1.5">
                           {projectActivityStats.delayedList.map((act) => (
-                            <li
-                              key={act.id}
-                              className="text-xs text-slate-700 flex justify-between gap-3"
-                            >
+                            <li key={act.id} className="text-xs text-slate-400 flex justify-between gap-3">
                               <span className="truncate">{act.name}</span>
-                              {act.due_date && (
-                                <span className="shrink-0 text-slate-500">
-                                  Fin {act.due_date}
-                                </span>
-                              )}
+                              {act.due_date && <span className="shrink-0 text-slate-500 tabular-nums">Due {act.due_date}</span>}
                             </li>
                           ))}
                         </ul>
@@ -1881,165 +1771,121 @@ export default function ProjectDashboardPage() {
         {/* SAP Activate Plan */}
         {(activatePlan?.phases?.length ?? 0) > 0 && (
           <section>
-            <h2 className="text-sm font-semibold text-slate-800 mb-1">Plan SAP Activate</h2>
-            <p className="text-xs text-slate-500 mb-5">Fases y fechas planificadas · Actividades por fase.</p>
-            <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+            <h2 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-widest">SAP Activate plan</h2>
+            <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 px-6 py-5">
               {loadingActivatePlan ? (
-                <p className="text-sm text-slate-500">Cargando…</p>
+                <div className="flex flex-wrap gap-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <Skeleton key={i} className="h-9 w-40 rounded-xl" />
+                  ))}
+                </div>
               ) : (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3">
                   {activatePlan?.phases?.map((phase) => {
                     const pct = phase.completionPercent;
-                    const traffic = pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-slate-300";
+                    const traffic = pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-slate-500";
                     return (
-                      <div
-                        key={phase.phase_key}
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2 text-xs"
-                      >
-                        <span className={`h-2 w-2 rounded-full ${traffic}`} title={`${phase.completedTasks}/${phase.totalTasks} completadas`} />
-                        <span className="font-medium text-slate-800">{phase.name}</span>
-                        <span className="text-slate-500">
-                          {new Date(phase.start_date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}
-                          –{new Date(phase.end_date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}
+                      <div key={phase.phase_key} className="inline-flex items-center gap-2.5 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2.5 text-xs shadow-sm">
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${traffic}`} title={`${phase.completedTasks}/${phase.totalTasks} completed`} />
+                        <span className="font-medium text-slate-200">{phase.name}</span>
+                        <span className="text-slate-500 tabular-nums">
+                          {new Date(phase.start_date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}–{new Date(phase.end_date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}
                         </span>
-                        <span className="text-slate-400">
-                          {phase.completedTasks}/{phase.totalTasks} · {phase.completionPercent}%
-                        </span>
+                        <span className="text-slate-400 tabular-nums">{phase.completedTasks}/{phase.totalTasks} · {phase.completionPercent}%</span>
                       </div>
                     );
                   }) ?? null}
                 </div>
               )}
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <Link href={`/projects/${projectId}/planning`} className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
-                  Editar fases del proyecto →
-                </Link>
-                <Link
-                  href={`/projects/${projectId}/planning`}
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                >
-                  Ir a planificación
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <Link href={`/projects/${projectId}/planning`} className="text-sm font-medium text-indigo-400 hover:text-indigo-300">Edit phases →</Link>
+                <Link href={`/projects/${projectId}/planning`} className="inline-flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-100 hover:bg-slate-700 transition-colors">
+                  Go to planning
                 </Link>
               </div>
             </div>
           </section>
         )}
 
-        {/* Module impact + Recent activity */}
+        {/* Recent activity & impact */}
         <section>
-          <h2 className="text-sm font-semibold text-slate-800 mb-1">Impacto y actividad</h2>
-          <p className="text-xs text-slate-500 mb-5">Módulos impactados y actividad reciente del proyecto.</p>
-          <div className="grid gap-5 lg:grid-cols-3">
-          <div className="lg:col-span-1">
-            <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-800">Impacto por módulos</h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">Módulos SAP con notas asociadas.</p>
+          <h2 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-widest">Recent activity & impact</h2>
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 px-6 py-5">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Modules impacted</h3>
+              <p className="text-xs text-slate-500 mt-0.5">SAP modules with linked notes.</p>
               {loadingStats ? (
-                <p className="mt-3 text-[11px] text-slate-500">Cargando…</p>
+                <Skeleton className="mt-4 h-8 w-16 rounded-xl" />
               ) : (
-                <p className="mt-3 text-2xl font-semibold text-slate-900">
-                  {stats != null ? stats.modules_impacted : "—"}
-                </p>
+                <p className="mt-4 text-2xl font-bold tabular-nums text-slate-100">{stats != null ? stats.modules_impacted : "—"}</p>
               )}
-              <Link href={`/projects/${projectId}/notes`} className="mt-2 inline-block text-[11px] font-medium text-indigo-600 hover:text-indigo-800">
-                Ver notas por módulo →
-              </Link>
+              <Link href={`/projects/${projectId}/notes`} className="mt-4 inline-block text-xs font-medium text-indigo-400 hover:text-indigo-300">View notes by module →</Link>
             </div>
-          </div>
-          <div className="lg:col-span-2">
-            <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-800">Actividad reciente</h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">Últimas notas y tickets del proyecto.</p>
+            <div className="lg:col-span-2 rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 px-6 py-5">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Project activity log</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Latest notes and tickets.</p>
               {loadingNotes || loadingTickets ? (
-                <p className="mt-3 text-[11px] text-slate-500">Cargando…</p>
+                <div className="mt-4 space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-10 w-full rounded-xl" />
+                  ))}
+                </div>
               ) : recentActivity.length === 0 ? (
-                <p className="mt-3 text-[11px] text-slate-500">Sin actividad reciente.</p>
+                <p className="mt-4 text-sm text-slate-500 py-2">No recent activity yet. Add the first note or ticket.</p>
               ) : (
-                <ul className="mt-3 space-y-0.5">
+                <ul className="mt-4 space-y-0.5">
                   {recentActivity.map((item) => (
                     <li key={`${item.type}-${item.id}`}>
-                      <Link
-                        href={item.href}
-                        className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                      >
-                        <span className="font-medium text-slate-900 truncate">{item.title}</span>
-                        <span className="shrink-0 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
-                          {item.type === "note" ? "Nota" : "Ticket"}
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          {new Date(item.created_at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}
-                        </span>
+                      <Link href={item.href} className="flex items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-slate-800/60 transition-colors">
+                        <span className="font-medium text-slate-100 truncate">{item.title}</span>
+                        <span className="shrink-0 inline-flex items-center rounded-full border border-slate-600/60 bg-slate-800/80 px-2 py-0.5 text-[10px] text-slate-400">{item.type === "note" ? "Note" : "Ticket"}</span>
+                        <span className="text-[10px] text-slate-500 tabular-nums">{new Date(item.created_at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}</span>
                       </Link>
                     </li>
                   ))}
                 </ul>
               )}
-              <Link href={`/projects/${projectId}/notes`} className="mt-2 inline-block text-[11px] font-medium text-indigo-600 hover:text-indigo-800">
-                Ver todas las notas
-              </Link>
-              <span className="mx-2 text-slate-300">·</span>
-              <Link href={`/projects/${projectId}/tickets`} className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800">
-                Ver todos los tickets
-              </Link>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <Link href={`/projects/${projectId}/notes`} className="text-xs font-medium text-indigo-400 hover:text-indigo-300">View notes</Link>
+                <span className="text-slate-600">·</span>
+                <Link href={`/projects/${projectId}/tickets`} className="text-xs font-medium text-indigo-400 hover:text-indigo-300">View tickets</Link>
+              </div>
             </div>
-          </div>
           </div>
         </section>
 
-        {/* Accesos rápidos */}
+        {/* Quick access — premium pills */}
         <section>
-          <h2 className="text-sm font-semibold text-slate-800 mb-1">Accesos rápidos</h2>
-          <p className="text-xs text-slate-500 mb-5">Notas, knowledge, enlaces, tickets y planificación.</p>
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-            <MetricActionCard
-              title="Notas del proyecto"
-              value={loadingStats ? "…" : (stats != null ? String(stats.total_notes) : "—")}
-              subtitle="Memoria funcional"
-              href={`/projects/${projectId}/notes`}
-              icon={<FileText className="h-5 w-5" />}
-            />
-            <MetricActionCard
-              title="Base de conocimiento"
-              value="—"
-              subtitle="Documentación y procedimientos"
-              href={`/projects/${projectId}/knowledge`}
-              icon={<BookOpen className="h-5 w-5" />}
-            />
-            <MetricActionCard
-              title="Enlaces del proyecto"
-              value={loadingLinks ? "…" : String(links.length)}
-              subtitle="Accesos rápidos"
-              href={`/projects/${projectId}/links`}
-              icon={<LinkIcon className="h-5 w-5" />}
-            />
-            <MetricActionCard
-              title="Tickets / Actividad"
-              value={loadingTickets ? "…" : String(openTicketsCount)}
-              subtitle="Tickets abiertos"
-              href={`/projects/${projectId}/tickets`}
-              icon={<Ticket className="h-5 w-5" />}
-            />
-            <MetricActionCard
-              title="Planificación"
-              value="Fases"
-              subtitle="SAP Activate: editar fases y fechas"
-              href={`/projects/${projectId}/planning`}
-              icon={<CalendarDays className="h-5 w-5" />}
-            />
+          <h2 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-widest">Quick access</h2>
+          <div className="flex flex-wrap gap-3">
+            <Link href={`/projects/${projectId}/notes`} className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-800/80 px-4 py-2 text-xs font-medium text-slate-200 shadow-sm hover:bg-slate-700 hover:border-slate-500 hover:text-slate-100 transition-colors">
+              <FileText className="h-3.5 w-3.5 shrink-0" /> Notes
+            </Link>
+            <Link href={`/projects/${projectId}/brain`} className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-800/80 px-4 py-2 text-xs font-medium text-slate-200 shadow-sm hover:bg-slate-700 hover:border-slate-500 hover:text-slate-100 transition-colors">
+              <BookOpen className="h-3.5 w-3.5 shrink-0" /> Brain
+            </Link>
+            <Link href={`/projects/${projectId}/links`} className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-800/80 px-4 py-2 text-xs font-medium text-slate-200 shadow-sm hover:bg-slate-700 hover:border-slate-500 hover:text-slate-100 transition-colors">
+              <LinkIcon className="h-3.5 w-3.5 shrink-0" /> Links
+            </Link>
+            <Link href={`/projects/${projectId}/members`} className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-800/80 px-4 py-2 text-xs font-medium text-slate-200 shadow-sm hover:bg-slate-700 hover:border-slate-500 hover:text-slate-100 transition-colors">
+              <User className="h-3.5 w-3.5 shrink-0" /> Team
+            </Link>
           </div>
         </section>
-      </div>
-    </PageShell>
+    </div>
   );
 }
+
 
 // ==========================
 // Componentes auxiliares
 // ==========================
 
 const STATUS_LABELS: Record<string, string> = {
+  planned: "Planificado",
   in_progress: "En progreso",
   completed: "Completado",
+  archived: "Archivado",
   paused: "En pausa",
 };
 

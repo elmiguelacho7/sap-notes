@@ -61,6 +61,7 @@ export default function TicketDetailPage() {
   const id = (params?.id ?? "") as string;
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [assigneeLabel, setAssigneeLabel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [appRole, setAppRole] = useState<string | null>(null);
@@ -71,7 +72,7 @@ export default function TicketDetailPage() {
 
     const { data, error } = await supabase
       .from("tickets")
-      .select("id, title, description, priority, status, project_id, due_date, created_at, updated_at")
+      .select("id, title, description, priority, status, project_id, due_date, created_at, updated_at, assigned_to")
       .eq("id", id)
       .single();
 
@@ -81,8 +82,21 @@ export default function TicketDetailPage() {
         setErrorMsg("No se pudo cargar el ticket. Inténtalo de nuevo más tarde.");
       }
       setTicket(null);
+      setAssigneeLabel(null);
     } else {
       setTicket(data as Ticket);
+      const assignedTo = (data as { assigned_to?: string | null }).assigned_to;
+      if (assignedTo) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, email")
+          .eq("id", assignedTo)
+          .single();
+        const p = profile as { full_name?: string | null; email?: string | null } | null;
+        setAssigneeLabel(p ? (p.full_name ?? p.email ?? null) : null);
+      } else {
+        setAssigneeLabel(null);
+      }
     }
     setLoading(false);
   }, [id]);
@@ -253,6 +267,11 @@ export default function TicketDetailPage() {
             </div>
           )}
 
+          <div>
+            <h2 className="text-xs font-semibold text-slate-700 mb-1">Asignado a</h2>
+            <p className="text-sm text-slate-600">{assigneeLabel ?? "Sin asignar"}</p>
+          </div>
+
           {ticket.due_date && (
             <div>
               <h2 className="text-xs font-semibold text-slate-700 mb-1">Fecha límite</h2>
@@ -263,11 +282,20 @@ export default function TicketDetailPage() {
           )}
 
           <div>
-            <h2 className="text-xs font-semibold text-slate-700 mb-1">Última actualización</h2>
+            <h2 className="text-xs font-semibold text-slate-700 mb-1">Creado</h2>
             <p className="text-sm text-slate-600">
-              {new Date(ticket.updated_at).toLocaleString("es-ES")}
+              {new Date(ticket.created_at).toLocaleString("es-ES")}
             </p>
           </div>
+
+          {ticket.updated_at && (
+            <div>
+              <h2 className="text-xs font-semibold text-slate-700 mb-1">Última actualización</h2>
+              <p className="text-sm text-slate-600">
+                {new Date(ticket.updated_at).toLocaleString("es-ES")}
+              </p>
+            </div>
+          )}
         </div>
       </section>
     </div>

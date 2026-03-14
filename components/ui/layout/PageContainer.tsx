@@ -1,8 +1,9 @@
 /**
  * Wraps all page content. Design system v1.
- * Two variants:
- * - Wide workspace: max-w-[1600px], used for dashboard, my-work, projects, knowledge, notes, search, project workspace.
- * - Standard workspace: max-w-7xl, used for account, admin.
+ * Variants:
+ * - fullWidth: no max-width, content uses full viewport (dashboard, charts).
+ * - wide: max-w-[1400px], used for my-work, projects, knowledge, notes, search, project workspace.
+ * - standard: max-w-7xl, used for account, admin.
  */
 import type { ReactNode } from "react";
 
@@ -10,20 +11,20 @@ export function PageContainer({
   children,
   className = "",
   wide = true,
+  fullWidth = false,
 }: {
   children: ReactNode;
   className?: string;
-  /** true = wide workspace (1600px); false = standard (7xl) for settings/admin. */
+  /** true = wide workspace (1400px); false = standard (7xl) for settings/admin. */
   wide?: boolean;
+  /** true = no max-width, full viewport (e.g. operational dashboard). */
+  fullWidth?: boolean;
 }) {
+  const base = "px-4 sm:px-6 md:px-8 xl:px-10 py-6 md:py-8";
+  const max =
+    fullWidth ? "" : wide ? "max-w-[1400px] mx-auto" : "max-w-7xl mx-auto";
   return (
-    <div
-      className={
-        wide
-          ? `max-w-[1600px] mx-auto px-6 md:px-8 xl:px-10 py-8 ${className}`.trim()
-          : `max-w-7xl mx-auto px-8 py-8 ${className}`.trim()
-      }
-    >
+    <div className={`${max} ${base} ${className}`.trim()}>
       {children}
     </div>
   );

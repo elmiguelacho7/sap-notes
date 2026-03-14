@@ -9,8 +9,6 @@ import TasksBoard, {
   type BoardTask,
   type CreateTaskPayload,
 } from "@/app/components/TasksBoard";
-import { PageShell } from "@/components/layout/PageShell";
-import { PageHeader } from "@/components/layout/PageHeader";
 
 function serializeUnknownError(e: unknown): Record<string, unknown> {
   if (e instanceof Error) {
@@ -59,6 +57,7 @@ export default function ProjectTasksPage() {
 
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [activities, setActivities] = useState<{ id: string; name: string }[]>([]);
+  const [memberProfiles, setMemberProfiles] = useState<{ id: string; full_name: string | null; email: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -68,7 +67,7 @@ export default function ProjectTasksPage() {
       setLoading(true);
       setErrorMsg(null);
 
-      const [tasksRes, activitiesRes] = await Promise.all([
+      const [tasksRes, activitiesRes, membersRes] = await Promise.all([
         supabase
           .from("project_tasks")
           .select("*")
@@ -80,6 +79,10 @@ export default function ProjectTasksPage() {
           .select("id, name")
           .eq("project_id", projectId)
           .order("name"),
+        supabase
+          .from("project_members")
+          .select("profile_id, user_id")
+          .eq("project_id", projectId),
       ]);
 
       if (tasksRes.error) {
@@ -98,6 +101,21 @@ export default function ProjectTasksPage() {
             name: a.name,
           }))
         );
+      }
+
+      // Project team: same source as Team page — project_members for this project, then profiles for names.
+      // Use profile_id ?? user_id so we resolve all members (profile_id may be null on some rows).
+      const profileIds = (membersRes.data ?? [])
+        .map((r: { profile_id?: string | null; user_id?: string | null }) => r.profile_id ?? r.user_id)
+        .filter((id): id is string => id != null && id !== "");
+      if (profileIds.length > 0 && !membersRes.error) {
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", profileIds);
+        setMemberProfiles((profilesData ?? []) as { id: string; full_name: string | null; email: string | null }[]);
+      } else {
+        setMemberProfiles([]);
       }
     } catch (err) {
       console.error("Error loading tasks", err);
@@ -124,12 +142,23 @@ export default function ProjectTasksPage() {
       activity_id: t.activity_id,
       description: t.description,
       created_at: t.created_at,
+      assignee_profile_id: t.assignee_profile_id,
     }));
   }, [tasks, activityFilter]);
 
   const activityOptions = useMemo(
     () => activities.map((a) => ({ value: a.id, label: a.name })),
     [activities]
+  );
+
+  // Responsible dropdown: only real project team members (project_members → profiles). Same people as Team page.
+  const assigneeOptions = useMemo(
+    () =>
+      memberProfiles.map((p) => ({
+        value: p.id,
+        label: p.full_name || p.email || p.id,
+      })),
+    [memberProfiles]
   );
 
   const handleCreateProjectTask = useCallback(
@@ -148,6 +177,7 @@ export default function ProjectTasksPage() {
         priority: payload.priority ?? "medium",
         due_date: payload.due_date ?? null,
         status: "pending",
+        assignee_profile_id: payload.assignee_profile_id ?? null,
       };
       console.debug("[createTask] payload", insertPayload);
 
@@ -180,7 +210,6 @@ export default function ProjectTasksPage() {
   const handleUpdateStatus = useCallback(
     (taskId: string, newStatusKey: string) => {
       let previousStatus: ProjectTask["status"] | null = null;
-      // Optimistic update first so drag-end is not blocked by Supabase
       setTasks((prev) =>
         prev.map((t) => {
           if (t.id !== taskId) return t;
@@ -188,7 +217,6 @@ export default function ProjectTasksPage() {
           return { ...t, status: newStatusKey as ProjectTask["status"] };
         })
       );
-      // Persist in background; revert on failure
       supabase
         .from("project_tasks")
         .update({ status: newStatusKey })
@@ -209,36 +237,62 @@ export default function ProjectTasksPage() {
     []
   );
 
+  const handleAssigneeChange = useCallback(
+    (taskId: string, assigneeProfileId: string | null) => {
+      let previous: string | null = null;
+      setTasks((prev) =>
+        prev.map((t) => {
+          if (t.id !== taskId) return t;
+          previous = t.assignee_profile_id;
+          return { ...t, assignee_profile_id: assigneeProfileId };
+        })
+      );
+      supabase
+        .from("project_tasks")
+        .update({ assignee_profile_id: assigneeProfileId })
+        .eq("id", taskId)
+        .then(({ error }) => {
+          if (error) {
+            console.error("Error updating task assignee", error);
+            setTasks((prev) =>
+              prev.map((t) =>
+                t.id === taskId ? { ...t, assignee_profile_id: previous } : t
+              )
+            );
+          }
+        });
+    },
+    []
+  );
+
   const getStatusKey = useCallback((task: BoardTask) => task.status ?? "pending", []);
 
   if (!projectId) {
     return (
-      <PageShell>
-        <p className="text-sm text-slate-600">No se ha encontrado el identificador del proyecto.</p>
-      </PageShell>
+      <div className="w-full min-w-0 bg-slate-950">
+        <p className="text-sm text-slate-400">No se ha encontrado el identificador del proyecto.</p>
+      </div>
     );
   }
 
   return (
-    <PageShell>
-      <div className="space-y-8">
+    <div className="w-full min-w-0 space-y-6 bg-slate-950">
         {showCreandoBanner && (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 transition-opacity duration-300">
+          <div className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-400 transition-opacity duration-300">
             Creando...
           </div>
         )}
-        <PageHeader
-          variant="section"
-          title="Tareas"
-          description="Organiza y gestiona las tareas del proyecto."
-        />
+        <header>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-100">Tareas</h1>
+          <p className="mt-0.5 text-sm text-slate-500">Organiza y gestiona las tareas del proyecto.</p>
+        </header>
 
         {activityFilter && (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-slate-400">
             Mostrando tareas de la actividad seleccionada.{" "}
             <Link
               href={`/projects/${projectId}/tasks`}
-              className="font-medium text-indigo-600 hover:text-indigo-700"
+              className="font-medium text-indigo-400 hover:text-indigo-300"
             >
               Ver todas
             </Link>
@@ -246,14 +300,14 @@ export default function ProjectTasksPage() {
         )}
 
         {errorMsg && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
             {errorMsg}
           </div>
         )}
 
         {activities.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-6 py-12 text-center">
-            <p className="text-sm font-medium text-slate-700">Sin tareas aún</p>
+          <div className="rounded-2xl border border-dashed border-slate-700/60 bg-slate-800/30 px-6 py-12 text-center">
+            <p className="text-sm font-medium text-slate-300">Sin tareas aún</p>
             <p className="mt-1 text-sm text-slate-500">
               Crea actividades en Planificación → Actividades por fase. Luego podrás crear tareas vinculadas.
             </p>
@@ -267,15 +321,16 @@ export default function ProjectTasksPage() {
             getStatusKey={getStatusKey}
             onCreateTask={handleCreateProjectTask}
             onStatusChange={handleUpdateStatus}
+            onAssigneeChange={handleAssigneeChange}
             showActivityField
             activityOptions={activityOptions}
+            assigneeOptions={assigneeOptions}
             doneStatusKey="done"
             loading={loading}
             error={errorMsg}
             openCreateInitially={openCreateFromQuery}
           />
         )}
-      </div>
-    </PageShell>
+    </div>
   );
 }

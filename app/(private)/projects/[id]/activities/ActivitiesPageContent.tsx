@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
-import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import { getProjectPhases, type ProjectPhase } from "@/lib/services/projectPhaseService";
 import { Plus, Pencil, Save, Trash2, ListTodo } from "lucide-react";
+import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
 
 // Types aligned with DB: project_activities uses name, due_date; status/priority are text
 // NOTE: In the future, each activity will spawn one or more tasks. The tasks table will include
@@ -273,42 +273,35 @@ export default function ProjectActivitiesPageContent() {
 
   if (!projectId) {
     return (
-      <main className="min-h-screen bg-slate-50">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6 lg:py-8">
-          <p className="text-sm text-slate-600">No se ha encontrado el identificador del proyecto.</p>
-        </div>
-      </main>
+      <div className="w-full min-w-0 bg-slate-950">
+        <p className="text-sm text-slate-400">No se ha encontrado el identificador del proyecto.</p>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6 lg:py-8 space-y-6">
+    <div className="w-full min-w-0 space-y-6 bg-slate-950">
         {showCreandoBanner && (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 transition-opacity duration-300">
+          <div className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-400 transition-opacity duration-300">
             Creando...
           </div>
         )}
         {errorMsg && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+          <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-5 py-3 text-sm text-red-200">
             {errorMsg}
           </div>
         )}
 
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-lg font-medium tracking-tight text-slate-700">
-              Actividades
-            </h1>
-            <p className="mt-0.5 text-sm text-slate-500">
-              Plan de trabajo estructurado por fases SAP Activate.
-            </p>
+            <h1 className="text-xl font-semibold tracking-tight text-slate-100">Actividades</h1>
+            <p className="mt-0.5 text-sm text-slate-500">Plan de trabajo estructurado por fases SAP Activate.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
             <select
               value={selectedPhaseId}
               onChange={(e) => setSelectedPhaseId(e.target.value as string | "all")}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
             >
               <option value="all">Todas las fases</option>
               {phases.map((p) => (
@@ -321,7 +314,7 @@ export default function ProjectActivitiesPageContent() {
               type="button"
               onClick={() => setIsCreating(true)}
               disabled={phases.length === 0}
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="h-4 w-4" />
               Nueva actividad
@@ -329,37 +322,37 @@ export default function ProjectActivitiesPageContent() {
           </div>
         </header>
 
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Listado de actividades
-            </h2>
+        <section className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+          <div className="border-b border-slate-700/60 px-6 py-4 bg-slate-800/50">
+            <h2 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Listado de actividades</h2>
+            <p className="mt-0.5 text-sm text-slate-400">Actividades por fase. Edita y enlaza con tareas.</p>
           </div>
           <div className="p-5">
             {loading ? (
-              <p className="text-sm text-slate-500">Cargando actividades…</p>
+              <TableSkeleton rows={6} colCount={7} />
             ) : activities.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                Este proyecto aún no tiene actividades. Crea la primera actividad para empezar el plan de trabajo.
-              </p>
+              <div className="rounded-xl border border-dashed border-slate-700/60 bg-slate-800/30 py-10 text-center">
+                <p className="text-sm font-medium text-slate-300">Sin actividades aún</p>
+                <p className="mt-1 text-sm text-slate-500">Crea la primera actividad para empezar el plan de trabajo.</p>
+              </div>
             ) : filteredActivities.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                No hay actividades en la fase seleccionada.
-              </p>
+              <p className="text-sm text-slate-500">No hay actividades en la fase seleccionada.</p>
             ) : (
-              <div className="overflow-x-auto -mx-5 px-5">
-                <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
-                    <tr className="border-b border-slate-200">
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-32 align-middle">Fase</th>
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 min-w-[180px] align-middle">Actividad</th>
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-36 align-middle">Responsable</th>
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-32 align-middle">Estado</th>
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-32 align-middle">Inicio</th>
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-32 align-middle">Fin</th>
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-20 align-middle">%</th>
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-20 align-middle">Riesgo</th>
-                      <th className="px-4 py-3 pl-4 pr-5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-40 text-right align-middle">Acciones</th>
+              <div
+                className="w-full overflow-x-auto rounded-lg [scrollbar-width:thin] [scrollbar-color:#475569_#1e293b] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500"
+              >
+                <table className="w-full text-left text-sm min-w-[880px]">
+                  <thead className="sticky top-0 z-10 bg-slate-800/95 backdrop-blur border-b border-slate-700/60">
+                    <tr>
+                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[100px] min-w-[100px] align-middle whitespace-nowrap">Fase</th>
+                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[140px] min-w-[140px] align-middle">Actividad</th>
+                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[140px] min-w-[140px] align-middle">Responsable</th>
+                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[110px] min-w-[110px] align-middle">Estado</th>
+                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[100px] min-w-[100px] align-middle whitespace-nowrap">Inicio</th>
+                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[100px] min-w-[100px] align-middle whitespace-nowrap">Fin</th>
+                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[44px] min-w-[44px] align-middle">%</th>
+                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[72px] min-w-[72px] align-middle">Riesgo</th>
+                      <th className="px-3 py-3.5 pl-3 pr-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[180px] min-w-[180px] max-w-[180px] align-middle text-right whitespace-nowrap">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -383,7 +376,6 @@ export default function ProjectActivitiesPageContent() {
             )}
           </div>
         </section>
-      </div>
 
       {(isCreating || editingActivity) && (
         <ActivityFormModal
@@ -406,14 +398,14 @@ export default function ProjectActivitiesPageContent() {
 
       {deleteConfirmId && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
           onClick={() => !deletingId && setDeleteConfirmId(null)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl"
+            className="w-full max-w-sm rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-xl ring-1 ring-slate-700/50"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-slate-300">
               ¿Seguro que deseas eliminar esta actividad? Las tareas asociadas seguirán existiendo pero quedarán sin vínculo.
             </p>
             <div className="mt-4 flex justify-end gap-2">
@@ -421,7 +413,7 @@ export default function ProjectActivitiesPageContent() {
                 type="button"
                 onClick={() => setDeleteConfirmId(null)}
                 disabled={!!deletingId}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -432,7 +424,7 @@ export default function ProjectActivitiesPageContent() {
                   if (id) deleteActivity(id);
                 }}
                 disabled={!!deletingId}
-                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                className="rounded-xl bg-red-600/90 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
               >
                 {deletingId ? "Eliminando…" : "Sí, eliminar"}
               </button>
@@ -440,7 +432,7 @@ export default function ProjectActivitiesPageContent() {
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
 
@@ -490,13 +482,22 @@ function ActivityRow({
     });
   };
 
+  const selectClass =
+    "w-full min-w-0 rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-2 text-sm text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 transition-colors";
+  const dateInputClass =
+    "w-full max-w-[100px] min-w-0 rounded-lg border border-slate-600/80 bg-slate-800/80 px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 transition-colors";
+  const actionBtnClass =
+    "inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-600 bg-slate-800/60 text-slate-400 hover:bg-slate-700/60 hover:text-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0";
+
   return (
-    <tr className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-      <td className="px-4 py-3 text-slate-700 align-middle">{phaseName}</td>
-      <td className="px-4 py-3 font-medium text-slate-900 align-middle">{activity.name}</td>
-      <td className="px-4 py-3 align-middle">
+    <tr className="border-b border-slate-700/40 hover:bg-slate-800/40 transition-colors">
+      <td className="px-3 py-3.5 text-slate-300 align-middle whitespace-nowrap">{phaseName}</td>
+      <td className="px-3 py-3.5 font-medium text-slate-100 align-middle min-w-0 max-w-[140px]">
+        <span className="block truncate" title={activity.name}>{activity.name}</span>
+      </td>
+      <td className="px-3 py-3.5 align-middle">
         <select
-          className="w-full min-w-0 max-w-[140px] rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className={`${selectClass} max-w-full min-w-0 w-full`}
           value={ownerProfileId ?? ""}
           onChange={(e) => setOwnerProfileId(e.target.value || null)}
         >
@@ -508,12 +509,8 @@ function ActivityRow({
           ))}
         </select>
       </td>
-      <td className="px-4 py-3 align-middle">
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="w-full rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
+      <td className="px-3 py-3.5 align-middle">
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${selectClass} max-w-full min-w-0 w-full`}>
           {STATUS_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
@@ -521,81 +518,70 @@ function ActivityRow({
           ))}
         </select>
       </td>
-      <td className="px-4 py-3 align-middle">
-        <input
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          className="w-full rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
+      <td className="px-3 py-3.5 align-middle">
+        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={dateInputClass} />
       </td>
-      <td className="px-4 py-3 align-middle">
-        <input
-          type="date"
-          value={dueDate}
-          onChange={(e) => setDueDate(e.target.value)}
-          className="w-full rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
+      <td className="px-3 py-3.5 align-middle">
+        <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={dateInputClass} />
       </td>
-      <td className="px-4 py-3 align-middle">
-        <span className="text-slate-700 tabular-nums" title="Progreso derivado de tareas (hechas / total)">
+      <td className="px-3 py-3.5 align-middle">
+        <span className="text-slate-300 tabular-nums whitespace-nowrap" title="Progreso derivado de tareas (hechas / total)">
           {displayProgress}%
         </span>
       </td>
-      <td className="px-4 py-3 align-middle">
+      <td className="px-3 py-3.5 align-middle">
         {riskLevel == null || riskLevel === "" ? (
-          <span className="text-slate-400 text-[11px]">—</span>
+          <span className="text-slate-500 text-[11px]">—</span>
         ) : (
           <span
             className={
               riskLevel === "HIGH"
-                ? "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium bg-red-100 text-red-700"
+                ? "inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium bg-red-500/20 text-red-400"
                 : riskLevel === "MEDIUM"
-                  ? "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium bg-amber-100 text-amber-700"
-                  : "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium bg-emerald-100 text-emerald-700"
+                  ? "inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium bg-amber-500/20 text-amber-400"
+                  : "inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium bg-emerald-500/20 text-emerald-400"
             }
           >
             {riskLevel === "HIGH" ? "Alto" : riskLevel === "MEDIUM" ? "Medio" : "Bajo"}
           </span>
         )}
       </td>
-      <td className="px-4 py-3 align-middle text-right">
-        <div className="flex items-center justify-end gap-1 flex-wrap">
+      <td className="px-3 py-3.5 align-middle text-right w-[180px] min-w-[180px] max-w-[180px]">
+        <div className="flex items-center gap-1.5 justify-end whitespace-nowrap">
           <button
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-            title="Guardar"
+            className={`${actionBtnClass} ${saving ? "text-indigo-400/70" : "text-indigo-300 hover:text-indigo-200 hover:border-indigo-500/50 hover:bg-indigo-500/10"}`}
+            title="Save changes"
           >
-            <Save className="h-3.5 w-3.5" />
-            {saving ? "…" : "Guardar"}
+            <Save className="h-4 w-4" />
           </button>
           <button
             type="button"
             onClick={onEdit}
-            className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white w-8 h-8 text-slate-600 hover:bg-slate-50 shrink-0"
-            aria-label="Editar"
-            title="Editar"
+            className={actionBtnClass}
+            aria-label="Edit activity"
+            title="Edit activity"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="h-4 w-4" />
           </button>
           <button
             type="button"
-            onClick={onViewTasks.bind(null, activity.id)}
-            className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white w-8 h-8 text-slate-600 hover:bg-slate-50 shrink-0"
-            title="Ver tareas"
+            onClick={() => onViewTasks(activity.id)}
+            className={actionBtnClass}
+            title="Manage tasks"
           >
-            <ListTodo className="h-3.5 w-3.5" />
+            <ListTodo className="h-4 w-4" />
           </button>
           <button
             type="button"
             onClick={onDelete}
-            className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white w-8 h-8 text-red-600 hover:bg-red-50 shrink-0"
-            aria-label="Eliminar"
-            title="Eliminar"
+            className={`${actionBtnClass} text-red-400 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/40`}
+            aria-label="Delete activity"
+            title="Delete activity"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-4 w-4" />
           </button>
         </div>
       </td>
@@ -734,22 +720,25 @@ function ActivityFormModal({
     }
   };
 
+  const fieldClass =
+    "mt-1 w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50";
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
       onClick={onClose}
     >
       <div
         ref={formContainerRef}
-        className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl"
+        className="w-full max-w-lg rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-xl ring-1 ring-slate-700/50"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold text-slate-900">
+        <h2 className="text-lg font-semibold text-slate-100">
           {isEdit ? "Editar actividad" : "Nueva actividad"}
         </h2>
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           {error && (
-            <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+            <p className="mt-2 rounded-lg bg-red-950/50 border border-red-800/50 px-3 py-2 text-sm text-red-200">{error}</p>
           )}
           <div>
             <label className="block text-xs font-medium text-slate-500">Fase *</label>
@@ -757,7 +746,7 @@ function ActivityFormModal({
               value={phaseId}
               onChange={(e) => setPhaseId(e.target.value)}
               required
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={fieldClass}
             >
               <option value="">Selecciona una fase</option>
               {phases.map((p) => (
@@ -774,7 +763,7 @@ function ActivityFormModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={fieldClass}
             />
           </div>
           <div>
@@ -783,13 +772,13 @@ function ActivityFormModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={fieldClass}
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700">Responsable</label>
+            <label className="block text-xs font-medium text-slate-500">Responsable</label>
             <select
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={fieldClass}
               value={ownerProfileId ?? ""}
               onChange={(e) => setOwnerProfileId(e.target.value || null)}
             >
@@ -804,11 +793,7 @@ function ActivityFormModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-500">Estado</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
+              <select value={status} onChange={(e) => setStatus(e.target.value)} className={fieldClass}>
                 {STATUS_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
@@ -818,11 +803,7 @@ function ActivityFormModal({
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-500">Prioridad</label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
+              <select value={priority} onChange={(e) => setPriority(e.target.value)} className={fieldClass}>
                 {PRIORITY_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
@@ -838,7 +819,7 @@ function ActivityFormModal({
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={fieldClass}
               />
             </div>
             <div>
@@ -847,7 +828,7 @@ function ActivityFormModal({
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={fieldClass}
               />
             </div>
           </div>
@@ -859,21 +840,21 @@ function ActivityFormModal({
               max={100}
               value={progressPct}
               onChange={(e) => setProgressPct(e.target.value)}
-              className="mt-1 w-24 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={`${fieldClass} w-24`}
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50"
             >
               {saving ? (isEdit ? "Guardando…" : "Creando…") : isEdit ? "Guardar cambios" : "Crear actividad"}
             </button>

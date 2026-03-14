@@ -1,6 +1,7 @@
 "use client";
 
 import type { TicketWithRelations } from "./ticketTypes";
+import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
 
 type TicketsTableProps = {
   tickets: TicketWithRelations[];
@@ -25,7 +26,7 @@ export default function TicketsTable({
   if (loading) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-        <p className="text-sm text-slate-500">Cargando tickets...</p>
+        <TableSkeleton rows={5} colCount={5} />
       </div>
     );
   }

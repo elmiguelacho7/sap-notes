@@ -29,17 +29,20 @@ function ProjectLayoutInner({
 
   return (
     <div className="flex h-full flex-col">
-      <ProjectWorkspaceHeader
-        projectId={projectId}
-        projectName={project?.name ?? null}
-        projectStatus={project?.status ?? null}
-        loading={loading}
-        actions={headerActions}
-      />
-      <div className="shrink-0 border-b border-slate-800 bg-slate-900/50 px-6 py-3">
-        <ProjectTabsNav projectId={projectId} variant="dark" />
+      {/* Workspace masthead: one composed header system */}
+      <div className="shrink-0 bg-slate-950/95">
+        <ProjectWorkspaceHeader
+          projectId={projectId}
+          projectName={project?.name ?? null}
+          projectStatus={project?.status ?? null}
+          loading={loading}
+          actions={headerActions}
+        />
+        <div className="px-6 pb-3.5 pt-1">
+          <ProjectTabsNav projectId={projectId} variant="dark" />
+        </div>
       </div>
-      <section className="flex-1 overflow-y-auto px-8 py-6">
+      <section className="flex-1 overflow-y-auto w-full min-w-0 px-6 pt-7 pb-6 xl:px-8 2xl:px-10">
         {children}
       </section>
       {projectId && (

@@ -63,13 +63,13 @@ export function ObjectActions({
 
   const isDark = variant === "dark";
   const editBtnClass = isDark
-    ? "inline-flex items-center gap-1.5 rounded-xl border border-slate-600 bg-slate-800 px-3 h-9 text-sm font-medium text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
+    ? "inline-flex items-center gap-1.5 rounded-lg border border-slate-600/80 bg-slate-800/80 px-2.5 h-8 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:border-slate-500 hover:text-white transition-colors"
     : "inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 h-8 text-sm font-medium text-white hover:bg-indigo-700 transition-colors";
   const archiveBtnClass = isDark
-    ? "inline-flex items-center gap-1.5 rounded-xl border border-slate-600 bg-slate-800/80 px-3 h-9 text-sm font-medium text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
+    ? "inline-flex items-center gap-1.5 rounded-lg border border-slate-600/80 bg-slate-800/80 px-2.5 h-8 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:border-slate-500 hover:text-white transition-colors"
     : "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 h-8 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors";
   const deleteBtnClass = isDark
-    ? "inline-flex items-center gap-1.5 rounded-xl border border-rose-500/50 bg-rose-500/10 px-3 h-9 text-sm font-medium text-rose-300 hover:bg-rose-500/20 transition-colors"
+    ? "inline-flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 h-8 text-xs font-medium text-rose-300 hover:bg-rose-500/20 hover:border-rose-500/60 transition-colors"
     : "inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-white px-3 h-8 text-sm font-medium text-rose-600 hover:bg-rose-50 transition-colors";
 
   const label = ENTITY_LABELS[entity];
