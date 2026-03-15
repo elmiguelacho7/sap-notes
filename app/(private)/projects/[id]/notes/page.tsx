@@ -339,7 +339,7 @@ export default function ProjectNotesPage() {
       )}
 
       {loading ? (
-        <section className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+        <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
           <div className="px-6 py-6">
             <TableSkeleton rows={6} colCount={5} />
           </div>
@@ -347,26 +347,22 @@ export default function ProjectNotesPage() {
       ) : (
         <>
           {/* Summary strip */}
-          <div className="flex flex-wrap gap-3">
-            <div className="inline-flex items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-800/50 px-3.5 py-2 text-slate-200">
-              <FileText className="h-4 w-4 text-slate-400" />
-              <span className="text-sm font-medium">{summary.total}</span>
-              <span className="text-xs text-slate-400">Total</span>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+              <p className="text-xs uppercase text-slate-400">Total</p>
+              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.total}</p>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-800/50 px-3.5 py-2 text-slate-200">
-              <AlertCircle className="h-4 w-4 text-slate-400" />
-              <span className="text-sm font-medium">{summary.withErrorCode}</span>
-              <span className="text-xs text-slate-400">Con código error</span>
+            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+              <p className="text-xs uppercase text-slate-400">Con código error</p>
+              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.withErrorCode}</p>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-800/50 px-3.5 py-2 text-slate-200">
-              <Link2 className="h-4 w-4 text-slate-400" />
-              <span className="text-sm font-medium">{summary.withLinks}</span>
-              <span className="text-xs text-slate-400">Con enlaces</span>
+            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+              <p className="text-xs uppercase text-slate-400">Con enlaces</p>
+              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.withLinks}</p>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-800/50 px-3.5 py-2 text-slate-200">
-              <Calendar className="h-4 w-4 text-slate-400" />
-              <span className="text-sm font-medium">{summary.recentlyAdded}</span>
-              <span className="text-xs text-slate-400">Recientes (7 d)</span>
+            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+              <p className="text-xs uppercase text-slate-400">Recientes (7 d)</p>
+              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.recentlyAdded}</p>
             </div>
           </div>
 
@@ -379,7 +375,7 @@ export default function ProjectNotesPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Buscar en notas..."
-                className="w-full rounded-xl border border-slate-600/80 bg-slate-800/60 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
               />
             </div>
             {uniqueModules.length > 0 && (
@@ -409,32 +405,30 @@ export default function ProjectNotesPage() {
             </select>
           </div>
 
-          <section className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+          <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
             {notes.length === 0 ? (
-              <div className="px-6 py-16 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-600/60 bg-slate-800/50 text-slate-500">
+              <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-16 px-6 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 text-slate-500">
                   <FileText className="h-7 w-7" />
                 </div>
-                <h2 className="mt-4 text-lg font-semibold text-slate-200">
-                  Aún no hay notas en este proyecto
-                </h2>
-                <p className="mt-2 max-w-md mx-auto text-sm text-slate-400">
-                  Estas notas pueden capturar incidencias, soluciones, decisiones, enlaces y contexto operativo del proyecto. Crea la primera para empezar a construir la memoria del proyecto.
+                <p className="mt-4 text-base font-medium text-slate-200">Aún no hay notas en este proyecto</p>
+                <p className="mt-1.5 max-w-md mx-auto text-sm text-slate-500">
+                  Captura incidencias, soluciones, decisiones y contexto operativo. Crea la primera para empezar.
                 </p>
                 <Link
                   href={`/notes/new?projectId=${projectId}`}
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors"
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors"
                 >
                   Crear primera nota
                 </Link>
               </div>
             ) : filteredAndSortedNotes.length === 0 ? (
-              <div className="px-6 py-12 text-center">
+              <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-12 px-6 text-center">
                 <p className="text-sm font-medium text-slate-300">Ninguna nota coincide con los filtros</p>
-                <p className="mt-1 text-sm text-slate-500">Prueba a cambiar la búsqueda o el módulo.</p>
+                <p className="mt-1 text-xs text-slate-500">Prueba a cambiar la búsqueda o el módulo.</p>
               </div>
             ) : (
-              <ul className="divide-y divide-slate-700/50">
+              <ul className="divide-y divide-slate-700/40">
                 {filteredAndSortedNotes.map((note) => {
                   const excerpt =
                     (note.body && note.body.trim() !== ""
@@ -448,11 +442,20 @@ export default function ProjectNotesPage() {
                   return (
                     <li
                       key={note.id}
-                      className="flex items-start justify-between gap-3 px-5 py-4 hover:bg-slate-800/40 transition-colors rounded-xl mx-2 my-1.5 first:mt-2 last:mb-2"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => router.push(`/notes/${note.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          router.push(`/notes/${note.id}`);
+                        }
+                      }}
+                      className="flex items-start justify-between gap-3 px-6 py-4 cursor-pointer hover:bg-slate-800/50 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-inset"
                     >
                       <div
                         className="min-w-0 flex-1 cursor-pointer"
-                        onClick={() => router.push(`/notes/${note.id}`)}
+                        onClick={(e) => { e.stopPropagation(); router.push(`/notes/${note.id}`); }}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="font-medium text-slate-100">

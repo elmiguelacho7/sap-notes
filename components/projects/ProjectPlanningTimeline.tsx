@@ -205,7 +205,7 @@ export function ProjectPlanningTimeline({
                 return (
                   <div
                     key={task.id}
-                    className="group flex shrink-0 items-center border-b border-slate-700/30 last:border-b-0"
+                    className="group flex shrink-0 items-center border-b border-slate-700/30 last:border-b-0 hover:bg-slate-800/50 transition-colors"
                     style={{ height: rowHeight }}
                   >
                     {/* Phase label */}
@@ -216,8 +216,8 @@ export function ProjectPlanningTimeline({
                       <span
                         className={
                           isCurrent
-                            ? "text-sm font-semibold text-indigo-200"
-                            : "text-sm font-medium text-slate-300 group-hover:text-slate-200"
+                            ? "text-sm font-medium text-indigo-200"
+                            : "text-sm font-medium text-slate-100 group-hover:text-slate-100"
                         }
                       >
                         {task.name}

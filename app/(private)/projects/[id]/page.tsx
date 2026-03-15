@@ -18,8 +18,10 @@ import { useProjectWorkspace } from "@/components/projects/ProjectWorkspaceConte
 import type { TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
 import { FileText, BookOpen, Link as LinkIcon, Ticket, CalendarDays, AlertTriangle, CalendarClock, User, Ban, Plus, CheckSquare, ListTodo, BarChart3 } from "lucide-react";
 import { getSuggestedKnowledgeForProject } from "@/lib/knowledgeService";
+import { getTicketDetailHref } from "@/lib/routes";
 import type { KnowledgePage } from "@/lib/types/knowledge";
 import { ProjectOverviewSkeleton } from "@/components/skeletons/ProjectOverviewSkeleton";
+import { SapitoInsights } from "@/components/projects/SapitoInsights";
 import { Skeleton } from "@/components/ui/Skeleton";
 import type { EChartsOption } from "echarts";
 import ReactECharts from "echarts-for-react";
@@ -117,15 +119,15 @@ type DashboardProjectActivity = {
   progress_pct: number | null;
 };
 
-/** Display-only mapping: task status -> Spanish label (does not change stored values). */
+/** Display-only mapping: task status -> Spanish label (unified workflow). */
 function getTaskStatusLabel(status: string | null | undefined): string {
   const s = String((status ?? "").toLowerCase().trim());
   const map: Record<string, string> = {
     pending: "Por hacer",
     in_progress: "En progreso",
-    blocked: "Bloqueada",
+    blocked: "Bloqueado",
     review: "En revisión",
-    done: "Hecha",
+    done: "Hecho",
   };
   if (map[s]) return map[s];
   if (!s) return "—";
@@ -1116,7 +1118,7 @@ export default function ProjectDashboardPage() {
         id: t.id,
         title: t.title,
         created_at: t.created_at,
-        href: `/tickets/${t.id}`,
+        href: getTicketDetailHref(t.id, projectId),
       });
     });
     items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -1297,7 +1299,7 @@ export default function ProjectDashboardPage() {
   }
 
   return (
-    <div className="w-full min-w-0 space-y-12 bg-slate-950">
+    <div className="w-full min-w-0 space-y-8 bg-slate-950">
         {errorMsg && (
           <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
             {errorMsg}
@@ -1310,14 +1312,14 @@ export default function ProjectDashboardPage() {
           </div>
         )}
 
-        {/* Hero: project identity + metrics + quick actions — strongest visual block */}
+        {/* Hero: project identity + metrics + quick actions — dashboard header */}
         <header className="relative overflow-hidden rounded-2xl border border-slate-700/90 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-900/95 shadow-xl shadow-black/20 ring-1 ring-slate-700/50">
-          <div className="relative p-8 md:p-10">
+          <div className="relative p-4 sm:p-6 md:p-8 lg:p-10">
             <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
-              <div className="min-w-0 flex-1 space-y-4">
-                <div>
-                  <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">{project?.name ?? "—"}</h1>
-                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-slate-400">
+              <div className="min-w-0 flex-1 space-y-3">
+                <div className="space-y-3">
+                  <h1 className="text-xl font-semibold text-slate-100 sm:text-2xl">{project?.name ?? "—"}</h1>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-slate-400">
                     {clientName && <span className="font-medium text-slate-300">{clientName}</span>}
                     {project?.status && (
                       <span className="inline-flex items-center rounded-lg border border-slate-600/80 bg-slate-800/90 px-3 py-1 text-xs font-medium text-slate-200">
@@ -1332,7 +1334,7 @@ export default function ProjectDashboardPage() {
                       </span>
                     )}
                   </div>
-                  <p className="mt-2 text-xs font-medium uppercase tracking-wider text-slate-500">Project workspace · Overview</p>
+                  <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Project workspace · Overview</p>
                 </div>
                 <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3 border-t border-slate-700/80 pt-5">
                   <span className="flex flex-col gap-0.5">
@@ -1373,43 +1375,46 @@ export default function ProjectDashboardPage() {
           </div>
         </header>
 
-        {/* Executive overview: single unified panel */}
+        {/* Sapito Insights */}
+        <section>
+          <SapitoInsights projectId={projectId} />
+        </section>
+
+        {/* Executive overview: KPI cards */}
         <section>
           <h2 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-widest">Executive overview</h2>
           {projectTasksLoading ? (
             <p className="text-sm text-slate-500 py-8">Cargando indicadores…</p>
           ) : (
-            <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 p-6 md:p-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10">
-                <div className="space-y-1">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Health score</p>
-                  <p className="text-3xl font-bold tabular-nums text-slate-100 md:text-4xl">{projectHealthScore.score}</p>
-                  <p className={`text-sm font-medium ${projectHealthScore.label === "Healthy" ? "text-emerald-400" : projectHealthScore.label === "Attention" ? "text-amber-400" : "text-red-400"}`}>
-                    {projectHealthScore.label}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+                <p className="text-xs uppercase text-slate-400">Health score</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-slate-100">{projectHealthScore.score}</p>
+                <p className={`mt-0.5 text-sm font-medium ${projectHealthScore.label === "Healthy" ? "text-emerald-400" : projectHealthScore.label === "Attention" ? "text-amber-400" : "text-red-400"}`}>
+                  {projectHealthScore.label}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+                <p className="text-xs uppercase text-slate-400">Progress</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-slate-100">{healthMetrics.progressGeneral}%</p>
+                <div className="mt-2 h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+                  <div className="h-full rounded-full bg-indigo-500/90 transition-all duration-300" style={{ width: `${healthMetrics.progressGeneral}%` }} />
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+                <p className="text-xs uppercase text-slate-400">Current phase</p>
+                <p className="mt-1 text-lg font-semibold text-slate-100">{planningSummary.currentPhase?.name ?? "—"}</p>
+                {planningSummary.currentPhase?.end_date && (
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    End: {new Date(planningSummary.currentPhase.end_date).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
                   </p>
-                </div>
-                <div className="space-y-3">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Progress</p>
-                  <p className="text-3xl font-bold tabular-nums text-slate-100 md:text-4xl">{healthMetrics.progressGeneral}%</p>
-                  <div className="h-2.5 w-full rounded-full bg-slate-800 overflow-hidden">
-                    <div className="h-full rounded-full bg-indigo-500/90 transition-all duration-300" style={{ width: `${healthMetrics.progressGeneral}%` }} />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Current phase</p>
-                  <p className="text-lg font-semibold text-slate-100">{planningSummary.currentPhase?.name ?? "—"}</p>
-                  {planningSummary.currentPhase?.end_date && (
-                    <p className="text-xs text-slate-500">
-                      End: {new Date(planningSummary.currentPhase.end_date).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Operational snapshot</p>
-                  <p className="text-sm leading-relaxed text-slate-300">
-                    {openTicketsCount} open tickets · {healthMetrics.overdueTasks} overdue · {healthMetrics.blockedTasks} blocked
-                  </p>
-                </div>
+                )}
+              </div>
+              <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+                <p className="text-xs uppercase text-slate-400">Operational snapshot</p>
+                <p className="mt-1 text-sm leading-relaxed text-slate-300">
+                  {openTicketsCount} open tickets · {healthMetrics.overdueTasks} overdue · {healthMetrics.blockedTasks} blocked
+                </p>
               </div>
             </div>
           )}
@@ -1435,7 +1440,7 @@ export default function ProjectDashboardPage() {
                     <ul className="mt-4 space-y-1">
                       {todayTickets.slice(0, 5).map((t) => (
                         <li key={t.id}>
-                          <Link href={`/tickets/${t.id}`} className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-slate-800/60 hover:text-slate-100 transition-colors">
+                          <Link href={getTicketDetailHref(t.id, projectId)} className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-slate-800/60 hover:text-slate-100 transition-colors duration-150">
                             <span className="font-medium truncate">{t.title}</span>
                             <span className="shrink-0 text-xs text-slate-500">{new Date(t.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}</span>
                           </Link>
@@ -1510,22 +1515,22 @@ export default function ProjectDashboardPage() {
                   <div>
                     <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-3">Today / immediate focus</h3>
                     <ul className="space-y-0.5 text-sm">
-                      <Link href={`/projects/${projectId}/planning/activities`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800/70 transition-colors">
+                      <Link href={`/projects/${projectId}/planning/activities`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800/70 transition-colors duration-150">
                         <AlertTriangle className="h-3.5 w-3.5 text-red-400 shrink-0" />
                         <span>High-risk activities</span>
                         <span className="ml-auto font-semibold tabular-nums text-slate-100">{healthMetrics.highRiskActivitiesCount}</span>
                       </Link>
-                      <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800/70 transition-colors">
+                      <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800/70 transition-colors duration-150">
                         <CalendarClock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
                         <span>Overdue tasks</span>
                         <span className="ml-auto font-semibold tabular-nums text-slate-100">{healthMetrics.overdueTasks}</span>
                       </Link>
-                      <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800/70 transition-colors">
+                      <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800/70 transition-colors duration-150">
                         <User className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                         <span>Unassigned tasks</span>
                         <span className="ml-auto font-semibold tabular-nums text-slate-100">{healthMetrics.unassignedTasks}</span>
                       </Link>
-                      <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800/70 transition-colors">
+                      <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800/70 transition-colors duration-150">
                         <Ban className={`h-3.5 w-3.5 shrink-0 ${healthMetrics.blockedTasks > 0 ? "text-red-400" : "text-emerald-400"}`} />
                         <span>Blocked tasks</span>
                         <span className="ml-auto font-semibold tabular-nums text-slate-100">{healthMetrics.blockedTasks}</span>
@@ -1587,7 +1592,7 @@ export default function ProjectDashboardPage() {
               ) : (
                 <ul className="space-y-1">
                   {healthMetrics.upcomingTasks.map((t) => (
-                    <li key={t.id} className="flex items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-xs hover:bg-slate-800/60 transition-colors">
+                    <li key={t.id} className="flex items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-xs hover:bg-slate-800/60 transition-colors duration-150">
                       <span className="font-medium text-slate-200 truncate">{t.title}</span>
                       <span className="shrink-0 text-slate-500 tabular-nums">{t.due_date ? new Date(t.due_date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) : "—"}</span>
                       <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${String((t.status ?? "").toLowerCase().trim()) === "blocked" ? "bg-red-500/20 text-red-300" : String((t.status ?? "").toLowerCase().trim()) === "in_progress" ? "bg-indigo-500/20 text-indigo-300" : String((t.status ?? "").toLowerCase().trim()) === "review" ? "bg-violet-500/20 text-violet-300" : "bg-slate-500/20 text-slate-400"}`}>
@@ -1637,7 +1642,7 @@ export default function ProjectDashboardPage() {
               <ul className="space-y-0.5">
                 {suggestedKnowledge.map((page) => (
                   <li key={page.id}>
-                    <Link href={`/knowledge/${page.id}`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-slate-800/60 transition-colors">
+                    <Link href={`/knowledge/${page.id}?projectId=${projectId}`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-slate-800/60 transition-colors duration-150">
                       <BookOpen className="h-4 w-4 shrink-0 text-slate-500" />
                       <span className="truncate">{page.title}</span>
                     </Link>
@@ -1701,7 +1706,7 @@ export default function ProjectDashboardPage() {
             </div>
 
             {activitiesLoading ? (
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <Skeleton key={i} className="h-20 rounded-xl" />
                 ))}
@@ -1710,34 +1715,34 @@ export default function ProjectDashboardPage() {
               <p className="text-sm text-slate-500 py-2">No activities yet. Create activities in Planning.</p>
             ) : (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  <div className="rounded-xl border border-slate-700/50 bg-slate-800/60 p-4">
-                    <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Total</div>
-                    <div className="mt-1 text-xl font-bold tabular-nums text-slate-100">{projectActivityStats.total}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="rounded-xl border border-slate-700/50 bg-slate-900/30 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+                    <p className="text-xs uppercase text-slate-400">Total</p>
+                    <p className="mt-1 text-lg font-semibold tabular-nums text-slate-100">{projectActivityStats.total}</p>
                   </div>
-                  <div className="rounded-xl border border-slate-700/50 bg-slate-800/60 p-4">
-                    <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">In progress</div>
-                    <div className="mt-1 text-xl font-bold tabular-nums text-slate-100">{projectActivityStats.inProgress}</div>
+                  <div className="rounded-xl border border-slate-700/50 bg-slate-900/30 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+                    <p className="text-xs uppercase text-slate-400">In progress</p>
+                    <p className="mt-1 text-lg font-semibold tabular-nums text-slate-100">{projectActivityStats.inProgress}</p>
                   </div>
-                  <div className="rounded-xl border border-slate-700/50 bg-slate-800/60 p-4">
-                    <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Blocked</div>
-                    <div className="mt-1 text-xl font-bold tabular-nums text-slate-100">{projectActivityStats.blocked}</div>
+                  <div className="rounded-xl border border-slate-700/50 bg-slate-900/30 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+                    <p className="text-xs uppercase text-slate-400">Blocked</p>
+                    <p className="mt-1 text-lg font-semibold tabular-nums text-slate-100">{projectActivityStats.blocked}</p>
                   </div>
-                  <div className="rounded-xl border border-slate-700/50 bg-slate-800/60 p-4">
-                    <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Delayed</div>
-                    <div className="mt-1 text-xl font-bold tabular-nums text-slate-100">{projectActivityStats.delayed}</div>
+                  <div className="rounded-xl border border-slate-700/50 bg-slate-900/30 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+                    <p className="text-xs uppercase text-slate-400">Delayed</p>
+                    <p className="mt-1 text-lg font-semibold tabular-nums text-slate-100">{projectActivityStats.delayed}</p>
                   </div>
-                  <div className="rounded-xl border border-slate-700/50 bg-slate-800/60 p-4">
-                    <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Avg. progress</div>
-                    <div className="mt-1 text-xl font-bold tabular-nums text-slate-100">{projectActivityStats.avgProgress !== null ? `${projectActivityStats.avgProgress}%` : "—"}</div>
+                  <div className="rounded-xl border border-slate-700/50 bg-slate-900/30 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150 sm:col-span-2 lg:col-span-1">
+                    <p className="text-xs uppercase text-slate-400">Avg. progress</p>
+                    <p className="mt-1 text-lg font-semibold tabular-nums text-slate-100">{projectActivityStats.avgProgress !== null ? `${projectActivityStats.avgProgress}%` : "—"}</p>
                   </div>
                 </div>
 
                 {(projectActivityStats.blockedList.length > 0 || projectActivityStats.delayedList.length > 0) && (
                   <div className="grid gap-4 md:grid-cols-2">
                     {projectActivityStats.blockedList.length > 0 && (
-                      <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
-                        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Blocked activities</div>
+                      <div className="rounded-xl border border-slate-700/50 bg-slate-900/30 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Blocked activities</div>
                         <ul className="space-y-1.5">
                           {projectActivityStats.blockedList.map((act) => (
                             <li key={act.id} className="text-xs text-slate-400 flex justify-between gap-3">
@@ -1749,8 +1754,8 @@ export default function ProjectDashboardPage() {
                       </div>
                     )}
                     {projectActivityStats.delayedList.length > 0 && (
-                      <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
-                        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Delayed activities</div>
+                      <div className="rounded-xl border border-slate-700/50 bg-slate-900/30 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Delayed activities</div>
                         <ul className="space-y-1.5">
                           {projectActivityStats.delayedList.map((act) => (
                             <li key={act.id} className="text-xs text-slate-400 flex justify-between gap-3">
@@ -1836,7 +1841,7 @@ export default function ProjectDashboardPage() {
                 <ul className="mt-4 space-y-0.5">
                   {recentActivity.map((item) => (
                     <li key={`${item.type}-${item.id}`}>
-                      <Link href={item.href} className="flex items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-slate-800/60 transition-colors">
+                      <Link href={item.href} className="flex items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-slate-800/60 transition-colors duration-150">
                         <span className="font-medium text-slate-100 truncate">{item.title}</span>
                         <span className="shrink-0 inline-flex items-center rounded-full border border-slate-600/60 bg-slate-800/80 px-2 py-0.5 text-[10px] text-slate-400">{item.type === "note" ? "Note" : "Ticket"}</span>
                         <span className="text-[10px] text-slate-500 tabular-nums">{new Date(item.created_at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}</span>
@@ -1854,21 +1859,29 @@ export default function ProjectDashboardPage() {
           </div>
         </section>
 
-        {/* Quick access — premium pills */}
-        <section>
+        {/* Quick access — cards */}
+        <section className="min-w-0">
           <h2 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-widest">Quick access</h2>
-          <div className="flex flex-wrap gap-3">
-            <Link href={`/projects/${projectId}/notes`} className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-800/80 px-4 py-2 text-xs font-medium text-slate-200 shadow-sm hover:bg-slate-700 hover:border-slate-500 hover:text-slate-100 transition-colors">
-              <FileText className="h-3.5 w-3.5 shrink-0" /> Notes
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Link href={`/projects/${projectId}/notes`} className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 cursor-pointer hover:bg-slate-800/60 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+              <div className="text-slate-400"><FileText className="h-5 w-5" /></div>
+              <p className="mt-2 text-sm font-medium text-slate-200">Notes</p>
+              <p className="mt-0.5 text-xs text-slate-400">Project notes and documentation</p>
             </Link>
-            <Link href={`/projects/${projectId}/brain`} className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-800/80 px-4 py-2 text-xs font-medium text-slate-200 shadow-sm hover:bg-slate-700 hover:border-slate-500 hover:text-slate-100 transition-colors">
-              <BookOpen className="h-3.5 w-3.5 shrink-0" /> Brain
+            <Link href={`/projects/${projectId}/brain`} className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 cursor-pointer hover:bg-slate-800/60 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+              <div className="text-slate-400"><BookOpen className="h-5 w-5" /></div>
+              <p className="mt-2 text-sm font-medium text-slate-200">Brain</p>
+              <p className="mt-0.5 text-xs text-slate-400">AI assistant and context</p>
             </Link>
-            <Link href={`/projects/${projectId}/links`} className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-800/80 px-4 py-2 text-xs font-medium text-slate-200 shadow-sm hover:bg-slate-700 hover:border-slate-500 hover:text-slate-100 transition-colors">
-              <LinkIcon className="h-3.5 w-3.5 shrink-0" /> Links
+            <Link href={`/projects/${projectId}/links`} className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 cursor-pointer hover:bg-slate-800/60 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+              <div className="text-slate-400"><LinkIcon className="h-5 w-5" /></div>
+              <p className="mt-2 text-sm font-medium text-slate-200">Links</p>
+              <p className="mt-0.5 text-xs text-slate-400">References and resources</p>
             </Link>
-            <Link href={`/projects/${projectId}/members`} className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-800/80 px-4 py-2 text-xs font-medium text-slate-200 shadow-sm hover:bg-slate-700 hover:border-slate-500 hover:text-slate-100 transition-colors">
-              <User className="h-3.5 w-3.5 shrink-0" /> Team
+            <Link href={`/projects/${projectId}/members`} className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 cursor-pointer hover:bg-slate-800/60 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+              <div className="text-slate-400"><User className="h-5 w-5" /></div>
+              <p className="mt-2 text-sm font-medium text-slate-200">Team</p>
+              <p className="mt-0.5 text-xs text-slate-400">Members and permissions</p>
             </Link>
           </div>
         </section>

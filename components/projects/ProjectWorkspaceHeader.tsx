@@ -41,8 +41,8 @@ export function ProjectWorkspaceHeader({
   const statusLabel = projectStatus ? STATUS_LABELS[projectStatus] ?? projectStatus : null;
 
   return (
-    <header className="px-6 py-3.5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
+    <header className="w-full min-w-0 px-4 sm:px-5 lg:px-6 py-3.5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 lg:gap-8">
         <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
           <Link
             href="/projects"
@@ -76,7 +76,7 @@ export function ProjectWorkspaceHeader({
           </div>
         </div>
         {actions != null && (
-          <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 sm:gap-2.5 pl-4 sm:pl-5 border-l border-slate-800/70">
+          <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 sm:gap-2.5 pt-2 border-t border-slate-800/70 sm:pt-0 sm:border-t-0 sm:pl-4 sm:border-l border-slate-800/70">
             {actions}
           </div>
         )}

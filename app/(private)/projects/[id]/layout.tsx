@@ -38,11 +38,11 @@ function ProjectLayoutInner({
           loading={loading}
           actions={headerActions}
         />
-        <div className="px-6 pb-3.5 pt-1">
+        <div className="min-w-0 overflow-x-auto px-4 sm:px-5 lg:px-6 pb-3.5 pt-1">
           <ProjectTabsNav projectId={projectId} variant="dark" />
         </div>
       </div>
-      <section className="flex-1 overflow-y-auto w-full min-w-0 px-6 pt-7 pb-6 xl:px-8 2xl:px-10">
+      <section className="flex-1 overflow-y-auto w-full min-w-0 px-4 sm:px-5 lg:px-6 xl:px-8 2xl:px-10 pt-6 sm:pt-7 pb-6">
         {children}
       </section>
       {projectId && (

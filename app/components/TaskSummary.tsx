@@ -9,6 +9,8 @@ export type TaskSummaryProps = {
   riskLevel?: "Alto" | "Medio" | "Bajo";
   /** When provided, show "En revisión" card (e.g. global board). */
   review?: number;
+  /** When provided, show "Assigned to me" card. */
+  assignedToMe?: number;
 };
 
 export function TaskSummary({
@@ -19,9 +21,17 @@ export function TaskSummary({
   completedPercent,
   riskLevel = "Bajo",
   review,
+  assignedToMe,
 }: TaskSummaryProps) {
   const showReview = review !== undefined;
-  const gridCols = showReview ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6" : "grid-cols-2 sm:grid-cols-5";
+  const showAssignedToMe = assignedToMe !== undefined;
+  const extraCards = (showReview ? 1 : 0) + (showAssignedToMe ? 1 : 0);
+  const gridCols =
+    extraCards >= 2
+      ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-7"
+      : extraCards === 1
+        ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6"
+        : "grid-cols-2 sm:grid-cols-5";
 
   return (
     <div className="rounded-2xl border border-slate-700 bg-slate-900/90 p-4">
@@ -62,6 +72,12 @@ export function TaskSummary({
             />
           </div>
         </div>
+        {showAssignedToMe && (
+          <div className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm">
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Assigned to me</p>
+            <p className="text-lg font-semibold text-slate-100 mt-0.5">{assignedToMe}</p>
+          </div>
+        )}
       </div>
       {riskLevel && (
         <div className="mt-3 flex items-center justify-end">

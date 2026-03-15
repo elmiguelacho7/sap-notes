@@ -28,12 +28,16 @@ export type Ticket = {
   created_at: string;
 };
 
-/** Full ticket row for detail view (includes description, updated_at, closed_at, scope_items). */
+/** Full ticket row for detail view (includes description, updated_at, closed_at, scope_items, solution fields). */
 export type TicketDetailRow = Ticket & {
   description?: string | null;
   updated_at?: string | null;
   closed_at?: string | null;
   scope_items?: string[] | null;
+  solution_markdown?: string | null;
+  root_cause?: string | null;
+  resolution_type?: string | null;
+  knowledge_page_id?: string | null;
 };
 
 export type TicketDetail = TicketDetailRow & {
@@ -45,16 +49,27 @@ export type TicketDetail = TicketDetailRow & {
 
 export type TicketCommentDetail = {
   id: string;
-  body: string;
-  is_internal: boolean;
+  ticket_id: string;
+  author_id: string;
+  content: string;
   created_at: string;
-  created_by_name: string | null;
+  author_name: string | null;
 };
 
 export type TicketAttachmentDetail = {
   id: string;
   file_name: string;
   file_url: string;
+  created_at: string;
+};
+
+export type TicketReferenceType = "sap_note" | "link" | "document";
+
+export type TicketReference = {
+  id: string;
+  ticket_id: string;
+  type: TicketReferenceType;
+  value: string;
   created_at: string;
 };
 

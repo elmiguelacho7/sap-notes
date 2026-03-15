@@ -325,55 +325,58 @@ export default function ProjectPlanningPage() {
 
   return (
     <div className="w-full min-w-0 space-y-8 bg-slate-950">
-        {/* Planning summary header */}
-        <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 p-5 md:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-100">Planning</h1>
-              <p className="mt-0.5 text-sm text-slate-500">SAP Activate phases and project timeline.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              {phases.length > 0 ? (
-                <span className="inline-flex items-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-emerald-400">
-                  Plan configured
-                </span>
-              ) : (
-                <span className="inline-flex items-center rounded-lg border border-slate-600/80 bg-slate-800/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                  Plan pending
-                </span>
-              )}
-              {projectDateRange && (
-                <span className="inline-flex items-center rounded-lg border border-slate-600/80 bg-slate-800/60 px-3 py-1.5 text-[11px] font-medium text-slate-300">
-                  {projectDateRange}
-                </span>
-              )}
-            </div>
+        {/* Planning header */}
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold text-slate-100 sm:text-2xl">Planificación del proyecto</h1>
+            <p className="mt-0.5 text-sm text-slate-500">Estructura del proyecto basada en SAP Activate.</p>
           </div>
-          {phases.length > 0 && (
-            <div className="mt-5 pt-5 border-t border-slate-700/60 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="flex flex-wrap items-center gap-3 shrink-0 pt-2 sm:pt-0">
+            {phases.length > 0 ? (
+              <span className="inline-flex items-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-emerald-400">
+                Plan configurado
+              </span>
+            ) : (
+              <span className="inline-flex items-center rounded-lg border border-slate-600/80 bg-slate-800/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                Plan pendiente
+              </span>
+            )}
+            {projectDateRange && (
+              <span className="inline-flex items-center rounded-lg border border-slate-600/80 bg-slate-800/60 px-3 py-1.5 text-[11px] font-medium text-slate-300">
+                {projectDateRange}
+              </span>
+            )}
+          </div>
+        </header>
+
+        {/* Planning summary block */}
+        {phases.length > 0 && (
+          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5">
+            <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-3">Resumen</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Current phase</p>
-                <p className="mt-0.5 text-sm font-semibold text-slate-200">{currentPhase?.name ?? "—"}</p>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Fase actual</p>
+                <p className="mt-0.5 text-sm font-medium text-slate-200">{currentPhase?.name ?? "—"}</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Planned start</p>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Inicio previsto</p>
                 <p className="mt-0.5 text-sm font-medium text-slate-300">{minStartDate ? new Date(minStartDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) : "—"}</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Planned end</p>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Fin previsto</p>
                 <p className="mt-0.5 text-sm font-medium text-slate-300">{maxEndDate ? new Date(maxEndDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) : "—"}</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Duration</p>
-                <p className="mt-0.5 text-sm font-medium text-slate-300">{totalDurationDays != null ? `${totalDurationDays} days` : "—"}</p>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Duración</p>
+                <p className="mt-0.5 text-sm font-medium text-slate-300">{totalDurationDays != null ? `${totalDurationDays} días` : "—"}</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Phases</p>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Fases</p>
                 <p className="mt-0.5 text-sm font-medium text-slate-300">{phases.length}</p>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {errorMsg && (
           <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-5 py-3 text-sm text-red-200">
@@ -384,10 +387,10 @@ export default function ProjectPlanningPage() {
         {loading ? (
           <p className="text-sm text-slate-500">Loading phases…</p>
         ) : phases.length === 0 ? (
-          <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 p-6 md:p-8">
-            <h2 className="text-lg font-semibold text-slate-100">No planning phases yet</h2>
+          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-6 md:p-8">
+            <h2 className="text-lg font-semibold text-slate-100">Aún no hay fases de planificación</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Generate SAP Activate phases only, or the full plan (phases, activities, tasks) when the project has start and end dates.
+              Genera solo las fases SAP Activate o el plan completo (fases, actividades, tareas) cuando el proyecto tenga fechas de inicio y fin.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               {project?.start_date && project?.planned_end_date && (
@@ -397,29 +400,29 @@ export default function ProjectPlanningPage() {
                   disabled={generatingPlan}
                   className="inline-flex items-center justify-center rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
                 >
-                  {generatingPlan ? "Generating…" : "Generate plan from template"}
+                  {generatingPlan ? "Generando…" : "Generar plan desde plantilla"}
                 </button>
               )}
               <button
                 type="button"
                 onClick={generateDefaultPhases}
                 disabled={generatingPhases}
-                className="inline-flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors disabled:opacity-50"
+                className="inline-flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors duration-150 disabled:opacity-50"
               >
-                {generatingPhases ? "Generating…" : "Generate phases only"}
+                {generatingPhases ? "Generando…" : "Generar solo fases"}
               </button>
               <Link
                 href={`/projects/${projectId}`}
-                className="inline-flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors"
+                className="inline-flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors duration-150"
               >
-                Back to project overview
+                Volver al proyecto
               </Link>
             </div>
           </div>
         ) : (
           <>
-            {/* Timeline hero */}
-            <section className="w-full min-w-0">
+            {/* Timeline hero — scrollable, no overflow */}
+            <section className="w-full min-w-0 overflow-x-auto">
               <ProjectPlanningGantt
                 phases={phases}
                 projectStart={ganttProjectStart}
@@ -428,13 +431,13 @@ export default function ProjectPlanningPage() {
               />
             </section>
 
-            {/* Phase editor — control panel for timeline */}
-            <section>
-              <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
-                <div className="border-b border-slate-700/60 px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-800/40">
+            {/* Phase editor — structured card */}
+            <section className="w-full min-w-0">
+              <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
+                <div className="border-b border-slate-700/60 px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
-                    <h2 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Phase editor</h2>
-                    <p className="mt-0.5 text-sm text-slate-400">Edit phase names and dates. Changes update the timeline above.</p>
+                    <h2 className="text-sm font-medium text-slate-200">Editor de fases</h2>
+                    <p className="mt-0.5 text-xs text-slate-400">Edita nombres y fechas. Los cambios se reflejan en el timeline.</p>
                   </div>
                   <div className="flex items-center gap-3">
                     {saveAllMessage && (
@@ -454,22 +457,22 @@ export default function ProjectPlanningPage() {
                       disabled={savingAll}
                       className="inline-flex items-center justify-center rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
                     >
-                      {savingAll ? "Saving…" : "Save planning"}
+                      {savingAll ? "Guardando…" : "Guardar planificación"}
                     </button>
                   </div>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="min-w-0 overflow-x-auto">
                   <table className="w-full text-left min-w-[540px]">
                     <thead className="bg-slate-800/50 border-b border-slate-700/50">
                       <tr>
-                        <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-20 whitespace-nowrap">Order</th>
-                        <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[200px]">Phase</th>
-                        <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-40">Start</th>
-                        <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-40">End</th>
-                        <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-24 text-right">Actions</th>
+                        <th className="px-4 sm:px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-20 whitespace-nowrap">Orden</th>
+                        <th className="px-4 sm:px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[200px]">Fase</th>
+                        <th className="px-4 sm:px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-40">Inicio</th>
+                        <th className="px-4 sm:px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-40">Fin</th>
+                        <th className="px-4 sm:px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-24 text-right">Acciones</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-slate-700/40">
                       {phases.map((phase, index) => (
                         <PhaseRow
                           key={phase.id}
@@ -534,15 +537,15 @@ function PhaseRow({
     "w-full rounded-xl border border-slate-500 bg-slate-800/80 px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-400 transition-colors";
 
   return (
-    <tr className="border-b border-slate-700/40 hover:bg-slate-800/30 transition-colors">
-      <td className="px-5 py-4 align-middle">
+    <tr className="hover:bg-slate-800/50 transition-colors duration-150">
+      <td className="px-4 sm:px-5 py-3 align-middle whitespace-nowrap">
         <div className="flex items-center gap-2">
           <div className="inline-flex flex-col rounded-lg border border-slate-600/50 bg-slate-800/40 p-0.5 shrink-0">
             <button
               type="button"
               onClick={() => onMove(index, "up")}
               disabled={index === 0}
-              className="rounded-md p-1 text-slate-500 hover:bg-slate-700/60 hover:text-slate-300 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              className="rounded-md p-1 text-slate-500 hover:bg-slate-700/60 hover:text-slate-300 disabled:opacity-30 disabled:pointer-events-none transition-colors duration-150"
               aria-label="Move up"
             >
               <ChevronUp className="h-3.5 w-3.5" />
@@ -551,7 +554,7 @@ function PhaseRow({
               type="button"
               onClick={() => onMove(index, "down")}
               disabled={index === total - 1}
-              className="rounded-md p-1 text-slate-500 hover:bg-slate-700/60 hover:text-slate-300 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              className="rounded-md p-1 text-slate-500 hover:bg-slate-700/60 hover:text-slate-300 disabled:opacity-30 disabled:pointer-events-none transition-colors duration-150"
               aria-label="Move down"
             >
               <ChevronDown className="h-3.5 w-3.5" />
@@ -560,16 +563,16 @@ function PhaseRow({
           <span className="text-xs font-medium text-slate-500 tabular-nums">{phase.sort_order}</span>
         </div>
       </td>
-      <td className="px-5 py-4 align-middle">
+      <td className="px-4 sm:px-5 py-3 align-middle">
         <input
           type="text"
           value={name}
           onChange={(e) => onPhaseNameChange(phase.id, e.target.value)}
           className={`${textInputClass} max-w-[220px]`}
-          placeholder="Phase name"
+          placeholder="Nombre de fase"
         />
       </td>
-      <td className="px-5 py-4 align-middle">
+      <td className="px-4 sm:px-5 py-3 align-middle">
         <input
           type="date"
           value={startDate}
@@ -577,7 +580,7 @@ function PhaseRow({
           className={dateInputClass}
         />
       </td>
-      <td className="px-5 py-4 align-middle">
+      <td className="px-4 sm:px-5 py-3 align-middle">
         <input
           type="date"
           value={endDate}
@@ -585,14 +588,14 @@ function PhaseRow({
           className={dateInputClass}
         />
       </td>
-      <td className="px-5 py-4 align-middle text-right w-24">
+      <td className="px-4 sm:px-5 py-3 align-middle text-right w-24">
         <button
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="rounded-lg border border-indigo-500/50 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="rounded-lg border border-indigo-500/50 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {saving ? "…" : "Save"}
+          {saving ? "…" : "Guardar"}
         </button>
       </td>
     </tr>

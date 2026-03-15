@@ -17,8 +17,12 @@
 /.next/
 /out/
 
+# supabase local
+.supabase/
+
 # production
 /build
+/dist
 
 # misc
 .DS_Store

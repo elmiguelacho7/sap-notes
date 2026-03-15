@@ -9,6 +9,7 @@ import {
   Ticket,
   BookOpen,
   FileText,
+  FolderOpen,
   Search,
   ShieldCheck,
   Settings,
@@ -17,6 +18,7 @@ import {
   LogOut,
   Briefcase,
   Building2,
+  Cloud,
 } from "lucide-react";
 
 const ICON_CLASS = "h-[18px] w-[18px] shrink-0";
@@ -45,9 +47,10 @@ const SIDEBAR_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: "KNOWLEDGE",
     items: [
-      { label: "Knowledge", href: "/knowledge", icon: BookOpen },
+      { label: "Knowledge Explorer", href: "/knowledge", icon: BookOpen },
+      { label: "Spaces", href: "/knowledge/documents", icon: FolderOpen },
       { label: "Notes", href: "/notes", icon: FileText },
-      { label: "Search", href: "/knowledge/search", icon: Search },
+      { label: "Sapito", href: "/knowledge/search", icon: Search },
     ],
   },
   {
@@ -55,6 +58,7 @@ const SIDEBAR_SECTIONS: { label: string; items: NavItem[] }[] = [
     items: [
       { label: "Clients", href: "/clients", icon: Building2, roles: ["superadmin", "admin"] },
       { label: "Admin", href: "/admin", icon: ShieldCheck, roles: ["superadmin"] },
+      { label: "Knowledge Sources", href: "/admin/knowledge-sources", icon: Cloud, roles: ["superadmin"] },
       { label: "Settings", href: "/account", icon: Settings },
     ],
   },
@@ -110,13 +114,15 @@ export function Sidebar({
   onLogout: () => void;
 }) {
   const isActive = (path: string, itemLabel?: string) => {
-    if (path === "/admin") return pathname === "/admin";
+    if (path === "/admin") return pathname === "/admin" || pathname.startsWith("/admin/");
+    if (path === "/admin/knowledge-sources") return pathname === "/admin/knowledge-sources";
     if (path === "/account") return pathname === "/account";
     if (path === "/clients") return pathname === "/clients";
     if (path === "/my-work") return pathname === "/my-work";
     if (path === "/knowledge/search") return pathname === "/knowledge/search";
+    if (path === "/knowledge/documents") return pathname === "/knowledge/documents";
     if (path === "/knowledge")
-      return pathname === "/knowledge" || (pathname.startsWith("/knowledge/") && !pathname.startsWith("/knowledge/search"));
+      return pathname === "/knowledge" || (pathname.startsWith("/knowledge/") && pathname !== "/knowledge/search" && pathname !== "/knowledge/documents");
     if (path === "/tickets") return pathname.startsWith("/tickets");
     if (path === "/tasks") return pathname === "/tasks" || pathname.startsWith("/tasks/");
     if (path === "/projects") return pathname === "/projects" || pathname.startsWith("/projects/");

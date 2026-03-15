@@ -34,6 +34,8 @@ export type KnowledgePage = {
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Optional parent page for subpages (future). NULL = top-level page. */
+  parent_page_id?: string | null;
 };
 
 export type KnowledgeBlockType =

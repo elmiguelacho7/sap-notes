@@ -7,12 +7,12 @@ import { Skeleton } from "@/components/ui/Skeleton";
  */
 export function ProjectOverviewSkeleton({ wrapInPageShell = true }: { wrapInPageShell?: boolean }) {
   const content = (
-    <div className="space-y-12">
-      <div className="relative overflow-hidden rounded-2xl border border-slate-700/90 bg-slate-900/95 p-8 md:p-10">
+    <div className="space-y-8">
+      <div className="relative overflow-hidden rounded-2xl border border-slate-700/90 bg-slate-900/95 p-4 sm:p-6 md:p-8 lg:p-10">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0 flex-1 space-y-4">
+          <div className="min-w-0 flex-1 space-y-3">
             <div>
-              <Skeleton className="mb-3 h-8 w-3/4 max-w-md" />
+              <Skeleton className="h-7 w-3/4 max-w-md sm:h-8" />
               <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
                 <Skeleton className="h-4 w-24" />
                 <Skeleton className="h-5 w-20 rounded-lg" />
@@ -35,13 +35,11 @@ export function ProjectOverviewSkeleton({ wrapInPageShell = true }: { wrapInPage
           </div>
         </div>
       </div>
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="rounded-xl border border-slate-700/80 bg-slate-900/60 p-6">
-            <Skeleton className="mb-4 h-5 w-2/3" />
-            <Skeleton className="mb-2 h-4 w-full" />
-            <Skeleton className="mb-2 h-4 w-5/6" />
-            <Skeleton className="h-4 w-1/2" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="mt-2 h-6 w-16" />
           </div>
         ))}
       </div>

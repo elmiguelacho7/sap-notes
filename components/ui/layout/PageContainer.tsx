@@ -20,7 +20,7 @@ export function PageContainer({
   /** true = no max-width, full viewport (e.g. operational dashboard). */
   fullWidth?: boolean;
 }) {
-  const base = "px-4 sm:px-6 md:px-8 xl:px-10 py-6 md:py-8";
+  const base = "w-full min-w-0 px-4 sm:px-5 lg:px-6 xl:px-8 2xl:px-10 py-6 md:py-8";
   const max =
     fullWidth ? "" : wide ? "max-w-[1400px] mx-auto" : "max-w-7xl mx-auto";
   return (

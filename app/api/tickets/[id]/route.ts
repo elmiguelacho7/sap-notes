@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUserIdFromRequest } from "@/lib/auth/serverAuth";
 import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
@@ -27,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const { data: ticketRow, error: fetchErr } = await supabaseAdmin
       .from("tickets")
-      .select("id, title, description, project_id, assigned_to")
+      .select("id, title, description, solution_markdown, project_id, assigned_to")
       .eq("id", ticketId)
       .single();
 
@@ -39,43 +40,79 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const projectId = (ticketRow.project_id as string | null) ?? null;
-    if (!projectId) {
-      return NextResponse.json(
-        { error: "Ticket sin proyecto asociado." },
-        { status: 400 }
-      );
+    let userId: string;
+    if (projectId) {
+      const auth = await requireAuthAndProjectPermission(request, projectId, "manage_project_tickets");
+      if (auth instanceof NextResponse) return auth;
+      userId = auth.userId;
+    } else {
+      const globalUserId = await getCurrentUserIdFromRequest(request);
+      if (!globalUserId?.trim()) {
+        return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+      }
+      userId = globalUserId;
     }
 
-    const auth = await requireAuthAndProjectPermission(request, projectId, "manage_project_tickets");
-    if (auth instanceof NextResponse) return auth;
-    const user = { userId: auth.userId };
-
-    const body = (await request.json().catch(() => ({}))) as { status?: string };
+    const body = (await request.json().catch(() => ({}))) as {
+      status?: string;
+      solution_markdown?: string | null;
+      root_cause?: string | null;
+      resolution_type?: string | null;
+    };
     const status = typeof body.status === "string" ? body.status.trim().toLowerCase() : null;
-    if (!status || !ALLOWED_STATUSES.includes(status as (typeof ALLOWED_STATUSES)[number])) {
+    const hasStatus = status && ALLOWED_STATUSES.includes(status as (typeof ALLOWED_STATUSES)[number]);
+    const solutionMarkdown = body.solution_markdown !== undefined ? body.solution_markdown : undefined;
+    const rootCause = body.root_cause !== undefined ? body.root_cause : undefined;
+    const resolutionType = body.resolution_type !== undefined ? body.resolution_type : undefined;
+    const hasSolutionFields =
+      solutionMarkdown !== undefined || rootCause !== undefined || resolutionType !== undefined;
+
+    if (!hasStatus && !hasSolutionFields) {
       return NextResponse.json(
-        { error: "Se requiere status válido: open, in_progress, resolved, closed, cancelled." },
+        { error: "Se requiere status o al menos un campo (solution_markdown, root_cause, resolution_type)." },
+        { status: 400 }
+      );
+    }
+    if (hasStatus && !ALLOWED_STATUSES.includes(status as (typeof ALLOWED_STATUSES)[number])) {
+      return NextResponse.json(
+        { error: "Status válido: open, in_progress, resolved, closed, cancelled." },
         { status: 400 }
       );
     }
 
-    if (status === "closed") {
-      if (ticketRow.project_id && (ticketRow.title || ticketRow.description)) {
+    const updatePayload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (hasStatus) updatePayload.status = status;
+    if (solutionMarkdown !== undefined) updatePayload.solution_markdown = solutionMarkdown;
+    if (rootCause !== undefined) updatePayload.root_cause = rootCause;
+    if (resolutionType !== undefined) updatePayload.resolution_type = resolutionType;
+
+    if (hasStatus && status === "closed") {
+      const currentSolution =
+        (solutionMarkdown !== undefined ? solutionMarkdown : (ticketRow.solution_markdown as string | null)) ??
+        (ticketRow.description as string | null) ??
+        null;
+      if (
+        ticketRow.project_id &&
+        ((ticketRow.title as string) || currentSolution)
+      ) {
         const pid = ticketRow.project_id as string;
-        const userIdForMemory = (ticketRow.assigned_to as string | null) ?? user.userId ?? null;
+        const userIdForMemory = (ticketRow.assigned_to as string | null) ?? userId ?? null;
         const record = extractKnowledgeFromTicket(
           (ticketRow.title as string) ?? "Issue resolved",
-          (ticketRow.description as string) || null
+          (ticketRow.description as string) || null,
+          (currentSolution as string) || null
         );
-        storeProjectMemory(pid, userIdForMemory, record, "ticket_closed").catch((err) =>
-          console.error("[tickets] project memory store failed", err)
-        );
+        if (record.solution.trim()) {
+          storeProjectMemory(pid, userIdForMemory, record, "ticket_closed").catch((err) =>
+            console.error("[tickets] project memory store failed", err)
+          );
+        }
       }
     }
 
     const { error } = await supabaseAdmin
       .from("tickets")
-      .update({ status, updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq("id", ticketId);
 
     if (error) {

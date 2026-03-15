@@ -33,7 +33,7 @@ export function ProjectPageHeader({
   const isSection = variant === "section";
 
   const titleClass = dark
-    ? "text-xl font-semibold tracking-tight text-slate-100"
+    ? "text-xl font-semibold text-slate-100 sm:text-2xl"
     : isSection
       ? "text-lg font-medium tracking-tight text-slate-700"
       : "text-xl font-semibold text-slate-900 md:text-2xl";
@@ -43,8 +43,8 @@ export function ProjectPageHeader({
       ? "mt-0.5 text-sm text-slate-500 max-w-2xl"
       : "mt-1 text-sm text-slate-500 max-w-2xl";
   const primaryBtnClass = dark
-    ? "inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-3.5 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors"
-    : "inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition";
+    ? "inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
+    : "inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-2";
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">

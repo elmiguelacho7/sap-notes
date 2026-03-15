@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import ReactFlow, {
@@ -62,7 +62,10 @@ function toReactFlowEdges(graph: PageGraph): Edge[] {
 export default function KnowledgeGraphPage() {
   const params = useParams<{ pageId: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const pageId = params?.pageId as string | undefined;
+  const projectIdFromQuery = searchParams?.get("projectId") ?? null;
+  const pageEditorHref = `/knowledge/${pageId}${projectIdFromQuery ? `?projectId=${projectIdFromQuery}` : ""}`;
 
   const [graph, setGraph] = useState<PageGraph>({ nodes: [], edges: [] });
   const [loading, setLoading] = useState(true);
@@ -89,9 +92,9 @@ export default function KnowledgeGraphPage() {
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      router.push(`/knowledge/${node.id}`);
+      router.push(`/knowledge/${node.id}${projectIdFromQuery ? `?projectId=${projectIdFromQuery}` : ""}`);
     },
-    [router]
+    [router, projectIdFromQuery]
   );
 
   if (!pageId) {
@@ -117,7 +120,7 @@ export default function KnowledgeGraphPage() {
           {error}
         </div>
         <Link
-          href={`/knowledge/${pageId}`}
+          href={pageEditorHref}
           className="mt-4 inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -131,7 +134,7 @@ export default function KnowledgeGraphPage() {
     <div className="flex flex-col h-[calc(100vh-8rem)] max-w-6xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between gap-4 mb-4">
         <Link
-          href={`/knowledge/${pageId}`}
+          href={pageEditorHref}
           className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-indigo-600"
         >
           <ChevronLeft className="h-4 w-4" />

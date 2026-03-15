@@ -16,6 +16,8 @@ export type ObjectActionsProps = {
   editHref?: string;
   deleteEndpoint?: string;
   archiveEndpoint?: string;
+  /** Override redirect after delete/archive (e.g. project list). If not set, uses default list for entity. */
+  listPath?: string;
   /** Callback after successful archive (e.g. refresh project data). If not set, redirects to list. */
   onArchived?: () => void;
   /** Use "dark" when rendering inside a dark header/shell (e.g. project workspace header). */
@@ -53,6 +55,7 @@ export function ObjectActions({
   editHref,
   deleteEndpoint,
   archiveEndpoint,
+  listPath: listPathOverride,
   onArchived,
   variant = "light",
 }: ObjectActionsProps) {
@@ -62,18 +65,19 @@ export function ObjectActions({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const isDark = variant === "dark";
-  const editBtnClass = isDark
+  const focusRing = " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0";
+  const editBtnClass = (isDark
     ? "inline-flex items-center gap-1.5 rounded-lg border border-slate-600/80 bg-slate-800/80 px-2.5 h-8 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:border-slate-500 hover:text-white transition-colors"
-    : "inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 h-8 text-sm font-medium text-white hover:bg-indigo-700 transition-colors";
-  const archiveBtnClass = isDark
+    : "inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 h-8 text-sm font-medium text-white hover:bg-indigo-700 transition-colors") + focusRing;
+  const archiveBtnClass = (isDark
     ? "inline-flex items-center gap-1.5 rounded-lg border border-slate-600/80 bg-slate-800/80 px-2.5 h-8 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:border-slate-500 hover:text-white transition-colors"
-    : "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 h-8 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors";
-  const deleteBtnClass = isDark
+    : "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 h-8 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors") + focusRing;
+  const deleteBtnClass = (isDark
     ? "inline-flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 h-8 text-xs font-medium text-rose-300 hover:bg-rose-500/20 hover:border-rose-500/60 transition-colors"
-    : "inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-white px-3 h-8 text-sm font-medium text-rose-600 hover:bg-rose-50 transition-colors";
+    : "inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-white px-3 h-8 text-sm font-medium text-rose-600 hover:bg-rose-50 transition-colors") + focusRing;
 
   const label = ENTITY_LABELS[entity];
-  const listPath = LIST_PATHS[entity];
+  const listPath = listPathOverride ?? LIST_PATHS[entity];
 
   const handleEdit = () => {
     if (canEdit && editHref) router.push(editHref);
@@ -178,12 +182,13 @@ export function ObjectActions({
 
       {/* Delete confirmation modal */}
       {modal === "delete" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={closeModal}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={closeModal} role="dialog" aria-modal="true" aria-labelledby="object-delete-title">
           <div
             className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg max-w-md w-full"
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (e.key === "Escape") closeModal(); }}
           >
-            <h3 className="text-lg font-semibold text-slate-900">
+            <h3 id="object-delete-title" className="text-lg font-semibold text-slate-900">
               Eliminar {label}
             </h3>
             <p className="mt-2 text-sm text-slate-600">
@@ -199,7 +204,7 @@ export function ObjectActions({
                 type="button"
                 onClick={closeModal}
                 disabled={loading}
-                className="rounded-full border border-slate-200 px-3 h-8 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                className="rounded-full border border-slate-200 px-3 h-8 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
               >
                 Cancelar
               </button>
@@ -207,7 +212,7 @@ export function ObjectActions({
                 type="button"
                 onClick={handleDeleteConfirm}
                 disabled={loading}
-                className="rounded-full bg-rose-600 px-3 h-8 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60"
+                className="rounded-full bg-rose-600 px-3 h-8 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
               >
                 {loading ? "Eliminando…" : "Eliminar"}
               </button>
@@ -218,12 +223,13 @@ export function ObjectActions({
 
       {/* Archive confirmation modal */}
       {modal === "archive" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={closeModal}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={closeModal} role="dialog" aria-modal="true" aria-labelledby="object-archive-title">
           <div
             className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg max-w-md w-full"
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (e.key === "Escape") closeModal(); }}
           >
-            <h3 className="text-lg font-semibold text-slate-900">
+            <h3 id="object-archive-title" className="text-lg font-semibold text-slate-900">
               Archivar {label}
             </h3>
             <p className="mt-2 text-sm text-slate-600">
@@ -239,7 +245,7 @@ export function ObjectActions({
                 type="button"
                 onClick={closeModal}
                 disabled={loading}
-                className="rounded-full border border-slate-200 px-3 h-8 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                className="rounded-full border border-slate-200 px-3 h-8 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
               >
                 Cancelar
               </button>
@@ -247,7 +253,7 @@ export function ObjectActions({
                 type="button"
                 onClick={handleArchiveConfirm}
                 disabled={loading}
-                className="rounded-full bg-indigo-600 px-3 h-8 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                className="rounded-full bg-indigo-600 px-3 h-8 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
               >
                 {loading ? "Archivando…" : "Archivar"}
               </button>

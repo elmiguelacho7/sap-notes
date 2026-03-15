@@ -77,6 +77,23 @@ export async function createSpace(
 }
 
 /**
+ * Get a single space by id.
+ */
+export async function getSpace(
+  supabase: SupabaseClient,
+  spaceId: string
+): Promise<KnowledgeSpace | null> {
+  const { data, error } = await supabase
+    .from("knowledge_spaces")
+    .select("*")
+    .eq("id", spaceId)
+    .single();
+
+  if (error || !data) return null;
+  return data as KnowledgeSpace;
+}
+
+/**
  * List pages in a space (excluding soft-deleted).
  */
 export async function listPages(
@@ -169,6 +186,69 @@ export async function getPage(
     page: pageData as KnowledgePage,
     blocks: (blocksData ?? []) as KnowledgeBlock[],
   };
+}
+
+export type UpdatePageInput = {
+  title?: string;
+  summary?: string | null;
+  space_id?: string;
+};
+
+/**
+ * Update a knowledge page (title, summary, space). Requires auth.
+ */
+export async function updatePage(
+  supabase: SupabaseClient,
+  pageId: string,
+  input: UpdatePageInput
+): Promise<KnowledgePage> {
+  const { data: user } = await supabase.auth.getUser();
+  if (!user?.user?.id) throw new Error("No autorizado.");
+
+  const payload: Record<string, unknown> = {};
+  if (input.title !== undefined) payload.title = input.title.trim();
+  if (input.summary !== undefined) payload.summary = input.summary?.trim() || null;
+  if (input.space_id !== undefined) payload.space_id = input.space_id;
+
+  if (Object.keys(payload).length === 0) {
+    const { data } = await supabase.from("knowledge_pages").select("*").eq("id", pageId).single();
+    if (!data) throw new Error("Página no encontrada.");
+    return data as KnowledgePage;
+  }
+
+  const { data, error } = await supabase
+    .from("knowledge_pages")
+    .update(payload)
+    .eq("id", pageId)
+    .select()
+    .single();
+
+  if (error) {
+    logSupabaseError("knowledgeService.updatePage", error);
+    throw new Error(error.message ?? "Error al actualizar la página.");
+  }
+  return data as KnowledgePage;
+}
+
+/**
+ * Soft-delete a knowledge page (sets deleted_at). Requires auth.
+ */
+export async function deletePage(
+  supabase: SupabaseClient,
+  pageId: string
+): Promise<void> {
+  const { data: user } = await supabase.auth.getUser();
+  if (!user?.user?.id) throw new Error("No autorizado.");
+
+  const { error } = await supabase
+    .from("knowledge_pages")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", pageId);
+
+  if (error) {
+    logSupabaseError("knowledgeService.deletePage", error);
+    throw new Error(error.message ?? "Error al eliminar la página.");
+  }
 }
 
 export type BlockInput = {

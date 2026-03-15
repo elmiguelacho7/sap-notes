@@ -5,8 +5,10 @@ import { useParams, useSearchParams, useRouter, usePathname } from "next/navigat
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import { getProjectPhases, type ProjectPhase } from "@/lib/services/projectPhaseService";
-import { Plus, Pencil, Save, Trash2, ListTodo } from "lucide-react";
+import { Plus, Pencil, Save, Trash2, ListTodo, User, Search } from "lucide-react";
 import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
+
+type StatusFilterKind = "all" | "planned" | "in_progress" | "blocked" | "done" | "overdue" | "assigned_to_me";
 
 // Types aligned with DB: project_activities uses name, due_date; status/priority are text
 // NOTE: In the future, each activity will spawn one or more tasks. The tasks table will include
@@ -53,6 +55,60 @@ type Profile = {
   email: string | null;
 };
 
+function AssigneeCell({ profileId, profilesMap }: { profileId: string | null; profilesMap: Map<string, Profile> }) {
+  if (!profileId) {
+    return (
+      <span className="flex items-center gap-2 text-slate-500">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-700/80 text-slate-500">
+          <User className="h-3.5 w-3.5" />
+        </span>
+        Sin asignar
+      </span>
+    );
+  }
+  const p = profilesMap.get(profileId);
+  const label = p ? (p.full_name || p.email || profileId) : profileId.slice(0, 8);
+  const initial = (label.trim() || "?").charAt(0).toUpperCase();
+  return (
+    <span className="flex items-center gap-2 text-slate-300">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-600 text-slate-200 text-[10px] font-medium">
+        {initial}
+      </span>
+      <span className="truncate max-w-[120px]" title={label}>{label}</span>
+    </span>
+  );
+}
+
+function ActivityStatusBadge({ status, isOverdue }: { status: string | null; isOverdue?: boolean }) {
+  const s = (status ?? "planned").toLowerCase();
+  if (isOverdue && s !== "done") {
+    return (
+      <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium bg-amber-500/20 text-amber-300">
+        Overdue
+      </span>
+    );
+  }
+  const styles: Record<string, string> = {
+    planned: "bg-slate-700 text-slate-300",
+    in_progress: "bg-indigo-500/20 text-indigo-300",
+    blocked: "bg-rose-500/20 text-rose-300",
+    done: "bg-emerald-500/20 text-emerald-300",
+  };
+  const labels: Record<string, string> = {
+    planned: "Planned",
+    in_progress: "In Progress",
+    blocked: "Blocked",
+    done: "Completed",
+  };
+  const style = styles[s] ?? "bg-slate-700/60 text-slate-400";
+  const label = labels[s] ?? (status ?? "—");
+  return (
+    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${style}`}>
+      {label}
+    </span>
+  );
+}
+
 export default function ProjectActivitiesPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -67,6 +123,9 @@ export default function ProjectActivitiesPageContent() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilterKind>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentUserProfileId, setCurrentUserProfileId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [editingActivity, setEditingActivity] = useState<ProjectActivity | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -204,6 +263,10 @@ export default function ProjectActivitiesPageContent() {
       } else {
         setProfiles((profilesRes.data ?? []) as Profile[]);
       }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) setCurrentUserProfileId(session.user.id);
+      else setCurrentUserProfileId(null);
     } catch {
       setErrorMsg("No se pudieron cargar los datos.");
     } finally {
@@ -223,10 +286,52 @@ export default function ProjectActivitiesPageContent() {
     }
   }, [searchParams, phases]);
 
+  const profilesMap = useMemo(() => {
+    const map = new Map<string, Profile>();
+    profiles.forEach((p) => map.set(p.id, p));
+    return map;
+  }, [profiles]);
+
   const filteredActivities = useMemo(() => {
-    if (selectedPhaseId === "all") return activities;
-    return activities.filter((a) => a.phase_id === selectedPhaseId);
-  }, [activities, selectedPhaseId]);
+    const today = new Date().toISOString().slice(0, 10);
+    let list = activities;
+    if (selectedPhaseId !== "all") list = list.filter((a) => a.phase_id === selectedPhaseId);
+    if (statusFilter !== "all") {
+      if (statusFilter === "overdue") {
+        list = list.filter((a) => a.due_date && a.due_date < today && (a.status ?? "planned") !== "done");
+      } else if (statusFilter === "assigned_to_me") {
+        list = list.filter((a) => currentUserProfileId && a.owner_profile_id === currentUserProfileId);
+      } else {
+        list = list.filter((a) => (a.status ?? "planned") === statusFilter);
+      }
+    }
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((a) => {
+        const name = (a.name ?? "").toLowerCase();
+        const desc = (a.description ?? "").toLowerCase();
+        const ownerName = a.owner_profile_id ? (getProfileName(a.owner_profile_id) ?? "").toLowerCase() : "";
+        return name.includes(q) || desc.includes(q) || ownerName.includes(q);
+      });
+    }
+    return list;
+  }, [activities, selectedPhaseId, statusFilter, searchQuery, currentUserProfileId, profiles]);
+
+  const summary = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    let open = 0;
+    let inProgress = 0;
+    let blocked = 0;
+    let overdue = 0;
+    activities.forEach((a) => {
+      const s = a.status ?? "planned";
+      if (s !== "done") open += 1;
+      if (s === "in_progress") inProgress += 1;
+      if (s === "blocked") blocked += 1;
+      if (a.due_date && a.due_date < today && s !== "done") overdue += 1;
+    });
+    return { open, inProgress, blocked, overdue };
+  }, [activities]);
 
   const getPhaseName = (phaseId: string) => phases.find((p) => p.id === phaseId)?.name ?? "—";
 
@@ -292,12 +397,12 @@ export default function ProjectActivitiesPageContent() {
           </div>
         )}
 
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-100">Actividades</h1>
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold text-slate-100 sm:text-2xl">Actividades</h1>
             <p className="mt-0.5 text-sm text-slate-500">Plan de trabajo estructurado por fases SAP Activate.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-3 shrink-0 pt-2 sm:pt-0">
             <select
               value={selectedPhaseId}
               onChange={(e) => setSelectedPhaseId(e.target.value as string | "all")}
@@ -316,36 +421,120 @@ export default function ProjectActivitiesPageContent() {
               disabled={phases.length === 0}
               className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4 shrink-0" />
               Nueva actividad
             </button>
           </div>
         </header>
 
-        <section className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
+        {!loading && activities.length > 0 && (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+              <p className="text-xs uppercase tracking-wider text-slate-400">Open</p>
+              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.open}</p>
+            </div>
+            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+              <p className="text-xs uppercase tracking-wider text-slate-400">In Progress</p>
+              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.inProgress}</p>
+            </div>
+            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+              <p className="text-xs uppercase tracking-wider text-slate-400">Blocked</p>
+              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.blocked}</p>
+            </div>
+            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
+              <p className="text-xs uppercase tracking-wider text-slate-400">Overdue</p>
+              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.overdue}</p>
+            </div>
+          </div>
+        )}
+
+        {!loading && activities.length > 0 && (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              {(
+                [
+                  { key: "all" as StatusFilterKind, label: "All" },
+                  { key: "planned" as StatusFilterKind, label: "Planned" },
+                  { key: "in_progress" as StatusFilterKind, label: "In Progress" },
+                  { key: "blocked" as StatusFilterKind, label: "Blocked" },
+                  { key: "done" as StatusFilterKind, label: "Completed" },
+                  { key: "overdue" as StatusFilterKind, label: "Overdue" },
+                  { key: "assigned_to_me" as StatusFilterKind, label: "Assigned to me" },
+                ] as const
+              ).map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setStatusFilter(key)}
+                  className={`rounded-full border px-3 py-1.5 text-xs transition-colors duration-150 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0 ${
+                    statusFilter === key
+                      ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-300"
+                      : "border-slate-700 bg-slate-800/40 text-slate-300 hover:bg-slate-800"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="w-full sm:w-auto sm:min-w-[200px]">
+              <label className="relative block">
+                <span className="sr-only">Search activities</span>
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
+                <input
+                  type="search"
+                  placeholder="Search activities..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:border-indigo-500/50 min-w-0"
+                />
+              </label>
+            </div>
+          </div>
+        )}
+
+        <section className="w-full min-w-0 rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
           <div className="border-b border-slate-700/60 px-6 py-4 bg-slate-800/50">
             <h2 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Listado de actividades</h2>
             <p className="mt-0.5 text-sm text-slate-400">Actividades por fase. Edita y enlaza con tareas.</p>
           </div>
-          <div className="p-5">
+          <div className="p-5 min-w-0">
             {loading ? (
               <TableSkeleton rows={6} colCount={7} />
             ) : activities.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-700/60 bg-slate-800/30 py-10 text-center">
-                <p className="text-sm font-medium text-slate-300">Sin actividades aún</p>
-                <p className="mt-1 text-sm text-slate-500">Crea la primera actividad para empezar el plan de trabajo.</p>
+              <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-16 px-6 flex flex-col items-center justify-center min-h-[200px] text-center">
+                <p className="text-base font-medium text-slate-200">No hay actividades en este proyecto</p>
+                <p className="mt-1.5 text-sm text-slate-500 max-w-sm">Puedes crear actividades para organizar el trabajo y vincular tareas del proyecto.</p>
+                <button
+                  type="button"
+                  onClick={() => phases.length > 0 && setIsCreating(true)}
+                  disabled={phases.length === 0}
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
+                >
+                  <Plus className="h-4 w-4 shrink-0" />
+                  Crear primera actividad
+                </button>
               </div>
             ) : filteredActivities.length === 0 ? (
-              <p className="text-sm text-slate-500">No hay actividades en la fase seleccionada.</p>
+              <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-12 px-6 flex flex-col items-center justify-center min-h-[160px] text-center">
+                {selectedPhaseId !== "all" ? (
+                  <>
+                    <p className="text-sm font-medium text-slate-300">No hay actividades en esta fase.</p>
+                    <p className="mt-1 text-xs text-slate-500">Cambia de fase o crea una nueva actividad.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-slate-300">No hay actividades que coincidan con los filtros</p>
+                    <p className="mt-1 text-xs text-slate-500">Prueba otro filtro o búsqueda.</p>
+                  </>
+                )}
+              </div>
             ) : (
-              <div
-                className="w-full overflow-x-auto rounded-lg [scrollbar-width:thin] [scrollbar-color:#475569_#1e293b] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500"
-              >
-                <table className="w-full text-left text-sm min-w-[880px]">
+              <div className="w-full min-w-0 overflow-x-auto rounded-lg [scrollbar-width:thin] [scrollbar-color:#475569_#1e293b] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500">
+                <table className="w-full text-left text-sm min-w-[640px]">
                   <thead className="sticky top-0 z-10 bg-slate-800/95 backdrop-blur border-b border-slate-700/60">
                     <tr>
                       <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[100px] min-w-[100px] align-middle whitespace-nowrap">Fase</th>
-                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[140px] min-w-[140px] align-middle">Actividad</th>
+                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[180px] min-w-[180px] align-middle">Actividad</th>
                       <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[140px] min-w-[140px] align-middle">Responsable</th>
                       <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[110px] min-w-[110px] align-middle">Estado</th>
                       <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[100px] min-w-[100px] align-middle whitespace-nowrap">Inicio</th>
@@ -355,13 +544,14 @@ export default function ProjectActivitiesPageContent() {
                       <th className="px-3 py-3.5 pl-3 pr-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[180px] min-w-[180px] max-w-[180px] align-middle text-right whitespace-nowrap">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-700/40">
                     {filteredActivities.map((activity) => (
                       <ActivityRow
                         key={activity.id}
                         activity={activity}
                         phaseName={getPhaseName(activity.phase_id)}
                         profiles={profiles}
+                        profilesMap={profilesMap}
                         riskLevel={riskByActivity[activity.id]}
                         onUpdate={updateActivity}
                         saving={savingId === activity.id}
@@ -400,12 +590,16 @@ export default function ProjectActivitiesPageContent() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
           onClick={() => !deletingId && setDeleteConfirmId(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="activity-delete-title"
         >
           <div
             className="w-full max-w-sm rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-xl ring-1 ring-slate-700/50"
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (e.key === "Escape") !deletingId && setDeleteConfirmId(null); }}
           >
-            <p className="text-sm text-slate-300">
+            <p id="activity-delete-title" className="text-sm text-slate-300">
               ¿Seguro que deseas eliminar esta actividad? Las tareas asociadas seguirán existiendo pero quedarán sin vínculo.
             </p>
             <div className="mt-4 flex justify-end gap-2">
@@ -413,7 +607,7 @@ export default function ProjectActivitiesPageContent() {
                 type="button"
                 onClick={() => setDeleteConfirmId(null)}
                 disabled={!!deletingId}
-                className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
               >
                 Cancelar
               </button>
@@ -424,7 +618,7 @@ export default function ProjectActivitiesPageContent() {
                   if (id) deleteActivity(id);
                 }}
                 disabled={!!deletingId}
-                className="rounded-xl bg-red-600/90 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
+                className="rounded-xl bg-red-600/90 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
               >
                 {deletingId ? "Eliminando…" : "Sí, eliminar"}
               </button>
@@ -440,6 +634,7 @@ type ActivityRowProps = {
   activity: ProjectActivity;
   phaseName: string;
   profiles: Profile[];
+  profilesMap: Map<string, Profile>;
   riskLevel?: string | null;
   onUpdate: (id: string, payload: Partial<ProjectActivity>) => Promise<void>;
   saving: boolean;
@@ -451,7 +646,7 @@ type ActivityRowProps = {
 function ActivityRow({
   activity,
   phaseName,
-  profiles,
+  profilesMap,
   riskLevel,
   onUpdate,
   saving,
@@ -459,64 +654,46 @@ function ActivityRow({
   onDelete,
   onViewTasks,
 }: ActivityRowProps) {
-  const [status, setStatus] = useState(activity.status ?? "planned");
-  const [ownerProfileId, setOwnerProfileId] = useState<string | null>(activity.owner_profile_id);
   const [startDate, setStartDate] = useState(activity.start_date ?? "");
   const [dueDate, setDueDate] = useState(activity.due_date ?? "");
 
   const displayProgress = activity.derived_progress_pct ?? activity.progress_pct ?? 0;
+  const today = new Date().toISOString().slice(0, 10);
+  const isOverdue = !!(activity.due_date && activity.due_date < today && (activity.status ?? "planned") !== "done");
 
   useEffect(() => {
-    setStatus(activity.status ?? "planned");
-    setOwnerProfileId(activity.owner_profile_id);
     setStartDate(activity.start_date ?? "");
     setDueDate(activity.due_date ?? "");
-  }, [activity.id, activity.status, activity.owner_profile_id, activity.start_date, activity.due_date]);
+  }, [activity.id, activity.start_date, activity.due_date]);
 
   const handleSave = () => {
     onUpdate(activity.id, {
-      status: status || null,
-      owner_profile_id: ownerProfileId || null,
       start_date: startDate.trim() || null,
       due_date: dueDate.trim() || null,
     });
   };
 
-  const selectClass =
-    "w-full min-w-0 rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-2 text-sm text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 transition-colors";
   const dateInputClass =
     "w-full max-w-[100px] min-w-0 rounded-lg border border-slate-600/80 bg-slate-800/80 px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 transition-colors";
   const actionBtnClass =
     "inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-600 bg-slate-800/60 text-slate-400 hover:bg-slate-700/60 hover:text-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0";
 
   return (
-    <tr className="border-b border-slate-700/40 hover:bg-slate-800/40 transition-colors">
+    <tr className="hover:bg-slate-800/50 transition-colors duration-150">
       <td className="px-3 py-3.5 text-slate-300 align-middle whitespace-nowrap">{phaseName}</td>
-      <td className="px-3 py-3.5 font-medium text-slate-100 align-middle min-w-0 max-w-[140px]">
-        <span className="block truncate" title={activity.name}>{activity.name}</span>
+      <td className="px-3 py-3.5 align-middle min-w-0 max-w-[180px]">
+        <div className="flex flex-col gap-0.5">
+          <span className="font-medium text-slate-100 truncate" title={activity.name}>{activity.name}</span>
+          {activity.description && (
+            <span className="text-xs text-slate-400 line-clamp-1">{activity.description}</span>
+          )}
+        </div>
       </td>
       <td className="px-3 py-3.5 align-middle">
-        <select
-          className={`${selectClass} max-w-full min-w-0 w-full`}
-          value={ownerProfileId ?? ""}
-          onChange={(e) => setOwnerProfileId(e.target.value || null)}
-        >
-          <option value="">Sin asignar</option>
-          {profiles.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.full_name || p.email || p.id}
-            </option>
-          ))}
-        </select>
+        <AssigneeCell profileId={activity.owner_profile_id} profilesMap={profilesMap} />
       </td>
       <td className="px-3 py-3.5 align-middle">
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${selectClass} max-w-full min-w-0 w-full`}>
-          {STATUS_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        <ActivityStatusBadge status={activity.status} isOverdue={isOverdue} />
       </td>
       <td className="px-3 py-3.5 align-middle">
         <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={dateInputClass} />

@@ -5,10 +5,15 @@ import { useParams, useSearchParams, usePathname, useRouter } from "next/navigat
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import type { ProjectTask } from "@/lib/types/projectTasks";
+import { PROJECT_STATUS_KEYS } from "@/lib/taskWorkflow";
 import TasksBoard, {
   type BoardTask,
   type CreateTaskPayload,
 } from "@/app/components/TasksBoard";
+import { TaskWorkspaceHeader } from "@/components/tasks/TaskWorkspaceHeader";
+import { TaskFilterBar } from "@/components/tasks/TaskFilterBar";
+import { ViewModeToggle, type ViewMode } from "@/components/tasks/ViewModeToggle";
+import { TaskDetailDrawer, type TaskDetailPayload } from "@/components/tasks/TaskDetailDrawer";
 
 function serializeUnknownError(e: unknown): Record<string, unknown> {
   if (e instanceof Error) {
@@ -29,11 +34,13 @@ function serializeUnknownError(e: unknown): Record<string, unknown> {
   return { value: e };
 }
 
+/** Unified workflow: same order as global board (TODO → … → DONE) */
 const KANBAN_COLUMNS: { id: string; label: string }[] = [
   { id: "pending", label: "Por hacer" },
   { id: "in_progress", label: "En progreso" },
   { id: "blocked", label: "Bloqueado" },
-  { id: "done", label: "Hecha" },
+  { id: "review", label: "En revisión" },
+  { id: "done", label: "Hecho" },
 ];
 
 export default function ProjectTasksPage() {
@@ -60,6 +67,16 @@ export default function ProjectTasksPage() {
   const [memberProfiles, setMemberProfiles] = useState<{ id: string; full_name: string | null; email: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState("");
+  const [detailTask, setDetailTask] = useState<BoardTask | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailSaving, setDetailSaving] = useState(false);
+  const [projectName, setProjectName] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!projectId) return;
@@ -129,10 +146,45 @@ export default function ProjectTasksPage() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    if (!projectId) return;
+    supabase
+      .from("projects")
+      .select("name")
+      .eq("id", projectId)
+      .maybeSingle()
+      .then(({ data }) => setProjectName((data as { name?: string } | null)?.name ?? null));
+  }, [projectId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!cancelled) setCurrentUserId(user?.id ?? null);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   const visibleTasks: BoardTask[] = useMemo(() => {
-    const list = activityFilter
+    let list = activityFilter
       ? tasks.filter((t) => t.activity_id === activityFilter)
       : tasks;
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((t) => {
+        const title = (t.title ?? "").toLowerCase();
+        const desc = (t.description ?? "").toLowerCase();
+        return title.includes(q) || desc.includes(q);
+      });
+    }
+    if (statusFilter) {
+      list = list.filter((t) => (t.status ?? "").toLowerCase() === statusFilter.toLowerCase());
+    }
+    if (priorityFilter) {
+      list = list.filter((t) => (t.priority ?? "").toLowerCase() === priorityFilter.toLowerCase());
+    }
+    if (assigneeFilter) {
+      list = list.filter((t) => (t.assignee_profile_id ?? "") === assigneeFilter);
+    }
     return list.map((t) => ({
       id: t.id,
       title: t.title,
@@ -142,9 +194,10 @@ export default function ProjectTasksPage() {
       activity_id: t.activity_id,
       description: t.description,
       created_at: t.created_at,
+      updated_at: t.updated_at,
       assignee_profile_id: t.assignee_profile_id,
     }));
-  }, [tasks, activityFilter]);
+  }, [tasks, activityFilter, searchQuery, statusFilter, priorityFilter, assigneeFilter]);
 
   const activityOptions = useMemo(
     () => activities.map((a) => ({ value: a.id, label: a.name })),
@@ -159,6 +212,45 @@ export default function ProjectTasksPage() {
         label: p.full_name || p.email || p.id,
       })),
     [memberProfiles]
+  );
+
+  const assignedToMeCount = useMemo(() => {
+    if (!currentUserId) return 0;
+    return visibleTasks.filter((t) => t.assignee_profile_id === currentUserId).length;
+  }, [visibleTasks, currentUserId]);
+
+  const activityFilterOptions = useMemo(
+    () => [
+      { value: "", label: "All activities" },
+      ...activities.map((a) => ({ value: a.id, label: a.name })),
+    ],
+    [activities]
+  );
+
+  const statusFilterOptions = useMemo(
+    () => [
+      { value: "", label: "All statuses" },
+      ...KANBAN_COLUMNS.map((c) => ({ value: c.id, label: c.label })),
+    ],
+    []
+  );
+
+  const priorityFilterOptions = useMemo(
+    () => [
+      { value: "", label: "All priorities" },
+      { value: "high", label: "Alta" },
+      { value: "medium", label: "Media" },
+      { value: "low", label: "Baja" },
+    ],
+    []
+  );
+
+  const assigneeFilterOptions = useMemo(
+    () => [
+      { value: "", label: "All assignees" },
+      ...assigneeOptions.map((o) => ({ value: o.value, label: o.label })),
+    ],
+    [assigneeOptions]
   );
 
   const handleCreateProjectTask = useCallback(
@@ -265,7 +357,83 @@ export default function ProjectTasksPage() {
     []
   );
 
-  const getStatusKey = useCallback((task: BoardTask) => task.status ?? "pending", []);
+  const handleUpdatePriority = useCallback((taskId: string, priority: string) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id !== taskId ? t : { ...t, priority: priority as ProjectTask["priority"] }))
+    );
+    supabase
+      .from("project_tasks")
+      .update({ priority })
+      .eq("id", taskId)
+      .then(({ error }) => {
+        if (error) console.error("Error updating task priority", error);
+      });
+  }, []);
+
+  const handleUpdateDueDate = useCallback((taskId: string, dueDate: string | null) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id !== taskId ? t : { ...t, due_date: dueDate }))
+    );
+    supabase
+      .from("project_tasks")
+      .update({ due_date: dueDate })
+      .eq("id", taskId)
+      .then(({ error }) => {
+        if (error) console.error("Error updating task due date", error);
+      });
+  }, []);
+
+  const handleSaveDetail = useCallback(
+    async (taskId: string, payload: TaskDetailPayload) => {
+      setDetailSaving(true);
+      try {
+        const { error } = await supabase
+          .from("project_tasks")
+          .update({
+            title: payload.title,
+            description: payload.description,
+            status: payload.status,
+            priority: payload.priority,
+            assignee_profile_id: payload.assignee_profile_id,
+            due_date: payload.due_date,
+            activity_id: payload.activity_id ?? null,
+          })
+          .eq("id", taskId);
+        if (error) throw error;
+        setTasks((prev) =>
+          prev.map((t) => {
+            if (t.id !== taskId) return t;
+            return {
+              ...t,
+              title: payload.title,
+              description: payload.description,
+              status: payload.status as ProjectTask["status"],
+              priority: payload.priority as ProjectTask["priority"],
+              assignee_profile_id: payload.assignee_profile_id,
+              due_date: payload.due_date,
+              activity_id: payload.activity_id ?? null,
+            };
+          })
+        );
+        setDetailOpen(false);
+        setDetailTask(null);
+      } catch (e) {
+        console.error("Error saving task detail", e);
+      } finally {
+        setDetailSaving(false);
+      }
+    },
+    []
+  );
+
+  const validStatuses = useMemo(() => new Set(PROJECT_STATUS_KEYS), []);
+  const getStatusKey = useCallback(
+    (task: BoardTask) => {
+      const s = (task.status ?? "pending").toLowerCase().trim();
+      return validStatuses.has(s as (typeof PROJECT_STATUS_KEYS)[number]) ? s : "pending";
+    },
+    [validStatuses]
+  );
 
   if (!projectId) {
     return (
@@ -282,10 +450,36 @@ export default function ProjectTasksPage() {
             Creando...
           </div>
         )}
-        <header>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-100">Tareas</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Organiza y gestiona las tareas del proyecto.</p>
-        </header>
+        <TaskWorkspaceHeader
+          title="Tasks"
+          subtitle="Organize and track project tasks. Same task system as the global workspace, scoped to this project."
+          actions={
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+          }
+        />
+
+        <TaskFilterBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Search project tasks..."
+          scopeOptions={activityFilterOptions}
+          scopeValue={activityFilter ?? ""}
+          onScopeChange={(value) => {
+            const url = value
+              ? `/projects/${projectId}/tasks?activity=${encodeURIComponent(value)}`
+              : `/projects/${projectId}/tasks`;
+            router.push(url);
+          }}
+          statusOptions={statusFilterOptions}
+          statusValue={statusFilter}
+          onStatusChange={setStatusFilter}
+          priorityOptions={priorityFilterOptions}
+          priorityValue={priorityFilter}
+          onPriorityChange={setPriorityFilter}
+          assigneeOptions={assigneeFilterOptions}
+          assigneeValue={assigneeFilter}
+          onAssigneeChange={setAssigneeFilter}
+        />
 
         {activityFilter && (
           <p className="text-sm text-slate-400">
@@ -314,23 +508,52 @@ export default function ProjectTasksPage() {
           </div>
         ) : (
           <TasksBoard
-            title="Tareas del proyecto"
-            subtitle="Tareas asociadas a las actividades del proyecto. Úsalas para hacer seguimiento del trabajo real."
+            title="Board"
+            subtitle="Project tasks linked to activities. Drag to change status."
             tasks={visibleTasks}
             columns={KANBAN_COLUMNS}
             getStatusKey={getStatusKey}
             onCreateTask={handleCreateProjectTask}
             onStatusChange={handleUpdateStatus}
             onAssigneeChange={handleAssigneeChange}
+            onPriorityChange={handleUpdatePriority}
+            onDueDateChange={handleUpdateDueDate}
+            onOpenDetail={(task) => {
+              setDetailTask(task);
+              setDetailOpen(true);
+            }}
             showActivityField
             activityOptions={activityOptions}
             assigneeOptions={assigneeOptions}
             doneStatusKey="done"
             loading={loading}
             error={errorMsg}
+            viewMode={viewMode}
             openCreateInitially={openCreateFromQuery}
+            assignedToMeCount={assignedToMeCount}
           />
         )}
+
+      <TaskDetailDrawer
+        task={detailTask}
+        open={detailOpen}
+        onClose={() => {
+          setDetailOpen(false);
+          setDetailTask(null);
+        }}
+        onSave={handleSaveDetail}
+        context="project"
+        statusOptions={KANBAN_COLUMNS.map((c) => ({ value: c.id, label: c.label }))}
+        priorityOptions={[
+          { value: "high", label: "Alta" },
+          { value: "medium", label: "Media" },
+          { value: "low", label: "Baja" },
+        ]}
+        assigneeOptions={assigneeOptions}
+        activityOptions={activityOptions}
+        projectName={projectName}
+        saving={detailSaving}
+      />
     </div>
   );
 }

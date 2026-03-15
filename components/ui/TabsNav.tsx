@@ -23,11 +23,11 @@ export function TabsNav({
 
   const wrapperClass =
     variant === "dark"
-      ? "flex items-center gap-0.5 rounded-lg bg-slate-800/40 p-1 overflow-x-auto"
-      : "flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1";
+      ? "flex items-center gap-0.5 rounded-lg bg-slate-800/40 p-1 overflow-x-auto overflow-y-hidden min-w-0"
+      : "flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1 overflow-x-auto overflow-y-hidden min-w-0";
 
   return (
-    <div className={`${wrapperClass} ${className}`}>
+    <div className={`${wrapperClass} ${className}`.trim()}>
       {items.map((item) => {
         const active = item.exact
           ? pathname === item.href
@@ -54,7 +54,7 @@ export function TabsNav({
           <Link
             key={item.href}
             href={item.href}
-            className={`relative inline-flex items-center font-medium transition-colors ${sizeClass} ${linkClass}`}
+            className={`relative inline-flex items-center font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0 ${sizeClass} ${linkClass}`}
           >
             {item.icon ? <span className={iconClass}>{item.icon}</span> : null}
             <span className="truncate">{item.label}</span>

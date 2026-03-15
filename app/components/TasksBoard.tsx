@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState, FormEvent, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
+import { STANDARD_STATUS_ORDER } from "@/lib/taskWorkflow";
 import {
   DragDropContext,
   Droppable,
@@ -25,6 +26,7 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { User } from "lucide-react";
 import { TaskCard } from "@/app/components/TaskCard";
 import { TaskSummary } from "@/app/components/TaskSummary";
+import { TaskList } from "@/components/tasks/TaskList";
 import { TasksBoardSkeleton } from "@/components/skeletons/TasksBoardSkeleton";
 
 type TaskStatus = {
@@ -73,12 +75,34 @@ type TasksBoardProps = {
   assigneeOptions?: { value: string; label: string }[];
   /** When assignee is changed from a card. */
   onAssigneeChange?: (taskId: string, assigneeProfileId: string | null) => void | Promise<void>;
+  /** When priority is changed (list or card). */
+  onPriorityChange?: (taskId: string, priority: string) => void | Promise<void>;
+  /** When due date is changed (list or card). */
+  onDueDateChange?: (taskId: string, dueDate: string | null) => void | Promise<void>;
   /** Status key that counts as "done" for metrics (e.g. "DONE" or "done"). */
   doneStatusKey?: string;
   loading?: boolean;
   error?: string | null;
   /** When true, focus the create-task input on mount (e.g. when opened via ?new=1). */
   openCreateInitially?: boolean;
+  /** Global board only: filter to tasks assigned to or created by this user id. */
+  filterByUserId?: string | null;
+  /** Global board only: filter by search string (title, description). */
+  searchQuery?: string;
+  /** Global board only: filter by status_id. */
+  statusFilter?: string;
+  /** Global board only: filter by priority. */
+  priorityFilter?: string;
+  /** View mode: kanban (default) or list. List only applied in uncontrolled (global) mode. */
+  viewMode?: "kanban" | "list";
+  /** Current user id for "Assigned to me" metric (global board). */
+  currentUserId?: string | null;
+  /** Controlled mode: when provided, show "Assigned to me" in KPI strip. */
+  assignedToMeCount?: number;
+  /** When provided (global board), open task detail drawer. */
+  onOpenDetail?: (task: BoardTask) => void;
+  /** When changed (global board), refetch tasks (e.g. after drawer save). */
+  refreshTrigger?: number | string;
 };
 
 export type BoardTask = {
@@ -134,6 +158,7 @@ const COLUMN_COLOR_MAP: Record<string, string> = {
   pending: "bg-slate-500",
   in_progress: "bg-indigo-500",
   blocked: "bg-red-500",
+  review: "bg-violet-500",
   done: "bg-emerald-500",
 };
 
@@ -147,6 +172,7 @@ const COLUMN_BORDER_MAP: Record<string, string> = {
   pending: "border-t-slate-500",
   in_progress: "border-t-indigo-500",
   blocked: "border-t-red-500",
+  review: "border-t-violet-500",
   done: "border-t-emerald-500",
 };
 
@@ -192,6 +218,7 @@ type ProjectBoardColumnProps = {
   activityOptions: { value: string; label: string }[];
   assigneeOptions?: { value: string; label: string }[];
   onAssigneeChange?: (taskId: string, assigneeProfileId: string | null) => void | Promise<void>;
+  onOpenDetail?: (task: BoardTask) => void;
 };
 
 const ProjectBoardColumn = React.memo(function ProjectBoardColumn({
@@ -205,6 +232,7 @@ const ProjectBoardColumn = React.memo(function ProjectBoardColumn({
   activityOptions,
   assigneeOptions,
   onAssigneeChange,
+  onOpenDetail,
 }: ProjectBoardColumnProps) {
   const accentBorder = COLUMN_BORDER_MAP[id] ?? "border-t-slate-500";
   const dotClass = COLUMN_COLOR_MAP[id] ?? "bg-slate-500";
@@ -255,6 +283,7 @@ const ProjectBoardColumn = React.memo(function ProjectBoardColumn({
                 onStatusChange={onStatusChange}
                 assigneeOptions={assigneeOptions}
                 onAssigneeChange={onAssigneeChange}
+                onOpenDetail={onOpenDetail}
               />
             );
           })}
@@ -277,10 +306,21 @@ export default function TasksBoard({
   activityOptions = [],
   assigneeOptions = [],
   onAssigneeChange,
+  onPriorityChange: controlledOnPriorityChange,
+  onDueDateChange: controlledOnDueDateChange,
+  onOpenDetail,
   doneStatusKey = "DONE",
   loading: controlledLoading = false,
   error: controlledError,
   openCreateInitially = false,
+  filterByUserId = null,
+  searchQuery: filterSearchQuery = "",
+  statusFilter: filterStatusId = "",
+  priorityFilter: filterPriority = "",
+  viewMode = "kanban",
+  currentUserId = null,
+  assignedToMeCount: propAssignedToMeCount,
+  refreshTrigger,
 }: TasksBoardProps) {
   const isControlled =
     controlledTasks !== undefined &&
@@ -386,7 +426,7 @@ export default function TasksBoard({
     };
 
     loadData();
-  }, [projectId, isControlled]);
+  }, [projectId, isControlled, refreshTrigger]);
 
   // Datos para modo controlled
   const controlledGrouped = useMemo(() => {
@@ -406,19 +446,20 @@ export default function TasksBoard({
     today.setHours(0, 0, 0, 0);
     let completed = 0;
     let blocked = 0;
+    let active = 0; // TODO + IN_PROGRESS + REVIEW
     let overdue = 0;
     for (const t of controlledTasks) {
-      const key = controlledGetStatusKey(t);
-      if (key === doneStatusKey) completed += 1;
-      if (key === "blocked" || key === "BLOCKED") blocked += 1;
-      if (key !== doneStatusKey && t.due_date) {
+      const key = (controlledGetStatusKey(t) ?? "").toLowerCase().trim();
+      if (key === (doneStatusKey ?? "done").toLowerCase()) completed += 1;
+      else if (key === "blocked") blocked += 1;
+      else if (key === "pending" || key === "in_progress" || key === "review") active += 1;
+      if (key !== (doneStatusKey ?? "done").toLowerCase() && t.due_date) {
         const due = new Date(t.due_date);
         due.setHours(0, 0, 0, 0);
         if (due < today) overdue += 1;
       }
     }
     const total = controlledTasks.length;
-    const active = total - completed;
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
     let riskLevel: "Alto" | "Medio" | "Bajo" = "Bajo";
     if (blocked > 0 || overdue > 0) riskLevel = "Alto";
@@ -427,7 +468,7 @@ export default function TasksBoard({
       totalActivities: total,
       activeActivities: active,
       blockedActivities: blocked,
-      reviewActivities: 0,
+      reviewActivities: controlledTasks.filter((t) => (controlledGetStatusKey(t) ?? "").toLowerCase().trim() === "review").length,
       completedActivities: completed,
       overdueActivities: overdue,
       completionRate,
@@ -435,18 +476,41 @@ export default function TasksBoard({
     };
   }, [isControlled, controlledTasks, controlledGetStatusKey, doneStatusKey]);
 
-  // Agrupado por estado para pintar columnas (opcionalmente filtrado por fase)
+  // Filter tasks: phase (global), filterByUserId, search, status, priority
   const filteredTasks = useMemo(() => {
-    if (!phaseFilter) return tasks;
-    return tasks.filter((t) => t.activate_phase_key === phaseFilter);
-  }, [tasks, phaseFilter]);
+    let list = tasks;
+    if (phaseFilter) list = list.filter((t) => t.activate_phase_key === phaseFilter);
+    if (filterByUserId) {
+      list = list.filter(
+        (t) => t.assignee_id === filterByUserId || t.created_by === filterByUserId
+      );
+    }
+    const q = (filterSearchQuery ?? "").trim().toLowerCase();
+    if (q) {
+      list = list.filter((t) => {
+        const title = (t.title ?? "").toLowerCase();
+        const desc = (t.description ?? "").toLowerCase();
+        return title.includes(q) || desc.includes(q);
+      });
+    }
+    if (filterStatusId) list = list.filter((t) => t.status_id === filterStatusId);
+    if (filterPriority) list = list.filter((t) => t.priority === filterPriority);
+    return list;
+  }, [tasks, phaseFilter, filterByUserId, filterSearchQuery, filterStatusId, filterPriority]);
+
+  const orderedStatuses = useMemo(() => {
+    const codeToOrder = new Map<string, number>(STANDARD_STATUS_ORDER.map((c, i) => [c, i]));
+    return [...statuses]
+      .filter((s) => codeToOrder.has((s.code ?? "").toUpperCase()))
+      .sort((a, b) => (codeToOrder.get((a.code ?? "").toUpperCase()) ?? 99) - (codeToOrder.get((b.code ?? "").toUpperCase()) ?? 99));
+  }, [statuses]);
 
   const groupedByStatus = useMemo(() => {
-    return statuses.map((status) => ({
+    return orderedStatuses.map((status) => ({
       status,
       tasks: filteredTasks.filter((t) => t.status_id === status.id),
     }));
-  }, [statuses, filteredTasks]);
+  }, [orderedStatuses, filteredTasks]);
 
   // Métricas derivadas de tareas (sin llamadas a BD) — usamos tareas filtradas
   const activityMetrics = useMemo(() => {
@@ -484,6 +548,13 @@ export default function TasksBoard({
     if (blockedActivities > 0 || overdueActivities > 0) riskLevel = "Alto";
     else if (completionRate < 50) riskLevel = "Medio";
 
+    const assignedToMeCount =
+      currentUserId != null && currentUserId !== ""
+        ? tasks.filter(
+            (t) => t.assignee_id === currentUserId || t.created_by === currentUserId
+          ).length
+        : undefined;
+
     return {
       totalActivities,
       activeActivities,
@@ -493,8 +564,9 @@ export default function TasksBoard({
       overdueActivities,
       completionRate,
       riskLevel,
+      assignedToMeCount,
     };
-  }, [filteredTasks, statuses]);
+  }, [filteredTasks, statuses, tasks, currentUserId]);
 
   const getPriorityLabel = (priority: TaskPriority) => {
     switch (priority) {
@@ -630,22 +702,43 @@ export default function TasksBoard({
   // Cambio de estado desde el select (lo mantenemos como alternativa)
   const handleStatusChange = async (taskId: string, newStatusId: string) => {
     setError(null);
-
-    // update optimista
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, status_id: newStatusId } : t))
     );
-
     const { error: updateError } = await supabase
       .from("tasks")
       .update({ status_id: newStatusId })
       .eq("id", taskId);
-
     if (updateError) {
       handleSupabaseError("tasks update status", updateError);
       setError("No se pudo actualizar el estado.");
-      // en caso extremo podrías recargar desde BD
     }
+  };
+
+  const handlePriorityChange = async (taskId: string, priority: string) => {
+    if (isControlled) return;
+    setError(null);
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, priority: priority as TaskPriority } : t))
+    );
+    const { error: updateError } = await supabase
+      .from("tasks")
+      .update({ priority })
+      .eq("id", taskId);
+    if (updateError) handleSupabaseError("tasks update priority", updateError);
+  };
+
+  const handleDueDateChange = async (taskId: string, dueDate: string | null) => {
+    if (isControlled) return;
+    setError(null);
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, due_date: dueDate } : t))
+    );
+    const { error: updateError } = await supabase
+      .from("tasks")
+      .update({ due_date: dueDate })
+      .eq("id", taskId);
+    if (updateError) handleSupabaseError("tasks update due_date", updateError);
   };
 
   // Drag & drop → mover tarjeta de una columna a otra
@@ -928,11 +1021,43 @@ export default function TasksBoard({
           completedPercent={displayMetrics.completionRate}
           riskLevel={displayMetrics.riskLevel}
           review={!isControlled ? displayMetrics.reviewActivities : undefined}
+          assignedToMe={
+            propAssignedToMeCount !== undefined
+              ? propAssignedToMeCount
+              : !isControlled && "assignedToMeCount" in displayMetrics
+                ? (displayMetrics as { assignedToMeCount?: number }).assignedToMeCount
+                : undefined
+          }
         />
       )}
 
-      {/* Board: controlled mode (project tasks) - scroll container + padding so last column has breathing room */}
-      {isControlled && (
+      {/* List view: controlled mode (project tasks) */}
+      {isControlled && viewMode === "list" && (
+        <div className="relative w-full min-w-0">
+          <TaskList
+            tasks={controlledTasks ?? []}
+            context="project"
+            statusOptions={(controlledColumns ?? []).map((c) => ({ value: c.id, label: c.label }))}
+            getStatusKey={controlledGetStatusKey!}
+            onStatusChange={controlledOnStatusChange!}
+            priorityOptions={[
+              { value: "high", label: "Alta" },
+              { value: "medium", label: "Media" },
+              { value: "low", label: "Baja" },
+            ]}
+            onPriorityChange={controlledOnPriorityChange}
+            assigneeOptions={assigneeOptions}
+            onAssigneeChange={onAssigneeChange}
+            onDueDateChange={controlledOnDueDateChange}
+            onOpenDetail={onOpenDetail}
+            getActivityLabel={(id) => activityOptions.find((o) => o.value === id)?.label ?? null}
+            loading={effectiveLoading}
+          />
+        </div>
+      )}
+
+      {/* Board: controlled mode (project tasks) - Kanban */}
+      {isControlled && viewMode !== "list" && (
         <div className="relative w-full min-w-0">
           {effectiveLoading ? (
             <TasksBoardSkeleton columnCount={controlledGrouped?.length ?? 5} />
@@ -960,6 +1085,7 @@ export default function TasksBoard({
                     activityOptions={activityOptions}
                     assigneeOptions={assigneeOptions}
                     onAssigneeChange={onAssigneeChange}
+                    onOpenDetail={onOpenDetail}
                   />
                 ))}
                 </div>
@@ -1019,8 +1145,42 @@ export default function TasksBoard({
         </div>
       )}
 
+      {/* List view (global mode) */}
+      {!isControlled && viewMode === "list" && (
+        <div className="relative w-full min-w-0">
+          <TaskList
+            tasks={filteredTasks.map((t) => ({
+              id: t.id,
+              title: t.title,
+              status_id: t.status_id,
+              priority: t.priority,
+              due_date: t.due_date,
+              description: t.description,
+              created_at: t.created_at,
+              updated_at: t.updated_at,
+              assignee_profile_id: (t as Task).assignee_id ?? null,
+            }))}
+            context="global"
+            statusOptions={statuses.map((s) => ({ value: s.id, label: s.name }))}
+            getStatusKey={(t) => t.status_id ?? ""}
+            onStatusChange={handleStatusChange}
+            priorityOptions={[
+              { value: "high", label: "Alta" },
+              { value: "medium", label: "Media" },
+              { value: "low", label: "Baja" },
+            ]}
+            onPriorityChange={handlePriorityChange}
+            onDueDateChange={handleDueDateChange}
+            onOpenDetail={onOpenDetail ?? undefined}
+            scopeLabel={filterByUserId ? "My" : "Global"}
+            getProjectName={() => null}
+            loading={loading}
+          />
+        </div>
+      )}
+
       {/* Board con drag & drop (global mode) — scroll container with end padding */}
-      {!isControlled && (
+      {!isControlled && viewMode !== "list" && (
       <div className="relative w-full min-w-0">
         {loading ? (
           <TasksBoardSkeleton />

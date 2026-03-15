@@ -211,8 +211,8 @@ export default function ProjectBrainPage() {
       <ProjectPageHeader
         variant="section"
         dark
-        title="Project Brain"
-        subtitle="Resumen del conocimiento aprendido por el proyecto a partir de las notas: problemas resueltos, soluciones aplicadas, lecciones y decisiones."
+        title="Cerebro del proyecto"
+        subtitle="Conocimiento extraído de las notas: problemas resueltos, soluciones aplicadas, lecciones y decisiones."
       />
       {!loading && lastUpdated && (
         <p className="text-xs text-slate-500 -mt-2">Última actualización: {lastUpdated}</p>
@@ -220,15 +220,15 @@ export default function ProjectBrainPage() {
 
       {/* Ask Sapito quick actions (visible only if user can use project AI) */}
       {canUseProjectAI && (
-        <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 px-5 py-4">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-2">Preguntar a Sapito</p>
+        <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5">
+          <p className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-3">Preguntar a Sapito</p>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Sugerencias de consulta">
             {SAPITO_BRAIN_SUGGESTIONS.map((text) => (
               <button
                 key={text}
                 type="button"
                 onClick={() => openProjectCopilotWithMessage(text)}
-                className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-300 hover:border-indigo-500/50 hover:bg-indigo-500/10 hover:text-indigo-200 transition-colors"
+                className="rounded-xl border border-slate-600 bg-slate-800/60 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:border-slate-500 transition-colors duration-150"
               >
                 {text}
               </button>
@@ -244,20 +244,17 @@ export default function ProjectBrainPage() {
       )}
 
       {loading ? (
-        <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 px-6 py-10 text-sm text-slate-500">
+        <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-10 text-sm text-slate-500">
           Cargando…
         </div>
       ) : memories.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-700/60 bg-slate-800/30 px-6 py-12 text-center">
-          <p className="text-sm font-medium text-slate-300">Aún no hay memoria en el Project Brain</p>
-          <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
-            El Project Brain se irá llenando automáticamente cuando documentes en las notas del proyecto problemas, soluciones, decisiones o lecciones aprendidas.
+        <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-12 px-6 text-center">
+          <p className="text-base font-medium text-slate-200">Aún no hay memoria en el Cerebro del proyecto</p>
+          <p className="mt-1.5 text-sm text-slate-500 max-w-md mx-auto">
+            Se irá llenando cuando documentes en las notas problemas, soluciones, decisiones o lecciones aprendidas.
           </p>
           <p className="mt-2 text-xs text-slate-500">
             Crea notas en la pestaña Notas del proyecto para que el sistema extraiga y muestre aquí el conocimiento.
-          </p>
-          <p className="mt-3 text-xs text-slate-500">
-            El Brain será más útil a medida que añadas más notas al proyecto.
           </p>
         </div>
       ) : (
@@ -301,7 +298,7 @@ export default function ProjectBrainPage() {
 
           {/* AI Insights */}
           {insights.length > 0 && (
-            <div className="rounded-2xl border border-slate-700/80 bg-slate-800/50 shadow-lg shadow-black/5 px-5 py-4">
+            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 sm:px-5 py-4">
               <h3 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-2">Insights del proyecto</h3>
               <ul className="list-disc list-inside space-y-1 text-sm text-slate-400">
                 {insights.map((line, idx) => (
@@ -314,14 +311,14 @@ export default function ProjectBrainPage() {
           {grouped.map((section) => (
             <section
               key={section.type}
-              className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden"
+              className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden"
             >
               <h2 className="border-b border-slate-700/60 bg-slate-800/50 px-5 py-3.5 text-[11px] font-semibold uppercase tracking-widest text-slate-500">
                 {section.label}
               </h2>
               <ul className="divide-y divide-slate-700/40">
                 {section.items.map((item) => (
-                  <li key={item.id} className="px-5 py-4 hover:bg-slate-800/30 transition">
+                  <li key={item.id} className="px-5 py-4 hover:bg-slate-800/50 transition-colors duration-150 cursor-pointer">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         {item.title?.trim() && (

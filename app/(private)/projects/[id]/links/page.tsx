@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { Pencil, Trash2 } from "lucide-react";
@@ -98,6 +98,7 @@ export default function ProjectLinksPage() {
   const [formUrl, setFormUrl] = useState("");
   const [formType, setFormType] = useState("");
   const [saving, setSaving] = useState(false);
+  const linkModalFirstInputRef = useRef<HTMLInputElement>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<ProjectLinkRow | null>(null);
@@ -230,6 +231,19 @@ export default function ProjectLinksPage() {
       setFormError(null);
     }
   };
+
+  useEffect(() => {
+    if (!modalOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeModal();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const id = requestAnimationFrame(() => linkModalFirstInputRef.current?.focus());
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      cancelAnimationFrame(id);
+    };
+  }, [modalOpen]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -478,26 +492,26 @@ export default function ProjectLinksPage() {
       )}
 
       {/* Operational project links */}
-      <section className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-700/60 bg-slate-800/50">
-          <h2 className="text-sm font-semibold text-slate-200">Enlaces del proyecto</h2>
-          <p className="mt-1 text-xs text-slate-400 max-w-2xl">
-            Enlaces operativos de navegación: Jira, Confluence, carpeta principal, tableros y accesos rápidos a documentación y herramientas.
+      <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-700/50">
+          <h2 className="text-sm font-medium text-slate-200">Enlaces del proyecto</h2>
+          <p className="mt-0.5 text-xs text-slate-400 max-w-2xl">
+            Enlaces operativos: Jira, Confluence, documentación y herramientas.
           </p>
         </div>
         {loading ? (
           <div className="px-6 py-10 text-sm text-slate-500">Cargando enlaces…</div>
         ) : links.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <p className="text-sm font-medium text-slate-300">No hay enlaces registrados</p>
-            <p className="mt-1.5 text-sm text-slate-500">Añade enlaces operativos con el botón «Nuevo enlace» para accesos rápidos desde el proyecto.</p>
+          <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-12 px-6 text-center">
+            <p className="text-base font-medium text-slate-200">No hay enlaces registrados</p>
+            <p className="mt-1.5 text-sm text-slate-500">Añade enlaces con «Nuevo enlace» para accesos rápidos desde el proyecto.</p>
           </div>
         ) : (
-          <ul className="divide-y divide-slate-700/50">
+          <ul className="divide-y divide-slate-700/40">
             {links.map((link) => (
               <li
                 key={link.id}
-                className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-slate-800/40 transition-colors"
+                className="flex items-center justify-between gap-4 px-6 py-4 cursor-pointer hover:bg-slate-800/50 transition-colors duration-150"
               >
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -505,7 +519,7 @@ export default function ProjectLinksPage() {
                       href={link.url ?? "#"}
                       target="_blank"
                       rel="noreferrer"
-                      className="font-medium text-indigo-300 hover:text-indigo-200 hover:underline"
+                      className="font-medium text-slate-100 hover:text-indigo-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0 rounded"
                     >
                       {link.name ?? "Sin nombre"}
                     </a>
@@ -526,7 +540,7 @@ export default function ProjectLinksPage() {
                     <button
                       type="button"
                       onClick={() => openEditModal(link)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-600/80 bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-600/80 bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
                       title="Editar"
                       aria-label="Editar"
                     >
@@ -535,7 +549,7 @@ export default function ProjectLinksPage() {
                     <button
                       type="button"
                       onClick={() => setDeleteTarget(link)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-600/80 bg-slate-800/60 text-slate-400 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/30 transition-colors"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-600/80 bg-slate-800/60 text-slate-400 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/30 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
                       title="Eliminar"
                       aria-label="Eliminar"
                     >
@@ -550,8 +564,8 @@ export default function ProjectLinksPage() {
       </section>
 
       {/* Project knowledge sources (Sapito) */}
-      <section className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-700/60 bg-slate-800/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-700/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="relative h-10 w-10 rounded-xl overflow-hidden bg-slate-700 shrink-0 ring-1 ring-slate-600/50">
               <Image
@@ -563,7 +577,7 @@ export default function ProjectLinksPage() {
               />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-slate-200">Fuentes de conocimiento</h2>
+              <h2 className="text-sm font-medium text-slate-200">Fuentes de conocimiento</h2>
               <p className="mt-0.5 text-xs text-slate-400 max-w-2xl">
                 Fuentes conectadas a este proyecto para que Sapito las use como contexto. Las cuentas de Google Drive y fuentes globales se gestionan en Admin → Knowledge Sources.
               </p>
@@ -576,7 +590,7 @@ export default function ProjectLinksPage() {
                   type="button"
                   onClick={handleSyncGoogleDrive}
                   disabled={syncDriveLoading}
-                  className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 hover:border-slate-500 disabled:opacity-60 transition-colors"
+                  className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 hover:border-slate-500 disabled:opacity-60 transition-colors duration-150"
                 >
                   {syncDriveLoading ? "Sincronizando…" : "Sincronizar Drive"}
                 </button>
@@ -584,7 +598,7 @@ export default function ProjectLinksPage() {
               <button
                 type="button"
                 onClick={openSourceModal}
-                className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors shrink-0"
+                className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors duration-150 shrink-0"
               >
                 Nueva fuente
               </button>
@@ -597,7 +611,7 @@ export default function ProjectLinksPage() {
             <button
               type="button"
               onClick={() => void loadSources()}
-              className="rounded-lg border border-red-600/60 bg-red-900/30 px-2.5 py-1 text-xs font-medium text-red-200 hover:bg-red-800/40 transition-colors"
+              className="rounded-lg border border-red-600/60 bg-red-900/30 px-2.5 py-1 text-xs font-medium text-red-200 hover:bg-red-800/40 transition-colors duration-150"
             >
               Reintentar
             </button>
@@ -623,7 +637,7 @@ export default function ProjectLinksPage() {
             </p>
             <a
               href="/admin"
-              className="mt-4 inline-block text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+              className="mt-4 inline-block text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150"
             >
               Ir a Admin → Knowledge Sources
             </a>
@@ -632,7 +646,7 @@ export default function ProjectLinksPage() {
                 <button
                   type="button"
                   onClick={openSourceModal}
-                  className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors"
+                  className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors duration-150"
                 >
                   Nueva fuente
                 </button>
@@ -644,7 +658,7 @@ export default function ProjectLinksPage() {
             {sources.map((src) => (
               <li
                 key={src.id}
-                className="flex items-start justify-between gap-4 px-6 py-4 hover:bg-slate-800/40 transition-colors"
+                className="flex items-start justify-between gap-4 px-6 py-4 cursor-pointer hover:bg-slate-800/50 transition-colors duration-150"
               >
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <p className="font-medium text-slate-100">{src.name}</p>
@@ -685,7 +699,7 @@ export default function ProjectLinksPage() {
                       type="button"
                       onClick={() => handleSyncSource(src)}
                       disabled={syncingSourceId !== null}
-                      className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors"
+                      className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors duration-150"
                     >
                       {syncingSourceId === src.id ? "Sincronizando…" : "Sincronizar"}
                     </button>
@@ -700,15 +714,19 @@ export default function ProjectLinksPage() {
       {/* Create/Edit link modal */}
       {modalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 overflow-y-auto"
           onClick={closeModal}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="link-modal-title"
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-slate-700/80 bg-slate-800/95 shadow-xl ring-1 ring-slate-700/50 p-6 md:p-8"
+            className="w-full max-w-md min-w-0 rounded-2xl border border-slate-700/80 bg-slate-800/95 shadow-xl ring-1 ring-slate-700/50 p-6 md:p-8 max-h-[85vh] overflow-y-auto my-4"
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (e.key === "Escape") closeModal(); }}
           >
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-slate-100">
+              <h2 id="link-modal-title" className="text-lg font-semibold text-slate-100">
                 {modalMode === "create" ? "Nuevo enlace" : "Editar enlace"}
               </h2>
               <p className="mt-1 text-sm text-slate-400">
@@ -717,22 +735,25 @@ export default function ProjectLinksPage() {
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Nombre *</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5" htmlFor="link-form-name">Nombre *</label>
                 <input
+                  id="link-form-name"
+                  ref={linkModalFirstInputRef}
                   type="text"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:border-indigo-500/50"
                   placeholder="Ej: Documentación SAP"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">URL *</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5" htmlFor="link-form-url">URL *</label>
                 <input
+                  id="link-form-url"
                   type="url"
                   value={formUrl}
                   onChange={(e) => setFormUrl(e.target.value)}
-                  className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:border-indigo-500/50"
                   placeholder="https://..."
                 />
               </div>
@@ -741,7 +762,7 @@ export default function ProjectLinksPage() {
                 <select
                   value={formType}
                   onChange={(e) => setFormType(e.target.value)}
-                  className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:border-indigo-500/50"
                 >
                   {LINK_TYPE_OPTIONS.map((opt) => (
                     <option key={opt.value || "empty"} value={opt.value}>
@@ -758,14 +779,14 @@ export default function ProjectLinksPage() {
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="rounded-xl border border-slate-600 bg-slate-700/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors"
+                  className="rounded-xl border border-slate-600 bg-slate-700/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-xl bg-indigo-500/90 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60 transition-colors"
+                  className="rounded-xl bg-indigo-500/90 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
                 >
                   {saving ? "Guardando…" : modalMode === "create" ? "Crear" : "Guardar"}
                 </button>
@@ -780,12 +801,16 @@ export default function ProjectLinksPage() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
           onClick={() => !deleting && setDeleteTarget(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="link-delete-title"
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-slate-700/80 bg-slate-800/95 p-6 shadow-xl ring-1 ring-slate-700/50"
+            className="w-full max-w-md min-w-0 rounded-2xl border border-slate-700/80 bg-slate-800/95 p-6 shadow-xl ring-1 ring-slate-700/50"
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (e.key === "Escape") !deleting && setDeleteTarget(null); }}
           >
-            <h3 className="text-lg font-semibold text-slate-100">Eliminar enlace</h3>
+            <h3 id="link-delete-title" className="text-lg font-semibold text-slate-100">Eliminar enlace</h3>
             <p className="mt-2 text-sm text-slate-400">
               ¿Eliminar «{deleteTarget.name ?? "Sin nombre"}»? Esta acción no se puede deshacer.
             </p>
@@ -797,7 +822,7 @@ export default function ProjectLinksPage() {
                 type="button"
                 onClick={() => setDeleteTarget(null)}
                 disabled={deleting}
-                className="rounded-xl border border-slate-600 bg-slate-700/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors"
+                className="rounded-xl border border-slate-600 bg-slate-700/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
               >
                 Cancelar
               </button>
@@ -805,7 +830,7 @@ export default function ProjectLinksPage() {
                 type="button"
                 onClick={handleDeleteConfirm}
                 disabled={deleting}
-                className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-60 transition-colors"
+                className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-60 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
               >
                 {deleting ? "Eliminando…" : "Eliminar"}
               </button>
@@ -821,7 +846,7 @@ export default function ProjectLinksPage() {
           onClick={closeSourceModal}
         >
           <div
-            className="w-full max-w-lg my-8 rounded-2xl border border-slate-700/80 bg-slate-800/95 shadow-xl ring-1 ring-slate-700/50 overflow-hidden"
+            className="w-full max-w-lg min-w-0 my-8 rounded-2xl border border-slate-700/80 bg-slate-800/95 shadow-xl ring-1 ring-slate-700/50 overflow-hidden max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 md:p-8 border-b border-slate-700/60">
@@ -951,14 +976,14 @@ export default function ProjectLinksPage() {
                   type="button"
                   onClick={closeSourceModal}
                   disabled={savingSource}
-                  className="rounded-xl border border-slate-600 bg-slate-700/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors"
+                  className="rounded-xl border border-slate-600 bg-slate-700/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors duration-150"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingSource}
-                  className="rounded-xl bg-indigo-500/90 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60 transition-colors"
+                  className="rounded-xl bg-indigo-500/90 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60 transition-colors duration-150"
                 >
                   {savingSource ? "Guardando…" : "Crear fuente"}
                 </button>

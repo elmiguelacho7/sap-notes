@@ -3,6 +3,7 @@
 import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { ChevronRight } from "lucide-react";
 import { AssigneeDropdown } from "@/app/components/AssigneeDropdown";
 import type { BoardTask } from "@/app/components/TasksBoard";
 
@@ -16,6 +17,7 @@ type TaskCardProps = {
   onStatusChange: (taskId: string, newStatusKey: string) => void | Promise<void>;
   assigneeOptions?: { value: string; label: string }[];
   onAssigneeChange?: (taskId: string, assigneeProfileId: string | null) => void | Promise<void>;
+  onOpenDetail?: (task: BoardTask) => void;
 };
 
 function TaskCardComponent({
@@ -28,6 +30,7 @@ function TaskCardComponent({
   onStatusChange,
   assigneeOptions,
   onAssigneeChange,
+  onOpenDetail,
 }: TaskCardProps) {
   const {
     attributes,
@@ -56,7 +59,22 @@ function TaskCardComponent({
       <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-lg ${leftBarClass}`} />
       <div className="pl-4 min-w-0 flex-1 flex flex-col">
         <div className="pr-0 space-y-1 min-w-0">
-          <p className="text-sm font-semibold text-slate-100 truncate" title={task.title}>{task.title}</p>
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <p className="text-sm font-semibold text-slate-100 truncate min-w-0" title={task.title}>{task.title}</p>
+            {task.priority && ["high", "medium", "low"].includes((task.priority ?? "").toLowerCase()) && (
+              <span
+                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                  (task.priority ?? "").toLowerCase() === "high"
+                    ? "bg-red-500/20 text-red-300 border border-red-500/30"
+                    : (task.priority ?? "").toLowerCase() === "medium"
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                      : "bg-slate-500/20 text-slate-400 border border-slate-500/30"
+                }`}
+              >
+                {(task.priority ?? "").toLowerCase() === "high" ? "Alta" : (task.priority ?? "").toLowerCase() === "medium" ? "Media" : "Baja"}
+              </span>
+            )}
+          </div>
           {activityLabel != null && (
             <p className="text-[11px] text-slate-500 leading-tight min-w-0 flex items-baseline gap-1">
               <span className="shrink-0">Actividad:</span>
@@ -110,11 +128,26 @@ function TaskCardComponent({
               </option>
             ))}
           </select>
-          {task.created_at && (
-            <span className="text-[11px] text-slate-500 shrink-0">
-              {new Date(task.created_at).toLocaleDateString()}
-            </span>
-          )}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {task.created_at && (
+              <span className="text-[11px] text-slate-500">
+                {new Date(task.created_at).toLocaleDateString()}
+              </span>
+            )}
+            {onOpenDetail && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenDetail(task);
+                }}
+                className="inline-flex items-center gap-0.5 rounded px-1.5 py-1 text-[11px] font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 transition-colors"
+              >
+                Open
+                <ChevronRight className="h-3 w-3" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

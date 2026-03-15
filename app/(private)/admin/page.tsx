@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { Users, Zap, Brain, Shield, BarChart2, Sliders, UserCog } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { PageShell } from "@/components/layout/PageShell";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { getSapitoGeneral } from "@/lib/agents/agentRegistry";
 import {
   INDUSTRY_OPTIONS,
@@ -82,9 +82,9 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <PageShell wide={false}>
+      <PageShell wide={false} className="bg-slate-950">
         <div className="py-12 text-center">
-          <p className="text-sm font-medium text-slate-700">Cargando…</p>
+          <p className="text-sm font-medium text-slate-300">Cargando…</p>
           <p className="mt-1 text-sm text-slate-500">Un momento.</p>
         </div>
       </PageShell>
@@ -93,9 +93,9 @@ export default function AdminPage() {
 
   if (appRole !== "superadmin") {
     return (
-      <PageShell wide={false}>
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-5 py-12 text-center">
-          <p className="text-sm font-medium text-slate-700">Acceso restringido</p>
+      <PageShell wide={false} className="bg-slate-950">
+        <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-5 py-12 text-center">
+          <p className="text-sm font-medium text-slate-200">Acceso restringido</p>
           <p className="mt-1 text-sm text-slate-500">
             Solo los administradores pueden ver este panel.
           </p>
@@ -107,88 +107,191 @@ export default function AdminPage() {
   return <AdminPanel />;
 }
 
+type OverviewStats = {
+  usersActive: number | null;
+  projectsTotal: number | null;
+  knowledgeIntegrations: number | null;
+  capacityPct: number | null;
+};
+
 function AdminPanel() {
   const [activeTab, setActiveTab] = useState<TabId>("users");
+  const [overview, setOverview] = useState<OverviewStats>({
+    usersActive: null,
+    projectsTotal: null,
+    knowledgeIntegrations: null,
+    capacityPct: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const headers = await getAdminAuthHeaders();
+      try {
+        const [usersRes, projectsRes, integrationsRes, capacityRes] = await Promise.all([
+          fetch("/api/admin/users", { headers }),
+          supabase.from("projects").select("id", { count: "exact", head: true }),
+          fetch("/api/integrations", { headers }),
+          fetch("/api/admin/quotas/capacity", { headers }),
+        ]);
+
+        if (cancelled) return;
+
+        const usersData = usersRes.ok ? ((await usersRes.json()) as { users?: { is_active?: boolean }[] }) : null;
+        const usersActive = usersData?.users?.filter((u) => u.is_active === true).length ?? null;
+
+        const projectsTotal = projectsRes.error ? null : (projectsRes.count ?? null);
+
+        let knowledgeIntegrations: number | null = null;
+        if (integrationsRes.ok) {
+          const data = (await integrationsRes.json()) as { integrations?: { provider?: string }[] };
+          knowledgeIntegrations = (data.integrations ?? []).filter((i) => i.provider === "google_drive").length;
+        }
+
+        let capacityPct: number | null = null;
+        if (capacityRes.ok) {
+          const cap = (await capacityRes.json()) as {
+            summary?: { usersAtLimit?: number; usersNearLimit?: number; userUsage?: unknown[] };
+          };
+          const total = cap.summary?.userUsage?.length ?? 0;
+          const atLimit = cap.summary?.usersAtLimit ?? 0;
+          const nearLimit = cap.summary?.usersNearLimit ?? 0;
+          if (total > 0) capacityPct = Math.round(((atLimit + nearLimit * 0.5) / total) * 100);
+        }
+        setOverview({
+          usersActive,
+          projectsTotal,
+          knowledgeIntegrations,
+          capacityPct,
+        });
+      } catch {
+        if (!cancelled) setOverview((o) => ({ ...o }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const iconClass = "size-4 shrink-0 text-slate-400";
 
   return (
-    <PageShell wide={false}>
+    <PageShell wide={false} className="bg-slate-950">
       <div className="space-y-6">
-        <PageHeader
-          title="Administración de la plataforma"
-          description="Usuarios, activaciones, roles globales y fuentes de conocimiento."
-        />
+        <div className="space-y-1">
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-100">Admin</h1>
+          <p className="text-sm text-slate-500">Platform administration and system configuration.</p>
+        </div>
 
-        <div className="inline-flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1.5 text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Users</p>
+            <p className="text-lg font-semibold text-slate-100 mt-0.5">
+              {overview.usersActive !== null ? overview.usersActive : "—"}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">Active users in the system</p>
+          </div>
+          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Projects</p>
+            <p className="text-lg font-semibold text-slate-100 mt-0.5">
+              {overview.projectsTotal !== null ? overview.projectsTotal : "—"}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">Total projects</p>
+          </div>
+          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Knowledge Sources</p>
+            <p className="text-lg font-semibold text-slate-100 mt-0.5">
+              {overview.knowledgeIntegrations !== null ? overview.knowledgeIntegrations : "—"}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">Connected integrations</p>
+          </div>
+          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Capacity</p>
+            <p className="text-lg font-semibold text-slate-100 mt-0.5">
+              {overview.capacityPct !== null ? `${overview.capacityPct}%` : "—"}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">Usage / near limit</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 rounded-lg border border-slate-700/60 bg-slate-900 p-1">
           <button
             type="button"
             onClick={() => setActiveTab("users")}
-            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
               activeTab === "users"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-900"
+                ? "bg-slate-800 text-slate-100"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
             }`}
           >
+            <Users className={iconClass} aria-hidden />
             Usuarios
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("activations")}
-            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
               activeTab === "activations"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-900"
+                ? "bg-slate-800 text-slate-100"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
             }`}
           >
+            <Zap className={iconClass} aria-hidden />
             Activaciones
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("knowledge")}
-            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
               activeTab === "knowledge"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-900"
+                ? "bg-slate-800 text-slate-100"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
             }`}
           >
+            <Brain className={iconClass} aria-hidden />
             Knowledge Sources
           </button>
           <a
             href="/admin/roles"
-            className="px-3 py-2 rounded-lg font-medium text-slate-500 hover:text-slate-900 hover:bg-white/50 transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors"
           >
+            <Shield className={iconClass} aria-hidden />
             Roles globales
           </a>
           <button
             type="button"
             onClick={() => setActiveTab("limits")}
-            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
               activeTab === "limits"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-900"
+                ? "bg-slate-800 text-slate-100"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
             }`}
           >
+            <Sliders className={iconClass} aria-hidden />
             Límites por rol
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("userLimits")}
-            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
               activeTab === "userLimits"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-900"
+                ? "bg-slate-800 text-slate-100"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
             }`}
           >
+            <UserCog className={iconClass} aria-hidden />
             Límites por usuario
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("capacity")}
-            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
               activeTab === "capacity"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-900"
+                ? "bg-slate-800 text-slate-100"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
             }`}
           >
+            <BarChart2 className={iconClass} aria-hidden />
             Capacidad
           </button>
         </div>
@@ -260,16 +363,16 @@ function RoleLimitsPanel() {
   const appRoles = roleLimits.filter((r) => r.roleKey !== "superadmin");
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
-        <h2 className="text-sm font-semibold text-slate-900">Límites por rol</h2>
+    <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden shadow-sm ring-1 ring-slate-700/50">
+      <div className="border-b border-slate-700/60 px-5 py-4 bg-slate-800/50">
+        <h2 className="text-sm font-medium text-slate-200">Límites por rol</h2>
         <p className="text-xs text-slate-500 mt-1">
           Cuotas por defecto para cada rol (superadmin no tiene límite). Vacío = sin límite.
         </p>
       </div>
       <div className="p-5 space-y-6">
         {message && (
-          <p className="text-sm text-emerald-600">{message}</p>
+          <p className="text-sm text-emerald-400">{message}</p>
         )}
         {loading ? (
           <p className="text-sm text-slate-500">Cargando…</p>
@@ -324,54 +427,54 @@ function RoleLimitForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-xl border border-slate-200 p-4 space-y-4">
-      <h3 className="text-sm font-medium text-slate-900">{entry.roleName}</h3>
+    <form onSubmit={handleSubmit} className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-4 space-y-4">
+      <h3 className="text-sm font-medium text-slate-200">{entry.roleName}</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs text-slate-600 mb-1">Máx. proyectos creados</label>
+          <label className="block text-xs text-slate-400 mb-1">Máx. proyectos creados</label>
           <input
             type="number"
             min={1}
             value={maxProjects}
             onChange={(e) => setMaxProjects(e.target.value)}
             placeholder="Sin límite"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             disabled={saving}
           />
         </div>
         <div>
-          <label className="block text-xs text-slate-600 mb-1">Máx. invitaciones pendientes por proyecto</label>
+          <label className="block text-xs text-slate-400 mb-1">Máx. invitaciones pendientes por proyecto</label>
           <input
             type="number"
             min={1}
             value={maxInvitations}
             onChange={(e) => setMaxInvitations(e.target.value)}
             placeholder="Sin límite"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             disabled={saving}
           />
         </div>
         <div>
-          <label className="block text-xs text-slate-600 mb-1">Máx. miembros por proyecto</label>
+          <label className="block text-xs text-slate-400 mb-1">Máx. miembros por proyecto</label>
           <input
             type="number"
             min={1}
             value={maxMembers}
             onChange={(e) => setMaxMembers(e.target.value)}
             placeholder="Sin límite"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             disabled={saving}
           />
         </div>
         <div>
-          <label className="block text-xs text-slate-600 mb-1">Máx. clientes creados</label>
+          <label className="block text-xs text-slate-400 mb-1">Máx. clientes creados</label>
           <input
             type="number"
             min={1}
             value={maxClients}
             onChange={(e) => setMaxClients(e.target.value)}
             placeholder="Sin límite"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             disabled={saving}
           />
         </div>
@@ -379,7 +482,7 @@ function RoleLimitForm({
       <button
         type="submit"
         disabled={saving}
-        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+        className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150"
       >
         {saving ? "Guardando…" : "Guardar"}
       </button>
@@ -453,9 +556,9 @@ function UserLimitsPanel() {
   }, []);
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
-        <h2 className="text-sm font-semibold text-slate-900">Límites por usuario</h2>
+    <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden shadow-sm ring-1 ring-slate-700/50">
+      <div className="border-b border-slate-700/60 px-5 py-4 bg-slate-800/50">
+        <h2 className="text-sm font-medium text-slate-200">Límites por usuario</h2>
         <p className="text-xs text-slate-500 mt-1">
           Overrides por usuario (vacío = usar límite del rol). Solo superadmin.
         </p>
@@ -464,27 +567,27 @@ function UserLimitsPanel() {
         {loading ? (
           <p className="text-sm text-slate-500">Cargando usuarios…</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl border border-slate-700/60">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-600">
+                <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-xs uppercase tracking-wide text-slate-400">
                   <th className="py-2 pr-4">Nombre</th>
                   <th className="py-2 pr-4">Email</th>
                   <th className="py-2 pr-4">Rol</th>
                   <th className="py-2"></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-700/40">
                 {users.map((u) => (
-                  <tr key={u.id} className="border-b border-slate-100">
-                    <td className="py-2 pr-4">{u.full_name ?? "—"}</td>
-                    <td className="py-2 pr-4">{u.email ?? "—"}</td>
-                    <td className="py-2 pr-4">{u.app_role}</td>
+                  <tr key={u.id} className="hover:bg-slate-800/50 transition-colors duration-150">
+                    <td className="py-2 pr-4 text-slate-200">{u.full_name ?? "—"}</td>
+                    <td className="py-2 pr-4 text-slate-200">{u.email ?? "—"}</td>
+                    <td className="py-2 pr-4 text-slate-200">{u.app_role}</td>
                     <td className="py-2">
                       <button
                         type="button"
                         onClick={() => openModal(u.id)}
-                        className="text-indigo-600 hover:underline text-xs font-medium"
+                        className="text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors duration-150"
                       >
                         Configurar límites
                       </button>
@@ -577,40 +680,40 @@ function UserQuotaModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="rounded-xl border border-slate-700/60 bg-slate-800/95 shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-slate-700/60 px-5 py-4 flex items-center justify-between">
+          <h3 className="text-sm font-medium text-slate-200">
             Límites: {user?.full_name || user?.email || userId}
           </h3>
-          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-700 text-xl leading-none">&times;</button>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-200 text-xl leading-none transition-colors">&times;</button>
         </div>
         <div className="p-5">
           {loading ? (
             <p className="text-sm text-slate-500">Cargando…</p>
           ) : quotaData ? (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <p className="text-xs text-slate-600">Rol: <strong>{quotaData.appRole ?? "—"}</strong></p>
-              <div className="rounded-lg border border-slate-200 p-3 bg-slate-50/50">
-                <p className="text-xs font-medium text-slate-600 mb-2">Límites por defecto del rol</p>
-                <ul className="text-xs text-slate-700 space-y-1">
+              <p className="text-xs text-slate-400">Rol: <strong className="text-slate-200">{quotaData.appRole ?? "—"}</strong></p>
+              <div className="rounded-lg border border-slate-700/60 p-3 bg-slate-900/50">
+                <p className="text-xs font-medium text-slate-400 mb-2">Límites por defecto del rol</p>
+                <ul className="text-xs text-slate-300 space-y-1">
                   {Object.entries(USER_QUOTA_LABELS).map(([key, label]) => (
                     <li key={key}>{label}: {quotaData.roleLimits[key] ?? "sin límite"}</li>
                   ))}
                 </ul>
               </div>
-              <p className="text-xs text-slate-600">Override por usuario (vacío = usar valor del rol):</p>
+              <p className="text-xs text-slate-400">Override por usuario (vacío = usar valor del rol):</p>
               <div className="grid grid-cols-1 gap-3">
                 {Object.entries(USER_QUOTA_LABELS).map(([key, label]) => (
                   <div key={key}>
-                    <label className="block text-xs text-slate-600 mb-0.5">{label}</label>
+                    <label className="block text-xs text-slate-400 mb-0.5">{label}</label>
                     <input
                       type="number"
                       min={1}
                       value={overrides[key] ?? ""}
                       onChange={(e) => setOverrides((o) => ({ ...o, [key]: e.target.value }))}
                       placeholder={quotaData.roleLimits[key] != null ? String(quotaData.roleLimits[key]) : "Sin límite"}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                      className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                       disabled={saving}
                     />
                     {quotaData.effectiveLimits[key] != null && (
@@ -619,16 +722,16 @@ function UserQuotaModal({
                   </div>
                 ))}
               </div>
-              {message && <p className="text-sm text-emerald-600">{message}</p>}
+              {message && <p className="text-sm text-emerald-400">{message}</p>}
               <div className="flex gap-2">
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150"
                 >
                   {saving ? "Guardando…" : "Guardar"}
                 </button>
-                <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <button type="button" onClick={onClose} className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 transition-colors duration-150">
                   Cerrar
                 </button>
               </div>
@@ -772,9 +875,9 @@ function CapacityDashboard() {
 
   return (
     <section className="space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
-          <h2 className="text-sm font-semibold text-slate-900">Uso y límites</h2>
+      <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden shadow-sm ring-1 ring-slate-700/50">
+        <div className="border-b border-slate-700/60 px-5 py-4 bg-slate-800/50">
+          <h2 className="text-sm font-medium text-slate-200">Uso y límites</h2>
           <p className="text-xs text-slate-500 mt-1">
             Resumen de uso de cuotas por usuario y por proyecto. Umbral: ≥80% cerca del límite, ≥100% al límite.
           </p>
@@ -785,64 +888,64 @@ function CapacityDashboard() {
           ) : data ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-6">
-                <div className="rounded-xl border border-red-200 bg-red-50/50 p-3">
-                  <p className="text-lg font-semibold text-red-800">{data.summary.usersAtLimit}</p>
-                  <p className="text-xs text-red-700">Usuarios al límite</p>
+                <div className="rounded-xl border border-red-500/30 bg-red-500/15 p-3">
+                  <p className="text-lg font-semibold text-red-400">{data.summary.usersAtLimit}</p>
+                  <p className="text-xs text-red-400/80">Usuarios al límite</p>
                 </div>
-                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3">
-                  <p className="text-lg font-semibold text-amber-800">{data.summary.usersNearLimit}</p>
-                  <p className="text-xs text-amber-700">Usuarios cerca del límite</p>
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/15 p-3">
+                  <p className="text-lg font-semibold text-amber-400">{data.summary.usersNearLimit}</p>
+                  <p className="text-xs text-amber-400/80">Usuarios cerca del límite</p>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
-                  <p className="text-lg font-semibold text-slate-800">{data.summary.usersWithOverrides}</p>
-                  <p className="text-xs text-slate-600">Con overrides</p>
+                <div className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-3">
+                  <p className="text-lg font-semibold text-slate-200">{data.summary.usersWithOverrides}</p>
+                  <p className="text-xs text-slate-400">Con overrides</p>
                 </div>
-                <div className="rounded-xl border border-red-200 bg-red-50/50 p-3">
-                  <p className="text-lg font-semibold text-red-800">{data.summary.projectsAtMemberLimit}</p>
-                  <p className="text-xs text-red-700">Proyectos al límite (miembros)</p>
+                <div className="rounded-xl border border-red-500/30 bg-red-500/15 p-3">
+                  <p className="text-lg font-semibold text-red-400">{data.summary.projectsAtMemberLimit}</p>
+                  <p className="text-xs text-red-400/80">Proyectos al límite (miembros)</p>
                 </div>
-                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3">
-                  <p className="text-lg font-semibold text-amber-800">{data.summary.projectsNearMemberLimit}</p>
-                  <p className="text-xs text-amber-700">Cerca (miembros)</p>
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/15 p-3">
+                  <p className="text-lg font-semibold text-amber-400">{data.summary.projectsNearMemberLimit}</p>
+                  <p className="text-xs text-amber-400/80">Cerca (miembros)</p>
                 </div>
-                <div className="rounded-xl border border-red-200 bg-red-50/50 p-3">
-                  <p className="text-lg font-semibold text-red-800">{data.summary.projectsAtInvitationLimit}</p>
-                  <p className="text-xs text-red-700">Al límite (invit.)</p>
+                <div className="rounded-xl border border-red-500/30 bg-red-500/15 p-3">
+                  <p className="text-lg font-semibold text-red-400">{data.summary.projectsAtInvitationLimit}</p>
+                  <p className="text-xs text-red-400/80">Al límite (invit.)</p>
                 </div>
-                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3">
-                  <p className="text-lg font-semibold text-amber-800">{data.summary.projectsNearInvitationLimit}</p>
-                  <p className="text-xs text-amber-700">Cerca (invit.)</p>
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/15 p-3">
+                  <p className="text-lg font-semibold text-amber-400">{data.summary.projectsNearInvitationLimit}</p>
+                  <p className="text-xs text-amber-400/80">Cerca (invit.)</p>
                 </div>
               </div>
 
               <div className="flex flex-wrap gap-2 mb-4 items-center">
-                <span className="text-xs font-medium text-slate-500 mr-1">Vistas:</span>
+                <span className="text-xs font-medium text-slate-400 mr-1">Vistas:</span>
                 <button
                   type="button"
                   onClick={() => setFilterStatus("at_limit")}
-                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100"
+                  className="rounded-lg border border-red-500/30 bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/25 transition-colors"
                 >
                   Solo al límite
                 </button>
                 <button
                   type="button"
                   onClick={() => setFilterStatus("near_limit")}
-                  className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                  className="rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/25 transition-colors"
                 >
                   Solo cerca del límite
                 </button>
                 <button
                   type="button"
                   onClick={() => setFilterStatus("")}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800/50 transition-colors"
                 >
                   Todos
                 </button>
-                <span className="w-px h-5 bg-slate-200 mx-1" />
+                <span className="w-px h-5 bg-slate-600 mx-1" />
                 <select
                   value={filterRole}
                   onChange={(e) => setFilterRole(e.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+                  className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-100"
                 >
                   <option value="">Todos los roles</option>
                   <option value="admin">admin</option>
@@ -853,7 +956,7 @@ function CapacityDashboard() {
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+                  className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-100"
                 >
                   <option value="">Todos los estados</option>
                   <option value="at_limit">Al límite</option>
@@ -861,21 +964,21 @@ function CapacityDashboard() {
                   <option value="normal">Normal</option>
                   <option value="unlimited">Sin límite</option>
                 </select>
-                <label className="flex items-center gap-2 text-sm text-slate-600">
-                  <input type="checkbox" checked={overridesOnly} onChange={(e) => setOverridesOnly(e.target.checked)} className="rounded border-slate-300" />
+                <label className="flex items-center gap-2 text-sm text-slate-400">
+                  <input type="checkbox" checked={overridesOnly} onChange={(e) => setOverridesOnly(e.target.checked)} className="rounded border-slate-600 bg-slate-900 text-indigo-600" />
                   Solo con overrides
                 </label>
-                <label className="flex items-center gap-2 text-sm text-slate-600">
-                  <input type="checkbox" checked={projectsWithLimitsOnly} onChange={(e) => setProjectsWithLimitsOnly(e.target.checked)} className="rounded border-slate-300" />
+                <label className="flex items-center gap-2 text-sm text-slate-400">
+                  <input type="checkbox" checked={projectsWithLimitsOnly} onChange={(e) => setProjectsWithLimitsOnly(e.target.checked)} className="rounded border-slate-600 bg-slate-900 text-indigo-600" />
                   Solo proyectos con límite
                 </label>
               </div>
 
-              <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mt-6 mb-2">Por usuario</h3>
-              <div className="overflow-x-auto rounded-xl border border-slate-200 mb-6">
+              <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wide mt-6 mb-2">Por usuario</h3>
+              <div className="overflow-x-auto rounded-xl border border-slate-700/60 mb-6">
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-[11px] font-medium uppercase tracking-wide text-slate-400">
                       <th className="py-2 px-3">Usuario</th>
                       <th className="py-2 px-3">Email</th>
                       <th className="py-2 px-3">Rol</th>
@@ -886,20 +989,20 @@ function CapacityDashboard() {
                       <th className="py-2 px-3 text-right">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-700/40">
                     {data.userUsage.map((u) => (
-                      <tr key={u.userId} className="hover:bg-slate-50">
-                        <td className="py-2 px-3 text-slate-900">{u.fullName ?? "—"}</td>
-                        <td className="py-2 px-3 text-slate-600">{u.email ?? "—"}</td>
-                        <td className="py-2 px-3">{u.appRole}</td>
-                        <td className="py-2 px-3">{u.projectsLimit != null ? `${u.projectsUsed} / ${u.projectsLimit}` : `${u.projectsUsed} (sin límite)`}</td>
-                        <td className="py-2 px-3">{u.clientsLimit != null ? `${u.clientsUsed} / ${u.clientsLimit}` : `${u.clientsUsed} (sin límite)`}</td>
-                        <td className="py-2 px-3">{u.hasOverrides ? "Sí" : "—"}</td>
+                      <tr key={u.userId} className="hover:bg-slate-800/50 transition-colors duration-150">
+                        <td className="py-2 px-3 text-slate-200">{u.fullName ?? "—"}</td>
+                        <td className="py-2 px-3 text-slate-400">{u.email ?? "—"}</td>
+                        <td className="py-2 px-3 text-slate-300">{u.appRole}</td>
+                        <td className="py-2 px-3 text-slate-300">{u.projectsLimit != null ? `${u.projectsUsed} / ${u.projectsLimit}` : `${u.projectsUsed} (sin límite)`}</td>
+                        <td className="py-2 px-3 text-slate-300">{u.clientsLimit != null ? `${u.clientsUsed} / ${u.clientsLimit}` : `${u.clientsUsed} (sin límite)`}</td>
+                        <td className="py-2 px-3 text-slate-400">{u.hasOverrides ? "Sí" : "—"}</td>
                         <td className="py-2 px-3">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                            u.status === "at_limit" ? "bg-red-100 text-red-800" :
-                            u.status === "near_limit" ? "bg-amber-100 text-amber-800" :
-                            u.status === "unlimited" ? "bg-slate-100 text-slate-600" : "bg-slate-100 text-slate-700"
+                          <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${
+                            u.status === "at_limit" ? "bg-red-500/15 text-red-400 border border-red-500/30" :
+                            u.status === "near_limit" ? "bg-amber-500/15 text-amber-400 border border-amber-500/30" :
+                            u.status === "unlimited" ? "bg-slate-700/60 text-slate-400 border border-slate-600/60" : "bg-slate-700/60 text-slate-300 border border-slate-600/60"
                           }`}>
                             {STATUS_LABELS[u.status] ?? u.status}
                           </span>
@@ -908,7 +1011,7 @@ function CapacityDashboard() {
                           <button
                             type="button"
                             onClick={() => setQuotaModalUserId(u.userId)}
-                            className="text-indigo-600 hover:underline text-xs font-medium"
+                            className="text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors duration-150"
                           >
                             Configurar límites
                           </button>
@@ -919,11 +1022,11 @@ function CapacityDashboard() {
                 </table>
               </div>
 
-              <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mt-6 mb-2">Por proyecto</h3>
-              <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wide mt-6 mb-2">Por proyecto</h3>
+              <div className="overflow-x-auto rounded-xl border border-slate-700/60">
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-[11px] font-medium uppercase tracking-wide text-slate-400">
                       <th className="py-2 px-3">Proyecto</th>
                       <th className="py-2 px-3">Cliente</th>
                       <th className="py-2 px-3">Miembros</th>
@@ -932,27 +1035,27 @@ function CapacityDashboard() {
                       <th className="py-2 px-3 text-right">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-700/40">
                     {data.projectUsage.map((p) => (
-                      <tr key={p.projectId} className="hover:bg-slate-50">
-                        <td className="py-2 px-3 text-slate-900">{p.projectName}</td>
-                        <td className="py-2 px-3 text-slate-600">{p.clientName ?? "—"}</td>
-                        <td className="py-2 px-3">{p.membersLimit != null ? `${p.membersCurrent} / ${p.membersLimit}` : `${p.membersCurrent} (sin límite)`}</td>
-                        <td className="py-2 px-3">{p.invitationsLimit != null ? `${p.invitationsCurrent} / ${p.invitationsLimit}` : `${p.invitationsCurrent} (sin límite)`}</td>
+                      <tr key={p.projectId} className="hover:bg-slate-800/50 transition-colors duration-150">
+                        <td className="py-2 px-3 text-slate-200">{p.projectName}</td>
+                        <td className="py-2 px-3 text-slate-400">{p.clientName ?? "—"}</td>
+                        <td className="py-2 px-3 text-slate-300">{p.membersLimit != null ? `${p.membersCurrent} / ${p.membersLimit}` : `${p.membersCurrent} (sin límite)`}</td>
+                        <td className="py-2 px-3 text-slate-300">{p.invitationsLimit != null ? `${p.invitationsCurrent} / ${p.invitationsLimit}` : `${p.invitationsCurrent} (sin límite)`}</td>
                         <td className="py-2 px-3">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                            p.status === "at_limit" ? "bg-red-100 text-red-800" :
-                            p.status === "near_limit" ? "bg-amber-100 text-amber-800" :
-                            p.status === "unlimited" ? "bg-slate-100 text-slate-600" : "bg-slate-100 text-slate-700"
+                          <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${
+                            p.status === "at_limit" ? "bg-red-500/15 text-red-400 border border-red-500/30" :
+                            p.status === "near_limit" ? "bg-amber-500/15 text-amber-400 border border-amber-500/30" :
+                            p.status === "unlimited" ? "bg-slate-700/60 text-slate-400 border border-slate-600/60" : "bg-slate-700/60 text-slate-300 border border-slate-600/60"
                           }`}>
                             {STATUS_LABELS[p.status] ?? p.status}
                           </span>
                         </td>
                         <td className="py-2 px-3 text-right">
-                          <Link href={`/projects/${p.projectId}`} className="text-indigo-600 hover:underline text-xs font-medium mr-2">
+                          <Link href={`/projects/${p.projectId}`} className="text-indigo-400 hover:text-indigo-300 text-xs font-medium mr-2 transition-colors duration-150">
                             Ver proyecto
                           </Link>
-                          <Link href={`/projects/${p.projectId}/members`} className="text-indigo-600 hover:underline text-xs font-medium">
+                          <Link href={`/projects/${p.projectId}/members`} className="text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors duration-150">
                             Ver equipo
                           </Link>
                         </td>
@@ -1025,38 +1128,38 @@ function CapacityQuotaModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-900">Límites: {userLabel}</h3>
-          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-700 text-xl leading-none">&times;</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="rounded-xl border border-slate-700/60 bg-slate-800/95 shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-slate-700/60 px-5 py-4 flex items-center justify-between">
+          <h3 className="text-sm font-medium text-slate-200">Límites: {userLabel}</h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-200 text-xl leading-none transition-colors">&times;</button>
         </div>
         <div className="p-5">
           {loading ? (
             <p className="text-sm text-slate-500">Cargando…</p>
           ) : quotaData ? (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <p className="text-xs text-slate-600">Rol: <strong>{quotaData.appRole ?? "—"}</strong></p>
-              <div className="rounded-lg border border-slate-200 p-3 bg-slate-50/50">
-                <p className="text-xs font-medium text-slate-600 mb-2">Límites por defecto del rol</p>
-                <ul className="text-xs text-slate-700 space-y-1">
+              <p className="text-xs text-slate-400">Rol: <strong className="text-slate-200">{quotaData.appRole ?? "—"}</strong></p>
+              <div className="rounded-lg border border-slate-700/60 p-3 bg-slate-900/50">
+                <p className="text-xs font-medium text-slate-400 mb-2">Límites por defecto del rol</p>
+                <ul className="text-xs text-slate-300 space-y-1">
                   {Object.entries(USER_QUOTA_LABELS).map(([key, label]) => (
                     <li key={key}>{label}: {quotaData.roleLimits[key] ?? "sin límite"}</li>
                   ))}
                 </ul>
               </div>
-              <p className="text-xs text-slate-600">Override por usuario (vacío = usar valor del rol):</p>
+              <p className="text-xs text-slate-400">Override por usuario (vacío = usar valor del rol):</p>
               <div className="grid grid-cols-1 gap-3">
                 {Object.entries(USER_QUOTA_LABELS).map(([key, label]) => (
                   <div key={key}>
-                    <label className="block text-xs text-slate-600 mb-0.5">{label}</label>
+                    <label className="block text-xs text-slate-400 mb-0.5">{label}</label>
                     <input
                       type="number"
                       min={1}
                       value={overrides[key] ?? ""}
                       onChange={(e) => setOverrides((o) => ({ ...o, [key]: e.target.value }))}
                       placeholder={quotaData.roleLimits[key] != null ? String(quotaData.roleLimits[key]) : "Sin límite"}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                      className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                       disabled={saving}
                     />
                     {quotaData.effectiveLimits[key] != null && (
@@ -1065,12 +1168,12 @@ function CapacityQuotaModal({
                   </div>
                 ))}
               </div>
-              {message && <p className="text-sm text-emerald-600">{message}</p>}
+              {message && <p className="text-sm text-emerald-400">{message}</p>}
               <div className="flex gap-2">
-                <button type="submit" disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+                <button type="submit" disabled={saving} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150">
                   {saving ? "Guardando…" : "Guardar"}
                 </button>
-                <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cerrar</button>
+                <button type="button" onClick={onClose} className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 transition-colors duration-150">Cerrar</button>
               </div>
             </form>
           ) : (
@@ -1109,9 +1212,9 @@ function ActivationsPanel() {
   const active = users.filter((u) => u.is_active);
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
-        <h2 className="text-sm font-semibold text-slate-900">Activación de usuarios</h2>
+    <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden shadow-sm ring-1 ring-slate-700/50">
+      <div className="border-b border-slate-700/60 px-5 py-4 bg-slate-800/50">
+        <h2 className="text-sm font-medium text-slate-200">Activación de usuarios</h2>
         <p className="text-xs text-slate-500 mt-1">
           Los usuarios que se registran por la página pública quedan pendientes hasta que un administrador los active.
         </p>
@@ -1121,15 +1224,15 @@ function ActivationsPanel() {
           <p className="text-sm text-slate-500">Cargando…</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
-              <p className="text-2xl font-semibold text-amber-800">{pending.length}</p>
-              <p className="text-sm font-medium text-amber-800">Pendientes</p>
-              <p className="text-xs text-amber-700 mt-0.5">Sin acceso a la plataforma</p>
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/15 p-4">
+              <p className="text-2xl font-semibold text-amber-400">{pending.length}</p>
+              <p className="text-sm font-medium text-amber-400">Pendientes</p>
+              <p className="text-xs text-amber-400/80 mt-0.5">Sin acceso a la plataforma</p>
             </div>
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
-              <p className="text-2xl font-semibold text-emerald-800">{active.length}</p>
-              <p className="text-sm font-medium text-emerald-800">Activos</p>
-              <p className="text-xs text-emerald-700 mt-0.5">Pueden iniciar sesión</p>
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/15 p-4">
+              <p className="text-2xl font-semibold text-emerald-400">{active.length}</p>
+              <p className="text-sm font-medium text-emerald-400">Activos</p>
+              <p className="text-xs text-emerald-400/80 mt-0.5">Pueden iniciar sesión</p>
             </div>
           </div>
         )}
@@ -1285,26 +1388,26 @@ function UsersRolesPanel() {
   };
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+    <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5 space-y-6 shadow-sm ring-1 ring-slate-700/50">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">
-            Usuarios y roles
+          <h2 className="text-sm font-medium text-slate-200">
+            Users & Roles
           </h2>
           <p className="text-xs text-slate-500">
-            Define el rol global de cada usuario en la plataforma.
+            Manage global platform access for each user.
           </p>
         </div>
         <a
           href="/admin/users"
-          className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700"
+          className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
         >
-          Gestionar usuarios
+          Manage users
         </a>
       </div>
 
       {rolesError && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+        <div className="rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-2 text-sm text-amber-200">
           {rolesError}
         </div>
       )}
@@ -1313,8 +1416,8 @@ function UsersRolesPanel() {
         <div
           className={`rounded-xl border px-4 py-2 text-sm ${
             saveMessage.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-red-200 bg-red-50 text-red-800"
+              ? "border-emerald-800/50 bg-emerald-950/30 text-emerald-200"
+              : "border-red-800/50 bg-red-950/30 text-red-200"
           }`}
         >
           {saveMessage.text}
@@ -1324,19 +1427,19 @@ function UsersRolesPanel() {
       {loading ? (
         <p className="text-sm text-slate-500">Cargando usuarios...</p>
       ) : error ? (
-        <p className="text-sm text-red-600">{error}</p>
+        <p className="text-sm text-red-400">{error}</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200">
+        <div className="overflow-x-auto rounded-xl border border-slate-700/60">
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-xs uppercase tracking-wide text-slate-400">
                 <th className="py-3 px-4">Usuario</th>
                 <th className="py-3 px-4">Rol</th>
                 <th className="py-3 px-4">Activación</th>
                 <th className="py-3 px-4 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-700/40">
               {users.map((user) => {
                 const displayName =
                   user.full_name || user.email || "Sin nombre";
@@ -1349,8 +1452,8 @@ function UsersRolesPanel() {
                       { id: "superadmin", key: "superadmin", name: "Superadmin" },
                     ];
                 return (
-                  <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-3 px-4 text-slate-900">
+                  <tr key={user.id} className="hover:bg-slate-800/50 transition-colors duration-150">
+                    <td className="py-3 px-4 text-slate-200">
                       {displayName}
                     </td>
                     <td className="py-3 px-4">
@@ -1359,7 +1462,7 @@ function UsersRolesPanel() {
                         onChange={(e) =>
                           handleRoleChange(user.id, e.target.value)
                         }
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
                         disabled={savingUserId === user.id}
                       >
                         {roleOptions.map((role) => (
@@ -1375,7 +1478,7 @@ function UsersRolesPanel() {
                       </select>
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${user.is_active ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+                      <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${user.is_active ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "bg-amber-500/15 text-amber-400 border border-amber-500/30"}`}>
                         {user.is_active ? "Activo" : "Pendiente"}
                       </span>
                     </td>
@@ -1385,13 +1488,13 @@ function UsersRolesPanel() {
                           type="button"
                           onClick={() => handleSaveRole(user.id)}
                           disabled={savingUserId === user.id}
-                          className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                          className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150"
                         >
                           {savingUserId === user.id ? "Guardando..." : "Guardar"}
                         </button>
                         <a
                           href="/admin/users"
-                          className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                          className="inline-flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700 transition-colors duration-150"
                         >
                           Gestionar
                         </a>
@@ -1570,43 +1673,45 @@ function ProjectAccessPanel() {
   };
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+    <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5 space-y-6 shadow-sm ring-1 ring-slate-700/50">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-900">
-          Acceso a proyectos
-        </h2>
-        <p className="text-xs text-slate-500">
-          Define qué usuarios pueden ver y editar cada proyecto.
-        </p>
+        <div>
+          <h2 className="text-sm font-medium text-slate-200">
+            Acceso a proyectos
+          </h2>
+          <p className="text-xs text-slate-500">
+            Define qué usuarios pueden ver y editar cada proyecto.
+          </p>
+        </div>
       </div>
 
       {error && (
-        <p className="text-sm text-rose-600">{error}</p>
+        <p className="text-sm text-rose-400">{error}</p>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Left: projects list */}
         <div className="md:col-span-1">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Proyectos</p>
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Proyectos</p>
           {loadingProjects ? (
             <p className="text-sm text-slate-500">Cargando proyectos...</p>
           ) : (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-2 max-h-80 overflow-y-auto space-y-1">
+            <div className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-2 max-h-80 overflow-y-auto space-y-1">
               {projects.map((project) => (
                 <button
                   key={project.id}
                   type="button"
                   onClick={() => handleSelectProject(project.id)}
-                  className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
+                  className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${
                     selectedProjectId === project.id
                       ? "bg-indigo-600 text-white"
-                      : "text-slate-700 hover:bg-white hover:shadow-sm"
+                      : "text-slate-200 hover:bg-slate-800/50"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate">{project.name}</span>
                     {project.status && (
-                      <span className="text-[11px] rounded-full border border-slate-200 px-2 py-0.5">
+                      <span className="text-[11px] rounded-md border border-slate-600 px-2 py-0.5 text-slate-400">
                         {project.status}
                       </span>
                     )}
@@ -1626,7 +1731,7 @@ function ProjectAccessPanel() {
           ) : (
             <>
               <div>
-                <p className="text-xs font-medium text-slate-600 mb-2">
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">
                   Miembros del proyecto
                 </p>
                 {loadingMembers ? (
@@ -1634,26 +1739,26 @@ function ProjectAccessPanel() {
                     Cargando miembros...
                   </p>
                 ) : (
-                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <div className="overflow-x-auto rounded-xl border border-slate-700/60">
                     <table className="min-w-full text-sm">
                       <thead>
-                        <tr className="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                        <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-xs uppercase tracking-wide text-slate-400">
                           <th className="py-3 px-4">Usuario</th>
                           <th className="py-3 px-4">Rol</th>
                           <th className="py-3 px-4 text-right">Acción</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-700/40">
                         {members.map((member) => {
                           const displayName =
                             member.user_full_name || "Usuario sin nombre";
                           return (
-                            <tr key={member.id} className="hover:bg-slate-50 transition-colors">
-                              <td className="py-3 px-4 text-slate-900">
+                            <tr key={member.id} className="hover:bg-slate-800/50 transition-colors duration-150">
+                              <td className="py-3 px-4 text-slate-200">
                                 {displayName}
                               </td>
                               <td className="py-3 px-4">
-                                <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                                <span className="inline-flex rounded-md bg-indigo-500/15 px-2 py-0.5 text-xs font-medium text-indigo-400 border border-indigo-500/30">
                                   {ROLE_LABELS[member.role]}
                                 </span>
                               </td>
@@ -1662,7 +1767,7 @@ function ProjectAccessPanel() {
                                   type="button"
                                   onClick={() => handleRemoveMember(member.id)}
                                   disabled={savingMemberId === member.id}
-                                  className="text-xs font-medium text-rose-600 hover:text-rose-700 disabled:opacity-50 transition-colors"
+                                  className="text-xs font-medium text-rose-400 hover:text-rose-300 disabled:opacity-50 transition-colors duration-150"
                                 >
                                   {savingMemberId === member.id
                                     ? "Eliminando..."
@@ -1680,20 +1785,20 @@ function ProjectAccessPanel() {
 
               <form
                 onSubmit={handleAddMember}
-                className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3"
+                className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-4 space-y-3"
               >
-                <p className="text-xs font-medium text-slate-700 uppercase tracking-wide">
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">
                   Añadir miembro
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-slate-600 mb-1">
+                    <label className="block text-xs text-slate-400 mb-1">
                       Usuario
                     </label>
                     <select
                       value={addUserId}
                       onChange={(e) => setAddUserId(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                       disabled={savingMemberId !== null}
                     >
                       <option value="">Seleccionar usuario</option>
@@ -1710,7 +1815,7 @@ function ProjectAccessPanel() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-600 mb-1">
+                    <label className="block text-xs text-slate-400 mb-1">
                       Rol
                     </label>
                     <select
@@ -1720,7 +1825,7 @@ function ProjectAccessPanel() {
                           e.target.value as "owner" | "editor" | "viewer" | ""
                         )
                       }
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                       disabled={savingMemberId !== null}
                     >
                       <option value="">Seleccionar rol</option>
@@ -1737,7 +1842,7 @@ function ProjectAccessPanel() {
                     !addRole ||
                     savingMemberId !== null
                   }
-                  className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150"
                 >
                   {savingMemberId === "new" ? "Añadiendo..." : "Añadir"}
                 </button>
@@ -2084,10 +2189,10 @@ function GlobalKnowledgeSourcesPanel() {
   const hasGoogleIntegration = integrations.length > 0;
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+    <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5 space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="relative h-10 w-10 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+          <div className="relative h-10 w-10 rounded-xl overflow-hidden bg-slate-700 shrink-0">
             <Image
               src={getSapitoGeneral().avatarImage}
               alt=""
@@ -2097,7 +2202,7 @@ function GlobalKnowledgeSourcesPanel() {
             />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">
+            <h2 className="text-sm font-medium text-slate-200">
               Knowledge Sources
             </h2>
             <p className="text-xs text-slate-500 max-w-xl">
@@ -2108,18 +2213,18 @@ function GlobalKnowledgeSourcesPanel() {
       </div>
 
       {/* Platform integrations: Google Drive — primary entry point */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
-        <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+      <div className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-4 space-y-3">
+        <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">
           Platform integrations
         </p>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="font-medium text-slate-800">Google Drive</p>
+            <p className="font-medium text-slate-200">Google Drive</p>
             {integrationsLoading ? (
               <p className="mt-1 text-xs text-slate-500">Cargando…</p>
             ) : hasGoogleIntegration ? (
               <>
-                <p className="mt-1 text-xs text-slate-600">
+                <p className="mt-1 text-xs text-slate-400">
                   Conectado: {integrations[0]?.account_email ?? integrations[0]?.display_name ?? "—"}
                 </p>
                 <p className="mt-0.5 text-xs text-slate-500">
@@ -2136,7 +2241,7 @@ function GlobalKnowledgeSourcesPanel() {
             type="button"
             onClick={handleConnectGoogleDrive}
             disabled={googleConnectPending || !canManageKnowledgeSources}
-            className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 transition-colors shrink-0"
+            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60 transition-colors duration-150 shrink-0"
           >
             {googleConnectPending ? "Redirigiendo…" : hasGoogleIntegration ? "Reconectar Google Drive" : "Connect Google Drive"}
           </button>
@@ -2145,11 +2250,11 @@ function GlobalKnowledgeSourcesPanel() {
 
       {error && (
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-sm text-red-400">{error}</p>
           <button
             type="button"
             onClick={() => void loadSources()}
-            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-xl border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700 transition-colors duration-150"
           >
             Reintentar
           </button>
@@ -2159,27 +2264,27 @@ function GlobalKnowledgeSourcesPanel() {
         <div
           className={`rounded-xl border px-4 py-3 text-sm ${
             syncMessage.includes("completada") && !syncMessage.includes("errores")
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              ? "border-emerald-800/50 bg-emerald-950/30 text-emerald-200"
               : syncMessage.includes("Error") || syncMessage.includes("errores")
-                ? "border-red-200 bg-red-50 text-red-800"
-                : "border-amber-200 bg-amber-50 text-amber-800"
+                ? "border-red-800/50 bg-red-950/30 text-red-200"
+                : "border-amber-800/50 bg-amber-950/30 text-amber-200"
           }`}
         >
           {syncMessage}
         </div>
       )}
 
-      <form onSubmit={handleCreate} className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-        <p className="text-xs font-medium text-slate-700 uppercase tracking-wide">
+      <form onSubmit={handleCreate} className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-4 space-y-3">
+        <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">
           Crear fuente global
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <label className="block text-xs text-slate-600 mb-1">Tipo</label>
+            <label className="block text-xs text-slate-400 mb-1">Tipo</label>
             <select
               value={newSourceType}
               onChange={(e) => setNewSourceType(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               disabled={saving}
             >
               {Object.entries(GLOBAL_SOURCE_TYPE_LABELS).map(([value, label]) => (
@@ -2191,21 +2296,21 @@ function GlobalKnowledgeSourcesPanel() {
                 <p className="text-xs text-slate-500">
                   Añade la URL de la página (una por fuente). Al sincronizar se indexará solo esa página.
                 </p>
-                <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1.5 border border-amber-200">
+                <p className="text-xs text-amber-200 bg-amber-500/15 rounded px-2 py-1.5 border border-amber-500/30">
                   <strong>Guía:</strong> Las páginas SAP Help solo se indexan cuando el contenido legible está en el HTML inicial. Las que cargan todo por JavaScript no se pueden indexar con este flujo. Si una URL falla, prueba otra página curada o usa un documento/PDF como alternativa.
                 </p>
                 {newSourceType === "sap_help" && (
-                  <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1">
+                  <p className="text-xs text-amber-200 bg-amber-500/15 rounded px-2 py-1 border border-amber-500/30">
                     <strong>SAP Help Portal:</strong> solo URLs de help.sap.com. No uses community.sap.com (esas páginas usan JavaScript y no se pueden indexar aquí).
                   </p>
                 )}
                 {newSourceType === "sap_official" && (
-                  <p className="text-xs text-slate-600">
+                  <p className="text-xs text-slate-400">
                     <strong>SAP Official:</strong> documentación oficial SAP aprobada (p. ej. help.sap.com u otras fuentes oficiales).
                   </p>
                 )}
                 {newSourceType === "official_web" && (
-                  <p className="text-xs text-slate-600">
+                  <p className="text-xs text-slate-400">
                     <strong>Official Web:</strong> páginas públicas curadas (p. ej. community.sap.com u otros dominios). Si la página requiere JavaScript o verificación anti-bot, la sincronización fallará con un mensaje claro.
                   </p>
                 )}
@@ -2213,23 +2318,23 @@ function GlobalKnowledgeSourcesPanel() {
             )}
           </div>
           <div>
-            <label className="block text-xs text-slate-600 mb-1">Nombre *</label>
+            <label className="block text-xs text-slate-400 mb-1">Nombre *</label>
             <input
               type="text"
               value={newSourceName}
               onChange={(e) => setNewSourceName(e.target.value)}
               placeholder="Nombre de la fuente"
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               disabled={saving}
             />
           </div>
           {(newSourceType === "google_drive_folder" || newSourceType === "google_drive_file") && (
             <div>
-              <label className="block text-xs text-slate-600 mb-1">Cuenta Google Drive</label>
+              <label className="block text-xs text-slate-400 mb-1">Cuenta Google Drive</label>
               <select
                 value={newIntegrationId}
                 onChange={(e) => setNewIntegrationId(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                 disabled={saving}
               >
                 <option value="">Seleccionar cuenta</option>
@@ -2245,24 +2350,24 @@ function GlobalKnowledgeSourcesPanel() {
             </div>
           )}
           <div>
-            <label className="block text-xs text-slate-600 mb-1">URL</label>
+            <label className="block text-xs text-slate-400 mb-1">URL</label>
             <input
               type="text"
               value={newSourceUrl}
               onChange={(e) => setNewSourceUrl(e.target.value)}
               placeholder="https://..."
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               disabled={saving}
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-600 mb-1">Ref externa (ej. ID carpeta)</label>
+            <label className="block text-xs text-slate-400 mb-1">Ref externa (ej. ID carpeta)</label>
             <input
               type="text"
               value={newExternalRef}
               onChange={(e) => setNewExternalRef(e.target.value)}
               placeholder="Opcional"
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               disabled={saving}
             />
           </div>
@@ -2270,28 +2375,28 @@ function GlobalKnowledgeSourcesPanel() {
         <button
           type="submit"
           disabled={!newSourceName.trim() || saving}
-          className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150"
         >
           {saving ? "Creando…" : "Crear fuente global"}
         </button>
         {createError && (
-          <p className="text-sm text-red-600">{createError}</p>
+          <p className="text-sm text-red-400">{createError}</p>
         )}
       </form>
 
       <div>
         <div className="flex flex-wrap items-center gap-2 mb-2">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">
             Listado
           </p>
-          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs">
+          <div className="inline-flex rounded-lg border border-slate-700/60 bg-slate-900 p-0.5 text-xs">
             {(["global", "project", "all"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => setScopeFilter(s)}
-                className={`px-2 py-1 rounded-md font-medium transition-colors ${
-                  scopeFilter === s ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                className={`px-2 py-1 rounded-md font-medium transition-colors duration-150 ${
+                  scopeFilter === s ? "bg-slate-800 text-slate-100" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
                 }`}
               >
                 {s === "global" ? "Global" : s === "project" ? "Project" : "All"}
@@ -2308,10 +2413,10 @@ function GlobalKnowledgeSourcesPanel() {
             {scopeFilter === "all" && "No hay fuentes de conocimiento. Añade una fuente global o de proyecto para empezar."}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <div className="overflow-x-auto rounded-xl border border-slate-700/60">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-xs uppercase tracking-wide text-slate-400">
                   <th className="py-3 px-4">Nombre</th>
                   <th className="py-3 px-4">Tipo</th>
                   <th className="py-3 px-4">Scope</th>
@@ -2321,37 +2426,37 @@ function GlobalKnowledgeSourcesPanel() {
                   <th className="py-3 px-4 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-700/40">
                 {sources.map((s) => {
                   const syncStatus = getSyncStatus(s, syncingSourceId);
                   return (
-                  <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-3 px-4 text-slate-900 font-medium">{s.source_name}</td>
+                  <tr key={s.id} className="hover:bg-slate-800/50 transition-colors duration-150">
+                    <td className="py-3 px-4 text-slate-200 font-medium">{s.source_name}</td>
                     <td className="py-3 px-4">
-                      <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                      <span className="inline-flex rounded-md bg-slate-700/60 px-2 py-0.5 text-xs text-slate-300 border border-slate-600/60">
                         {GLOBAL_SOURCE_TYPE_LABELS[s.source_type] ?? s.source_type}
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">
+                      <span className="inline-flex rounded-md bg-indigo-500/15 px-2 py-0.5 text-xs text-indigo-400 border border-indigo-500/30">
                         {s.scope_type === "global" ? "Global" : "Project"}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-slate-600">
+                    <td className="py-3 px-4 text-slate-400">
                       {s.scope_type === "project" && (s.project_name ?? s.project_id ?? "—")}
                       {s.scope_type === "global" && "—"}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex flex-col gap-0.5">
                         <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium w-fit ${
+                          className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium w-fit ${
                             syncStatus === "syncing"
-                              ? "bg-amber-100 text-amber-800"
+                              ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
                               : syncStatus === "error"
-                                ? "bg-red-100 text-red-800"
+                                ? "bg-red-500/15 text-red-400 border border-red-500/30"
                                 : syncStatus === "synced"
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : "bg-slate-100 text-slate-600"
+                                  ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                                  : "bg-slate-700/60 text-slate-400 border border-slate-600/60"
                           }`}
                         >
                           {SYNC_STATUS_LABELS[syncStatus]}
@@ -2363,7 +2468,7 @@ function GlobalKnowledgeSourcesPanel() {
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-slate-600 text-xs">
+                    <td className="py-3 px-4 text-slate-400 text-xs">
                       {s.last_synced_at ? formatSyncDate(s.last_synced_at) : "—"}
                     </td>
                     <td className="py-3 px-4 text-right">
@@ -2374,12 +2479,12 @@ function GlobalKnowledgeSourcesPanel() {
                             onClick={() => handleSync(s.id)}
                             disabled={syncingSourceId !== null || !canSyncSource(s) || !canManageKnowledgeSources}
                             title={!canSyncSource(s) ? (isCuratedSapSource(s) ? "Añade la URL de la página SAP en la fuente" : "Configura cuenta de Google Drive y Ref externa (ID carpeta) en la fuente") : "Sincronizar ahora"}
-                            className="text-xs font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
+                            className="text-xs font-medium text-indigo-400 hover:text-indigo-300 disabled:opacity-50 transition-colors duration-150"
                           >
                             {syncingSourceId === s.id ? "Syncing…" : "Sync now"}
                           </button>
                         ) : (
-                          <span className="text-xs text-slate-400" title="Sync solo disponible para Google Drive o SAP oficial (sap_help, sap_official, official_web)">
+                          <span className="text-xs text-slate-500" title="Sync solo disponible para Google Drive o SAP oficial (sap_help, sap_official, official_web)">
                             —
                           </span>
                         )}
@@ -2388,7 +2493,7 @@ function GlobalKnowledgeSourcesPanel() {
                             type="button"
                             onClick={() => handleDelete(s.id)}
                             disabled={deletingId !== null}
-                            className="text-xs font-medium text-rose-600 hover:text-rose-700 disabled:opacity-50"
+                            className="text-xs font-medium text-rose-400 hover:text-rose-300 disabled:opacity-50 transition-colors duration-150"
                           >
                             {deletingId === s.id ? "Eliminando…" : "Eliminar"}
                           </button>
@@ -2641,37 +2746,39 @@ function ClientsPanel() {
 
   const field = (key: string, label: string, placeholder = "") => (
     <div key={key} className="space-y-1">
-      <label className="block text-xs text-slate-600">{label}</label>
+      <label className="block text-xs text-slate-400">{label}</label>
       <input
         type="text"
         value={(form[key] as string) ?? ""}
         onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
         disabled={saving}
       />
     </div>
   );
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+    <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5 space-y-6 shadow-sm ring-1 ring-slate-700/50">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-900">Clientes</h2>
-        <p className="text-xs text-slate-500">Crear y editar clientes para proyectos, reporting y contexto SAP.</p>
+        <div>
+          <h2 className="text-sm font-medium text-slate-200">Clientes</h2>
+          <p className="text-xs text-slate-500">Crear y editar clientes para proyectos, reporting y contexto SAP.</p>
+        </div>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-400">{error}</p>}
 
-      <form onSubmit={handleSubmit} className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-4">
+      <form onSubmit={handleSubmit} className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-4 space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-slate-700 uppercase tracking-wide">
+          <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">
             {editingId ? "Editar cliente" : "Nuevo cliente"}
           </span>
           {editingId && (
             <button
               type="button"
               onClick={() => { setEditingId(null); setForm(EMPTY_CLIENT_FORM as Record<string, string | boolean>); }}
-              className="text-xs text-indigo-600 hover:underline"
+              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
             >
               Cancelar
             </button>
@@ -2680,7 +2787,7 @@ function ClientsPanel() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-3">
-            <p className="text-xs font-medium text-slate-600">Identidad</p>
+            <p className="text-xs font-medium text-slate-400">Identidad</p>
             {field("name", "Nombre (obligatorio)", "Nombre o razón social")}
             {field("display_name", "Nombre para mostrar", "Ej. Acme")}
             {field("legal_name", "Razón social / legal")}
@@ -2689,29 +2796,29 @@ function ClientsPanel() {
             {field("linkedin_url", "LinkedIn")}
           </div>
           <div className="space-y-3">
-            <p className="text-xs font-medium text-slate-600">Segmentación</p>
+            <p className="text-xs font-medium text-slate-400">Segmentación</p>
             <div className="space-y-1">
-              <label className="block text-xs text-slate-600">Industria</label>
-              <select value={(form.industry as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, industry: e.target.value }))} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" disabled={saving}>
+              <label className="block text-xs text-slate-400">Industria</label>
+              <select value={(form.industry as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, industry: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40" disabled={saving}>
                 {INDUSTRY_OPTIONS.map((o) => <option key={o.value || "_"} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             {field("subindustry", "Subindustria")}
             <div className="space-y-1">
-              <label className="block text-xs text-slate-600">Tamaño empresa</label>
-              <select value={(form.company_size_bucket as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, company_size_bucket: e.target.value }))} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" disabled={saving}>
+              <label className="block text-xs text-slate-400">Tamaño empresa</label>
+              <select value={(form.company_size_bucket as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, company_size_bucket: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40" disabled={saving}>
                 {COMPANY_SIZE_OPTIONS.map((o) => <option key={o.value || "_"} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             {field("employee_range", "Rango empleados")}
             {field("annual_revenue_range", "Facturación (rango)")}
-            <p className="text-xs font-medium text-slate-600 mt-3">Estructura</p>
+            <p className="text-xs font-medium text-slate-400 mt-3">Estructura</p>
             <div className="space-y-1">
-              <label className="block text-xs text-slate-600">Cliente padre</label>
+              <label className="block text-xs text-slate-400">Cliente padre</label>
               <select
                 value={(form.parent_client_id as string) ?? ""}
                 onChange={(e) => setForm((f) => ({ ...f, parent_client_id: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                 disabled={saving}
               >
                 <option value="">Ninguno</option>
@@ -2721,11 +2828,11 @@ function ClientsPanel() {
               </select>
             </div>
             <div className="space-y-1">
-              <label className="block text-xs text-slate-600">País</label>
+              <label className="block text-xs text-slate-400">País</label>
               <select
                 value={resolveCountryOptionValue(form.country as string)}
                 onChange={(e) => { const v = e.target.value; setForm((f) => ({ ...f, country: v, region: "" })); }}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                 disabled={saving}
               >
                 <option value="">—</option>
@@ -2738,11 +2845,11 @@ function ClientsPanel() {
               </select>
             </div>
             <div className="space-y-1">
-              <label className="block text-xs text-slate-600">Región / Estado</label>
+              <label className="block text-xs text-slate-400">Región / Estado</label>
               <select
                 value={resolveStateOptionValue(form.country as string, form.region as string)}
                 onChange={(e) => setForm((f) => ({ ...f, region: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                 disabled={saving}
               >
                 <option value="">—</option>
@@ -2756,20 +2863,20 @@ function ClientsPanel() {
             </div>
             {field("account_group", "Grupo de cuenta")}
             <div className="space-y-1">
-              <label className="block text-xs text-slate-600">Tier</label>
-              <select value={(form.account_tier as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, account_tier: e.target.value }))} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" disabled={saving}>
+              <label className="block text-xs text-slate-400">Tier</label>
+              <select value={(form.account_tier as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, account_tier: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40" disabled={saving}>
                 {ACCOUNT_TIER_OPTIONS.map((o) => <option key={o.value || "_"} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="block text-xs text-slate-600">Tipo propiedad</label>
-              <select value={(form.ownership_type as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, ownership_type: e.target.value }))} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" disabled={saving}>
+              <label className="block text-xs text-slate-400">Tipo propiedad</label>
+              <select value={(form.ownership_type as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, ownership_type: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40" disabled={saving}>
                 {OWNERSHIP_TYPE_OPTIONS.map((o) => <option key={o.value || "_"} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="block text-xs text-slate-600">Modelo negocio</label>
-              <select value={(form.business_model as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, business_model: e.target.value }))} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" disabled={saving}>
+              <label className="block text-xs text-slate-400">Modelo negocio</label>
+              <select value={(form.business_model as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, business_model: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40" disabled={saving}>
                 {BUSINESS_MODEL_OPTIONS.map((o) => <option key={o.value || "_"} value={o.value}>{o.label}</option>)}
               </select>
             </div>
@@ -2779,25 +2886,25 @@ function ClientsPanel() {
         </div>
 
         <div className="space-y-3">
-          <p className="text-xs font-medium text-slate-600">Contexto SAP</p>
+          <p className="text-xs font-medium text-slate-400">Contexto SAP</p>
           <textarea
             value={(form.sap_relevance_summary as string) ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, sap_relevance_summary: e.target.value }))}
             placeholder="Resumen de relevancia SAP, sistemas, roadmap…"
             rows={2}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             disabled={saving}
           />
         </div>
 
         <div className="space-y-3">
-          <p className="text-xs font-medium text-slate-600">Notas estratégicas</p>
+          <p className="text-xs font-medium text-slate-400">Notas estratégicas</p>
           <textarea
             value={(form.known_pain_points as string) ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, known_pain_points: e.target.value }))}
             placeholder="Pain points conocidos"
             rows={1}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             disabled={saving}
           />
           <textarea
@@ -2805,61 +2912,61 @@ function ClientsPanel() {
             onChange={(e) => setForm((f) => ({ ...f, strategic_notes: e.target.value }))}
             placeholder="Notas internas estratégicas"
             rows={2}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             disabled={saving}
           />
         </div>
 
         <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="flex items-center gap-2 text-sm text-slate-300">
             <input
               type="checkbox"
               checked={form.is_active === true}
               onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
               disabled={saving}
-              className="rounded border-slate-300"
+              className="rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500/40"
             />
             Activo
           </label>
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150"
           >
             {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Crear cliente"}
           </button>
         </div>
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
+        {formError && <p className="text-sm text-red-400">{formError}</p>}
       </form>
 
       <div>
-        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Listado de clientes</p>
+        <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Listado de clientes</p>
         {loading ? (
           <p className="text-sm text-slate-500">Cargando clientes…</p>
         ) : clients.length === 0 ? (
           <p className="text-sm text-slate-500">Aún no hay clientes. Crea uno arriba.</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <div className="overflow-x-auto rounded-xl border border-slate-700/60">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-xs uppercase tracking-wide text-slate-400">
                   <th className="py-3 px-4">Nombre</th>
                   <th className="py-3 px-4">País</th>
                   <th className="py-3 px-4">Industria</th>
                   <th className="py-3 px-4">Tier</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-700/40">
                 {clients.map((c) => (
                   <tr
                     key={c.id}
                     onClick={() => setEditingId(c.id)}
-                    className="hover:bg-slate-50 transition-colors cursor-pointer"
+                    className="hover:bg-slate-800/50 transition-colors duration-150 cursor-pointer"
                   >
-                    <td className="py-3 px-4 text-slate-900 font-medium">{c.display_name || c.name}</td>
-                    <td className="py-3 px-4 text-slate-600">{getCountryDisplayName(c.country) || "—"}</td>
-                    <td className="py-3 px-4 text-slate-600">{c.industry ?? "—"}</td>
-                    <td className="py-3 px-4 text-slate-600">{c.account_tier ?? "—"}</td>
+                    <td className="py-3 px-4 text-slate-200 font-medium">{c.display_name || c.name}</td>
+                    <td className="py-3 px-4 text-slate-400">{getCountryDisplayName(c.country) || "—"}</td>
+                    <td className="py-3 px-4 text-slate-400">{c.industry ?? "—"}</td>
+                    <td className="py-3 px-4 text-slate-400">{c.account_tier ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -2870,7 +2977,7 @@ function ClientsPanel() {
           <button
             type="button"
             onClick={() => { setEditingId(null); setForm(EMPTY_CLIENT_FORM as Record<string, string | boolean>); }}
-            className="mt-2 text-sm text-indigo-600 hover:underline"
+            className="mt-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors duration-150"
           >
             + Nuevo cliente
           </button>

@@ -25,14 +25,15 @@ function truncate(s: string, max: number): string {
 
 /**
  * Extract knowledge from a closed ticket.
- * Uses title as problem, description as solution; module from content or "general".
+ * Prefers solution_markdown when present; otherwise uses description. Title as problem.
  */
 export function extractKnowledgeFromTicket(
   title: string,
-  description: string | null
+  description: string | null,
+  solutionMarkdown?: string | null
 ): ProjectMemoryRecord {
   const problem = title.trim() || "Issue resolved";
-  const solution = (description ?? "").trim() || problem;
+  const solution = (solutionMarkdown ?? description ?? "").trim() || problem;
   let module: string | null = "general";
   const lower = solution.toLowerCase();
   if (/\b(mm|sd|fi|co|pp|qm|pm|ps)\b/.test(lower)) {

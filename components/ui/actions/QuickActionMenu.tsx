@@ -32,6 +32,8 @@ export function QuickActionMenu({
   const [canCreateProject, setCanCreateProject] = useState(false);
   const [itemsReady, setItemsReady] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const itemRefs = useRef<(HTMLAnchorElement | null)[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,30 +63,62 @@ export function QuickActionMenu({
       : ALL_ITEMS;
   const items = itemsProp ?? defaultItems;
 
+  // When opening, focus first menu item after DOM update
+  useEffect(() => {
+    if (!open || items.length === 0) return;
+    const id = requestAnimationFrame(() => {
+      itemRefs.current[0]?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [open, items.length]);
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+        return;
+      }
+      const el = document.activeElement;
+      const idx = itemRefs.current.indexOf(el as HTMLAnchorElement);
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const next = itemRefs.current[idx + 1] ?? itemRefs.current[0];
+        next?.focus();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const prev = itemRefs.current[idx - 1] ?? itemRefs.current[itemRefs.current.length - 1];
+        prev?.focus();
+      }
     };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     const onMouseDown = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener("keydown", onKeyDown);
     document.addEventListener("mousedown", onMouseDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("mousedown", onMouseDown);
-    };
+    return () => document.removeEventListener("mousedown", onMouseDown);
   }, [open]);
+
+  const closeAndFocusTrigger = () => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
 
   return (
     <div className={`relative ${className}`} ref={ref}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
+        className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
       >
         <Plus className="h-[18px] w-[18px]" />
         {label}
@@ -96,13 +130,14 @@ export function QuickActionMenu({
           role="menu"
         >
           <div className="p-1">
-            {items.map((item) => (
+            {items.map((item, i) => (
               <Link
                 key={item.href}
+                ref={(node) => { itemRefs.current[i] = node; }}
                 href={item.href}
                 role="menuitem"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+                onClick={() => closeAndFocusTrigger()}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
               >
                 {item.icon ? <span className="text-slate-500">{item.icon}</span> : null}
                 <span className="truncate">{item.label}</span>

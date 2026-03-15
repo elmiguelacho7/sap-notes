@@ -229,7 +229,7 @@ export async function getProjectActivityStats(
   }
 
   const total = tasks.length;
-  const active = Math.max(total - completed, 0);
+  const active = Math.max(total - completed - blocked, 0);
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return {

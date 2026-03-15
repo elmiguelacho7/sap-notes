@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { getKnowledgeListHref } from "@/lib/routes";
 import {
   ChevronLeft,
   ChevronUp,
@@ -18,9 +19,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
-import { getPage, upsertBlocks } from "@/lib/knowledgeService";
+import { getPage, getSpace, upsertBlocks } from "@/lib/knowledgeService";
 import { getPageGraph } from "@/lib/knowledgeGraphService";
-import type { KnowledgePage, KnowledgeBlock, KnowledgeBlockType } from "@/lib/types/knowledge";
+import type { KnowledgePage, KnowledgeSpace, KnowledgeBlock, KnowledgeBlockType } from "@/lib/types/knowledge";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 
@@ -232,7 +233,10 @@ function BlockEditor({
 
 export default function KnowledgePageDetail() {
   const params = useParams<{ pageId: string }>();
+  const searchParams = useSearchParams();
   const pageId = params?.pageId as string | undefined;
+  const projectIdFromQuery = searchParams?.get("projectId") ?? null;
+  const knowledgeListHref = getKnowledgeListHref(projectIdFromQuery);
 
   const [page, setPage] = useState<KnowledgePage | null>(null);
   const [blocks, setBlocks] = useState<KnowledgeBlock[]>([]);
@@ -243,6 +247,9 @@ export default function KnowledgePageDetail() {
   const [addBlockOpen, setAddBlockOpen] = useState(false);
   const addBlockRef = useRef<HTMLDivElement>(null);
   const [graph, setGraph] = useState<{ nodes: { id: string; title: string }[]; edges: { from_page_id: string; to_page_id: string; link_type: string }[] }>({ nodes: [], edges: [] });
+  const [space, setSpace] = useState<KnowledgeSpace | null>(null);
+  const [projectName, setProjectName] = useState<string | null>(null);
+  const backToListHref = getKnowledgeListHref(projectIdFromQuery ?? space?.project_id);
 
   useEffect(() => {
     if (!addBlockOpen) return;
@@ -278,6 +285,39 @@ export default function KnowledgePageDetail() {
     if (!pageId) return;
     getPageGraph(supabase, pageId).then(setGraph).catch(() => setGraph({ nodes: [], edges: [] }));
   }, [pageId]);
+
+  useEffect(() => {
+    if (!page?.space_id) {
+      setSpace(null);
+      setProjectName(null);
+      return;
+    }
+    let cancelled = false;
+    getSpace(supabase, page.space_id)
+      .then((s) => {
+        if (cancelled || !s) return;
+        setSpace(s);
+        if (s.project_id) {
+          supabase
+            .from("projects")
+            .select("name")
+            .eq("id", s.project_id)
+            .single()
+            .then(
+              ({ data }) => {
+                if (!cancelled) setProjectName((data as { name?: string } | null)?.name ?? null);
+              },
+              () => {
+                if (!cancelled) setProjectName(null);
+              }
+            );
+        } else {
+          setProjectName(null);
+        }
+      })
+      .catch(() => { if (!cancelled) setSpace(null); setProjectName(null); });
+    return () => { cancelled = true; };
+  }, [page?.space_id]);
 
   const updateBlockContent = (index: number, content: Record<string, unknown>) => {
     setBlocks((prev) =>
@@ -361,30 +401,63 @@ export default function KnowledgePageDetail() {
     return (
       <div className="min-h-screen bg-slate-950 px-6 md:px-8 xl:px-10 py-8">
         <div className="max-w-2xl mx-auto rounded-2xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">{error}</div>
-        <Link href="/knowledge" className="mt-4 inline-block text-sm text-indigo-400 hover:text-indigo-300">Volver a Knowledge</Link>
+        <Link href={knowledgeListHref} className="mt-4 inline-block text-sm text-indigo-400 hover:text-indigo-300">Volver a Knowledge</Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 w-full min-w-0 px-6 md:px-8 xl:px-10 py-8">
+    <div className="min-h-screen bg-slate-950 w-full min-w-0 px-4 sm:px-5 lg:px-6 xl:px-8 2xl:px-10 py-6 md:py-8">
       <div className="flex justify-center w-full">
         <div className="w-full max-w-[880px] space-y-8">
-          {/* PageHeader: back link + title + actions */}
-          <div>
+          {/* Breadcrumb: Global|Project > Space > Page */}
+          <div className="mb-4">
+            <nav className="flex items-center gap-1.5 text-sm text-slate-500 flex-wrap">
+              {projectName ? (
+                <Link
+                  href={`/projects/${space?.project_id ?? ""}/knowledge`}
+                  className="hover:text-slate-200 transition-colors"
+                >
+                  {projectName}
+                </Link>
+              ) : (
+                <Link href="/knowledge/documents" className="hover:text-slate-200 transition-colors">
+                  Global
+                </Link>
+              )}
+              {space && (
+                <>
+                  <span className="text-slate-600">/</span>
+                  <Link
+                    href={space.project_id ? `/projects/${space.project_id}/knowledge` : "/knowledge/documents"}
+                    className="hover:text-slate-200 transition-colors"
+                  >
+                    {space.name}
+                  </Link>
+                </>
+              )}
+              {page?.title && (
+                <>
+                  <span className="text-slate-600">/</span>
+                  <span className="text-slate-300">{page.title}</span>
+                </>
+              )}
+            </nav>
             <Link
-              href="/knowledge"
-              className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 mb-4 transition-colors"
+              href={backToListHref}
+              className="inline-flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 mt-1 transition-colors"
             >
-              <ChevronLeft className="h-4 w-4" />
-              Volver a Knowledge
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Back to list
             </Link>
+          </div>
+          <div>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <h1 className="text-2xl font-semibold tracking-tight text-slate-100">
                 {page?.title ?? "Page"}
               </h1>
               <div className="flex items-center gap-2 shrink-0">
-                <Link href={`/knowledge/${pageId}/graph`}>
+                <Link href={`/knowledge/${pageId}/graph${projectIdFromQuery ? `?projectId=${projectIdFromQuery}` : ""}`}>
                   <Button variant="secondary" className="border-slate-600 bg-slate-800/80 text-slate-200 hover:bg-slate-700">
                     <Network className="h-4 w-4" />
                     View Graph
@@ -479,7 +552,7 @@ export default function KnowledgePageDetail() {
                   return (
                     <li key={`${edge.from_page_id}-${edge.to_page_id}-${edge.link_type}-${i}`}>
                       <Link
-                        href={`/knowledge/${otherId}`}
+                        href={`/knowledge/${otherId}${projectIdFromQuery ? `?projectId=${projectIdFromQuery}` : ""}`}
                         className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-200 hover:bg-slate-700/40 transition-colors"
                       >
                         <span className="font-medium truncate flex-1 min-w-0">{title}</span>

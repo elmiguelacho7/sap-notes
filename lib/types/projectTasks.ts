@@ -1,4 +1,5 @@
-export type ProjectTaskStatus = "pending" | "in_progress" | "done" | "blocked";
+/** Unified workflow: TODO → pending, IN_PROGRESS → in_progress, BLOCKED → blocked, REVIEW → review, DONE → done */
+export type ProjectTaskStatus = "pending" | "in_progress" | "blocked" | "review" | "done";
 export type ProjectTaskPriority = "low" | "medium" | "high";
 
 export type ProjectTask = {
@@ -15,4 +16,6 @@ export type ProjectTask = {
   progress_pct: number;
   created_at: string;
   updated_at: string;
+  /** Optional parent task for subtasks (no UI yet). */
+  parent_task_id?: string | null;
 };

@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, CheckCircle, ShieldCheck, Shield, User, Eye, Crown, Pencil } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { PageShell } from "@/components/layout/PageShell";
-import { PageHeader } from "@/components/layout/PageHeader";
 
 type RoleWithPermissions = {
   id: string;
@@ -16,17 +15,37 @@ type RoleWithPermissions = {
   permissions: { id: string; key: string; name: string }[];
 };
 
-/** Fallback descriptions when API data is used for permissions; role names come from API. */
+/** Short descriptions for role cards (informational only). */
 const ROLE_DESCRIPTIONS: Record<string, string> = {
   superadmin:
-    "Acceso total a la plataforma: usuarios, activaciones, roles globales, Knowledge Sources y configuración.",
+    "Full access to platform configuration and administration.",
   admin:
-    "Gestión operativa (clientes, proyectos, fuentes de conocimiento, notas y métricas). Sin gestión de usuarios ni activaciones.",
+    "Manages users, projects, and clients but cannot change core system configuration.",
   consultant:
-    "Usuario estándar. Acceso a proyectos en los que esté asignado. Puede crear proyectos si está habilitado en la matriz.",
-  viewer: "Solo panel principal. Sin acceso al panel de administración ni a proyectos salvo asignación.",
-  owner: "Control total del proyecto: configuración, contenido y miembros.",
-  editor: "Editar tareas, notas, actividades, tickets y conocimiento. No gestionar miembros.",
+    "Standard user working on assigned projects.",
+  viewer:
+    "Read-only access.",
+  owner:
+    "Full control of the project, including members and content.",
+  editor:
+    "Can edit project content but cannot manage everything.",
+};
+
+/** Overrides for project-scoped roles when description differs from platform. */
+const PROJECT_ROLE_DESCRIPTIONS: Record<string, string> = {
+  viewer: "Read-only access inside the project.",
+};
+
+const MAX_PERMISSIONS_IN_CARD = 6;
+
+/** Icon component per role key (visual only). */
+const ROLE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  superadmin: ShieldCheck,
+  admin: Shield,
+  consultant: User,
+  viewer: Eye,
+  owner: Crown,
+  editor: Pencil,
 };
 
 async function getAdminAuthHeaders(): Promise<Record<string, string>> {
@@ -35,6 +54,61 @@ async function getAdminAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
+}
+
+function RoleCard({
+  role,
+  typeLabel,
+  userCount,
+}: {
+  role: RoleWithPermissions;
+  typeLabel: "Platform role" | "Project role";
+  userCount?: number | null;
+}) {
+  const description =
+    typeLabel === "Project role" && PROJECT_ROLE_DESCRIPTIONS[role.key]
+      ? PROJECT_ROLE_DESCRIPTIONS[role.key]
+      : ROLE_DESCRIPTIONS[role.key] ?? role.name;
+  const displayPerms = role.permissions.slice(0, MAX_PERMISSIONS_IN_CARD);
+  const Icon = ROLE_ICONS[role.key] ?? User;
+  const scopeLabel = typeLabel === "Platform role" ? "Platform" : "Project";
+
+  return (
+    <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5 space-y-3 min-w-0">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center min-w-0 flex-1">
+          <Icon className="size-4 shrink-0 text-slate-400 mr-2" aria-hidden />
+          <h3 className="text-sm font-semibold text-slate-100 truncate">{role.name}</h3>
+        </div>
+        <span className="bg-indigo-500/20 text-indigo-400 text-xs px-2 py-0.5 rounded-md shrink-0">
+          {typeLabel}
+        </span>
+      </div>
+      <p className="text-xs text-slate-500">{description}</p>
+      {displayPerms.length > 0 && (
+        <ul className="space-y-1.5" aria-label={`Permisos de ${role.name}`}>
+          {displayPerms.map((p) => (
+            <li key={p.id} className="flex items-center gap-2 text-sm text-slate-300 min-w-0">
+              <CheckCircle className="size-4 shrink-0 text-emerald-400" aria-hidden />
+              <span className="min-w-0 break-words">{p.name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="pt-1 space-y-0.5">
+        {userCount != null && (
+          <p className="text-xs text-slate-500">Users with this role: {userCount}</p>
+        )}
+        <p className="text-xs text-slate-500">Scope: {scopeLabel}</p>
+        <button
+          type="button"
+          className="text-xs text-slate-400 hover:text-slate-200 transition-colors duration-150"
+        >
+          Edit role
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function AdminRolesPage() {
@@ -106,7 +180,7 @@ export default function AdminRolesPage() {
 
   if (loading) {
     return (
-      <PageShell wide={false}>
+      <PageShell wide={false} className="bg-slate-950">
         <div className="py-12 text-center">
           <p className="text-sm text-slate-500">Cargando...</p>
         </div>
@@ -116,9 +190,9 @@ export default function AdminRolesPage() {
 
   if (appRole === null) {
     return (
-      <PageShell wide={false}>
-        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center shadow-sm">
-          <p className="text-sm font-medium text-slate-700">Acceso restringido</p>
+      <PageShell wide={false} className="bg-slate-950">
+        <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-5 py-12 text-center">
+          <p className="text-sm font-medium text-slate-200">Acceso restringido</p>
           <p className="mt-1 text-sm text-slate-500">
             Debes iniciar sesión para ver esta página.
           </p>
@@ -131,106 +205,66 @@ export default function AdminRolesPage() {
   const projectRoles = roles.filter((r) => r.scope === "project");
 
   return (
-    <PageShell wide={false}>
-      <div className="space-y-6">
+    <PageShell wide={false} className="bg-slate-950">
+      <div className="space-y-8">
         <Link
           href="/admin"
-          className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-indigo-600"
+          className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200 transition-colors"
         >
           <ChevronLeft className="h-4 w-4" />
           Volver al panel de administración
         </Link>
 
-        <PageHeader
-          title="Roles y permisos"
-          description="Matriz de permisos por rol. Los roles de plataforma se asignan en el perfil; los de proyecto, en cada proyecto."
-        />
+        <div className="space-y-1">
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-100">
+            Roles y permisos
+          </h1>
+          <p className="text-sm text-slate-500">
+            Matriz de permisos por rol. Los roles de plataforma se asignan en el perfil; los de proyecto, en cada proyecto.
+          </p>
+        </div>
 
         {matrixError && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+          <div className="rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-2 text-sm text-amber-200">
             {matrixError}
-          </p>
+          </div>
         )}
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 bg-slate-50/50 px-5 py-4">
-            <h2 className="text-sm font-semibold text-slate-900">
-              Roles de plataforma
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-sm font-medium text-slate-200">
+              Platform Roles
             </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Se asignan a cada usuario a nivel global (perfil). Definen qué puede
-              hacer en la aplicación fuera de un proyecto concreto.
+            <p className="text-xs text-slate-500 mt-0.5">
+              Roles that define what a user can do across the whole platform.
             </p>
           </div>
-          <div className="p-5">
-            <ul className="space-y-5">
-              {platformRoles.length === 0 && !matrixError && (
-                <li className="text-sm text-slate-500">
-                  Cargando roles…
-                </li>
-              )}
-              {platformRoles.map((role) => (
-                <li key={role.id} className="flex flex-col gap-1">
-                  <span className="font-medium text-slate-900">{role.name}</span>
-                  <p className="text-sm text-slate-600">
-                    {ROLE_DESCRIPTIONS[role.key] ?? role.name}
-                  </p>
-                  {role.permissions.length > 0 && (
-                    <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={`Permisos de ${role.name}`}>
-                      {role.permissions.map((p) => (
-                        <li
-                          key={p.id}
-                          className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700"
-                        >
-                          {p.name}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {platformRoles.length === 0 && !matrixError && (
+              <p className="text-sm text-slate-500 col-span-full">Cargando roles…</p>
+            )}
+            {platformRoles.map((role) => (
+              <RoleCard key={role.id} role={role} typeLabel="Platform role" />
+            ))}
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 bg-slate-50/50 px-5 py-4">
-            <h2 className="text-sm font-semibold text-slate-900">
-              Roles de proyecto
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-sm font-medium text-slate-200">
+              Project Roles
             </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Se asignan por proyecto a cada miembro. La gestión de miembros se
-              hace en el contexto del proyecto.
+            <p className="text-xs text-slate-500 mt-0.5">
+              Roles assigned inside each project to control project-specific access.
             </p>
           </div>
-          <div className="p-5">
-            <ul className="space-y-5">
-              {projectRoles.length === 0 && !matrixError && (
-                <li className="text-sm text-slate-500">
-                  Cargando roles…
-                </li>
-              )}
-              {projectRoles.map((role) => (
-                <li key={role.id} className="flex flex-col gap-1">
-                  <span className="font-medium text-slate-900">{role.name}</span>
-                  <p className="text-sm text-slate-600">
-                    {ROLE_DESCRIPTIONS[role.key] ?? role.name}
-                  </p>
-                  {role.permissions.length > 0 && (
-                    <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={`Permisos de ${role.name}`}>
-                      {role.permissions.map((p) => (
-                        <li
-                          key={p.id}
-                          className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700"
-                        >
-                          {p.name}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {projectRoles.length === 0 && !matrixError && (
+              <p className="text-sm text-slate-500 col-span-full">Cargando roles…</p>
+            )}
+            {projectRoles.map((role) => (
+              <RoleCard key={role.id} role={role} typeLabel="Project role" />
+            ))}
           </div>
         </section>
 

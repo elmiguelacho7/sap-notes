@@ -1,0 +1,10 @@
+feat: ticket system with solutions, knowledge integration and AI memory
+
+- ticket solutions with markdown
+- root cause and resolution tracking
+- ticket comments
+- ticket references (SAP note / link / document)
+- knowledge page conversion
+- AI memory extraction for Sapito
+- global vs project ticket behavior
+- improved ticket detail UI

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Trash2, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
+import { addToRecent } from "@/components/command-palette/recentStore";
 
 type Note = {
   id: string;
@@ -65,6 +66,17 @@ export default function NoteDetailPage() {
       void fetchNote();
     }
   }, [noteId]);
+
+  useEffect(() => {
+    if (note?.id && note?.title != null) {
+      addToRecent({
+        type: "note",
+        id: note.id,
+        title: note.title || "Sin título",
+        href: `/notes/${note.id}`,
+      });
+    }
+  }, [note?.id, note?.title]);
 
   useEffect(() => {
     let cancelled = false;

@@ -12,16 +12,19 @@ import { Sidebar } from "@/components/ui/sidebar/Sidebar";
 import { Header } from "@/components/ui/header/Header";
 import { HeaderSearchInput } from "@/components/ui/header/HeaderSearchInput";
 import { QuickActionMenu } from "@/components/ui/actions/QuickActionMenu";
+import { CommandPalette } from "@/components/command-palette/CommandPalette";
 import type { BreadcrumbItem } from "@/components/ui/header/Breadcrumbs";
 
 const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/my-work": "My Work",
   "/notes": "Notas",
-  "/tasks": "Tareas",
+  "/tasks": "Tasks",
   "/projects": "Proyectos",
-  "/knowledge": "Knowledge",
+  "/knowledge": "Knowledge Explorer",
   "/knowledge/search": "Search",
+  "/knowledge/documents": "Spaces",
+  "/knowledge/spaces": "Documents",
   "/search": "Búsqueda",
   "/tickets": "Tickets",
   "/process-flows": "Flujos de proceso",
@@ -198,6 +201,7 @@ export default function PrivateLayout({
       >
         {children}
       </PageContainer>
+      <CommandPalette />
       <GlobalAssistantBubble />
     </AppShell>
   );
