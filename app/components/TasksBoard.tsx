@@ -28,6 +28,7 @@ import { TaskCard } from "@/app/components/TaskCard";
 import { TaskSummary } from "@/app/components/TaskSummary";
 import { TaskList } from "@/components/tasks/TaskList";
 import { TasksBoardSkeleton } from "@/components/skeletons/TasksBoardSkeleton";
+import { AssigneeDropdown } from "@/app/components/AssigneeDropdown";
 
 type TaskStatus = {
   id: string;
@@ -87,6 +88,8 @@ type TasksBoardProps = {
   openCreateInitially?: boolean;
   /** Global board only: filter to tasks assigned to or created by this user id. */
   filterByUserId?: string | null;
+  /** Global board only: filter by assignee_id (profiles.id). */
+  assigneeFilterId?: string | null;
   /** Global board only: filter by search string (title, description). */
   searchQuery?: string;
   /** Global board only: filter by status_id. */
@@ -314,6 +317,7 @@ export default function TasksBoard({
   error: controlledError,
   openCreateInitially = false,
   filterByUserId = null,
+  assigneeFilterId = null,
   searchQuery: filterSearchQuery = "",
   statusFilter: filterStatusId = "",
   priorityFilter: filterPriority = "",
@@ -481,9 +485,10 @@ export default function TasksBoard({
     let list = tasks;
     if (phaseFilter) list = list.filter((t) => t.activate_phase_key === phaseFilter);
     if (filterByUserId) {
-      list = list.filter(
-        (t) => t.assignee_id === filterByUserId || t.created_by === filterByUserId
-      );
+      list = list.filter((t) => t.assignee_id === filterByUserId);
+    }
+    if (assigneeFilterId) {
+      list = list.filter((t) => t.assignee_id === assigneeFilterId);
     }
     const q = (filterSearchQuery ?? "").trim().toLowerCase();
     if (q) {
@@ -496,7 +501,7 @@ export default function TasksBoard({
     if (filterStatusId) list = list.filter((t) => t.status_id === filterStatusId);
     if (filterPriority) list = list.filter((t) => t.priority === filterPriority);
     return list;
-  }, [tasks, phaseFilter, filterByUserId, filterSearchQuery, filterStatusId, filterPriority]);
+  }, [tasks, phaseFilter, filterByUserId, assigneeFilterId, filterSearchQuery, filterStatusId, filterPriority]);
 
   const orderedStatuses = useMemo(() => {
     const codeToOrder = new Map<string, number>(STANDARD_STATUS_ORDER.map((c, i) => [c, i]));
@@ -551,7 +556,7 @@ export default function TasksBoard({
     const assignedToMeCount =
       currentUserId != null && currentUserId !== ""
         ? tasks.filter(
-            (t) => t.assignee_id === currentUserId || t.created_by === currentUserId
+            (t) => t.assignee_id === currentUserId
           ).length
         : undefined;
 
@@ -739,6 +744,22 @@ export default function TasksBoard({
       .update({ due_date: dueDate })
       .eq("id", taskId);
     if (updateError) handleSupabaseError("tasks update due_date", updateError);
+  };
+
+  const handleAssigneeChange = async (taskId: string, nextAssigneeId: string | null) => {
+    if (isControlled) {
+      await onAssigneeChange?.(taskId, nextAssigneeId);
+      return;
+    }
+    setError(null);
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, assignee_id: nextAssigneeId } : t))
+    );
+    const { error: updateError } = await supabase
+      .from("tasks")
+      .update({ assignee_id: nextAssigneeId })
+      .eq("id", taskId);
+    if (updateError) handleSupabaseError("tasks update assignee", updateError);
   };
 
   // Drag & drop → mover tarjeta de una columna a otra
@@ -1118,7 +1139,7 @@ export default function TasksBoard({
                           )}
                           {(assigneeOptions?.length || assigneeLabel) && (
                             <p className="text-[11px] text-slate-500">
-                              Responsible: <span className={assigneeLabel ? "text-slate-300" : "text-slate-500"}>👤 {assigneeLabel ?? "Sin asignar"}</span>
+                              Responsable: <span className={assigneeLabel ? "text-slate-300" : "text-slate-500"}>👤 {assigneeLabel ?? "Sin asignar"}</span>
                             </p>
                           )}
                           {task.due_date && (
@@ -1170,9 +1191,11 @@ export default function TasksBoard({
               { value: "low", label: "Baja" },
             ]}
             onPriorityChange={handlePriorityChange}
+            assigneeOptions={assigneeOptions?.length ? assigneeOptions : undefined}
+            onAssigneeChange={assigneeOptions?.length ? handleAssigneeChange : undefined}
             onDueDateChange={handleDueDateChange}
             onOpenDetail={onOpenDetail ?? undefined}
-            scopeLabel={filterByUserId ? "My" : "Global"}
+            scopeLabel={filterByUserId ? "Asignado a mí" : "Global"}
             getProjectName={() => null}
             loading={loading}
           />
@@ -1270,6 +1293,19 @@ export default function TasksBoard({
                                       ).toLocaleDateString()}
                                     </p>
                                   )}
+
+                                  {assigneeOptions?.length ? (
+                                    <div className="mt-2">
+                                      <p className="text-[11px] text-slate-500 mb-1">Responsable</p>
+                                      <AssigneeDropdown
+                                        options={assigneeOptions}
+                                        value={task.assignee_id ?? null}
+                                        onChange={(profileId) => handleAssigneeChange(task.id, profileId)}
+                                        placeholder="Sin asignar"
+                                        variant={task.assignee_id ? "assigned" : "unassigned"}
+                                      />
+                                    </div>
+                                  ) : null}
 
                                   {task.description && (
                                     <p className="text-xs text-slate-400 line-clamp-2 mt-0.5">

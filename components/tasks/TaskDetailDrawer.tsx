@@ -178,13 +178,13 @@ export function TaskDetailDrawer({
 
           {assigneeOptions.length > 0 && (
             <div>
-              <label className={labelClass}>Assignee</label>
+              <label className={labelClass}>Responsable</label>
               <select
                 value={assigneeId ?? ""}
                 onChange={(e) => setAssigneeId(e.target.value || null)}
                 className={inputClass}
               >
-                <option value="">Unassigned</option>
+                <option value="">Sin asignar</option>
                 {assigneeOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
@@ -10,6 +10,8 @@ import { RowActions } from "@/components/RowActions";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
+import { AssigneeCell } from "@/components/AssigneeCell";
+import { useAssignableUsers } from "@/components/hooks/useAssignableUsers";
 
 const PRIORITY_LABELS: Record<TicketPriority, string> = {
   low: "Baja",
@@ -64,6 +66,10 @@ export default function TicketsPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [appRole, setAppRole] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [assigneeFilter, setAssigneeFilter] = useState<"all" | "unassigned" | "me">("all");
+
+  const { profilesMap } = useAssignableUsers({ contextType: "global" });
 
   const loadTickets = useCallback(async () => {
     setLoading(true);
@@ -71,7 +77,7 @@ export default function TicketsPage() {
 
     const { data, error } = await supabase
       .from("tickets")
-      .select("id, title, description, priority, status, project_id, due_date, created_at, updated_at")
+      .select("id, title, description, priority, status, project_id, due_date, created_at, updated_at, assigned_to")
       .is("project_id", null)
       .order("created_at", { ascending: false });
 
@@ -108,6 +114,22 @@ export default function TicketsPage() {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!cancelled) setCurrentUserId(user?.id ?? null);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const visibleTickets = useMemo(() => {
+    if (assigneeFilter === "unassigned") return tickets.filter((t) => !(t as Ticket & { assigned_to?: string | null }).assigned_to);
+    if (assigneeFilter === "me" && currentUserId) {
+      return tickets.filter((t) => (t as Ticket & { assigned_to?: string | null }).assigned_to === currentUserId);
+    }
+    return tickets;
+  }, [tickets, assigneeFilter, currentUserId]);
+
   return (
     <PageShell>
       <div className="space-y-8">
@@ -134,12 +156,34 @@ export default function TicketsPage() {
       <section>
         <h2 className="text-sm font-semibold text-slate-800 mb-1">Tickets globales</h2>
         <p className="text-xs text-slate-500 mb-5">Listado de tickets no asignados a ningún proyecto.</p>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {(
+            [
+              { key: "all" as const, label: "Todos" },
+              { key: "unassigned" as const, label: "Sin asignar" },
+              { key: "me" as const, label: "Asignado a mí" },
+            ] as const
+          ).map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setAssigneeFilter(key)}
+              className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                assigneeFilter === key
+                  ? "bg-indigo-600 text-white border-indigo-600"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           {loading ? (
             <div className="px-5 py-6">
               <TableSkeleton rows={6} colCount={6} />
             </div>
-          ) : tickets.length === 0 ? (
+          ) : visibleTickets.length === 0 ? (
             <div className="px-5 py-12 text-center">
               <p className="text-sm font-medium text-slate-700">No hay tickets</p>
               <p className="mt-1 text-sm text-slate-500">Crea uno desde el botón «Nuevo ticket» o desde un proyecto.</p>
@@ -151,6 +195,9 @@ export default function TicketsPage() {
                   <tr className="border-b border-slate-200 bg-slate-50/80">
                     <th className="px-5 py-3 font-semibold text-slate-700">
                       Título
+                    </th>
+                    <th className="px-5 py-3 font-semibold text-slate-700">
+                      Responsable
                     </th>
                     <th className="px-5 py-3 font-semibold text-slate-700">
                       Prioridad
@@ -167,7 +214,7 @@ export default function TicketsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {tickets.map((t) => (
+                  {visibleTickets.map((t) => (
                     <tr key={t.id} className="hover:bg-slate-50/50 transition">
                       <td className="px-5 py-3">
                         <Link
@@ -176,6 +223,13 @@ export default function TicketsPage() {
                         >
                           {t.title}
                         </Link>
+                      </td>
+                      <td className="px-5 py-3">
+                        <AssigneeCell
+                          profileId={(t as Ticket & { assigned_to?: string | null }).assigned_to ?? null}
+                          profilesMap={profilesMap}
+                          tone="light"
+                        />
                       </td>
                       <td className="px-5 py-3">
                         <PriorityBadge priority={t.priority} />

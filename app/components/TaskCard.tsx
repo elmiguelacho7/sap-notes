@@ -81,10 +81,10 @@ function TaskCardComponent({
               <span className="text-slate-400 truncate" title={activityLabel}>{activityLabel}</span>
             </p>
           )}
-          {/* Responsible: [pill] — compact, truncates long names, stays inside card */}
+          {/* Responsable: [pill] — compact, truncates long names, stays inside card */}
           {assigneeOptions !== undefined && (
             <p className="text-[11px] text-slate-500 leading-tight flex items-center gap-1.5 min-w-0">
-              <span className="shrink-0">Responsible:</span>
+              <span className="shrink-0">Responsable:</span>
               {onAssigneeChange ? (
                 <span
                   className="inline-flex min-w-0 max-w-full"

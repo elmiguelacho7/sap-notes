@@ -14,6 +14,7 @@ import { TaskWorkspaceHeader } from "@/components/tasks/TaskWorkspaceHeader";
 import { TaskFilterBar } from "@/components/tasks/TaskFilterBar";
 import { ViewModeToggle, type ViewMode } from "@/components/tasks/ViewModeToggle";
 import { TaskDetailDrawer, type TaskDetailPayload } from "@/components/tasks/TaskDetailDrawer";
+import { useAssignableUsers } from "@/components/hooks/useAssignableUsers";
 
 function serializeUnknownError(e: unknown): Record<string, unknown> {
   if (e instanceof Error) {
@@ -64,8 +65,8 @@ export default function ProjectTasksPage() {
 
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [activities, setActivities] = useState<{ id: string; name: string }[]>([]);
-  const [memberProfiles, setMemberProfiles] = useState<{ id: string; full_name: string | null; email: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
+  const { users: assignableUsers } = useAssignableUsers({ contextType: "project", projectId });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -84,7 +85,7 @@ export default function ProjectTasksPage() {
       setLoading(true);
       setErrorMsg(null);
 
-      const [tasksRes, activitiesRes, membersRes] = await Promise.all([
+      const [tasksRes, activitiesRes] = await Promise.all([
         supabase
           .from("project_tasks")
           .select("*")
@@ -96,10 +97,6 @@ export default function ProjectTasksPage() {
           .select("id, name")
           .eq("project_id", projectId)
           .order("name"),
-        supabase
-          .from("project_members")
-          .select("profile_id, user_id")
-          .eq("project_id", projectId),
       ]);
 
       if (tasksRes.error) {
@@ -120,20 +117,7 @@ export default function ProjectTasksPage() {
         );
       }
 
-      // Project team: same source as Team page — project_members for this project, then profiles for names.
-      // Use profile_id ?? user_id so we resolve all members (profile_id may be null on some rows).
-      const profileIds = (membersRes.data ?? [])
-        .map((r: { profile_id?: string | null; user_id?: string | null }) => r.profile_id ?? r.user_id)
-        .filter((id): id is string => id != null && id !== "");
-      if (profileIds.length > 0 && !membersRes.error) {
-        const { data: profilesData } = await supabase
-          .from("profiles")
-          .select("id, full_name, email")
-          .in("id", profileIds);
-        setMemberProfiles((profilesData ?? []) as { id: string; full_name: string | null; email: string | null }[]);
-      } else {
-        setMemberProfiles([]);
-      }
+      // Assignable users (Responsable) come from useAssignableUsers hook (project members).
     } catch (err) {
       console.error("Error loading tasks", err);
       setErrorMsg("No se pudieron cargar las tareas del proyecto.");
@@ -204,14 +188,10 @@ export default function ProjectTasksPage() {
     [activities]
   );
 
-  // Responsible dropdown: only real project team members (project_members → profiles). Same people as Team page.
+  // Responsable options from shared hook (project members only).
   const assigneeOptions = useMemo(
-    () =>
-      memberProfiles.map((p) => ({
-        value: p.id,
-        label: p.full_name || p.email || p.id,
-      })),
-    [memberProfiles]
+    () => assignableUsers.map((u) => ({ value: u.id, label: u.label })),
+    [assignableUsers]
   );
 
   const assignedToMeCount = useMemo(() => {
@@ -229,7 +209,7 @@ export default function ProjectTasksPage() {
 
   const statusFilterOptions = useMemo(
     () => [
-      { value: "", label: "All statuses" },
+      { value: "", label: "Todos los estados" },
       ...KANBAN_COLUMNS.map((c) => ({ value: c.id, label: c.label })),
     ],
     []
@@ -237,7 +217,7 @@ export default function ProjectTasksPage() {
 
   const priorityFilterOptions = useMemo(
     () => [
-      { value: "", label: "All priorities" },
+      { value: "", label: "Todas las prioridades" },
       { value: "high", label: "Alta" },
       { value: "medium", label: "Media" },
       { value: "low", label: "Baja" },
@@ -247,7 +227,7 @@ export default function ProjectTasksPage() {
 
   const assigneeFilterOptions = useMemo(
     () => [
-      { value: "", label: "All assignees" },
+      { value: "", label: "Todos los responsables" },
       ...assigneeOptions.map((o) => ({ value: o.value, label: o.label })),
     ],
     [assigneeOptions]

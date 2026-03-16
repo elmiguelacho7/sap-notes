@@ -86,7 +86,7 @@ export function TaskList({
   if (tasks.length === 0) {
     return (
       <p className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-8 text-center text-sm text-slate-500">
-        No tasks match the current filters.
+        No hay tareas que coincidan con los filtros actuales.
       </p>
     );
   }
@@ -107,7 +107,7 @@ export function TaskList({
               {context === "project" && getActivityLabel && <th className={baseTh}>Activity</th>}
               <th className={baseTh}>Status</th>
               <th className={baseTh}>Priority</th>
-              {(assigneeOptions != null || onAssigneeChange) && <th className={baseTh}>Assignee</th>}
+              {(assigneeOptions != null || onAssigneeChange) && <th className={baseTh}>Responsable</th>}
               <th className={baseTh}>Due date</th>
               <th className={baseTh}>Updated</th>
               {onOpenDetail && <th className={`${baseTh} w-0`}>Actions</th>}
@@ -193,11 +193,11 @@ export function TaskList({
                           options={assigneeOptions}
                           value={task.assignee_profile_id ?? null}
                           onChange={(id) => onAssigneeChange(task.id, id)}
-                          placeholder="Unassigned"
+                          placeholder="Sin asignar"
                           variant={assigneeLabel ? "assigned" : "unassigned"}
                         />
                       ) : (
-                        <span className="text-slate-400">{assigneeLabel ?? "—"}</span>
+                        <span className="text-slate-400">{assigneeLabel ?? "Sin asignar"}</span>
                       )}
                     </td>
                   )}

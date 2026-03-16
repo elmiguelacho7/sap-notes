@@ -74,7 +74,7 @@ export function TaskSummary({
         </div>
         {showAssignedToMe && (
           <div className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm">
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Assigned to me</p>
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Asignado a mí</p>
             <p className="text-lg font-semibold text-slate-100 mt-0.5">{assignedToMe}</p>
           </div>
         )}

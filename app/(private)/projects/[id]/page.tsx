@@ -1527,7 +1527,7 @@ export default function ProjectDashboardPage() {
                       </Link>
                       <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800/70 transition-colors duration-150">
                         <User className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                        <span>Unassigned tasks</span>
+                        <span>Tareas sin asignar</span>
                         <span className="ml-auto font-semibold tabular-nums text-slate-100">{healthMetrics.unassignedTasks}</span>
                       </Link>
                       <Link href={`/projects/${projectId}/tasks`} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800/70 transition-colors duration-150">

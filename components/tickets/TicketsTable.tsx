@@ -2,6 +2,7 @@
 
 import type { TicketWithRelations } from "./ticketTypes";
 import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
+import { AssigneePill } from "@/components/AssigneePill";
 
 type TicketsTableProps = {
   tickets: TicketWithRelations[];
@@ -66,7 +67,7 @@ export default function TicketsTable({
                 Prioridad
               </th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                Asignado
+                Responsable
               </th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
                 Creado
@@ -121,8 +122,13 @@ export default function TicketsTable({
                     "—"
                   )}
                 </td>
-                <td className="px-4 py-3 text-slate-600">
-                  {t.assignee_name ?? "—"}
+                <td className="px-4 py-3">
+                  <AssigneePill
+                    profileId={t.assignee_name ? "resolved" : null}
+                    displayLabel={t.assignee_name ?? null}
+                    tone="light"
+                    compact
+                  />
                 </td>
                 <td className="px-4 py-3 text-slate-500 text-xs">
                   {formatDate(t.created_at)}

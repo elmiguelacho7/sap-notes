@@ -149,7 +149,7 @@ export function AssigneeDropdown({
         </button>
         {options.length === 0 && (
           <p className="px-3 py-2 text-[11px] text-slate-500 border-t border-slate-700/60">
-            No team members available
+            No hay usuarios disponibles
           </p>
         )}
         {options.map((opt) => {

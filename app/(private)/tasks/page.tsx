@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { BoardTask } from "@/app/components/TasksBoard";
 import { TaskWorkspaceHeader } from "@/components/tasks/TaskWorkspaceHeader";
@@ -8,19 +8,20 @@ import { TaskFilterBar } from "@/components/tasks/TaskFilterBar";
 import { ViewModeToggle } from "@/components/tasks/ViewModeToggle";
 import { TaskDetailDrawer, type TaskDetailPayload } from "@/components/tasks/TaskDetailDrawer";
 import TasksBoard from "@/app/components/TasksBoard";
+import { useAssignableUsers } from "@/components/hooks/useAssignableUsers";
 
 type TaskStatusRow = { id: string; code: string; name: string };
 
 const SCOPE_OPTIONS = [
-  { value: "global", label: "Global tasks" },
-  { value: "my", label: "My tasks" },
+  { value: "global", label: "Tareas globales" },
+  { value: "my", label: "Asignado a mí" },
 ];
 
 const PRIORITY_OPTIONS = [
-  { value: "", label: "All priorities" },
-  { value: "high", label: "High" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
+  { value: "", label: "Todas las prioridades" },
+  { value: "high", label: "Alta" },
+  { value: "medium", label: "Media" },
+  { value: "low", label: "Baja" },
 ];
 
 export default function GlobalTasksPage() {
@@ -31,10 +32,20 @@ export default function GlobalTasksPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailTask, setDetailTask] = useState<BoardTask | null>(null);
   const [detailSaving, setDetailSaving] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const { users: assignableUsers } = useAssignableUsers({ contextType: "global" });
+  const assigneeFilterOptions = useMemo(
+    () => [
+      { value: "", label: "Todos los responsables" },
+      ...assignableUsers.map((u) => ({ value: u.id, label: u.label })),
+    ],
+    [assignableUsers]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -58,7 +69,7 @@ export default function GlobalTasksPage() {
   }, [loadStatuses]);
 
   const statusOptions = [
-    { value: "", label: "All statuses" },
+    { value: "", label: "Todos los estados" },
     ...statuses.map((s) => ({ value: s.id, label: s.name })),
   ];
 
@@ -90,15 +101,15 @@ export default function GlobalTasksPage() {
   return (
     <div className="w-full min-w-0 space-y-6 bg-slate-950">
       <TaskWorkspaceHeader
-        title="Tasks"
-        subtitle="Track work across global, personal, and project contexts."
+        title="Tareas"
+        subtitle="Gestiona tareas globales y tareas asignadas a ti."
         actions={<ViewModeToggle value={viewMode} onChange={setViewMode} />}
       />
 
       <TaskFilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder="Search tasks..."
+        searchPlaceholder="Buscar tareas..."
         scopeOptions={SCOPE_OPTIONS}
         scopeValue={scope}
         onScopeChange={(v) => setScope(v as "global" | "my")}
@@ -108,19 +119,24 @@ export default function GlobalTasksPage() {
         priorityOptions={PRIORITY_OPTIONS}
         priorityValue={priorityFilter}
         onPriorityChange={setPriorityFilter}
+        assigneeOptions={assigneeFilterOptions}
+        assigneeValue={assigneeFilter}
+        onAssigneeChange={setAssigneeFilter}
       />
 
       <section>
         <TasksBoard
           projectId={null}
           title="Board"
-          subtitle="Global tasks (no project). Create and move cards across statuses."
+          subtitle="Tareas globales (sin proyecto). Crea y mueve tarjetas por estado."
           filterByUserId={scope === "my" ? currentUserId : null}
+          assigneeFilterId={assigneeFilter ? assigneeFilter : null}
           searchQuery={searchQuery}
           statusFilter={statusFilter || undefined}
           priorityFilter={priorityFilter || undefined}
           viewMode={viewMode}
           currentUserId={currentUserId}
+          assigneeOptions={assigneeFilterOptions.slice(1)}
           onOpenDetail={(task) => {
             setDetailTask(task);
             setDetailOpen(true);

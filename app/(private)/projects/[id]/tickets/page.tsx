@@ -9,6 +9,7 @@ import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
 import { handleSupabaseError, hasLoggableSupabaseError } from "@/lib/supabaseError";
 import { getTicketDetailHref } from "@/lib/routes";
 import type { TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
+import { AssigneeCell } from "@/components/AssigneeCell";
 
 const PRIORITY_LABELS: Record<string, string> = {
   low: "Baja",
@@ -69,30 +70,6 @@ function StatusBadge({ status }: { status: TicketStatus }) {
       className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${colors[status] ?? "bg-slate-700/60 text-slate-400"}`}
     >
       {STATUS_LABELS[status] ?? status}
-    </span>
-  );
-}
-
-function AssigneeCell({ profileId, profilesMap }: { profileId: string | null; profilesMap: Map<string, { full_name: string | null; email: string | null }> }) {
-  if (!profileId) {
-    return (
-      <span className="flex items-center gap-2 text-slate-500">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-700/80 text-slate-500">
-          <User className="h-3.5 w-3.5" />
-        </span>
-        Sin asignar
-      </span>
-    );
-  }
-  const p = profilesMap.get(profileId);
-  const label = p ? (p.full_name || p.email || profileId) : profileId.slice(0, 8);
-  const initial = (label.trim() || "?").charAt(0).toUpperCase();
-  return (
-    <span className="flex items-center gap-2 text-slate-300">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-600 text-slate-200 text-[10px] font-medium">
-        {initial}
-      </span>
-      <span className="truncate max-w-[120px]" title={label}>{label}</span>
     </span>
   );
 }
@@ -367,11 +344,11 @@ export default function ProjectTicketsPage() {
   }, [projectId]);
 
   const profilesMap = useMemo(() => {
-    const map = new Map<string, { full_name: string | null; email: string | null }>();
-    memberProfiles.forEach((p) => map.set(p.id, { full_name: p.full_name, email: p.email }));
+    const map = new Map<string, { id: string; full_name: string | null; email: string | null }>();
+    memberProfiles.forEach((p) => map.set(p.id, { id: p.id, full_name: p.full_name, email: p.email }));
     tickets.forEach((t) => {
       if (t.assigned_to && !map.has(t.assigned_to)) {
-        map.set(t.assigned_to, { full_name: null, email: null });
+        map.set(t.assigned_to, { id: t.assigned_to, full_name: null, email: null });
       }
     });
     return map;
@@ -480,8 +457,8 @@ export default function ProjectTicketsPage() {
                 { key: "in_progress" as FilterKind, label: "In Progress" },
                 { key: "closed" as FilterKind, label: "Closed" },
                 { key: "overdue" as FilterKind, label: "Overdue" },
-                { key: "unassigned" as FilterKind, label: "Unassigned" },
-                { key: "my_tickets" as FilterKind, label: "My Tickets" },
+                { key: "unassigned" as FilterKind, label: "Sin asignar" },
+                { key: "my_tickets" as FilterKind, label: "Asignado a mí" },
               ] as const
             ).map(({ key, label }) => (
               <button

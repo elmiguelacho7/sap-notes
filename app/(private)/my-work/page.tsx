@@ -119,7 +119,7 @@ function relativeTime(dateStr: string): string {
 function formatDueShort(dateStr: string | null): string {
   if (!dateStr) return "";
   const d = new Date(dateStr);
-  return `due ${d.toLocaleDateString("es-ES", { day: "numeric", month: "short" })}`;
+  return `vence ${d.toLocaleDateString("es-ES", { day: "numeric", month: "short" })}`;
 }
 
 function isRecentlyUpdated(updatedAt: string, days = 3): boolean {
@@ -174,7 +174,7 @@ function groupTasksByProject(
   }
   return Array.from(byProject.entries()).map(([projectId, taskList]) => ({
     projectId,
-    projectName: projectId === "__none__" ? "No project" : (getProjectName(projectId) ?? "Unknown project"),
+    projectName: projectId === "__none__" ? "Sin proyecto" : (getProjectName(projectId) ?? "Proyecto desconocido"),
     tasks: taskList,
   }));
 }
@@ -321,16 +321,16 @@ const TICKET_STATUS_LABELS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 const TYPE_LABELS: Record<WorkItem["type"], string> = {
-  task: "Task",
+  task: "Tarea",
   ticket: "Ticket",
-  activity: "Activity",
+  activity: "Actividad",
 };
 
 const PRIORITY_LABELS: Record<string, string> = {
-  low: "low priority",
-  medium: "medium priority",
-  high: "high priority",
-  urgent: "urgent",
+  low: "baja prioridad",
+  medium: "prioridad media",
+  high: "alta prioridad",
+  urgent: "urgente",
 };
 
 function WorkRow({ item }: { item: WorkItem }) {
@@ -343,12 +343,12 @@ function WorkRow({ item }: { item: WorkItem }) {
         : (item.status ?? "—").toLowerCase();
   const hasDue = item.dueDate && (item.type === "task" || item.type === "activity");
   const dueOrUpdatedLabel = hasDue && isSameDay(item.dueDate!, today)
-    ? "due today"
+    ? "vence hoy"
     : item.type === "task" && item.dueDate && isBeforeDay(item.dueDate, today)
-      ? "overdue"
+      ? "vencida"
       : hasDue
         ? formatDueShort(item.dueDate)
-        : `updated ${relativeTime(item.updatedAt)}`;
+        : `actualizado ${relativeTime(item.updatedAt)}`;
   const priorityLabel =
     item.priority && (item.priority === "high" || item.priority === "urgent")
       ? (PRIORITY_LABELS[item.priority] ?? item.priority)
@@ -364,7 +364,7 @@ function WorkRow({ item }: { item: WorkItem }) {
         ? "bg-violet-500/15 text-violet-300 border-violet-500/30"
         : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
   const metaParts = [
-    item.projectName ?? "No project",
+    item.projectName ?? "Sin proyecto",
     statusLabel,
     dueOrUpdatedLabel,
     ...(priorityLabel ? [priorityLabel] : []),
@@ -692,7 +692,7 @@ export default function MyWorkPage() {
   if (loadingIdentity && authUserId == null) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-slate-100">My Work</h1>
+        <h1 className="text-2xl font-semibold text-slate-100">Mi trabajo</h1>
         <p className="text-sm text-slate-500">Cargando…</p>
       </div>
     );
@@ -701,7 +701,7 @@ export default function MyWorkPage() {
   if (profileError != null && profileId == null) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-slate-100">My Work</h1>
+        <h1 className="text-2xl font-semibold text-slate-100">Mi trabajo</h1>
         <div className="rounded-xl border border-amber-800/50 bg-amber-950/30 px-5 py-6 text-center">
           <p className="text-sm font-medium text-amber-200">{profileError}</p>
           <p className="mt-1 text-xs text-amber-300/80">No se puede cargar tu trabajo sin un perfil válido.</p>
@@ -711,19 +711,19 @@ export default function MyWorkPage() {
   }
 
   const tabs: { key: TabFilter; label: string }[] = [
-    { key: "all", label: "All" },
-    { key: "overdue", label: "Overdue" },
-    { key: "due_today", label: "Due today" },
-    { key: "active", label: "Active" },
-    { key: "recent", label: "Recent" },
+    { key: "all", label: "Todo" },
+    { key: "overdue", label: "Vencido" },
+    { key: "due_today", label: "Vence hoy" },
+    { key: "active", label: "Activo" },
+    { key: "recent", label: "Reciente" },
   ];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <header>
-        <h1 className="text-2xl font-semibold text-slate-100">My Work</h1>
-        <p className="mt-1 text-sm text-slate-400">Your tasks, tickets and recent work in one place.</p>
+        <h1 className="text-2xl font-semibold text-slate-100">Mi trabajo</h1>
+        <p className="mt-1 text-sm text-slate-400">Tus tareas, tickets y trabajo reciente en un solo lugar.</p>
       </header>
 
       {pageError != null && (
@@ -734,27 +734,27 @@ export default function MyWorkPage() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2">
           <AlertTriangle className="h-4 w-4 text-amber-400" />
-          <span className="text-xs text-slate-400">Overdue</span>
+          <span className="text-xs text-slate-400">Vencido</span>
           <span className="text-sm font-semibold text-amber-300">{loading ? "—" : overdueCount}</span>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 py-2">
           <CalendarClock className="h-4 w-4 text-sky-400" />
-          <span className="text-xs text-slate-400">Due today</span>
+          <span className="text-xs text-slate-400">Vence hoy</span>
           <span className="text-sm font-semibold text-sky-300">{loading ? "—" : dueTodayCount}</span>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2">
           <Ticket className="h-4 w-4 text-violet-400" />
-          <span className="text-xs text-slate-400">Open tickets</span>
+          <span className="text-xs text-slate-400">Tickets abiertos</span>
           <span className="text-sm font-semibold text-violet-300">{loading ? "—" : tickets.length}</span>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/50 px-3 py-2">
           <ListTodo className="h-4 w-4 text-slate-400" />
-          <span className="text-xs text-slate-400">Tasks</span>
+          <span className="text-xs text-slate-400">Tareas</span>
           <span className="text-sm font-semibold text-slate-200">{loading ? "—" : openCount}</span>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2">
           <Clock className="h-4 w-4 text-emerald-400" />
-          <span className="text-xs text-slate-400">Recently updated</span>
+          <span className="text-xs text-slate-400">Actualizado recientemente</span>
           <span className="text-sm font-semibold text-emerald-300">{loading ? "—" : recentlyUpdatedCount}</span>
         </div>
       </div>
@@ -779,14 +779,14 @@ export default function MyWorkPage() {
         </div>
         <div className="flex items-center gap-2">
           <label htmlFor="my-work-filter" className="text-xs font-medium text-slate-500 whitespace-nowrap">
-            Filter work
+            Filtrar trabajo
           </label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
               id="my-work-filter"
               type="search"
-              placeholder="Search by title or project..."
+              placeholder="Buscar por título o proyecto..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full min-w-[200px] rounded-xl border border-slate-800 bg-slate-900/60 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500 focus:border-slate-600 focus:outline-none"
@@ -810,9 +810,9 @@ export default function MyWorkPage() {
           <p className="py-8 text-center text-sm text-slate-500">Cargando…</p>
         ) : filteredWorkItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <p className="text-base font-medium text-slate-300">Nothing requires your attention right now.</p>
+            <p className="text-base font-medium text-slate-300">Nada requiere tu atención ahora mismo.</p>
             <p className="mt-2 max-w-sm text-sm text-slate-500">
-              When you have tasks, tickets or activities assigned to you, they will appear here.
+              Cuando tengas tareas, tickets o actividades asignadas a ti, aparecerán aquí.
             </p>
           </div>
         ) : (

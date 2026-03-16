@@ -6,7 +6,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
-import { AssigneeDropdown } from "@/app/components/AssigneeDropdown";
+import { AssigneeSelect } from "@/components/AssigneeSelect";
 import type { TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
 
 const PRIORITY_OPTIONS: { value: TicketPriority; label: string }[] = [
@@ -46,41 +46,6 @@ export default function ProjectNewTicketPage() {
   const [dueDate, setDueDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const [memberProfiles, setMemberProfiles] = useState<{ id: string; full_name: string | null; email: string | null }[]>([]);
-
-  const loadMembers = useCallback(async () => {
-    if (!projectId) return;
-    const { data: membersRes } = await supabase
-      .from("project_members")
-      .select("profile_id, user_id")
-      .eq("project_id", projectId);
-    const profileIds = (membersRes ?? [])
-      .map((r: { profile_id?: string | null; user_id?: string | null }) => r.profile_id ?? r.user_id)
-      .filter((id): id is string => id != null && id !== "");
-    if (profileIds.length === 0) {
-      setMemberProfiles([]);
-      return;
-    }
-    const { data: profilesData } = await supabase
-      .from("profiles")
-      .select("id, full_name, email")
-      .in("id", profileIds);
-    setMemberProfiles((profilesData ?? []) as { id: string; full_name: string | null; email: string | null }[]);
-  }, [projectId]);
-
-  useEffect(() => {
-    loadMembers();
-  }, [loadMembers]);
-
-  const assigneeOptions = useMemo(
-    () =>
-      memberProfiles.map((p) => ({
-        value: p.id,
-        label: p.full_name || p.email || p.id,
-      })),
-    [memberProfiles]
-  );
 
   useEffect(() => {
     if (fromQuick) {
@@ -231,14 +196,14 @@ export default function ProjectNewTicketPage() {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                <label className={labelClass}>Asignado a</label>
+                <label className={labelClass}>Responsable</label>
                 <div className="flex items-center gap-2 min-h-[42px]">
-                  <AssigneeDropdown
-                    options={assigneeOptions}
+                  <AssigneeSelect
+                    contextType="project"
+                    projectId={projectId}
                     value={assigneeProfileId}
                     onChange={setAssigneeProfileId}
                     placeholder="Sin asignar"
-                    variant={assigneeProfileId ? "assigned" : "unassigned"}
                     className="w-full max-w-xs"
                   />
                 </div>

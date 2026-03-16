@@ -558,9 +558,9 @@ export default function DashboardPage() {
               return (
                 <div className="flex flex-col items-center justify-center gap-2 py-12 px-4">
                   <Users className="h-10 w-10 text-slate-600" aria-hidden />
-                  <p className="text-sm font-medium text-slate-400">No team workload data available yet</p>
+                  <p className="text-sm font-medium text-slate-400">Aún no hay datos de carga de trabajo</p>
                   <p className="text-xs text-slate-500 text-center max-w-[260px]">
-                    Data will appear when tasks are assigned to multiple users in your projects.
+                    Los datos aparecerán cuando existan tareas asignadas a varios responsables en tus proyectos.
                   </p>
                 </div>
               );

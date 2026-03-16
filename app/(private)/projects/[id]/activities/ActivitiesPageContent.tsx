@@ -7,6 +7,7 @@ import { handleSupabaseError } from "@/lib/supabaseError";
 import { getProjectPhases, type ProjectPhase } from "@/lib/services/projectPhaseService";
 import { Plus, Pencil, Save, Trash2, ListTodo, User, Search } from "lucide-react";
 import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
+import { AssigneeCell } from "@/components/AssigneeCell";
 
 type StatusFilterKind = "all" | "planned" | "in_progress" | "blocked" | "done" | "overdue" | "assigned_to_me";
 
@@ -54,30 +55,6 @@ type Profile = {
   full_name: string | null;
   email: string | null;
 };
-
-function AssigneeCell({ profileId, profilesMap }: { profileId: string | null; profilesMap: Map<string, Profile> }) {
-  if (!profileId) {
-    return (
-      <span className="flex items-center gap-2 text-slate-500">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-700/80 text-slate-500">
-          <User className="h-3.5 w-3.5" />
-        </span>
-        Sin asignar
-      </span>
-    );
-  }
-  const p = profilesMap.get(profileId);
-  const label = p ? (p.full_name || p.email || profileId) : profileId.slice(0, 8);
-  const initial = (label.trim() || "?").charAt(0).toUpperCase();
-  return (
-    <span className="flex items-center gap-2 text-slate-300">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-600 text-slate-200 text-[10px] font-medium">
-        {initial}
-      </span>
-      <span className="truncate max-w-[120px]" title={label}>{label}</span>
-    </span>
-  );
-}
 
 function ActivityStatusBadge({ status, isOverdue }: { status: string | null; isOverdue?: boolean }) {
   const s = (status ?? "planned").toLowerCase();
@@ -459,7 +436,7 @@ export default function ProjectActivitiesPageContent() {
                   { key: "blocked" as StatusFilterKind, label: "Blocked" },
                   { key: "done" as StatusFilterKind, label: "Completed" },
                   { key: "overdue" as StatusFilterKind, label: "Overdue" },
-                  { key: "assigned_to_me" as StatusFilterKind, label: "Assigned to me" },
+                  { key: "assigned_to_me" as StatusFilterKind, label: "Asignado a mí" },
                 ] as const
               ).map(({ key, label }) => (
                 <button
