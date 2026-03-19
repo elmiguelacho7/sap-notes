@@ -97,7 +97,7 @@ export function TaskList({
 
   return (
     <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto [scrollbar-width:thin] [scrollbar-color:#334155_#1e293b] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-slate-800/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/70 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500">
         <table className="w-full min-w-[800px] border-collapse">
           <thead>
             <tr className="border-b border-slate-700/60">

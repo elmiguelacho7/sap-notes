@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
-import { PageHeader } from "@/components/ui/page/PageHeader";
+import { AppPageShell } from "@/components/ui/layout/AppPageShell";
 import { StatCard } from "@/components/ui/stat/StatCard";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -298,12 +298,8 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Dashboard"
-        description="Workspace principal: prioridades, apps e insights."
-      />
-
+    <AppPageShell>
+      <div className="space-y-10">
       {errorMsg && (
         <div className="rounded-xl border border-red-900/50 bg-red-950/30 px-5 py-4 flex flex-wrap items-center gap-3">
           <p className="text-sm text-red-300">{errorMsg}</p>
@@ -313,16 +309,15 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Workspace header */}
-      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-100">
+      {/* 1. Greeting */}
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-lg font-semibold text-slate-100">
             {getGreeting()}{userName ? `, ${userName}` : ""}
           </h1>
-          <p className="text-sm text-slate-400 mt-0.5">Workspace overview</p>
-          <p className="text-xs text-slate-500">Projects, tasks and knowledge in one place.</p>
+          <p className="text-xs text-slate-500 mt-0.5">Workspace overview — projects, tasks and knowledge in one place.</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
           <div className="relative" ref={createMenuRef}>
             <Button
               type="button"
@@ -333,7 +328,7 @@ export default function DashboardPage() {
               aria-haspopup="true"
             >
               <Plus className="h-4 w-4 shrink-0" />
-              Create
+              Crear
               <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
             </Button>
             {createOpen && (
@@ -341,85 +336,45 @@ export default function DashboardPage() {
                 className="absolute left-0 top-full mt-1 z-50 min-w-[180px] rounded-xl border border-slate-700 bg-slate-800 py-1 shadow-lg"
                 role="menu"
               >
-                <Link
-                  href="/projects/new"
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700/80"
-                  role="menuitem"
-                  onClick={() => setCreateOpen(false)}
-                >
-                  <FolderOpen className="h-4 w-4 shrink-0" />
-                  Create Project
+                <Link href="/projects/new" className="flex items-center gap-2 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700/80" role="menuitem" onClick={() => setCreateOpen(false)}>
+                  <FolderOpen className="h-4 w-4 shrink-0" /> Crear proyecto
                 </Link>
-                <Link
-                  href="/tickets/new"
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700/80"
-                  role="menuitem"
-                  onClick={() => setCreateOpen(false)}
-                >
-                  <Ticket className="h-4 w-4 shrink-0" />
-                  Create Ticket
+                <Link href="/tickets/new" className="flex items-center gap-2 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700/80" role="menuitem" onClick={() => setCreateOpen(false)}>
+                  <Ticket className="h-4 w-4 shrink-0" /> Crear ticket
                 </Link>
-                <Link
-                  href="/tasks"
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700/80"
-                  role="menuitem"
-                  onClick={() => setCreateOpen(false)}
-                >
-                  <CheckSquare className="h-4 w-4 shrink-0" />
-                  Create Task
+                <Link href="/tasks" className="flex items-center gap-2 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700/80" role="menuitem" onClick={() => setCreateOpen(false)}>
+                  <CheckSquare className="h-4 w-4 shrink-0" /> Crear tarea
                 </Link>
-                <Link
-                  href="/notes/new"
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700/80"
-                  role="menuitem"
-                  onClick={() => setCreateOpen(false)}
-                >
-                  <FileText className="h-4 w-4 shrink-0" />
-                  Create Note
+                <Link href="/notes/new" className="flex items-center gap-2 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700/80" role="menuitem" onClick={() => setCreateOpen(false)}>
+                  <FileText className="h-4 w-4 shrink-0" /> Crear nota
                 </Link>
               </div>
             )}
           </div>
-          <Link
-            href="/search"
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors"
-          >
-            <Search className="h-4 w-4 shrink-0" />
-            Search
+          <Link href="/search" className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors">
+            <Search className="h-4 w-4 shrink-0" /> Buscar
           </Link>
-          <Link
-            href="/knowledge"
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors"
-          >
-            <BookOpen className="h-4 w-4 shrink-0" />
-            Ask Sapito
+          <Link href="/knowledge" className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors">
+            <BookOpen className="h-4 w-4 shrink-0" /> Preguntar a Sapito
           </Link>
         </div>
       </header>
 
-      {/* Context bar */}
-      <div className="flex flex-wrap gap-8 mb-8">
-        <div>
-          <span className="text-slate-400 text-sm">Projects</span>
-          <p className="text-slate-200 font-semibold">{loadingStats ? "—" : stats.openProjects}</p>
+      {/* 2. Workspace Metrics */}
+      <section>
+        <h2 className="sr-only">Workspace metrics</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+          <StatCard href="/projects" icon={<FolderOpen className="h-4 w-4 text-slate-500" />} label="Proyectos activos" value={loadingStats ? "—" : animatedProjects} trend="En curso" />
+          <StatCard href="/tickets" icon={<Ticket className="h-4 w-4 text-slate-500" />} label="Tickets abiertos" value={loadingStats ? "—" : animatedTickets} trend="Pendientes" />
+          <StatCard href="/my-work" icon={<CheckSquare className="h-4 w-4 text-slate-500" />} label="Tareas vencen hoy" value={loadingStats ? "—" : animatedTasksToday} trend="Fecha hoy" />
+          <StatCard href="/clients" icon={<Building2 className="h-4 w-4 text-slate-500" />} label="Clientes" value={loadingStats ? "—" : animatedClients} trend="Registrados" />
+          <StatCard href="/knowledge" icon={<BookOpen className="h-4 w-4 text-slate-500" />} label="Espacios knowledge" value={loadingStats ? "—" : animatedKnowledge} trend="Knowledge" />
         </div>
-        <div>
-          <span className="text-slate-400 text-sm">Tickets</span>
-          <p className="text-slate-200 font-semibold">{loadingStats ? "—" : stats.tickets_open}</p>
-        </div>
-        <div>
-          <span className="text-slate-400 text-sm">Tasks</span>
-          <p className="text-slate-200 font-semibold">{loadingStats ? "—" : stats.tasks_due_today}</p>
-        </div>
-        <div>
-          <span className="text-slate-400 text-sm">Knowledge spaces</span>
-          <p className="text-slate-200 font-semibold">{loadingStats ? "—" : stats.knowledge_entries_count}</p>
-        </div>
-      </div>
+      </section>
 
-      {/* 1. My Work (tiles) */}
-      <section className="space-y-6">
-        <h2 className="text-sm font-semibold text-slate-200">My Work</h2>
+      {/* 3. Your Work */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold text-slate-200">Tu trabajo</h2>
         {loadingStats ? (
           <p className="text-sm text-slate-500">Cargando…</p>
         ) : (() => {
@@ -440,28 +395,28 @@ export default function DashboardPage() {
             });
           if (stats.projects_without_recent_activity_count > 0)
             tiles.push({
-              icon: <FolderOpen className="h-5 w-5 shrink-0 text-slate-400" />,
-              label: `${stats.projects_without_recent_activity_count} proyecto${stats.projects_without_recent_activity_count !== 1 ? "s" : ""} sin actividad`,
+              icon: <FolderOpen className="h-5 w-5 shrink-0 text-amber-500/90" />,
+              label: `${stats.projects_without_recent_activity_count} proyecto${stats.projects_without_recent_activity_count !== 1 ? "s" : ""} sin actividad reciente`,
               href: "/projects",
-              isWarning: false,
+              isWarning: true,
             });
           if (tiles.length === 0) {
             return (
-              <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-5 py-4">
-                <p className="text-sm text-slate-400">Everything looks good today.</p>
+              <div className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-4">
+                <p className="text-sm text-slate-400">Todo al día.</p>
               </div>
             );
           }
           return (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {tiles.map((t) => (
                 <Link
                   key={t.href + t.label}
                   href={t.href}
-                  className={`flex items-center gap-3 rounded-xl border p-4 cursor-pointer transition-colors ${
+                  className={`flex items-center gap-3 rounded-xl border p-4 cursor-pointer transition-colors duration-150 ${
                     t.isWarning
-                      ? "border-amber-700/50 bg-amber-950/20 hover:bg-amber-900/30"
-                      : "border-slate-800 bg-slate-900/60 hover:bg-slate-800/60"
+                      ? "bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/15 hover:border-amber-500/40"
+                      : "bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:border-slate-700"
                   }`}
                 >
                   {t.icon}
@@ -474,10 +429,10 @@ export default function DashboardPage() {
         })()}
       </section>
 
-      {/* 2. Apps (launchpad tiles) */}
-      <section className="space-y-6">
-        <h2 className="text-sm font-semibold text-slate-200">Apps</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+      {/* 4. Applications */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold text-slate-200">Aplicaciones</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {[
             { href: "/projects", icon: FolderOpen, label: "Projects" },
             { href: "/tickets", icon: Ticket, label: "Tickets" },
@@ -490,61 +445,24 @@ export default function DashboardPage() {
             <Link
               key={href}
               href={href}
-              className="flex items-center gap-4 px-6 h-[96px] rounded-xl border border-slate-800 bg-slate-900/60 text-slate-200 hover:border-slate-700 hover:bg-slate-800/60 transition-colors"
+              className="flex flex-col items-center justify-center gap-2 h-20 rounded-xl border border-slate-800 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:border-slate-700 transition-colors duration-150 min-w-0"
             >
-              <Icon className="w-7 h-7 shrink-0 text-slate-400" />
-              <span className="text-sm font-medium truncate">{label}</span>
+              <Icon className="w-6 h-6 shrink-0 text-slate-400" />
+              <span className="text-sm font-medium truncate w-full text-center px-2">{label}</span>
             </Link>
           ))}
         </div>
       </section>
 
-      {/* 3. Insights (KPIs + charts in one panel) */}
+      {/* 5. Insights */}
       <section className="space-y-6">
         <h2 className="text-sm font-semibold text-slate-200">Insights</h2>
-        <p className="text-xs text-slate-500 -mt-2">Métricas y gráficos.</p>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 space-y-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          <StatCard
-            href="/projects"
-            icon={<FolderOpen className="h-4 w-4" />}
-            label="Proyectos activos"
-            value={loadingStats ? "—" : animatedProjects}
-            trend="En curso"
-          />
-          <StatCard
-            href="/tickets"
-            icon={<Ticket className="h-4 w-4" />}
-            label="Tickets abiertos"
-            value={loadingStats ? "—" : animatedTickets}
-            trend="Pendientes"
-          />
-          <StatCard
-            href="/my-work"
-            icon={<CheckSquare className="h-4 w-4" />}
-            label="Tareas vencen hoy"
-            value={loadingStats ? "—" : animatedTasksToday}
-            trend="Fecha hoy"
-          />
-          <StatCard
-            href="/clients"
-            icon={<Building2 className="h-4 w-4" />}
-            label="Clientes"
-            value={loadingStats ? "—" : animatedClients}
-            trend="Registrados"
-          />
-          <StatCard
-            href="/knowledge"
-            icon={<BookOpen className="h-4 w-4" />}
-            label="Espacios knowledge"
-            value={loadingStats ? "—" : animatedKnowledge}
-            trend="Knowledge"
-          />
-        </div>
+        <p className="text-xs text-slate-500 -mt-4">Métricas y gráficos.</p>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 sm:p-6 space-y-6">
         <DashboardCharts data={chartData} />
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
           <div className="px-5 pt-4 pb-1 border-b border-slate-700/50">
-            <h3 className="text-sm font-semibold text-slate-100">Team Workload</h3>
+            <h3 className="text-sm font-semibold text-slate-100">Carga por responsable</h3>
             <p className="text-xs text-slate-500 mt-0.5">Tareas activas por responsable.</p>
           </div>
           {loadingStats ? (
@@ -575,9 +493,9 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* 4. System Health */}
-      <section className="space-y-6">
-        <h2 className="text-sm font-semibold text-slate-200">System Health</h2>
+      {/* System Health */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold text-slate-200">Estado del sistema</h2>
         <p className="text-xs text-slate-500 -mt-2">Resumen operativo de la plataforma.</p>
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-700/50">
@@ -613,8 +531,8 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* 5. Recent Activity */}
-      <section className="space-y-6">
+      {/* Recent Activity */}
+      <section className="space-y-4">
         <h2 className="text-sm font-semibold text-slate-200">Recent Activity</h2>
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
           <div className="px-5 pt-5 pb-3 border-b border-slate-700/50">
@@ -699,7 +617,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
-    </div>
+      </div>
+    </AppPageShell>
   );
 }
 

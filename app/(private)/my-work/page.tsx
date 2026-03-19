@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
+import { AppPageShell } from "@/components/ui/layout/AppPageShell";
+import { SapitoState } from "@/components/ui/SapitoState";
 import type { ProjectTask } from "@/lib/types/projectTasks";
 import {
   CalendarClock,
@@ -691,22 +693,26 @@ export default function MyWorkPage() {
 
   if (loadingIdentity && authUserId == null) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-slate-100">Mi trabajo</h1>
-        <p className="text-sm text-slate-500">Cargando…</p>
-      </div>
+      <AppPageShell>
+        <div className="space-y-6">
+          <h1 className="text-2xl font-semibold text-slate-100">Mi trabajo</h1>
+          <SapitoState variant="loading" title="Cargando…" description="Un momento." />
+        </div>
+      </AppPageShell>
     );
   }
 
   if (profileError != null && profileId == null) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-slate-100">Mi trabajo</h1>
-        <div className="rounded-xl border border-amber-800/50 bg-amber-950/30 px-5 py-6 text-center">
-          <p className="text-sm font-medium text-amber-200">{profileError}</p>
-          <p className="mt-1 text-xs text-amber-300/80">No se puede cargar tu trabajo sin un perfil válido.</p>
+      <AppPageShell>
+        <div className="space-y-6">
+          <h1 className="text-2xl font-semibold text-slate-100">Mi trabajo</h1>
+          <div className="rounded-xl border border-amber-800/50 bg-amber-950/30 px-5 py-6 text-center">
+            <p className="text-sm font-medium text-amber-200">{profileError}</p>
+            <p className="mt-1 text-xs text-amber-300/80">No se puede cargar tu trabajo sin un perfil válido.</p>
+          </div>
         </div>
-      </div>
+      </AppPageShell>
     );
   }
 
@@ -719,7 +725,8 @@ export default function MyWorkPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <AppPageShell>
+      <div className="space-y-6">
       {/* Header */}
       <header>
         <h1 className="text-2xl font-semibold text-slate-100">Mi trabajo</h1>
@@ -807,14 +814,13 @@ export default function MyWorkPage() {
           <p className="text-sm text-amber-400 mb-4">{activitiesError}</p>
         )}
         {loading ? (
-          <p className="py-8 text-center text-sm text-slate-500">Cargando…</p>
+          <SapitoState variant="loading" title="Cargando…" description="Un momento." />
         ) : filteredWorkItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <p className="text-base font-medium text-slate-300">Nada requiere tu atención ahora mismo.</p>
-            <p className="mt-2 max-w-sm text-sm text-slate-500">
-              Cuando tengas tareas, tickets o actividades asignadas a ti, aparecerán aquí.
-            </p>
-          </div>
+          <SapitoState
+            variant="empty"
+            title="Nada requiere tu atención ahora mismo."
+            description="Cuando tengas tareas, tickets o actividades asignadas a ti, aparecerán aquí."
+          />
         ) : (
           <ul className="space-y-2">
             {filteredWorkItems.map((item) => (
@@ -825,6 +831,7 @@ export default function MyWorkPage() {
           </ul>
         )}
       </section>
-    </div>
+      </div>
+    </AppPageShell>
   );
 }

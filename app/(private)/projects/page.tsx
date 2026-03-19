@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import Link from "next/link";
+import { AppPageShell } from "@/components/ui/layout/AppPageShell";
 import { ProjectCard, type ProjectCardProject } from "@/components/projects/ProjectCard";
 import { ContentSkeleton } from "@/components/skeletons/ContentSkeleton";
 import {
@@ -225,21 +226,47 @@ export default function ProjectsPage() {
   }, [projects, search, statusFilter, sortBy]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Proyectos</h1>
-          <p className="mt-1 text-sm text-slate-400">
+    <AppPageShell>
+      <div className="space-y-6">
+      {/* Header: stronger title, cleaner subtitle, metrics below, primary action right */}
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-white">Proyectos</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
             {projectsQuota?.limit != null
-              ? `Portafolio de proyectos. ${projectsQuota.current} / ${projectsQuota.limit} en uso.`
-              : "Gestiona y abre el workspace de cada proyecto. Crea uno nuevo para empezar."}
+              ? `${projectsQuota.current} / ${projectsQuota.limit} proyectos`
+              : "Gestiona y abre el workspace de cada proyecto."}
           </p>
+          {/* Compact metrics row below title */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2.5 py-1 text-xs text-slate-400">
+              <LayoutGrid className="h-3.5 w-3.5" />
+              <span className="font-medium text-slate-300">{loadingProjects ? "—" : summary.active}</span>
+              <span>activos</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-xs text-sky-400/90">
+              <CalendarClock className="h-3.5 w-3.5" />
+              {loadingProjects ? "—" : summary.planned}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-2.5 py-1 text-xs text-indigo-400/90">
+              <FolderOpen className="h-3.5 w-3.5" />
+              {loadingProjects ? "—" : summary.inProgress}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2.5 py-1 text-xs text-slate-500">
+              <Archive className="h-3.5 w-3.5" />
+              {loadingProjects ? "—" : summary.closed}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2.5 py-1 text-xs text-slate-500">
+              <Ticket className="h-3.5 w-3.5" />
+              <span className="font-medium text-slate-300">{loadingProjects ? "—" : summary.totalOpenTickets}</span>
+              <span>tickets</span>
+            </span>
+          </div>
         </div>
         {canCreateProject && (
           <Link
             href="/projects/new"
-            className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-500/40 bg-slate-200/90 px-4 py-2.5 text-sm font-medium text-slate-900 transition-colors hover:bg-white hover:border-slate-400/50 focus:outline-none focus:ring-2 focus:ring-slate-400/50 focus:ring-offset-2 focus:ring-offset-slate-950"
+            className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-100 transition-colors hover:bg-slate-700 hover:border-slate-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:ring-offset-2 focus:ring-offset-slate-950"
           >
             Nuevo proyecto
           </Link>
@@ -258,52 +285,23 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Portfolio summary strip */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2">
-          <LayoutGrid className="h-4 w-4 text-slate-400" />
-          <span className="text-xs text-slate-400">Activos</span>
-          <span className="text-sm font-semibold text-slate-200">{loadingProjects ? "—" : summary.active}</span>
-        </div>
-        <div className="flex items-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 py-2">
-          <CalendarClock className="h-4 w-4 text-sky-400" />
-          <span className="text-xs text-slate-400">Planned</span>
-          <span className="text-sm font-semibold text-sky-300">{loadingProjects ? "—" : summary.planned}</span>
-        </div>
-        <div className="flex items-center gap-2 rounded-xl border border-indigo-500/25 bg-indigo-500/10 px-3 py-2">
-          <FolderOpen className="h-4 w-4 text-indigo-400" />
-          <span className="text-xs text-slate-400">In progress</span>
-          <span className="text-sm font-semibold text-indigo-300">{loadingProjects ? "—" : summary.inProgress}</span>
-        </div>
-        <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/50 px-3 py-2">
-          <Archive className="h-4 w-4 text-slate-400" />
-          <span className="text-xs text-slate-400">Closed</span>
-          <span className="text-sm font-semibold text-slate-300">{loadingProjects ? "—" : summary.closed}</span>
-        </div>
-        <div className="flex items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2">
-          <Ticket className="h-4 w-4 text-violet-400" />
-          <span className="text-xs text-slate-400">Tickets abiertos</span>
-          <span className="text-sm font-semibold text-violet-300">{loadingProjects ? "—" : summary.totalOpenTickets}</span>
-        </div>
-      </div>
-
-      {/* Compact filter bar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <div className="relative flex-1 sm:max-w-xs">
+      {/* Filter bar: search first, status, sort; compact and aligned */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <div className="relative flex-1 sm:max-w-[280px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nombre, cliente o estado..."
-            className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500 focus:border-slate-600 focus:outline-none"
+            className="w-full rounded-lg border border-slate-800 bg-slate-900/80 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500 focus:border-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-600"
           />
         </div>
         <div className="flex items-center gap-2">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-200 focus:border-slate-600 focus:outline-none"
+            className="w-full sm:w-auto min-w-0 rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-200 focus:border-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-600 [&>option]:bg-slate-900"
           >
             <option value="">Todos los estados</option>
             <option value="planned">Planificado</option>
@@ -314,7 +312,7 @@ export default function ProjectsPage() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-200 focus:border-slate-600 focus:outline-none"
+            className="w-full sm:w-auto min-w-0 rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-200 focus:border-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-600 [&>option]:bg-slate-900"
           >
             <option value="priority">Activos primero</option>
             <option value="newest">Más recientes</option>
@@ -327,28 +325,29 @@ export default function ProjectsPage() {
       {/* Project grid */}
       <section>
         {loadingProjects ? (
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-6 py-8">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 px-6 py-8">
             <ContentSkeleton title={false} lines={0} cards={6} />
           </div>
         ) : errorMsg ? (
-          <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-5 py-4 text-sm text-red-200">
+          <div className="rounded-2xl border border-red-800/50 bg-red-950/30 px-5 py-4 text-sm text-red-200">
             {errorMsg}
           </div>
         ) : filteredAndSortedProjects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-slate-800 bg-slate-900/60 py-16 text-center">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/60 py-16 text-center">
             <p className="text-base font-medium text-slate-300">No se han encontrado proyectos</p>
             <p className="mt-2 max-w-sm text-sm text-slate-500">
               Ajusta el filtro o crea un nuevo proyecto para empezar.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {filteredAndSortedProjects.map((project) => (
               <ProjectCard key={project.id} project={project} />
             ))}
           </div>
         )}
       </section>
-    </div>
+      </div>
+    </AppPageShell>
   );
 }

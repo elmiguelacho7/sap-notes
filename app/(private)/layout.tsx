@@ -7,10 +7,9 @@ import { supabase } from "../../lib/supabaseClient";
 import { UserMenu } from "@/components/UserMenu";
 import { GlobalAssistantBubble } from "@/components/ai/GlobalAssistantBubble";
 import { AppShell } from "@/components/ui/layout/AppShell";
-import { PageContainer } from "@/components/ui/layout/PageContainer";
 import { Sidebar } from "@/components/ui/sidebar/Sidebar";
 import { Header } from "@/components/ui/header/Header";
-import { HeaderSearchInput } from "@/components/ui/header/HeaderSearchInput";
+import { HeaderCommandTrigger, HeaderCommandTriggerIcon } from "@/components/ui/header/HeaderCommandTrigger";
 import { QuickActionMenu } from "@/components/ui/actions/QuickActionMenu";
 import { CommandPalette } from "@/components/command-palette/CommandPalette";
 import type { BreadcrumbItem } from "@/components/ui/header/Breadcrumbs";
@@ -74,6 +73,12 @@ function isWideWorkspacePage(pathname: string): boolean {
 
 type AppRole = "superadmin" | "consultant";
 
+function getProjectIdFromPath(pathname: string): string | null {
+  const match = pathname.match(/^\/projects\/([^/]+)/);
+  if (!match?.[1] || match[1] === "new") return null;
+  return match[1];
+}
+
 export default function PrivateLayout({
   children,
 }: {
@@ -83,7 +88,14 @@ export default function PrivateLayout({
   const pathname = usePathname();
   const [isReady, setIsReady] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [hoverExpanded, setHoverExpanded] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [appRole, setAppRole] = useState<AppRole | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [sidebarProjectName, setSidebarProjectName] = useState<string | null>(null);
+  const [sidebarProjectSubtitle, setSidebarProjectSubtitle] = useState<string | null>(null);
+  const projectId = getProjectIdFromPath(pathname ?? "");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -97,6 +109,14 @@ export default function PrivateLayout({
         router.replace("/");
         return;
       }
+      const metadataName =
+        typeof user.user_metadata?.full_name === "string"
+          ? user.user_metadata.full_name
+          : typeof user.user_metadata?.name === "string"
+            ? user.user_metadata.name
+            : null;
+      setUserName(metadataName);
+      setUserEmail(user.email ?? null);
       const userId = user.id;
       const { data: profile } = await supabase
         .from("profiles")
@@ -160,47 +180,100 @@ export default function PrivateLayout({
     router.push("/");
   };
 
+  useEffect(() => {
+    if (!projectId) {
+      setSidebarProjectName(null);
+      setSidebarProjectSubtitle(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("projects")
+          .select("name, status")
+          .eq("id", projectId)
+          .single();
+        if (cancelled) return;
+        const row = data as { name?: string | null; status?: string | null } | null;
+        setSidebarProjectName(row?.name?.trim() || "Project");
+        setSidebarProjectSubtitle(row?.status?.trim() || null);
+      } catch {
+        if (cancelled) return;
+        setSidebarProjectName("Project");
+        setSidebarProjectSubtitle(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  const handleNavigate = (href: string) => {
+    setMobileMenuOpen(false);
+    router.push(href);
+  };
+
   if (!isReady) {
     return <div className="min-h-screen bg-slate-950 flex items-center justify-center" />;
   }
 
   return (
     <AppShell
+      mobileMenuOpen={mobileMenuOpen}
+      onMobileMenuClose={() => setMobileMenuOpen(false)}
+      sidebarCollapsed={collapsed}
+      sidebarHoverExpanded={hoverExpanded}
       sidebar={
         <Sidebar
           collapsed={collapsed}
+          hoverExpanded={hoverExpanded}
+          onHoverExpandChange={setHoverExpanded}
           onToggle={handleToggle}
           appRole={appRole}
-          onNavigate={(href) => router.push(href)}
+          userName={userName}
+          userEmail={userEmail}
+          projectName={sidebarProjectName}
+          projectSubtitle={sidebarProjectSubtitle}
+          onNavigate={handleNavigate}
           pathname={pathname ?? ""}
           onLogout={handleLogout}
         />
       }
+      mobileSidebar={
+        mobileMenuOpen ? (
+          <Sidebar
+            collapsed={false}
+            onToggle={handleToggle}
+            appRole={appRole}
+            userName={userName}
+            userEmail={userEmail}
+            projectName={sidebarProjectName}
+            projectSubtitle={sidebarProjectSubtitle}
+            onNavigate={handleNavigate}
+            pathname={pathname ?? ""}
+            onLogout={handleLogout}
+            mobileOpen
+            onClose={() => setMobileMenuOpen(false)}
+          />
+        ) : undefined
+      }
       header={
         <Header
           breadcrumbs={buildBreadcrumbs(pathname ?? "/")}
-          center={<HeaderSearchInput placeholder="Search..." />}
+          center={<HeaderCommandTrigger />}
           right={
             <>
+              <HeaderCommandTriggerIcon />
               <QuickActionMenu />
               <UserMenu />
             </>
           }
+          onMenuClick={() => setMobileMenuOpen(true)}
         />
       }
     >
-      <PageContainer
-        wide={isWideWorkspacePage(pathname ?? "")}
-        fullWidth={
-          pathname === "/dashboard" ||
-          (typeof pathname === "string" &&
-            pathname.startsWith("/projects/") &&
-            pathname.split("/")[2] !== "new") ||
-          (typeof pathname === "string" && pathname.startsWith("/notes"))
-        }
-      >
-        {children}
-      </PageContainer>
+      {children}
       <CommandPalette />
       <GlobalAssistantBubble />
     </AppShell>

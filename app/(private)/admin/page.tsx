@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Users, Zap, Brain, Shield, BarChart2, Sliders, UserCog } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
-import { PageShell } from "@/components/layout/PageShell";
+import { AppPageShell } from "@/components/ui/layout/AppPageShell";
 import { getSapitoGeneral } from "@/lib/agents/agentRegistry";
 import {
   INDUSTRY_OPTIONS,
@@ -82,25 +82,29 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <PageShell wide={false} className="bg-slate-950">
-        <div className="py-12 text-center">
-          <p className="text-sm font-medium text-slate-300">Cargando…</p>
-          <p className="mt-1 text-sm text-slate-500">Un momento.</p>
-        </div>
-      </PageShell>
+      <div className="bg-slate-950 min-h-full">
+        <AppPageShell>
+          <div className="py-12 text-center">
+            <p className="text-sm font-medium text-slate-300">Cargando…</p>
+            <p className="mt-1 text-sm text-slate-500">Un momento.</p>
+          </div>
+        </AppPageShell>
+      </div>
     );
   }
 
   if (appRole !== "superadmin") {
     return (
-      <PageShell wide={false} className="bg-slate-950">
-        <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-5 py-12 text-center">
-          <p className="text-sm font-medium text-slate-200">Acceso restringido</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Solo los administradores pueden ver este panel.
-          </p>
-        </div>
-      </PageShell>
+      <div className="bg-slate-950 min-h-full">
+        <AppPageShell>
+          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-5 py-12 text-center">
+            <p className="text-sm font-medium text-slate-200">Acceso restringido</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Solo los administradores pueden ver este panel.
+            </p>
+          </div>
+        </AppPageShell>
+      </div>
     );
   }
 
@@ -176,7 +180,8 @@ function AdminPanel() {
   const iconClass = "size-4 shrink-0 text-slate-400";
 
   return (
-    <PageShell wide={false} className="bg-slate-950">
+    <div className="bg-slate-950 min-h-full">
+      <AppPageShell>
       <div className="space-y-6">
         <div className="space-y-1">
           <h1 className="text-xl sm:text-2xl font-semibold text-slate-100">Admin</h1>
@@ -303,7 +308,8 @@ function AdminPanel() {
         {activeTab === "userLimits" && <UserLimitsPanel />}
         {activeTab === "capacity" && <CapacityDashboard />}
       </div>
-    </PageShell>
+      </AppPageShell>
+    </div>
   );
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent, useCallback, useEffect, useRef } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { SapitoAvatar } from "./SapitoAvatar";
 import { AssistantSuggestionChips } from "./AssistantSuggestionChips";
@@ -11,11 +12,16 @@ type ChatMessage = { role: "user" | "assistant"; content: string; grounded?: boo
 const AGENT_URL = "/api/project-agent";
 
 const PROJECT_SUGGESTIONS = [
-  "¿Hay riesgos en este proyecto?",
   "¿Qué tareas están vencidas?",
-  "¿Hay tickets prioritarios?",
-  "¿Cuál es el siguiente foco?",
+  "¿Qué tickets siguen abiertos?",
+  "¿Qué conocimiento tenemos sobre este tema?",
 ];
+
+const QUICK_ACTIONS = [
+  { label: "Ver tareas vencidas", href: (id: string) => `/projects/${id}/tasks` },
+  { label: "Ver tickets abiertos", href: (id: string) => `/projects/${id}/tickets` },
+  { label: "Ir a Tasks", href: (id: string) => `/projects/${id}/tasks` },
+] as const;
 
 type ProjectAssistantChatProps = {
   projectId: string;
@@ -108,29 +114,45 @@ export function ProjectAssistantChat({
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5 space-y-6 text-sm">
+        <div className="rounded-2xl border border-slate-700 bg-slate-900/40 p-4 sm:p-5 space-y-6 text-sm">
           {messages.length === 0 && !loading ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center">
-              <div className="flex justify-center mb-3">
-                <SapitoAvatar size="lg" />
+            <div className="rounded-xl border border-slate-700 bg-slate-900 p-4 space-y-4">
+              <div className="flex items-center gap-3">
+                <SapitoAvatar size="lg" styledContainer showOnlineIndicator />
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-100">Sapito AI</h3>
+                  <p className="text-xs text-slate-500">Copiloto del proyecto</p>
+                </div>
               </div>
-              <p className="text-sm font-medium text-slate-700">Soy Sapito, tu Project Copilot</p>
-              <p className="mt-1 text-xs text-slate-500">
-                Asistente contextual de este proyecto. Pregunta por riesgos, tareas vencidas, tickets o el siguiente foco.
-              </p>
-              <p className="mt-3 text-[11px] text-slate-500">Sugerencias:</p>
-              <div className="mt-3">
+              <div className="space-y-2">
+                <p className="text-slate-300 text-sm leading-relaxed font-medium">
+                  Qué puedo hacer por ti
+                </p>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  Soy tu asistente de proyecto con contexto de tareas, tickets y conocimiento. Puedo ayudarte a:
+                </p>
+                <ul className="list-disc list-outside pl-4 space-y-1 text-slate-300 text-sm">
+                  <li>Resumir el estado del proyecto y tareas vencidas</li>
+                  <li>Revisar tickets abiertos y prioridades</li>
+                  <li>Buscar en la base de conocimiento del proyecto</li>
+                  <li>Sugerir siguientes pasos y riesgos</li>
+                </ul>
+              </div>
+              <div className="pt-1">
+                <p className="text-slate-500 text-xs mb-2">Prueba preguntando:</p>
                 <AssistantSuggestionChips
                   suggestions={PROJECT_SUGGESTIONS}
                   onSelect={sendMessage}
                   disabled={loading}
+                  className="justify-start"
+                  variant="dark"
                 />
               </div>
             </div>
           ) : messages.length === 0 && loading ? (
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-center">
-              <SapitoAvatar size="lg" className="mx-auto mb-2 inline-block" thinking />
-              <p className="text-sm font-medium text-slate-700">Sapito está pensando…</p>
+            <div className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-6 text-center">
+              <SapitoAvatar size="lg" className="mx-auto mb-2 inline-block" thinking styledContainer />
+              <p className="text-sm font-medium text-slate-300">Sapito está pensando…</p>
             </div>
           ) : (
             <>
@@ -141,35 +163,46 @@ export function ProjectAssistantChat({
                 >
                   {msg.role === "assistant" && (
                     <div className="mt-1 shrink-0">
-                      <SapitoAvatar size="sm" />
+                      <SapitoAvatar size="sm" styledContainer />
                     </div>
                   )}
-                  <div
-                    className={`max-w-[88%] min-w-0 rounded-2xl px-4 py-3.5 ${
-                      msg.role === "user"
-                        ? "bg-indigo-600 text-white shadow-sm"
-                        : "bg-white text-slate-800 border border-slate-200/80 shadow-sm"
-                    }`}
-                  >
-                    {msg.role === "assistant" && (msg.groundingLabel || msg.grounded !== undefined) && (
-                      <p className="text-[11px] text-slate-500 mb-2.5 pb-2 border-b border-slate-100 font-medium">
-                        {msg.groundingLabel ?? (msg.grounded === true ? "Según la documentación sincronizada" : "Respuesta general (sin documentación indexada)")}
-                      </p>
-                    )}
-                    {msg.role === "assistant" ? (
-                      <AssistantMessageContent content={msg.content} />
-                    ) : (
+                  {msg.role === "user" ? (
+                    <div className="max-w-[88%] min-w-0 rounded-2xl px-4 py-3.5 bg-indigo-600 text-white shadow-sm">
                       <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="max-w-[88%] min-w-0 rounded-xl border border-slate-700 bg-slate-900 p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-100">Sapito AI</span>
+                        <span className="text-[11px] text-slate-500">Project Copilot</span>
+                      </div>
+                      {(msg.groundingLabel || msg.grounded !== undefined) && (
+                        <p className="text-[11px] text-slate-500 pb-2 border-b border-slate-700 font-medium">
+                          {msg.groundingLabel ?? (msg.grounded === true ? "Según la documentación sincronizada" : "Respuesta general (sin documentación indexada)")}
+                        </p>
+                      )}
+                      <AssistantMessageContent content={msg.content} variant="dark" />
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-700">
+                        {QUICK_ACTIONS.map((action) => (
+                          <Link
+                            key={action.label}
+                            href={action.href(projectId)}
+                            className="rounded-lg border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 transition-colors"
+                          >
+                            {action.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {loading && (
                 <div className="flex gap-3 justify-start">
                   <div className="mt-1 shrink-0">
-                    <SapitoAvatar size="sm" thinking />
+                    <SapitoAvatar size="sm" thinking styledContainer />
                   </div>
-                  <div className="rounded-2xl px-4 py-3.5 bg-slate-100 text-slate-500 text-sm border border-slate-200/80">
+                  <div className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3.5 text-slate-400 text-sm">
                     Sapito está pensando…
                   </div>
                 </div>
@@ -180,7 +213,7 @@ export function ProjectAssistantChat({
       </div>
 
       {error && (
-        <p className="mt-2 px-1 text-xs text-red-600">{error}</p>
+        <p className="mt-2 px-1 text-xs text-red-400">{error}</p>
       )}
 
       <form onSubmit={handleSubmit} className="mt-4 flex items-center gap-2.5 shrink-0 p-1">
@@ -190,13 +223,13 @@ export function ProjectAssistantChat({
           onChange={(e) => setInput(e.target.value)}
           placeholder="Mensaje, error SAP o consulta sobre este proyecto…"
           disabled={loading}
-          className="flex-1 rounded-xl border border-slate-200 bg-white/80 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-60 shadow-sm"
+          className="flex-1 rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:opacity-60"
           aria-label="Mensaje para Sapito del proyecto"
         />
         <button
           type="submit"
           disabled={loading || !input.trim()}
-          className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 shrink-0 transition-colors shadow-sm"
+          className="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-medium px-4 py-2.5 text-sm disabled:opacity-60 shrink-0 transition-colors"
         >
           {loading ? "Enviando…" : "Enviar"}
         </button>

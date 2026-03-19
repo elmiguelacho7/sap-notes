@@ -34,8 +34,12 @@ export type KnowledgePage = {
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
-  /** Optional parent page for subpages (future). NULL = top-level page. */
+  /** Optional parent page for subpages. NULL = top-level page. */
   parent_page_id?: string | null;
+  /** Block editor document JSON (e.g. BlockNote). */
+  content_json?: Record<string, unknown> | null;
+  /** Normalized plain text / markdown for search and Sapito indexing. */
+  content_text?: string | null;
 };
 
 export type KnowledgeBlockType =

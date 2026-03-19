@@ -385,7 +385,7 @@ export default function ProjectPlanningPage() {
         )}
 
         {loading ? (
-          <p className="text-sm text-slate-500">Loading phases…</p>
+          <p className="text-sm text-slate-500">Cargando fases…</p>
         ) : phases.length === 0 ? (
           <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-6 md:p-8">
             <h2 className="text-lg font-semibold text-slate-100">Aún no hay fases de planificación</h2>

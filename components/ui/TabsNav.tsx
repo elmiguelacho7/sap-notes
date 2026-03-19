@@ -23,7 +23,7 @@ export function TabsNav({
 
   const wrapperClass =
     variant === "dark"
-      ? "flex items-center gap-0.5 rounded-lg bg-slate-800/40 p-1 overflow-x-auto overflow-y-hidden min-w-0"
+      ? "flex items-center gap-0.5 rounded-lg bg-slate-800/50 border border-slate-700/50 p-1 overflow-x-auto overflow-y-hidden min-w-0"
       : "flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1 overflow-x-auto overflow-y-hidden min-w-0";
 
   return (
@@ -36,8 +36,8 @@ export function TabsNav({
         const linkClass =
           variant === "dark"
             ? active
-              ? "bg-slate-700/90 text-slate-100 shadow-sm"
-              : "text-slate-400 hover:bg-slate-700/50 hover:text-slate-200"
+              ? "bg-slate-700 text-slate-100 shadow-sm"
+              : "text-slate-400 hover:bg-slate-700/60 hover:text-slate-200"
             : active
               ? "bg-indigo-50 text-indigo-700"
               : "text-slate-700 hover:bg-slate-100/70";

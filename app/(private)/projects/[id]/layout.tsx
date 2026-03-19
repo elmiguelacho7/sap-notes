@@ -30,7 +30,7 @@ function ProjectLayoutInner({
   return (
     <div className="flex h-full flex-col">
       {/* Workspace masthead: one composed header system */}
-      <div className="shrink-0 bg-slate-950/95">
+      <div className="shrink-0 bg-slate-950/95 border-b border-slate-800/80">
         <ProjectWorkspaceHeader
           projectId={projectId}
           projectName={project?.name ?? null}
@@ -38,11 +38,11 @@ function ProjectLayoutInner({
           loading={loading}
           actions={headerActions}
         />
-        <div className="min-w-0 overflow-x-auto px-4 sm:px-5 lg:px-6 pb-3.5 pt-1">
+        <div className="min-w-0 overflow-x-auto px-4 sm:px-5 lg:px-6 pt-2 pb-3 [scrollbar-width:thin] [scrollbar-color:#334155_#1e293b] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-slate-800/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/70 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500">
           <ProjectTabsNav projectId={projectId} variant="dark" />
         </div>
       </div>
-      <section className="flex-1 overflow-y-auto w-full min-w-0 px-4 sm:px-5 lg:px-6 xl:px-8 2xl:px-10 pt-6 sm:pt-7 pb-6">
+      <section className="flex-1 overflow-y-auto w-full min-w-0 px-4 sm:px-5 lg:px-6 xl:px-8 2xl:px-10 pt-6 sm:pt-7 pb-4">
         {children}
       </section>
       {projectId && (

@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FileText, Search, MessageCircle, FolderOpen, ExternalLinkIcon } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { AppPageShell } from "@/components/ui/layout/AppPageShell";
+import { SapitoState } from "@/components/ui/SapitoState";
 import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
 import type { KnowledgeExploreItem, KnowledgeExploreMetrics, KnowledgeItemType, KnowledgeScope } from "@/app/api/knowledge/explore/route";
-import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
 
 const TYPE_LABELS: Record<KnowledgeItemType, string> = {
   note: "Note",
@@ -141,7 +142,8 @@ export default function KnowledgeExplorerPage() {
   const isExternal = (href: string) => href.startsWith("http") || href === "#";
 
   return (
-    <div className="w-full min-w-0 space-y-8">
+    <AppPageShell>
+      <div className="space-y-8">
       <header className="space-y-1">
         <ProjectPageHeader
           variant="section"
@@ -177,9 +179,11 @@ export default function KnowledgeExplorerPage() {
 
       {loading ? (
         <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
-          <div className="px-6 py-6">
-            <TableSkeleton rows={6} colCount={5} />
-          </div>
+          <SapitoState
+            variant="loading"
+            title="Cargando conocimiento…"
+            description="Un momento."
+          />
         </section>
       ) : data ? (
         <>
@@ -204,14 +208,14 @@ export default function KnowledgeExplorerPage() {
           </div>
 
           {/* Filters */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
+            <div className="relative flex-1 min-w-0 w-full sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search knowledge..."
+                placeholder="Buscar en conocimiento…"
                 className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
               />
             </div>
@@ -267,25 +271,25 @@ export default function KnowledgeExplorerPage() {
           {/* Grid of cards */}
           <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
             {data.items.length === 0 ? (
-              <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-16 px-6 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 text-slate-500">
-                  <FileText className="h-7 w-7" />
+              <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-8 px-6">
+                <SapitoState
+                  variant="empty"
+                  title="Aún no hay conocimiento"
+                  description="Añade notas globales, notas de proyecto, páginas de conocimiento o conecta fuentes SAP. Usa Sapito para buscar."
+                />
+                <div className="flex justify-center mt-4">
+                  <Link
+                    href="/knowledge/documents"
+                    className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors"
+                  >
+                    Crear espacios
+                  </Link>
                 </div>
-                <p className="mt-4 text-base font-medium text-slate-200">No knowledge yet</p>
-                <p className="mt-1.5 max-w-md mx-auto text-sm text-slate-500">
-                  Add global notes, project notes, knowledge pages, or connect SAP sources. Use Sapito to search conversationally.
-                </p>
-                <Link
-                  href="/knowledge/documents"
-                  className="mt-5 inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors"
-                >
-                  Create spaces
-                </Link>
               </div>
             ) : filteredAndSortedItems.length === 0 ? (
               <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-12 px-6 text-center">
-                <p className="text-sm font-medium text-slate-300">No items match the filters</p>
-                <p className="mt-1 text-xs text-slate-500">Try changing search, scope, type, or module.</p>
+                <p className="text-sm font-medium text-slate-300">No hay resultados para los filtros</p>
+                <p className="mt-1 text-xs text-slate-500">Prueba cambiando búsqueda, ámbito, tipo o módulo.</p>
               </div>
             ) : (
               <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -302,7 +306,8 @@ export default function KnowledgeExplorerPage() {
           </section>
         </>
       ) : null}
-    </div>
+      </div>
+    </AppPageShell>
   );
 }
 

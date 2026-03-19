@@ -20,6 +20,8 @@ import { PageDetailDrawer, type PageDetailPayload } from "@/components/knowledge
 import { KnowledgePageRow } from "@/components/knowledge/KnowledgePageRow";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
+import { blockNoteDocumentToText } from "@/lib/knowledge/blockNoteToText";
+import { getKnowledgeTemplateBlocks, type KnowledgeTemplateId } from "@/lib/knowledge/knowledgeTemplates";
 
 export default function KnowledgeDocumentsPage() {
   const router = useRouter();
@@ -33,6 +35,7 @@ export default function KnowledgeDocumentsPage() {
   const [newSpaceName, setNewSpaceName] = useState("");
   const [newSpaceDesc, setNewSpaceDesc] = useState("");
   const [newPageTitle, setNewPageTitle] = useState("");
+  const [newPageTemplateId, setNewPageTemplateId] = useState<KnowledgeTemplateId | "">("sap_procedure");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [askSapitoOpen, setAskSapitoOpen] = useState(false);
@@ -141,12 +144,18 @@ export default function KnowledgeDocumentsPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      const page = await createPage(supabase, selectedSpaceId, title);
+      const templateBlocks = newPageTemplateId
+        ? getKnowledgeTemplateBlocks(newPageTemplateId)
+        : null;
+      const page = await createPage(supabase, selectedSpaceId, title, {
+        content_json: templateBlocks ? { blocks: templateBlocks } : undefined,
+        content_text: templateBlocks ? blockNoteDocumentToText(templateBlocks) : undefined,
+      });
       setPages((prev) => [page, ...prev]);
       setNewPageTitle("");
+      setNewPageTemplateId("sap_procedure");
       setModalPage(false);
-      setDetailPageId(page.id);
-      setDetailOpen(true);
+      router.push(`/knowledge/pages/${page.id}`);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Error creating page.");
     } finally {
@@ -286,9 +295,9 @@ export default function KnowledgeDocumentsPage() {
                     <Skeleton className="h-11 w-4/5 rounded-xl bg-slate-700/50" />
                   </div>
                 ) : spaces.length === 0 ? (
-                  <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-12 text-center flex-1 flex flex-col items-center justify-center">
-                    <FolderOpen className="h-10 w-10 text-slate-500" />
-                    <p className="mt-3 text-sm font-medium text-slate-200">No spaces</p>
+                  <div className="py-12 flex-1 flex flex-col items-center justify-center text-center rounded-xl bg-slate-800/20">
+                    <FolderOpen className="w-10 h-10 text-slate-500 mb-3" />
+                    <p className="text-sm font-medium text-slate-200">No spaces</p>
                     <p className="mt-1 text-xs text-slate-500">Create one with «New space».</p>
                   </div>
                 ) : (
@@ -298,10 +307,10 @@ export default function KnowledgeDocumentsPage() {
                         <button
                           type="button"
                           onClick={() => setSelectedSpaceId(space.id)}
-                          className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-medium transition-colors duration-150 ${
+                          className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-medium transition-all duration-150 border ${
                             selectedSpaceId === space.id
-                              ? "bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-500/40"
-                              : "text-slate-300 hover:bg-slate-800/50 border border-transparent"
+                              ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-300"
+                              : "border-transparent text-slate-300 hover:bg-slate-800/60"
                           }`}
                         >
                           <FolderOpen className={`h-4 w-4 shrink-0 ${selectedSpaceId === space.id ? "text-indigo-400" : "text-slate-500"}`} />
@@ -314,16 +323,17 @@ export default function KnowledgeDocumentsPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden flex flex-col min-h-[320px]">
-              <div className="border-b border-slate-700/50 px-4 sm:px-5 py-4 flex items-center justify-between gap-3 shrink-0">
-                <h2 className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                  Pages
-                </h2>
+            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-visible flex flex-col min-h-[320px]">
+              <div className="border-b border-slate-700/50 px-4 sm:px-5 py-5 flex items-center justify-between gap-3 shrink-0">
+                <div>
+                  <h2 className="text-sm font-medium text-slate-100">Pages</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Manage and organize your documents</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => { setSaveError(null); setModalPage(true); }}
                   disabled={!selectedSpaceId}
-                  className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50 transition-colors"
+                  className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50 transition-colors shrink-0"
                 >
                   <Plus className="h-4 w-4" />
                   New page
@@ -331,16 +341,24 @@ export default function KnowledgeDocumentsPage() {
               </div>
               <div className="p-4 flex-1 min-h-0 flex flex-col">
                 {!selectedSpaceId ? (
-                  <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-12 text-center flex-1 flex flex-col items-center justify-center">
-                    <FolderOpen className="h-10 w-10 text-slate-500" />
-                    <p className="mt-3 text-sm font-medium text-slate-200">Select a space</p>
+                  <div className="py-12 flex-1 flex flex-col items-center justify-center text-center rounded-xl bg-slate-800/20">
+                    <FolderOpen className="w-10 h-10 text-slate-500 mb-3" />
+                    <p className="text-sm font-medium text-slate-200">Select a space</p>
                     <p className="mt-1 text-xs text-slate-500 max-w-xs">Choose a space from the list to see its pages.</p>
                   </div>
                 ) : pages.length === 0 ? (
-                  <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-12 text-center flex-1 flex flex-col items-center justify-center">
-                    <FileText className="h-10 w-10 text-slate-500" />
-                    <p className="mt-3 text-sm font-medium text-slate-200">No pages in this space</p>
-                    <p className="mt-1 text-xs text-slate-500 max-w-xs">Create one with «New page».</p>
+                  <div className="py-12 flex-1 flex flex-col items-center justify-center text-center rounded-xl bg-slate-800/20">
+                    <FileText className="w-10 h-10 text-slate-500 mb-3" />
+                    <p className="text-sm font-medium text-slate-200">No pages yet</p>
+                    <p className="text-xs text-slate-500 mb-4 max-w-xs">Create your first page to start documenting this space.</p>
+                    <button
+                      type="button"
+                      onClick={() => { setSaveError(null); setModalPage(true); }}
+                      className="mt-2 inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors"
+                    >
+                      <Plus className="h-4 w-4" />
+                      New page
+                    </button>
                   </div>
                 ) : (
                   <ul className="space-y-1">
@@ -523,6 +541,22 @@ export default function KnowledgeDocumentsPage() {
                   placeholder="e.g. How to configure variant valuation"
                   disabled={saving}
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">
+                  Template (optional)
+                </label>
+                <select
+                  value={newPageTemplateId}
+                  onChange={(e) => setNewPageTemplateId(e.target.value as KnowledgeTemplateId | "")}
+                  disabled={saving}
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50"
+                >
+                  <option value="">Blank</option>
+                  <option value="sap_procedure">SAP Procedure</option>
+                  <option value="sap_configuration">SAP Configuration</option>
+                  <option value="troubleshooting_guide">Troubleshooting Guide</option>
+                </select>
               </div>
               {saveError && <p className="text-sm text-red-400">{saveError}</p>}
               <div className="flex gap-2 pt-2">

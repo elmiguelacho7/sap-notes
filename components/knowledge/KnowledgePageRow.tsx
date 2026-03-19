@@ -56,7 +56,7 @@ export function KnowledgePageRow({
     : null;
 
   return (
-    <div className="group/page flex items-center gap-1 rounded-xl hover:bg-slate-800/40">
+    <div className="group/page flex items-center gap-2 rounded-xl hover:bg-slate-800/40">
       <button
         type="button"
         onClick={() => onOpen(page)}

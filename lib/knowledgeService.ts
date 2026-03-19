@@ -120,7 +120,12 @@ export async function listPages(
 export async function createPage(
   supabase: SupabaseClient,
   spaceId: string,
-  title: string
+  title: string,
+  input?: {
+    content_json?: Record<string, unknown> | null;
+    content_text?: string | null;
+    page_type?: KnowledgePage["page_type"];
+  }
 ): Promise<KnowledgePage> {
   const { data: user } = await supabase.auth.getUser();
   if (!user?.user?.id) throw new Error("No autorizado.");
@@ -133,15 +138,20 @@ export async function createPage(
       .replace(/[^a-z0-9-]/g, "") || "page";
   const slugUnique = `${slug}-${Date.now().toString(36)}`;
 
+  const payload: Record<string, unknown> = {
+    space_id: spaceId,
+    owner_profile_id: user.user.id,
+    title: title.trim(),
+    slug: slugUnique,
+    page_type: input?.page_type ?? "how_to",
+  };
+
+  if (input?.content_json !== undefined) payload.content_json = input.content_json;
+  if (input?.content_text !== undefined) payload.content_text = input.content_text;
+
   const { data, error } = await supabase
     .from("knowledge_pages")
-    .insert({
-      space_id: spaceId,
-      owner_profile_id: user.user.id,
-      title: title.trim(),
-      slug: slugUnique,
-      page_type: "how_to",
-    })
+    .insert(payload)
     .select()
     .single();
 
@@ -192,6 +202,10 @@ export type UpdatePageInput = {
   title?: string;
   summary?: string | null;
   space_id?: string;
+  /** Block editor document JSON (e.g. BlockNote). */
+  content_json?: Record<string, unknown> | null;
+  /** Normalized plain text for search and indexing. */
+  content_text?: string | null;
 };
 
 /**
@@ -209,6 +223,8 @@ export async function updatePage(
   if (input.title !== undefined) payload.title = input.title.trim();
   if (input.summary !== undefined) payload.summary = input.summary?.trim() || null;
   if (input.space_id !== undefined) payload.space_id = input.space_id;
+  if (input.content_json !== undefined) payload.content_json = input.content_json;
+  if (input.content_text !== undefined) payload.content_text = input.content_text;
 
   if (Object.keys(payload).length === 0) {
     const { data } = await supabase.from("knowledge_pages").select("*").eq("id", pageId).single();

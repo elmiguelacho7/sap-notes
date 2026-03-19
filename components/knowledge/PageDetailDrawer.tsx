@@ -100,20 +100,20 @@ export function PageDetailDrawer({
         aria-hidden
       />
       <div
-        className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-slate-900 border-l border-slate-700/80 shadow-xl flex flex-col"
+        className="fixed top-0 right-0 bottom-0 z-50 w-full md:max-w-xl bg-slate-900 border-l border-slate-700/80 shadow-xl flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="page-detail-title"
       >
-        <div className="flex items-center justify-between shrink-0 border-b border-slate-700/60 px-5 py-4">
+        <div className="flex items-center justify-between shrink-0 border-b border-slate-700/60 px-4 py-3">
           <h2 id="page-detail-title" className="text-lg font-semibold text-slate-100">
-            Page details
+            Detalle de página
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-            aria-label="Close"
+            aria-label="Cerrar"
           >
             <X className="h-5 w-5" />
           </button>
@@ -121,7 +121,7 @@ export function PageDetailDrawer({
 
         {/* Breadcrumb / context */}
         {page && (
-          <div className="shrink-0 px-5 py-2 border-b border-slate-700/40">
+          <div className="shrink-0 px-4 py-2 border-b border-slate-700/40">
             <p className="text-xs text-slate-500">
               {contextLabel}
               {spaceName ? ` · ${spaceName}` : ""}
@@ -130,32 +130,32 @@ export function PageDetailDrawer({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           <div>
-            <label className={labelClass}>Title *</label>
+            <label className={labelClass}>Título *</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className={inputClass}
-              placeholder="Page title"
+              placeholder="Título de la página"
               required
             />
           </div>
 
           <div>
-            <label className={labelClass}>Summary / content</label>
+            <label className={labelClass}>Resumen / contenido</label>
             <textarea
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               rows={4}
               className={inputClass}
-              placeholder="Brief summary or main content"
+              placeholder="Resumen o contenido principal"
             />
           </div>
 
           <div>
-            <label className={labelClass}>Space</label>
+            <label className={labelClass}>Espacio</label>
             <select
               value={spaceId}
               onChange={(e) => setSpaceId(e.target.value)}
@@ -171,16 +171,16 @@ export function PageDetailDrawer({
 
           {context === "project" && projectName != null && (
             <div>
-              <label className={labelClass}>Project</label>
+              <label className={labelClass}>Proyecto</label>
               <p className="text-sm text-slate-400">{projectName}</p>
             </div>
           )}
 
           {page && (
             <div className="space-y-1 pt-2 border-t border-slate-700/40">
-              <p className="text-xs text-slate-500">Updated</p>
+              <p className="text-xs text-slate-500">Actualizado</p>
               <p className="text-sm text-slate-400">{formatDate(page.updated_at)}</p>
-              <p className="text-xs text-slate-500 mt-2">Created</p>
+              <p className="text-xs text-slate-500 mt-2">Creado</p>
               <p className="text-sm text-slate-400">{formatDate(page.created_at)}</p>
             </div>
           )}
@@ -192,7 +192,7 @@ export function PageDetailDrawer({
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors"
               >
                 <ExternalLink className="h-4 w-4" />
-                Open full editor
+                Abrir editor completo
               </Link>
             )}
             <div className="flex gap-2">
@@ -201,14 +201,14 @@ export function PageDetailDrawer({
                 onClick={onClose}
                 className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors"
               >
-                Cancel
+                Cancelar
               </button>
               <button
                 type="submit"
                 disabled={saving || !title.trim()}
                 className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50 transition-colors"
               >
-                {saving ? "Saving…" : "Save"}
+                {saving ? "Guardando…" : "Guardar"}
               </button>
             </div>
           </div>

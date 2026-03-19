@@ -417,14 +417,18 @@ export default function ProjectTasksPage() {
 
   if (!projectId) {
     return (
-      <div className="w-full min-w-0 bg-slate-950">
-        <p className="text-sm text-slate-400">No se ha encontrado el identificador del proyecto.</p>
+      <div className="-mx-4 sm:-mx-5 lg:-mx-6 xl:-mx-8 2xl:-mx-10">
+        <div className="w-full max-w-[1440px] mx-auto px-6 lg:px-8">
+          <p className="text-sm text-slate-400">No se ha encontrado el identificador del proyecto.</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full min-w-0 space-y-6 bg-slate-950">
+    <div className="-mx-4 sm:-mx-5 lg:-mx-6 xl:-mx-8 2xl:-mx-10">
+      <div className="w-full max-w-[1440px] mx-auto px-6 lg:px-8">
+        <div className="min-w-0 space-y-6">
         {showCreandoBanner && (
           <div className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-400 transition-opacity duration-300">
             Creando...
@@ -534,6 +538,8 @@ export default function ProjectTasksPage() {
         projectName={projectName}
         saving={detailSaving}
       />
+        </div>
+      </div>
     </div>
   );
 }

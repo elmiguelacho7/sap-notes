@@ -506,40 +506,113 @@ export default function ProjectActivitiesPageContent() {
                 )}
               </div>
             ) : (
-              <div className="w-full min-w-0 overflow-x-auto rounded-lg [scrollbar-width:thin] [scrollbar-color:#475569_#1e293b] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500">
-                <table className="w-full text-left text-sm min-w-[640px]">
-                  <thead className="sticky top-0 z-10 bg-slate-800/95 backdrop-blur border-b border-slate-700/60">
-                    <tr>
-                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[100px] min-w-[100px] align-middle whitespace-nowrap">Fase</th>
-                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[180px] min-w-[180px] align-middle">Actividad</th>
-                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[140px] min-w-[140px] align-middle">Responsable</th>
-                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[110px] min-w-[110px] align-middle">Estado</th>
-                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[100px] min-w-[100px] align-middle whitespace-nowrap">Inicio</th>
-                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[100px] min-w-[100px] align-middle whitespace-nowrap">Fin</th>
-                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[44px] min-w-[44px] align-middle">%</th>
-                      <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[72px] min-w-[72px] align-middle">Riesgo</th>
-                      <th className="px-3 py-3.5 pl-3 pr-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[180px] min-w-[180px] max-w-[180px] align-middle text-right whitespace-nowrap">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-700/40">
-                    {filteredActivities.map((activity) => (
-                      <ActivityRow
+              <>
+                {/* Mobile: stacked cards */}
+                <div className="md:hidden divide-y divide-slate-700/40">
+                  {filteredActivities.map((activity) => {
+                    const today = new Date().toISOString().slice(0, 10);
+                    const isOverdue = !!(activity.due_date && activity.due_date < today && (activity.status ?? "planned") !== "done");
+                    const displayProgress = activity.derived_progress_pct ?? activity.progress_pct ?? 0;
+                    const riskLevel = riskByActivity[activity.id];
+                    return (
+                      <div
                         key={activity.id}
-                        activity={activity}
-                        phaseName={getPhaseName(activity.phase_id)}
-                        profiles={profiles}
-                        profilesMap={profilesMap}
-                        riskLevel={riskByActivity[activity.id]}
-                        onUpdate={updateActivity}
-                        saving={savingId === activity.id}
-                        onEdit={() => setEditingActivity(activity)}
-                        onDelete={() => setDeleteConfirmId(activity.id)}
-                        onViewTasks={handleViewTasks}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        className="px-4 py-4 hover:bg-slate-800/50 transition-colors"
+                      >
+                        <p className="text-xs text-slate-500 uppercase tracking-wider">{getPhaseName(activity.phase_id)}</p>
+                        <p className="font-medium text-slate-100 mt-0.5 line-clamp-2">{activity.name}</p>
+                        {activity.description && (
+                          <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{activity.description}</p>
+                        )}
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <AssigneeCell profileId={activity.owner_profile_id} profilesMap={profilesMap} />
+                          <ActivityStatusBadge status={activity.status} isOverdue={isOverdue} />
+                          <span className="text-slate-400 text-xs tabular-nums">{displayProgress}%</span>
+                          {riskLevel != null && riskLevel !== "" && (
+                            <span
+                              className={
+                                riskLevel === "HIGH"
+                                  ? "inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium bg-red-500/20 text-red-400"
+                                  : riskLevel === "MEDIUM"
+                                  ? "inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium bg-amber-500/20 text-amber-400"
+                                  : "inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium bg-emerald-500/20 text-emerald-400"
+                              }
+                            >
+                              {riskLevel === "HIGH" ? "Alto" : riskLevel === "MEDIUM" ? "Medio" : "Bajo"}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {activity.start_date ? `Inicio ${activity.start_date}` : ""}
+                          {activity.start_date && activity.due_date ? " · " : ""}
+                          {activity.due_date ? `Fin ${activity.due_date}` : ""}
+                        </p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingActivity(activity)}
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-600 bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                            aria-label="Editar"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleViewTasks(activity.id)}
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-600 bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                            aria-label="Ver tareas"
+                          >
+                            <ListTodo className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirmId(activity.id)}
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-600 bg-slate-800/60 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                            aria-label="Eliminar"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Desktop: table */}
+                <div className="hidden md:block w-full min-w-0 overflow-x-auto rounded-lg [scrollbar-width:thin] [scrollbar-color:#334155_#1e293b] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-800/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/70 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500">
+                  <table className="w-full text-left text-sm min-w-[640px] md:table">
+                    <thead className="sticky top-0 z-10 bg-slate-800/95 backdrop-blur border-b border-slate-700/60">
+                      <tr>
+                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[100px] min-w-[100px] align-middle whitespace-nowrap">Fase</th>
+                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[180px] min-w-[180px] align-middle">Actividad</th>
+                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[140px] min-w-[140px] align-middle">Responsable</th>
+                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[110px] min-w-[110px] align-middle">Estado</th>
+                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[100px] min-w-[100px] align-middle whitespace-nowrap">Inicio</th>
+                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[100px] min-w-[100px] align-middle whitespace-nowrap">Fin</th>
+                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[44px] min-w-[44px] align-middle">%</th>
+                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[72px] min-w-[72px] align-middle">Riesgo</th>
+                        <th className="px-3 py-3.5 pl-3 pr-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[180px] min-w-[180px] max-w-[180px] align-middle text-right whitespace-nowrap">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700/40">
+                      {filteredActivities.map((activity) => (
+                        <ActivityRow
+                          key={activity.id}
+                          activity={activity}
+                          phaseName={getPhaseName(activity.phase_id)}
+                          profiles={profiles}
+                          profilesMap={profilesMap}
+                          riskLevel={riskByActivity[activity.id]}
+                          onUpdate={updateActivity}
+                          saving={savingId === activity.id}
+                          onEdit={() => setEditingActivity(activity)}
+                          onDelete={() => setDeleteConfirmId(activity.id)}
+                          onViewTasks={handleViewTasks}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </section>

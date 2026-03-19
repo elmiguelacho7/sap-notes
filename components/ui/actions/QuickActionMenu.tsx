@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Plus, FolderKanban, CheckSquare, FileText, Ticket } from "lucide-react";
+import { Plus, FolderKanban, CheckSquare, FileText, Ticket, BookOpen } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 export type QuickActionItem = {
@@ -17,10 +17,11 @@ const ALL_ITEMS: QuickActionItem[] = [
   { label: "Create Task", href: "/tasks", icon: <CheckSquare className="h-[18px] w-[18px]" /> },
   { label: "Create Note", href: "/notes/new", icon: <FileText className="h-[18px] w-[18px]" /> },
   { label: "Create Ticket", href: "/tickets/new", icon: <Ticket className="h-[18px] w-[18px]" /> },
+  { label: "Create Knowledge Page", href: "/knowledge", icon: <BookOpen className="h-[18px] w-[18px]" /> },
 ];
 
 export function QuickActionMenu({
-  label = "+ Create",
+  label = "New",
   items: itemsProp,
   className = "",
 }: {
@@ -118,10 +119,10 @@ export function QuickActionMenu({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
+        className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-100 hover:bg-slate-700 hover:border-slate-600 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:ring-offset-2 focus:ring-offset-slate-950"
       >
-        <Plus className="h-[18px] w-[18px]" />
-        {label}
+        <Plus className="h-4 w-4 shrink-0" />
+        <span className="hidden md:inline">{label}</span>
       </button>
 
       {open ? (

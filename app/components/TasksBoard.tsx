@@ -860,7 +860,7 @@ export default function TasksBoard({
   }, []);
 
   return (
-    <div className="flex flex-col gap-6 rounded-2xl border border-slate-700/80 bg-slate-900/90 pt-6 pb-6 pl-6 pr-6">
+    <div className="flex flex-col gap-6 rounded-2xl border border-slate-700/80 bg-slate-900/90 pt-4 pb-4 pl-4 pr-4 sm:pl-6 sm:pr-6 sm:pt-6 sm:pb-5">
       {/* Header + Nueva tarea button */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
@@ -1090,9 +1090,9 @@ export default function TasksBoard({
               onDragEnd={handleControlledDragEnd}
             >
               <div
-                className="overflow-x-auto overflow-y-visible w-full -mx-2 px-2 pb-1 [scrollbar-width:thin] [scrollbar-color:#475569_#1e293b] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500"
+                className="overflow-x-auto overflow-y-visible w-full -mx-2 px-2 pb-1 touch-pan-x [scrollbar-width:thin] [scrollbar-color:#475569_#1e293b] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500"
               >
-                <div className="flex gap-4 items-start pb-4 pt-0.5 min-w-0 w-max min-h-[260px] pr-6">
+                <div className="flex gap-4 items-start pb-2 pt-0.5 min-w-0 w-max min-h-[260px] pr-3">
                 {controlledGrouped.map(({ id, label, tasks: colTasks }) => (
                   <ProjectBoardColumn
                     key={id}
@@ -1209,8 +1209,8 @@ export default function TasksBoard({
           <TasksBoardSkeleton />
         ) : (
           <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="overflow-x-auto overflow-y-visible w-full -mx-2 px-2 pb-1 [scrollbar-width:thin] [scrollbar-color:#475569_#1e293b] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500">
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 pb-4 pr-6 min-w-0 w-max">
+            <div className="overflow-x-auto overflow-y-visible w-full -mx-2 px-2 pb-1 touch-pan-x [scrollbar-width:thin] [scrollbar-color:#475569_#1e293b] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 pb-2 pr-3 min-w-0 w-max">
               {groupedByStatus.map(({ status, tasks }) => (
                 <Droppable droppableId={status.id} key={status.id}>
                   {(provided, snapshot) => {

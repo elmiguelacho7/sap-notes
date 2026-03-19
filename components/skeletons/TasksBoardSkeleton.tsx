@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 /** Skeleton for task board: column headers + card placeholders. */
 export function TasksBoardSkeleton({ columnCount = 5 }: { columnCount?: number }) {
   return (
-    <div className="flex gap-4 items-start pb-4 pl-3 pr-10 min-w-0">
+    <div className="flex gap-4 items-start pb-2 pl-3 pr-3 min-w-0">
       {Array.from({ length: columnCount }).map((_, i) => (
         <div key={i} className="flex flex-col gap-3 w-[280px] shrink-0">
           <Skeleton className="h-6 w-28 rounded-lg" />

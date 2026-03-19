@@ -2,18 +2,41 @@
 
 import type { ReactNode } from "react";
 
+type AssistantMessageContentProps = { content: string; variant?: "light" | "dark" };
+
+const lightClasses = {
+  h1: "text-slate-900",
+  h2: "text-slate-900",
+  h3: "text-slate-800",
+  p: "text-slate-700",
+  ul: "text-slate-700",
+  ol: "text-slate-700",
+  strong: "text-slate-800",
+};
+const darkClasses = {
+  h1: "text-slate-100",
+  h2: "text-slate-100",
+  h3: "text-slate-200",
+  p: "text-slate-300",
+  ul: "text-slate-300",
+  ol: "text-slate-300",
+  strong: "text-slate-200",
+};
+
 /**
  * Renders assistant message content with safe, lightweight markdown-style formatting:
  * paragraphs, headings (##, ###), bullet lists, numbered lists, and bold.
  * No raw HTML or user-controlled markup — safe for LLM output.
  * Optimized for SAP copilot: clear hierarchy, readable spacing, premium typography.
+ * Use variant="dark" when rendering inside dark cards (e.g. Project Copilot).
  */
-export function AssistantMessageContent({ content }: { content: string }) {
+export function AssistantMessageContent({ content, variant = "light" }: AssistantMessageContentProps) {
   if (!content || typeof content !== "string") return null;
 
   const trimmed = content.trim();
   if (!trimmed) return null;
 
+  const theme = variant === "dark" ? darkClasses : lightClasses;
   const blocks = splitBlocks(trimmed);
   const nodes: ReactNode[] = [];
 
@@ -26,24 +49,24 @@ export function AssistantMessageContent({ content }: { content: string }) {
     const h1Match = !h2Match && !h3Match && block.match(/^#\s+(.+)$/);
     if (h3Match) {
       nodes.push(
-        <h3 key={i} className="sapito-heading mt-5 first:mt-0 text-sm font-semibold text-slate-800 tracking-tight">
-          {renderInline(h3Match[1])}
+        <h3 key={i} className={`sapito-heading mt-5 first:mt-0 text-sm font-semibold tracking-tight ${theme.h3}`}>
+          {renderInline(h3Match[1], theme.strong)}
         </h3>
       );
       continue;
     }
     if (h2Match) {
       nodes.push(
-        <h2 key={i} className="sapito-heading mt-5 first:mt-0 text-base font-semibold text-slate-900 tracking-tight">
-          {renderInline(h2Match[1])}
+        <h2 key={i} className={`sapito-heading mt-5 first:mt-0 text-base font-semibold tracking-tight ${theme.h2}`}>
+          {renderInline(h2Match[1], theme.strong)}
         </h2>
       );
       continue;
     }
     if (h1Match) {
       nodes.push(
-        <h1 key={i} className="sapito-heading mt-5 first:mt-0 text-lg font-semibold text-slate-900 tracking-tight">
-          {renderInline(h1Match[1])}
+        <h1 key={i} className={`sapito-heading mt-5 first:mt-0 text-lg font-semibold tracking-tight ${theme.h1}`}>
+          {renderInline(h1Match[1], theme.strong)}
         </h1>
       );
       continue;
@@ -54,10 +77,10 @@ export function AssistantMessageContent({ content }: { content: string }) {
     const isFullUl = ulLines.length > 0 && ulLines.length === block.split("\n").length;
     if (isFullUl && ulLines.length > 0) {
       nodes.push(
-        <ul key={i} className="sapito-list mt-3 first:mt-0 list-disc list-outside pl-4 space-y-2 text-sm text-slate-700 leading-relaxed">
+        <ul key={i} className={`sapito-list mt-3 first:mt-0 list-disc list-outside pl-4 space-y-2 text-sm leading-relaxed ${theme.ul}`}>
           {ulLines.map((line, j) => (
             <li key={j}>
-              {renderInline(line.replace(/^\s*[\-\*]\s+/, ""))}
+              {renderInline(line.replace(/^\s*[\-\*]\s+/, ""), theme.strong)}
             </li>
           ))}
         </ul>
@@ -70,10 +93,10 @@ export function AssistantMessageContent({ content }: { content: string }) {
     const isFullOl = olLines.length > 0 && olLines.length === block.split("\n").length;
     if (isFullOl && olLines.length > 0) {
       nodes.push(
-        <ol key={i} className="sapito-list mt-3 first:mt-0 list-decimal list-outside pl-4 space-y-2 text-sm text-slate-700 leading-relaxed">
+        <ol key={i} className={`sapito-list mt-3 first:mt-0 list-decimal list-outside pl-4 space-y-2 text-sm leading-relaxed ${theme.ol}`}>
           {olLines.map((line, j) => (
             <li key={j}>
-              {renderInline(line.replace(/^\s*\d+\.\s+/, ""))}
+              {renderInline(line.replace(/^\s*\d+\.\s+/, ""), theme.strong)}
             </li>
           ))}
         </ol>
@@ -82,7 +105,7 @@ export function AssistantMessageContent({ content }: { content: string }) {
     }
 
     // Mixed block: paragraph(s) + optional list(s) — parse line-by-line
-    const lineNodes = renderMixedBlock(block, i);
+    const lineNodes = renderMixedBlock(block, i, theme);
     nodes.push(...lineNodes);
   }
 
@@ -93,8 +116,10 @@ export function AssistantMessageContent({ content }: { content: string }) {
   );
 }
 
+type ThemeClasses = { p: string; ul: string; ol: string; strong: string };
+
 /** Renders a block that may contain paragraphs and list lines mixed. */
-function renderMixedBlock(block: string, blockKey: number): ReactNode[] {
+function renderMixedBlock(block: string, blockKey: number, theme: ThemeClasses): ReactNode[] {
   const lines = block.split("\n");
   const out: ReactNode[] = [];
   let i = 0;
@@ -116,9 +141,9 @@ function renderMixedBlock(block: string, blockKey: number): ReactNode[] {
         i++;
       }
       out.push(
-        <ul key={`${blockKey}-${key++}`} className="sapito-list mt-3 list-disc list-outside pl-4 space-y-2 text-sm text-slate-700 leading-relaxed">
+        <ul key={`${blockKey}-${key++}`} className={`sapito-list mt-3 list-disc list-outside pl-4 space-y-2 text-sm leading-relaxed ${theme.ul}`}>
           {ulLines.map((l, j) => (
-            <li key={j}>{renderInline(l)}</li>
+            <li key={j}>{renderInline(l, theme.strong)}</li>
           ))}
         </ul>
       );
@@ -133,9 +158,9 @@ function renderMixedBlock(block: string, blockKey: number): ReactNode[] {
         i++;
       }
       out.push(
-        <ol key={`${blockKey}-${key++}`} className="sapito-list mt-3 list-decimal list-outside pl-4 space-y-2 text-sm text-slate-700 leading-relaxed">
+        <ol key={`${blockKey}-${key++}`} className={`sapito-list mt-3 list-decimal list-outside pl-4 space-y-2 text-sm leading-relaxed ${theme.ol}`}>
           {olLines.map((l, j) => (
-            <li key={j}>{renderInline(l)}</li>
+            <li key={j}>{renderInline(l, theme.strong)}</li>
           ))}
         </ol>
       );
@@ -154,8 +179,8 @@ function renderMixedBlock(block: string, blockKey: number): ReactNode[] {
     }
     if (paraLines.length > 0) {
       out.push(
-        <p key={`${blockKey}-${key++}`} className="sapito-paragraph mt-2.5 first:mt-0 text-sm text-slate-700 leading-[1.65]">
-          {renderInline(paraLines.join(" "))}
+        <p key={`${blockKey}-${key++}`} className={`sapito-paragraph mt-2.5 first:mt-0 text-sm leading-[1.65] ${theme.p}`}>
+          {renderInline(paraLines.join(" "), theme.strong)}
         </p>
       );
     }
@@ -169,7 +194,7 @@ function splitBlocks(text: string): string[] {
 }
 
 /** Renders inline content with **bold** only. No HTML. */
-function renderInline(text: string): ReactNode {
+function renderInline(text: string, strongClass = "font-semibold text-slate-800"): ReactNode {
   const parts: ReactNode[] = [];
   let remaining = text;
   let key = 0;
@@ -189,7 +214,7 @@ function renderInline(text: string): ReactNode {
       parts.push(<span key={key++}>{remaining}</span>);
       break;
     }
-    parts.push(<strong key={key++} className="font-semibold text-slate-800">{remaining.slice(0, close)}</strong>);
+    parts.push(<strong key={key++} className={`font-semibold ${strongClass}`}>{remaining.slice(0, close)}</strong>);
     remaining = remaining.slice(close + 2);
   }
   return parts.length === 1 ? parts[0] : <>{parts}</>;

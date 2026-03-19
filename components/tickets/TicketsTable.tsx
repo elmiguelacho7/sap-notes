@@ -44,8 +44,57 @@ export default function TicketsTable({
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      {/* Mobile: stacked cards */}
+      <div className="md:hidden divide-y divide-slate-100">
+        {tickets.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => onRowClick(t.id)}
+            className="w-full text-left px-4 py-4 hover:bg-slate-50/80 transition active:bg-slate-100"
+          >
+            <p className="font-medium text-slate-900 line-clamp-2">{t.title || "—"}</p>
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+              {t.client_name && <span>Cliente: {t.client_name}</span>}
+              {t.project_name && <span>Proyecto: {t.project_name}</span>}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {t.status && (
+                <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                  {t.status}
+                </span>
+              )}
+              {t.priority && (
+                <span
+                  className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                    t.priority === "urgent" || t.priority === "high"
+                      ? "bg-red-50 text-red-700"
+                      : t.priority === "medium"
+                      ? "bg-amber-50 text-amber-700"
+                      : "bg-slate-100 text-slate-700"
+                  }`}
+                >
+                  {t.priority}
+                </span>
+              )}
+              <AssigneePill
+                profileId={t.assignee_name ? "resolved" : null}
+                displayLabel={t.assignee_name ?? null}
+                tone="light"
+                compact
+              />
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              Creado {formatDate(t.created_at)}
+              {t.due_date ? ` · Vence ${formatDate(t.due_date)}` : ""}
+            </p>
+          </button>
+        ))}
+      </div>
+
+      {/* Desktop: table */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-sm md:table">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50/80">
               <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">

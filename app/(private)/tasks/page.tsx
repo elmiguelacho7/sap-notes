@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { BoardTask } from "@/app/components/TasksBoard";
+import { AppPageShell } from "@/components/ui/layout/AppPageShell";
 import { TaskWorkspaceHeader } from "@/components/tasks/TaskWorkspaceHeader";
 import { TaskFilterBar } from "@/components/tasks/TaskFilterBar";
 import { ViewModeToggle } from "@/components/tasks/ViewModeToggle";
@@ -99,7 +100,9 @@ export default function GlobalTasksPage() {
   }, []);
 
   return (
-    <div className="w-full min-w-0 space-y-6 bg-slate-950">
+    <div className="bg-slate-950 min-h-full">
+      <AppPageShell>
+      <div className="space-y-6">
       <TaskWorkspaceHeader
         title="Tareas"
         subtitle="Gestiona tareas globales y tareas asignadas a ti."
@@ -162,6 +165,8 @@ export default function GlobalTasksPage() {
         ]}
         saving={detailSaving}
       />
+      </div>
+      </AppPageShell>
     </div>
   );
 }

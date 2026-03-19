@@ -18,6 +18,8 @@ import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PageDetailDrawer, type PageDetailPayload } from "@/components/knowledge/PageDetailDrawer";
 import { KnowledgePageRow } from "@/components/knowledge/KnowledgePageRow";
+import { blockNoteDocumentToText } from "@/lib/knowledge/blockNoteToText";
+import { getKnowledgeTemplateBlocks, type KnowledgeTemplateId } from "@/lib/knowledge/knowledgeTemplates";
 
 export default function ProjectKnowledgePage() {
   const params = useParams<{ id: string }>();
@@ -33,6 +35,7 @@ export default function ProjectKnowledgePage() {
   const [newSpaceName, setNewSpaceName] = useState("");
   const [newSpaceDesc, setNewSpaceDesc] = useState("");
   const [newPageTitle, setNewPageTitle] = useState("");
+  const [newPageTemplateId, setNewPageTemplateId] = useState<KnowledgeTemplateId | "">("sap_procedure");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
@@ -145,9 +148,14 @@ export default function ProjectKnowledgePage() {
     setSaving(true);
     setSaveError(null);
     try {
-      const page = await createPage(supabase, selectedSpaceId, title);
+      const templateBlocks = newPageTemplateId ? getKnowledgeTemplateBlocks(newPageTemplateId) : null;
+      const page = await createPage(supabase, selectedSpaceId, title, {
+        content_json: templateBlocks ? { blocks: templateBlocks } : undefined,
+        content_text: templateBlocks ? blockNoteDocumentToText(templateBlocks) : undefined,
+      });
       setPages((prev) => [page, ...prev]);
       setNewPageTitle("");
+      setNewPageTemplateId("sap_procedure");
       setModalPage(false);
       setDetailPageId(page.id);
       setDetailOpen(true);
@@ -288,8 +296,8 @@ export default function ProjectKnowledgePage() {
           </div>
         </div>
 
-        <div className="md:col-span-2 rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
-          <div className="border-b border-slate-700/50 px-4 sm:px-5 py-4 flex items-center justify-between gap-3">
+        <div className="md:col-span-2 rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-visible">
+          <div className="border-b border-slate-700/50 px-4 sm:px-5 py-5 flex items-center justify-between gap-3">
             <h2 className="text-xs font-medium uppercase tracking-wider text-slate-400">
               Páginas
             </h2>
@@ -468,6 +476,22 @@ fullEditorHref="/knowledge"
                   placeholder="Ej: Cómo configurar variante de valoración"
                   disabled={saving}
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">
+                  Plantilla (opcional)
+                </label>
+                <select
+                  value={newPageTemplateId}
+                  onChange={(e) => setNewPageTemplateId(e.target.value as KnowledgeTemplateId | "")}
+                  disabled={saving}
+                  className="w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50"
+                >
+                  <option value="">En blanco</option>
+                  <option value="sap_procedure">SAP Procedure</option>
+                  <option value="sap_configuration">SAP Configuration</option>
+                  <option value="troubleshooting_guide">Troubleshooting Guide</option>
+                </select>
               </div>
               {saveError && <p className="text-sm text-red-400">{saveError}</p>}
               <div className="flex gap-2 pt-2">

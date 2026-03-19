@@ -15,15 +15,15 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <div className={`mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between ${className}`}>
+    <div className={`mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${className}`}>
       <div className="min-w-0">
-        <h1 className="text-2xl font-semibold text-white tracking-tight">{title}</h1>
+        <h1 className="text-xl font-semibold text-white tracking-tight sm:text-2xl">{title}</h1>
         {description && (
-          <p className="mt-1 text-sm text-slate-400">{description}</p>
+          <p className="mt-0.5 text-sm text-slate-400">{description}</p>
         )}
       </div>
       {actions ? (
-        <div className="flex items-center gap-2 shrink-0">{actions}</div>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>
       ) : null}
     </div>
   );

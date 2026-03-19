@@ -36,7 +36,7 @@ export type TaskFilterBarProps = {
 export function TaskFilterBar({
   searchQuery,
   onSearchChange,
-  searchPlaceholder = "Search tasks...",
+  searchPlaceholder = "Buscar tareas…",
   scopeOptions,
   scopeValue = "",
   onScopeChange,
@@ -55,10 +55,10 @@ export function TaskFilterBar({
   children,
 }: TaskFilterBarProps) {
   const selectClass =
-    "rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50";
+    "rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 w-full sm:w-auto min-w-0";
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="relative flex-1 min-w-[180px] max-w-xs">
+    <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
+      <div className="relative flex-1 min-w-0 w-full sm:max-w-xs">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
         <input
           type="search"

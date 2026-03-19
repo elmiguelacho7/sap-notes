@@ -278,7 +278,8 @@ export default function NotesPage() {
   }, [notes, searchQuery, moduleFilter, sortBy]);
 
   return (
-    <div className="w-full min-w-0 space-y-8">
+    <div className="w-full px-6 lg:px-8 py-8">
+      <div className="w-full min-w-0 space-y-8">
       <header className="space-y-1">
         <ProjectPageHeader
           variant="section"
@@ -287,6 +288,7 @@ export default function NotesPage() {
           subtitle="Reusable SAP patterns, incidents, configuration standards, and cross-project decisions. Only users with global notes permission can view and create them."
           primaryActionLabel={manageGlobalNotes ? "New global note" : undefined}
           primaryActionHref={manageGlobalNotes ? "/notes/new" : undefined}
+          primaryActionClassName="shadow-sm shadow-indigo-500/20 bg-indigo-500/20 hover:bg-indigo-500/30"
         />
       </header>
 
@@ -304,28 +306,28 @@ export default function NotesPage() {
         </section>
       ) : (
         <>
-          {/* Metrics cards */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase text-slate-400">Total notes</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.total}</p>
+          {/* Metrics cards — subdued so notes dominate */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-slate-700/40 bg-slate-800/30 p-3 sm:p-4">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Total notes</p>
+              <p className="mt-0.5 text-base font-semibold text-slate-300">{summary.total}</p>
             </div>
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase text-slate-400">SAP modules covered</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.modulesCovered}</p>
+            <div className="rounded-xl border border-slate-700/40 bg-slate-800/30 p-3 sm:p-4">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">SAP modules covered</p>
+              <p className="mt-0.5 text-base font-semibold text-slate-300">{summary.modulesCovered}</p>
             </div>
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase text-slate-400">Recent notes (7d)</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.recentlyAdded}</p>
+            <div className="rounded-xl border border-slate-700/40 bg-slate-800/30 p-3 sm:p-4">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Recent notes (7d)</p>
+              <p className="mt-0.5 text-base font-semibold text-slate-300">{summary.recentlyAdded}</p>
             </div>
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase text-slate-400">Recurring incidents</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.recurringIncidents}</p>
+            <div className="rounded-xl border border-slate-700/40 bg-slate-800/30 p-3 sm:p-4">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Recurring incidents</p>
+              <p className="mt-0.5 text-base font-semibold text-slate-300">{summary.recurringIncidents}</p>
             </div>
           </div>
 
-          {/* Filter / search bar */}
-          <div className="flex flex-wrap items-center gap-3">
+          {/* Filter / search bar — aligned with notes width */}
+          <div className="flex flex-wrap items-center gap-3 w-full">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
               <input
@@ -333,14 +335,14 @@ export default function NotesPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Buscar en notas..."
-                className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                className="h-10 w-full rounded-xl border border-slate-600 bg-slate-800/80 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
               />
             </div>
             {uniqueModules.length > 0 && (
               <select
                 value={moduleFilter}
                 onChange={(e) => setModuleFilter(e.target.value)}
-                className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                className="h-10 rounded-xl border border-slate-600 bg-slate-800/80 px-3 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
               >
                 <option value="">Todos los módulos</option>
                 {uniqueModules.map((m) => (
@@ -353,7 +355,7 @@ export default function NotesPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortValue)}
-              className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+              className="h-10 rounded-xl border border-slate-600 bg-slate-800/80 px-3 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -363,7 +365,7 @@ export default function NotesPage() {
             </select>
           </div>
 
-          <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
+          <section className="w-full rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden pb-1 min-h-[200px]">
             {notes.length === 0 ? (
               <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-16 px-6 text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 text-slate-500">
@@ -390,7 +392,7 @@ export default function NotesPage() {
                 <p className="mt-1 text-xs text-slate-500">Try changing the search or module.</p>
               </div>
             ) : (
-              <ul className="divide-y divide-slate-700/40">
+              <ul className="w-full space-y-5 p-4 pb-6">
                 {filteredAndSortedNotes.map((note) => {
                   const excerpt =
                     (note.body && note.body.trim() !== ""
@@ -413,7 +415,7 @@ export default function NotesPage() {
                           router.push(`/notes/${note.id}`);
                         }
                       }}
-                      className="flex items-start justify-between gap-3 px-6 py-4 cursor-pointer hover:bg-slate-800/50 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-inset"
+                      className="flex items-start justify-between gap-3 rounded-xl border border-slate-700/60 bg-slate-800/40 px-5 py-5 cursor-pointer transition-all duration-150 hover:bg-slate-800/60 hover:border-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-inset"
                     >
                       <div
                         className="min-w-0 flex-1 cursor-pointer"
@@ -482,8 +484,11 @@ export default function NotesPage() {
               </ul>
             )}
           </section>
+
+          <div className="pb-10" aria-hidden />
         </>
       )}
+      </div>
     </div>
   );
 }

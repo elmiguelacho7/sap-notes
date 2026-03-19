@@ -1,0 +1,61 @@
+<svg width="24" height="24" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bodyGrad" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="#1ED496"/><stop offset="50%" stop-color="#0FB87A"/><stop offset="100%" stop-color="#097A52"/></radialGradient>
+    <radialGradient id="bellyGrad" cx="50%" cy="60%" r="60%"><stop offset="0%" stop-color="#A8F0D0"/><stop offset="100%" stop-color="#4DD4A0"/></radialGradient>
+    <radialGradient id="eyeIrisL" cx="40%" cy="35%" r="60%"><stop offset="0%" stop-color="#AAFFD8"/><stop offset="60%" stop-color="#00E896"/><stop offset="100%" stop-color="#00915A"/></radialGradient>
+    <radialGradient id="eyeIrisR" cx="40%" cy="35%" r="60%"><stop offset="0%" stop-color="#AAFFD8"/><stop offset="60%" stop-color="#00E896"/><stop offset="100%" stop-color="#00915A"/></radialGradient>
+    <radialGradient id="eyeSocketGrad" cx="50%" cy="50%" r="55%"><stop offset="0%" stop-color="#0D9E6A"/><stop offset="100%" stop-color="#076645"/></radialGradient>
+    <radialGradient id="warnG" cx="50%" cy="30%" r="65%"><stop offset="0%" stop-color="#fef08a"/><stop offset="55%" stop-color="#facc15"/><stop offset="100%" stop-color="#d97706"/></radialGradient>
+    <style>
+      @keyframes warnPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+      @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+      @keyframes eyeWide{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.1)}}
+      @keyframes exclamPulse{0%,100%{opacity:.85}50%{opacity:1}}
+      @keyframes browFurrow{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
+      .warn-badge{animation:warnPulse 1.4s ease-in-out infinite;transform-origin:536px 148px}
+      .body-shake{animation:shake 2.4s ease-in-out infinite;transform-origin:340px 380px}
+      .eyeL-wide{animation:eyeWide 1.4s ease-in-out infinite;transform-origin:228px 255px}
+      .eyeR-wide{animation:eyeWide 1.4s ease-in-out infinite;transform-origin:452px 255px}
+      .exclam{animation:exclamPulse 1.4s ease-in-out infinite}
+      .brow-l{animation:browFurrow 1.4s ease-in-out infinite;transform-origin:228px 308px}
+      .brow-r{animation:browFurrow 1.4s ease-in-out infinite;transform-origin:452px 308px}
+    </style>
+  </defs>
+  <g class="body-shake">
+    <ellipse cx="340" cy="460" rx="220" ry="110" fill="url(#bodyGrad)"/>
+    <path d="M115 380 Q108 280 180 230 Q240 195 340 192 Q440 195 500 230 Q572 280 565 380 Q565 450 500 485 Q420 510 340 512 Q260 510 180 485 Q115 450 115 380Z" fill="url(#bodyGrad)"/>
+    <ellipse cx="340" cy="470" rx="155" ry="62" fill="url(#bellyGrad)" opacity="0.85"/>
+    <ellipse cx="340" cy="500" rx="120" ry="38" fill="#A8F0D0" opacity="0.5"/>
+    <circle cx="170" cy="295" r="26" fill="#0A8A5C" opacity="0.7"/><circle cx="170" cy="295" r="20" fill="#097A52" opacity="0.5"/>
+    <circle cx="510" cy="295" r="26" fill="#0A8A5C" opacity="0.7"/><circle cx="510" cy="295" r="20" fill="#097A52" opacity="0.5"/>
+    <g class="brow-l"><path d="M160 302 Q200 286 280 296" fill="none" stroke="#076645" stroke-width="5.5" stroke-linecap="round" opacity="0.75"/></g>
+    <g class="brow-r"><path d="M520 302 Q480 286 400 296" fill="none" stroke="#076645" stroke-width="5.5" stroke-linecap="round" opacity="0.75"/></g>
+    <g class="eyeL-wide"><ellipse cx="228" cy="255" rx="74" ry="72" fill="url(#eyeSocketGrad)"/><ellipse cx="228" cy="253" rx="62" ry="58" fill="white"/><ellipse cx="228" cy="251" rx="52" ry="48" fill="url(#eyeIrisL)"/><rect x="192" y="241" width="72" height="20" rx="10" fill="#002A1A"/><ellipse cx="212" cy="238" rx="10" ry="8" fill="white" opacity="0.7"/><ellipse cx="222" cy="244" rx="4" ry="3" fill="white" opacity="0.4"/><ellipse cx="228" cy="251" rx="52" ry="48" fill="none" stroke="#00FFB0" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.55"/></g>
+    <g class="eyeR-wide"><ellipse cx="452" cy="255" rx="74" ry="72" fill="url(#eyeSocketGrad)"/><ellipse cx="452" cy="253" rx="62" ry="58" fill="white"/><ellipse cx="452" cy="251" rx="52" ry="48" fill="url(#eyeIrisR)"/><rect x="416" y="241" width="72" height="20" rx="10" fill="#002A1A"/><ellipse cx="436" cy="238" rx="10" ry="8" fill="white" opacity="0.7"/><ellipse cx="446" cy="244" rx="4" ry="3" fill="white" opacity="0.4"/><ellipse cx="452" cy="251" rx="52" ry="48" fill="none" stroke="#00FFB0" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.55"/></g>
+    <ellipse cx="316" cy="300" rx="8" ry="6" fill="#076645" opacity="0.7"/>
+    <ellipse cx="364" cy="300" rx="8" ry="6" fill="#076645" opacity="0.7"/>
+    <path d="M210 378 Q270 370 340 368 Q410 370 470 378" fill="none" stroke="#076645" stroke-width="5" stroke-linecap="round" opacity="0.9"/>
+    <ellipse cx="210" cy="378" rx="10" ry="6" fill="#076645" opacity="0.6"/>
+    <ellipse cx="470" cy="378" rx="10" ry="6" fill="#076645" opacity="0.6"/>
+    <circle cx="200" cy="400" r="9" fill="#0D9E6A" opacity="0.5"/><circle cx="480" cy="400" r="9" fill="#0D9E6A" opacity="0.5"/>
+    <circle cx="230" cy="440" r="7" fill="#0D9E6A" opacity="0.4"/><circle cx="450" cy="445" r="7" fill="#0D9E6A" opacity="0.4"/>
+    <circle cx="340" cy="490" r="8" fill="#4DD4A0" opacity="0.35"/>
+    <circle cx="285" cy="475" r="6" fill="#0D9E6A" opacity="0.3"/><circle cx="395" cy="475" r="6" fill="#0D9E6A" opacity="0.3"/>
+    <line x1="295" y1="220" x2="385" y2="220" stroke="#00FFB0" stroke-width="1.8" stroke-linecap="round" opacity="0.6"/>
+    <circle cx="295" cy="220" r="5" fill="#00FFB0" opacity="0.75"/>
+    <circle cx="340" cy="213" r="6.5" fill="#00FFB0" opacity="0.95"/>
+    <circle cx="385" cy="220" r="5" fill="#00FFB0" opacity="0.75"/>
+    <line x1="295" y1="220" x2="295" y2="232" stroke="#00FFB0" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+    <line x1="385" y1="220" x2="385" y2="232" stroke="#00FFB0" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+  </g>
+  <g class="warn-badge">
+    <ellipse cx="538" cy="162" rx="46" ry="10" fill="#d97706" opacity="0.25"/>
+    <path d="M538 68 L596 168 L480 168 Z" fill="url(#warnG)" stroke="#d97706" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M538 82 L586 162 L490 162 Z" fill="white" opacity="0.1"/>
+    <g class="exclam"><rect x="533" y="96" width="10" height="42" rx="5" fill="#92400e"/><circle cx="538" cy="152" r="6" fill="#92400e"/></g>
+  </g>
+  <line x1="148" y1="200" x2="132" y2="188" stroke="#097A52" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+  <line x1="148" y1="210" x2="128" y2="210" stroke="#097A52" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+  <line x1="532" y1="200" x2="548" y2="188" stroke="#097A52" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+  <line x1="532" y1="210" x2="552" y2="210" stroke="#097A52" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+</svg>

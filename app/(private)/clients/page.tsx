@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Plus, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
-import { PageShell } from "@/components/layout/PageShell";
 import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
 import {
   INDUSTRY_OPTIONS,
   COMPANY_SIZE_OPTIONS,
   ACCOUNT_TIER_OPTIONS,
 } from "@/lib/constants/clientOptions";
+import { AppPageShell } from "@/components/ui/layout/AppPageShell";
 import {
   getAllCountryOptions,
   resolveCountryOptionValue,
@@ -197,32 +197,37 @@ export default function ClientsPage() {
 
   if (loading && appRole === null) {
     return (
-      <PageShell wide={false} className="bg-slate-950">
-        <div className="space-y-6">
-          <div className="h-8 w-48 rounded-lg bg-slate-800" />
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5">
-            <TableSkeleton rows={5} colCount={6} />
+      <div className="bg-slate-950 min-h-full">
+        <AppPageShell>
+          <div className="space-y-6">
+            <div className="h-8 w-48 rounded-lg bg-slate-800" />
+            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5">
+              <TableSkeleton rows={5} colCount={6} />
+            </div>
           </div>
-        </div>
-      </PageShell>
+        </AppPageShell>
+      </div>
     );
   }
 
   if (!canManage) {
     return (
-      <PageShell wide={false} className="bg-slate-950">
-        <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-5 py-12 text-center">
-          <p className="text-sm font-medium text-slate-200">Acceso restringido</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Solo administradores pueden gestionar clientes.
-          </p>
-        </div>
-      </PageShell>
+      <div className="bg-slate-950 min-h-full">
+        <AppPageShell>
+          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-5 py-12 text-center">
+            <p className="text-sm font-medium text-slate-200">Acceso restringido</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Solo administradores pueden gestionar clientes.
+            </p>
+          </div>
+        </AppPageShell>
+      </div>
     );
   }
 
   return (
-    <PageShell wide={false} className="bg-slate-950">
+    <div className="bg-slate-950 min-h-full">
+      <AppPageShell>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-1">
@@ -354,7 +359,8 @@ export default function ClientsPage() {
           setFormError={setFormError}
         />
       )}
-    </PageShell>
+      </AppPageShell>
+    </div>
   );
 }
 

@@ -118,22 +118,29 @@ export default function KnowledgeSearchPage() {
 
   return (
     <PageShell className="bg-slate-950">
-      <div className="flex flex-col h-[calc(100vh-8rem)] max-h-[800px]">
-        <div className="shrink-0 space-y-4 mb-6">
+      <div className="flex flex-col min-h-0 w-full">
+        {/* Back link */}
+        <div className="shrink-0 mb-4">
           <Link
             href="/knowledge"
             className="inline-block text-xs text-slate-500 hover:text-slate-300 transition-colors"
           >
             ← Back to Knowledge Explorer
           </Link>
+        </div>
 
-          <div className="space-y-1">
+        {/* Hero: Sapito + title + input + prompts */}
+        <div className="shrink-0 flex flex-col items-center w-full max-w-3xl mx-auto px-2 py-6 pb-8">
+          <div className="mb-5 flex justify-center">
+            <SapitoAvatar size="lg" className="shrink-0" />
+          </div>
+          <div className="text-center space-y-1 mb-6">
             <h1 className="text-xl sm:text-2xl font-semibold text-slate-100">Sapito</h1>
-            <p className="text-sm text-slate-500 max-w-2xl">
+            <p className="text-sm text-slate-500 max-w-xl mx-auto">
               Ask questions across platform knowledge, architecture, governance, and global
               insights.
             </p>
-            <div className="flex flex-wrap gap-2 mt-2">
+            <div className="flex flex-wrap justify-center gap-2 mt-2">
               <span className="rounded-md border border-slate-600/60 bg-slate-800/60 px-2 py-0.5 text-xs text-slate-400">
                 Global Knowledge
               </span>
@@ -145,39 +152,63 @@ export default function KnowledgeSearchPage() {
               </span>
             </div>
           </div>
+
+          {/* Primary input */}
+          <form
+            onSubmit={handleSubmit}
+            className="w-full flex items-end gap-3 mb-5"
+          >
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask Sapito about platform knowledge, architecture, governance, or SAP documentation..."
+              disabled={loading}
+              rows={1}
+              className="flex-1 min-h-[48px] max-h-[160px] resize-y rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 disabled:opacity-60"
+              aria-label="Message to Sapito"
+            />
+            <button
+              type="submit"
+              disabled={loading || !input.trim()}
+              className="shrink-0 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 h-[48px]"
+            >
+              {loading ? "Sending…" : "Send"}
+            </button>
+          </form>
+
+          {/* Suggested prompts */}
+          <div className="flex flex-wrap justify-center gap-3" role="group" aria-label="Suggested prompts">
+            {SUGGESTED_PROMPTS.map((text) => (
+              <button
+                key={text}
+                type="button"
+                onClick={() => sendMessage(text)}
+                disabled={loading}
+                className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:border-slate-600 hover:text-slate-200 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {text}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden shadow-sm">
+        {/* Conversation area */}
+        <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
+          {error && (
+            <div className="shrink-0 px-5 py-2.5 text-xs text-red-300 bg-red-950/30 border-b border-red-800/50">
+              {error}
+            </div>
+          )}
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth [scroll-padding-bottom:1rem]"
+            className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth [scroll-padding-bottom:1rem] min-h-[120px]"
           >
-            {isEmpty && (
-              <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                <div className="mb-4">
-                  <SapitoAvatar size="lg" />
-                </div>
-                <p className="text-sm font-medium text-slate-200">
-                  Ask Sapito about platform knowledge, architecture, governance, or SAP
-                  documentation.
+            {isEmpty && !loading && (
+              <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                <p className="text-sm text-slate-500 max-w-md">
+                  Your conversation with Sapito will appear here. Use the input above or try a suggested prompt.
                 </p>
-                <p className="mt-1 text-xs text-slate-500 max-w-md">
-                  This assistant uses only global knowledge sources and platform context—no
-                  project-specific memory.
-                </p>
-                <div className="mt-6 flex flex-wrap justify-center gap-2" role="group" aria-label="Suggested prompts">
-                  {SUGGESTED_PROMPTS.map((text) => (
-                    <button
-                      key={text}
-                      type="button"
-                      onClick={() => sendMessage(text)}
-                      disabled={loading}
-                      className="rounded-xl border border-slate-600 bg-slate-800/80 px-3 py-2 text-xs text-slate-300 hover:border-slate-500 hover:bg-slate-700/80 hover:text-slate-200 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {text}
-                    </button>
-                  ))}
-                </div>
               </div>
             )}
 
@@ -231,35 +262,6 @@ export default function KnowledgeSearchPage() {
               </>
             )}
           </div>
-
-          {error && (
-            <div className="shrink-0 px-5 py-2.5 text-xs text-red-300 bg-red-950/30 border-t border-red-800/50">
-              {error}
-            </div>
-          )}
-
-          <form
-            onSubmit={handleSubmit}
-            className="shrink-0 p-4 border-t border-slate-700/60 bg-slate-900/50 flex items-end gap-3"
-          >
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask Sapito about platform knowledge, architecture, governance, or SAP documentation..."
-              disabled={loading}
-              rows={1}
-              className="flex-1 min-h-[44px] max-h-[180px] resize-y rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-transparent disabled:opacity-60"
-              aria-label="Message to Sapito"
-            />
-            <button
-              type="submit"
-              disabled={loading || !input.trim()}
-              className="shrink-0 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
-            >
-              {loading ? "Sending…" : "Send"}
-            </button>
-          </form>
         </div>
       </div>
     </PageShell>

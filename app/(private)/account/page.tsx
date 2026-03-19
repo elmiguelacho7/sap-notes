@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { PageShell } from "@/components/layout/PageShell";
+import { AppPageShell } from "@/components/ui/layout/AppPageShell";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -122,22 +122,25 @@ export default function AccountPage() {
 
   if (loading) {
     return (
-      <PageShell wide={false} className="bg-slate-950">
-        <div className="py-12 text-center">
-          <p className="text-sm font-medium text-slate-300">Cargando…</p>
-          <p className="mt-1 text-sm text-slate-500">Un momento.</p>
-        </div>
-      </PageShell>
+      <div className="bg-slate-950 min-h-full">
+        <AppPageShell>
+          <div className="py-12 text-center">
+            <p className="text-sm font-medium text-slate-300">Cargando…</p>
+            <p className="mt-1 text-sm text-slate-500">Un momento.</p>
+          </div>
+        </AppPageShell>
+      </div>
     );
   }
 
   return (
-    <PageShell wide={false} className="bg-slate-950">
-      <div className="space-y-6">
-        <div className="mb-2">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-100">Cuenta</h1>
-          <p className="mt-1 text-sm text-slate-400">Información de tu cuenta, seguridad y preferencias.</p>
-        </div>
+    <div className="bg-slate-950 min-h-full">
+      <AppPageShell>
+        <div className="space-y-6">
+          <div className="mb-2">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-100">Cuenta</h1>
+            <p className="mt-1 text-sm text-slate-400">Información de tu cuenta, seguridad y preferencias.</p>
+          </div>
 
         {/* Profile */}
         <section className={cardClass}>
@@ -277,7 +280,8 @@ export default function AccountPage() {
             </li>
           </ul>
         </section>
-      </div>
-    </PageShell>
+        </div>
+      </AppPageShell>
+    </div>
   );
 }

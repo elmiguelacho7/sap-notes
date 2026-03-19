@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { User, ShieldCheck, LogOut } from "lucide-react";
+import { User, ShieldCheck, LogOut, ChevronDown } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 function getInitials(fullName: string | null, email: string | null): string {
@@ -92,22 +92,28 @@ export function UserMenu() {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-indigo-500 text-sm font-semibold text-white shadow-sm hover:ring-2 hover:ring-indigo-300 transition-all"
+        className="flex h-9 items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 pl-2 pr-2.5 text-slate-300 hover:bg-slate-700 hover:border-slate-600 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:ring-offset-2 focus:ring-offset-slate-950"
         aria-expanded={open}
         aria-haspopup="true"
         aria-label="Menú de usuario"
       >
-        {initials}
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/90 text-sm font-semibold text-white">
+          {initials}
+        </span>
+        <span className="hidden lg:inline text-sm font-medium truncate max-w-[120px]">
+          {fullName || email || "Cuenta"}
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 hidden lg:block" />
       </button>
 
       {open && (
         <div
-          className="absolute right-0 top-full z-50 mt-2 w-64 origin-top-right rounded-2xl border border-slate-200 bg-white py-1 shadow-lg focus:outline-none"
+          className="absolute right-0 top-full z-50 mt-2 w-64 origin-top-right rounded-xl border border-slate-700 bg-slate-900 shadow-xl py-1 focus:outline-none"
           role="menu"
         >
-          <div className="px-4 py-3 border-b border-slate-100">
+          <div className="px-4 py-3 border-b border-slate-700/80">
             {fullName && (
-              <p className="text-sm font-semibold text-slate-900 truncate">
+              <p className="text-sm font-semibold text-slate-100 truncate">
                 {fullName}
               </p>
             )}
@@ -118,8 +124,8 @@ export function UserMenu() {
               <span
                 className={`inline-block mt-1.5 text-[11px] font-medium rounded-full px-2 py-0.5 ${
                   appRole === "superadmin"
-                    ? "bg-indigo-100 text-indigo-700"
-                    : "bg-slate-100 text-slate-600"
+                    ? "bg-indigo-500/20 text-indigo-300"
+                    : "bg-slate-700/60 text-slate-400"
                 }`}
               >
                 {roleLabel}
@@ -134,10 +140,10 @@ export function UserMenu() {
                 setOpen(false);
                 router.push("/account");
               }}
-              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors duration-150"
               role="menuitem"
             >
-              <User className="h-4 w-4 shrink-0 text-slate-400" />
+              <User className="h-4 w-4 shrink-0 text-slate-500" />
               Cuenta
             </button>
 
@@ -148,23 +154,23 @@ export function UserMenu() {
                   setOpen(false);
                   router.push("/admin");
                 }}
-                className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors duration-150"
                 role="menuitem"
               >
-                <ShieldCheck className="h-4 w-4 shrink-0 text-slate-400" />
+                <ShieldCheck className="h-4 w-4 shrink-0 text-slate-500" />
                 Administración
               </button>
             )}
 
-            <div className="my-1 border-t border-slate-100" />
+            <div className="my-1 border-t border-slate-700/80" />
 
             <button
               type="button"
               onClick={handleLogout}
-              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-rose-600 transition-colors"
+              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-800 hover:text-rose-400 transition-colors duration-150"
               role="menuitem"
             >
-              <LogOut className="h-4 w-4 shrink-0 text-slate-400" />
+              <LogOut className="h-4 w-4 shrink-0 text-slate-500" />
               Cerrar sesión
             </button>
           </div>

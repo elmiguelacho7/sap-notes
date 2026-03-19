@@ -1,0 +1,105 @@
+<svg width="192" height="192" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bodyGrad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#1ED496"/>
+      <stop offset="50%" stop-color="#0FB87A"/>
+      <stop offset="100%" stop-color="#097A52"/>
+    </radialGradient>
+    <radialGradient id="bellyGrad" cx="50%" cy="60%" r="60%">
+      <stop offset="0%" stop-color="#A8F0D0"/>
+      <stop offset="100%" stop-color="#4DD4A0"/>
+    </radialGradient>
+    <radialGradient id="eyeIrisL" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#AAFFD8"/>
+      <stop offset="60%" stop-color="#00E896"/>
+      <stop offset="100%" stop-color="#00915A"/>
+    </radialGradient>
+    <radialGradient id="eyeIrisR" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#AAFFD8"/>
+      <stop offset="60%" stop-color="#00E896"/>
+      <stop offset="100%" stop-color="#00915A"/>
+    </radialGradient>
+    <radialGradient id="eyeSocketGrad" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#0D9E6A"/>
+      <stop offset="100%" stop-color="#076645"/>
+    </radialGradient>
+    <radialGradient id="bubbleG" cx="40%" cy="35%" r="62%">
+      <stop offset="0%" stop-color="#e0fff4"/>
+      <stop offset="100%" stop-color="#a7f3d0"/>
+    </radialGradient>
+    <radialGradient id="dotG" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#00FFB0"/>
+      <stop offset="100%" stop-color="#00915A"/>
+    </radialGradient>
+    <style>
+      @keyframes pulse1{0%,100%{opacity:.3;transform:scale(.8)}33%{opacity:1;transform:scale(1.15)}}
+      @keyframes pulse2{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
+      @keyframes pulse3{0%,100%{opacity:.3;transform:scale(.8)}66%{opacity:1;transform:scale(1.15)}}
+      @keyframes floatBubble{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+      @keyframes eyeShift{0%,40%,100%{transform:translateX(0)}50%,90%{transform:translateX(6px) translateY(-4px)}}
+      @keyframes brainGlow{0%,100%{opacity:.4}50%{opacity:.9}}
+      .dot1{animation:pulse1 1.4s ease-in-out infinite;transform-origin:center}
+      .dot2{animation:pulse2 1.4s ease-in-out infinite;transform-origin:center}
+      .dot3{animation:pulse3 1.4s ease-in-out infinite;transform-origin:center}
+      .bubble{animation:floatBubble 2.8s ease-in-out infinite}
+      .eyeL{animation:eyeShift 4s ease-in-out infinite;transform-origin:228px 251px}
+      .eyeR{animation:eyeShift 4s ease-in-out infinite;transform-origin:452px 251px}
+      .brainring{animation:brainGlow 1.8s ease-in-out infinite}
+    </style>
+  </defs>
+  <ellipse cx="340" cy="460" rx="220" ry="110" fill="url(#bodyGrad)"/>
+  <path d="M115 380 Q108 280 180 230 Q240 195 340 192 Q440 195 500 230 Q572 280 565 380 Q565 450 500 485 Q420 510 340 512 Q260 510 180 485 Q115 450 115 380Z" fill="url(#bodyGrad)"/>
+  <ellipse cx="340" cy="470" rx="155" ry="62" fill="url(#bellyGrad)" opacity="0.85"/>
+  <ellipse cx="340" cy="500" rx="120" ry="38" fill="#A8F0D0" opacity="0.5"/>
+  <path d="M160 315 Q220 288 290 293 Q220 300 165 323Z" fill="#076645" opacity="0.55"/>
+  <path d="M520 315 Q460 288 390 293 Q460 300 515 323Z" fill="#076645" opacity="0.55"/>
+  <circle cx="170" cy="295" r="26" fill="#0A8A5C" opacity="0.7"/>
+  <circle cx="170" cy="295" r="20" fill="#097A52" opacity="0.5"/>
+  <circle cx="510" cy="295" r="26" fill="#0A8A5C" opacity="0.7"/>
+  <circle cx="510" cy="295" r="20" fill="#097A52" opacity="0.5"/>
+  <ellipse cx="228" cy="255" rx="74" ry="68" fill="url(#eyeSocketGrad)"/>
+  <ellipse cx="228" cy="253" rx="60" ry="55" fill="white"/>
+  <ellipse cx="228" cy="251" rx="50" ry="46" fill="url(#eyeIrisL)"/>
+  <g class="eyeL"><rect x="196" y="233" width="80" height="22" rx="11" fill="#002A1A"/></g>
+  <ellipse cx="212" cy="234" rx="10" ry="8" fill="white" opacity="0.7"/>
+  <ellipse cx="222" cy="240" rx="4" ry="3" fill="white" opacity="0.4"/>
+  <ellipse cx="228" cy="251" rx="50" ry="46" fill="none" stroke="#00FFB0" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.55"/>
+  <ellipse cx="452" cy="255" rx="74" ry="68" fill="url(#eyeSocketGrad)"/>
+  <ellipse cx="452" cy="253" rx="60" ry="55" fill="white"/>
+  <ellipse cx="452" cy="251" rx="50" ry="46" fill="url(#eyeIrisR)"/>
+  <g class="eyeR"><rect x="420" y="233" width="80" height="22" rx="11" fill="#002A1A"/></g>
+  <ellipse cx="436" cy="234" rx="10" ry="8" fill="white" opacity="0.7"/>
+  <ellipse cx="446" cy="240" rx="4" ry="3" fill="white" opacity="0.4"/>
+  <ellipse cx="452" cy="251" rx="50" ry="46" fill="none" stroke="#00FFB0" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.55"/>
+  <ellipse cx="316" cy="300" rx="8" ry="6" fill="#076645" opacity="0.7"/>
+  <ellipse cx="364" cy="300" rx="8" ry="6" fill="#076645" opacity="0.7"/>
+  <path d="M215 372 Q270 388 340 386 Q410 388 468 376" fill="none" stroke="#076645" stroke-width="5" stroke-linecap="round" opacity="0.9"/>
+  <ellipse cx="215" cy="372" rx="10" ry="6" fill="#076645" opacity="0.6"/>
+  <ellipse cx="468" cy="376" rx="10" ry="6" fill="#076645" opacity="0.6"/>
+  <circle cx="200" cy="400" r="9" fill="#0D9E6A" opacity="0.5"/>
+  <circle cx="480" cy="400" r="9" fill="#0D9E6A" opacity="0.5"/>
+  <circle cx="230" cy="440" r="7" fill="#0D9E6A" opacity="0.4"/>
+  <circle cx="450" cy="445" r="7" fill="#0D9E6A" opacity="0.4"/>
+  <circle cx="340" cy="490" r="8" fill="#4DD4A0" opacity="0.35"/>
+  <circle cx="285" cy="475" r="6" fill="#0D9E6A" opacity="0.3"/>
+  <circle cx="395" cy="475" r="6" fill="#0D9E6A" opacity="0.3"/>
+  <line x1="295" y1="220" x2="385" y2="220" stroke="#00FFB0" stroke-width="1.8" stroke-linecap="round" opacity="0.6"/>
+  <circle cx="295" cy="220" r="5" fill="#00FFB0" opacity="0.75"/>
+  <circle cx="340" cy="213" r="6.5" fill="#00FFB0" opacity="0.95"/>
+  <circle cx="385" cy="220" r="5" fill="#00FFB0" opacity="0.75"/>
+  <line x1="295" y1="220" x2="295" y2="232" stroke="#00FFB0" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+  <line x1="385" y1="220" x2="385" y2="232" stroke="#00FFB0" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+  <g class="bubble">
+    <circle cx="510" cy="178" r="7" fill="url(#bubbleG)" stroke="#00E896" stroke-width="1.2" opacity="0.7"/>
+    <circle cx="524" cy="158" r="11" fill="url(#bubbleG)" stroke="#00E896" stroke-width="1.4" opacity="0.82"/>
+    <circle cx="542" cy="133" r="16" fill="url(#bubbleG)" stroke="#00E896" stroke-width="1.6" opacity="0.9"/>
+    <rect x="542" y="28" width="124" height="88" rx="22" fill="url(#bubbleG)" stroke="#00E896" stroke-width="2" opacity="0.95"/>
+    <path d="M558 114 Q550 128 542 133" fill="url(#bubbleG)" stroke="#00E896" stroke-width="1.8" opacity="0.9"/>
+    <ellipse cx="566" cy="48" rx="18" ry="10" fill="white" opacity="0.45"/>
+    <circle cx="604" cy="72" r="26" fill="none" stroke="#00CC88" stroke-width="1.8" stroke-dasharray="4 3" class="brainring"/>
+    <circle cx="604" cy="72" r="18" fill="none" stroke="#00E896" stroke-width="1.2" opacity="0.5" class="brainring"/>
+    <g class="dot1"><circle cx="584" cy="72" r="7" fill="url(#dotG)"/></g>
+    <g class="dot2"><circle cx="604" cy="72" r="7" fill="url(#dotG)"/></g>
+    <g class="dot3"><circle cx="624" cy="72" r="7" fill="url(#dotG)"/></g>
+  </g>
+</svg>

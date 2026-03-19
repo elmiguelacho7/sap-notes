@@ -1,0 +1,64 @@
+<svg width="24" height="24" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bodyGrad" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="#1ED496"/><stop offset="50%" stop-color="#0FB87A"/><stop offset="100%" stop-color="#097A52"/></radialGradient>
+    <radialGradient id="bellyGrad" cx="50%" cy="60%" r="60%"><stop offset="0%" stop-color="#A8F0D0"/><stop offset="100%" stop-color="#4DD4A0"/></radialGradient>
+    <radialGradient id="eyeIrisL" cx="40%" cy="35%" r="60%"><stop offset="0%" stop-color="#AAFFD8"/><stop offset="60%" stop-color="#00E896"/><stop offset="100%" stop-color="#00915A"/></radialGradient>
+    <radialGradient id="eyeIrisR" cx="40%" cy="35%" r="60%"><stop offset="0%" stop-color="#AAFFD8"/><stop offset="60%" stop-color="#00E896"/><stop offset="100%" stop-color="#00915A"/></radialGradient>
+    <radialGradient id="eyeSocketGrad" cx="50%" cy="50%" r="55%"><stop offset="0%" stop-color="#0D9E6A"/><stop offset="100%" stop-color="#076645"/></radialGradient>
+    <radialGradient id="errCircle" cx="40%" cy="30%" r="65%"><stop offset="0%" stop-color="#fca5a5"/><stop offset="55%" stop-color="#ef4444"/><stop offset="100%" stop-color="#b91c1c"/></radialGradient>
+    <style>
+      @keyframes wobble{0%,100%{transform:rotate(0deg)}20%{transform:rotate(-6deg)}40%{transform:rotate(5deg)}60%{transform:rotate(-4deg)}80%{transform:rotate(3deg)}}
+      @keyframes eyeCross{0%,100%{transform:rotate(0deg) scale(1)}50%{transform:rotate(5deg) scale(1.04)}}
+      @keyframes errPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+      @keyframes floatQ1{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-8px) rotate(8deg)}}
+      @keyframes floatQ2{0%,100%{transform:translateY(0) rotate(6deg)}50%{transform:translateY(-6px) rotate(-6deg)}}
+      @keyframes swirl{0%{stroke-dashoffset:0}100%{stroke-dashoffset:-40}}
+      .body-wobble{animation:wobble 2.2s ease-in-out infinite;transform-origin:340px 420px}
+      .eyeL-x{animation:eyeCross 1.8s ease-in-out infinite;transform-origin:228px 255px}
+      .eyeR-x{animation:eyeCross 1.8s ease-in-out infinite .2s;transform-origin:452px 255px}
+      .err-badge{animation:errPulse 1.2s ease-in-out infinite;transform-origin:536px 140px}
+      .q1{animation:floatQ1 2s ease-in-out infinite}
+      .q2{animation:floatQ2 2.4s ease-in-out infinite .4s}
+      .q3{animation:floatQ1 1.8s ease-in-out infinite .8s}
+      .swirl-line{animation:swirl 1.2s linear infinite;stroke-dasharray:8 4}
+    </style>
+  </defs>
+  <g class="body-wobble">
+    <ellipse cx="340" cy="460" rx="220" ry="110" fill="url(#bodyGrad)"/>
+    <path d="M115 380 Q108 280 180 230 Q240 195 340 192 Q440 195 500 230 Q572 280 565 380 Q565 450 500 485 Q420 510 340 512 Q260 510 180 485 Q115 450 115 380Z" fill="url(#bodyGrad)"/>
+    <ellipse cx="340" cy="470" rx="155" ry="62" fill="url(#bellyGrad)" opacity="0.85"/>
+    <ellipse cx="340" cy="500" rx="120" ry="38" fill="#A8F0D0" opacity="0.5"/>
+    <circle cx="170" cy="295" r="26" fill="#0A8A5C" opacity="0.7"/><circle cx="170" cy="295" r="20" fill="#097A52" opacity="0.5"/>
+    <circle cx="510" cy="295" r="26" fill="#0A8A5C" opacity="0.7"/><circle cx="510" cy="295" r="20" fill="#097A52" opacity="0.5"/>
+    <path d="M162 308 Q200 322 278 308" fill="none" stroke="#076645" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+    <path d="M400 308 Q458 294 522 308" fill="none" stroke="#076645" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+    <g class="eyeL-x"><ellipse cx="228" cy="255" rx="74" ry="68" fill="url(#eyeSocketGrad)"/><ellipse cx="228" cy="253" rx="60" ry="55" fill="white"/><ellipse cx="228" cy="251" rx="50" ry="46" fill="url(#eyeIrisL)"/><rect x="196" y="238" width="72" height="20" rx="10" fill="#002A1A" transform="rotate(-12 228 248)"/><ellipse cx="210" cy="234" rx="10" ry="8" fill="white" opacity="0.7"/><ellipse cx="220" cy="242" rx="4" ry="3" fill="white" opacity="0.4"/><ellipse cx="228" cy="251" rx="50" ry="46" fill="none" stroke="#00FFB0" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.55"/><circle cx="228" cy="251" r="28" fill="none" stroke="#00E896" stroke-width="1.2" class="swirl-line" opacity="0.35"/></g>
+    <g class="eyeR-x"><ellipse cx="452" cy="255" rx="74" ry="68" fill="url(#eyeSocketGrad)"/><ellipse cx="452" cy="253" rx="60" ry="55" fill="white"/><ellipse cx="452" cy="251" rx="50" ry="46" fill="url(#eyeIrisR)"/><rect x="420" y="236" width="72" height="20" rx="10" fill="#002A1A" transform="rotate(14 452 246)"/><ellipse cx="436" cy="234" rx="10" ry="8" fill="white" opacity="0.7"/><ellipse cx="448" cy="241" rx="4" ry="3" fill="white" opacity="0.4"/><ellipse cx="452" cy="251" rx="50" ry="46" fill="none" stroke="#00FFB0" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.55"/><circle cx="452" cy="251" r="28" fill="none" stroke="#00E896" stroke-width="1.2" class="swirl-line" opacity="0.35"/></g>
+    <ellipse cx="316" cy="300" rx="8" ry="6" fill="#076645" opacity="0.7"/>
+    <ellipse cx="364" cy="300" rx="8" ry="6" fill="#076645" opacity="0.7"/>
+    <path d="M210 385 Q260 375 310 380 Q355 384 390 372 Q430 360 468 372" fill="none" stroke="#076645" stroke-width="5" stroke-linecap="round" opacity="0.9"/>
+    <ellipse cx="210" cy="385" rx="10" ry="6" fill="#076645" opacity="0.6"/>
+    <ellipse cx="468" cy="372" rx="10" ry="6" fill="#076645" opacity="0.6"/>
+    <path d="M152 230 Q146 250 155 260 Q162 268 168 260 Q176 248 168 230 Q162 218 152 230Z" fill="#A8F0D0" opacity="0.8"/>
+    <ellipse cx="162" cy="245" rx="3" ry="2" fill="white" opacity="0.5"/>
+    <circle cx="200" cy="400" r="9" fill="#0D9E6A" opacity="0.5"/><circle cx="480" cy="400" r="9" fill="#0D9E6A" opacity="0.5"/>
+    <circle cx="230" cy="440" r="7" fill="#0D9E6A" opacity="0.4"/><circle cx="450" cy="445" r="7" fill="#0D9E6A" opacity="0.4"/>
+    <circle cx="340" cy="490" r="8" fill="#4DD4A0" opacity="0.35"/>
+    <circle cx="285" cy="475" r="6" fill="#0D9E6A" opacity="0.3"/><circle cx="395" cy="475" r="6" fill="#0D9E6A" opacity="0.3"/>
+    <line x1="295" y1="220" x2="385" y2="220" stroke="#00FFB0" stroke-width="1.8" stroke-linecap="round" opacity="0.6"/>
+    <circle cx="295" cy="220" r="5" fill="#00FFB0" opacity="0.75"/>
+    <circle cx="340" cy="213" r="6.5" fill="#00FFB0" opacity="0.95"/>
+    <circle cx="385" cy="220" r="5" fill="#00FFB0" opacity="0.75"/>
+    <line x1="295" y1="220" x2="295" y2="232" stroke="#00FFB0" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+    <line x1="385" y1="220" x2="385" y2="232" stroke="#00FFB0" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+  </g>
+  <g class="err-badge">
+    <circle cx="536" cy="140" r="44" fill="url(#errCircle)" stroke="#b91c1c" stroke-width="2.5"/>
+    <circle cx="536" cy="140" r="44" fill="white" opacity="0.1"/>
+    <line x1="516" y1="120" x2="556" y2="160" stroke="white" stroke-width="7" stroke-linecap="round"/>
+    <line x1="556" y1="120" x2="516" y2="160" stroke="white" stroke-width="7" stroke-linecap="round"/>
+  </g>
+  <g class="q1"><text x="96" y="178" font-size="42" font-family="system-ui,sans-serif" font-weight="700" fill="#00FFB0" opacity="0.7">?</text></g>
+  <g class="q2"><text x="556" y="280" font-size="36" font-family="system-ui,sans-serif" font-weight="700" fill="#00FFB0" opacity="0.55">?</text></g>
+  <g class="q3"><text x="310" y="98" font-size="28" font-family="system-ui,sans-serif" font-weight="700" fill="#00FFB0" opacity="0.45">?</text></g>
+</svg>

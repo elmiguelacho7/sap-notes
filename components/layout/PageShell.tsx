@@ -18,7 +18,7 @@ export function PageShell({
   const maxWidth = wide ? "max-w-[1600px]" : "max-w-7xl";
   return (
     <div
-      className={`mx-auto w-full min-w-0 ${maxWidth} px-4 sm:px-5 lg:px-6 xl:px-8 2xl:px-10 py-8 bg-slate-50 min-h-full flex flex-col gap-6 ${className}`.trim()}
+      className={`mx-auto w-full min-w-0 ${maxWidth} px-4 sm:px-5 lg:px-6 xl:px-8 2xl:px-10 py-6 sm:py-8 bg-slate-50 min-h-full flex flex-col gap-5 ${className}`.trim()}
     >
       {children}
     </div>

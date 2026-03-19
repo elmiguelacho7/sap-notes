@@ -1,0 +1,102 @@
+<svg width="128" height="128" viewBox="0 0 680 620" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bodyGrad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#1ED496"/>
+      <stop offset="50%" stop-color="#0FB87A"/>
+      <stop offset="100%" stop-color="#097A52"/>
+    </radialGradient>
+    <radialGradient id="bellyGrad" cx="50%" cy="60%" r="60%">
+      <stop offset="0%" stop-color="#A8F0D0"/>
+      <stop offset="100%" stop-color="#4DD4A0"/>
+    </radialGradient>
+    <radialGradient id="eyeIrisL" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#AAFFD8"/>
+      <stop offset="60%" stop-color="#00E896"/>
+      <stop offset="100%" stop-color="#00915A"/>
+    </radialGradient>
+    <radialGradient id="eyeIrisR" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#AAFFD8"/>
+      <stop offset="60%" stop-color="#00E896"/>
+      <stop offset="100%" stop-color="#00915A"/>
+    </radialGradient>
+    <radialGradient id="eyeSocketGrad" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#0D9E6A"/>
+      <stop offset="100%" stop-color="#076645"/>
+    </radialGradient>
+  </defs>
+
+  <!-- CUERPO principal del sapo — ancho, bajo, aplastado -->
+  <ellipse cx="340" cy="460" rx="220" ry="110" fill="url(#bodyGrad)"/>
+
+  <!-- Cabeza — ancha, plana arriba (sapo, no rana) -->
+  <path d="M115 380 Q108 280 180 230 Q240 195 340 192 Q440 195 500 230 Q572 280 565 380 Q565 450 500 485 Q420 510 340 512 Q260 510 180 485 Q115 450 115 380Z" fill="url(#bodyGrad)"/>
+
+  <!-- Panza / garganta clara -->
+  <ellipse cx="340" cy="470" rx="155" ry="62" fill="url(#bellyGrad)" opacity="0.85"/>
+
+  <!-- Bolsa gular (garganta del sapo) -->
+  <ellipse cx="340" cy="500" rx="120" ry="38" fill="#A8F0D0" opacity="0.5"/>
+
+  <!-- Párpados / ceño plano del sapo -->
+  <path d="M160 320 Q220 295 290 298 Q220 305 165 330Z" fill="#076645" opacity="0.4"/>
+  <path d="M520 320 Q460 295 390 298 Q460 305 515 330Z" fill="#076645" opacity="0.4"/>
+
+  <!-- === OJO IZQUIERDO — elevado en la cabeza, protuberante === -->
+  <!-- Protuberancia del ojo (globo ocular saliente) -->
+  <ellipse cx="228" cy="255" rx="74" ry="68" fill="url(#eyeSocketGrad)"/>
+  <!-- Esclerótica blanca -->
+  <ellipse cx="228" cy="253" rx="60" ry="55" fill="white"/>
+  <!-- Iris verde brillante -->
+  <ellipse cx="228" cy="251" rx="50" ry="46" fill="url(#eyeIrisL)"/>
+  <!-- Pupila horizontal (característico del sapo) -->
+  <rect x="188" y="240" width="80" height="22" rx="11" fill="#002A1A"/>
+  <!-- Reflejo -->
+  <ellipse cx="212" cy="238" rx="10" ry="8" fill="white" opacity="0.7"/>
+  <ellipse cx="222" cy="244" rx="4" ry="3" fill="white" opacity="0.4"/>
+  <!-- Anillo tech fino -->
+  <ellipse cx="228" cy="251" rx="50" ry="46" fill="none" stroke="#00FFB0" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.55"/>
+
+  <!-- === OJO DERECHO === -->
+  <ellipse cx="452" cy="255" rx="74" ry="68" fill="url(#eyeSocketGrad)"/>
+  <ellipse cx="452" cy="253" rx="60" ry="55" fill="white"/>
+  <ellipse cx="452" cy="251" rx="50" ry="46" fill="url(#eyeIrisR)"/>
+  <rect x="412" y="240" width="80" height="22" rx="11" fill="#002A1A"/>
+  <ellipse cx="436" cy="238" rx="10" ry="8" fill="white" opacity="0.7"/>
+  <ellipse cx="446" cy="244" rx="4" ry="3" fill="white" opacity="0.4"/>
+  <ellipse cx="452" cy="251" rx="50" ry="46" fill="none" stroke="#00FFB0" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.55"/>
+
+  <!-- === TÍMPANOS (círculos detrás de los ojos — rasgo característico del sapo) === -->
+  <circle cx="170" cy="295" r="26" fill="#0A8A5C" opacity="0.7"/>
+  <circle cx="170" cy="295" r="20" fill="#097A52" opacity="0.5"/>
+  <circle cx="510" cy="295" r="26" fill="#0A8A5C" opacity="0.7"/>
+  <circle cx="510" cy="295" r="20" fill="#097A52" opacity="0.5"/>
+
+  <!-- Fosas nasales del sapo (pequeñas, entre los ojos) -->
+  <ellipse cx="316" cy="300" rx="8" ry="6" fill="#076645" opacity="0.7"/>
+  <ellipse cx="364" cy="300" rx="8" ry="6" fill="#076645" opacity="0.7"/>
+
+  <!-- Boca amplia del sapo (corte horizontal ancho) -->
+  <path d="M205 370 Q270 395 340 390 Q410 395 475 370" fill="none" stroke="#076645" stroke-width="5" stroke-linecap="round" opacity="0.9"/>
+  <!-- Comisura de la boca -->
+  <ellipse cx="205" cy="370" rx="10" ry="6" fill="#076645" opacity="0.6"/>
+  <ellipse cx="475" cy="370" rx="10" ry="6" fill="#076645" opacity="0.6"/>
+
+  <!-- Texturas/verrugas del sapo (bumps sutiles) -->
+  <circle cx="200" cy="400" r="9" fill="#0D9E6A" opacity="0.5"/>
+  <circle cx="480" cy="400" r="9" fill="#0D9E6A" opacity="0.5"/>
+  <circle cx="230" cy="440" r="7" fill="#0D9E6A" opacity="0.4"/>
+  <circle cx="450" cy="445" r="7" fill="#0D9E6A" opacity="0.4"/>
+  <circle cx="340" cy="490" r="8" fill="#4DD4A0" opacity="0.35"/>
+  <circle cx="285" cy="475" r="6" fill="#0D9E6A" opacity="0.3"/>
+  <circle cx="395" cy="475" r="6" fill="#0D9E6A" opacity="0.3"/>
+
+  <!-- === ELEMENTO AI: nodo central en la frente === -->
+  <!-- Tres puntos de datos conectados (frente del sapo) -->
+  <line x1="295" y1="220" x2="385" y2="220" stroke="#00FFB0" stroke-width="1.8" stroke-linecap="round" opacity="0.6"/>
+  <circle cx="295" cy="220" r="5" fill="#00FFB0" opacity="0.75"/>
+  <circle cx="340" cy="213" r="6.5" fill="#00FFB0" opacity="0.95"/>
+  <circle cx="385" cy="220" r="5" fill="#00FFB0" opacity="0.75"/>
+  <!-- Líneas verticales desde los puntos extremos -->
+  <line x1="295" y1="220" x2="295" y2="232" stroke="#00FFB0" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+  <line x1="385" y1="220" x2="385" y2="232" stroke="#00FFB0" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+</svg>

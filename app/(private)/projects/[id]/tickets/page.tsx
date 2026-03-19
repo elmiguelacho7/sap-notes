@@ -10,6 +10,13 @@ import { handleSupabaseError, hasLoggableSupabaseError } from "@/lib/supabaseErr
 import { getTicketDetailHref } from "@/lib/routes";
 import type { TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
 import { AssigneeCell } from "@/components/AssigneeCell";
+import {
+  ModuleHeader,
+  ModuleKpiCard,
+  ModuleKpiRow,
+  ModuleToolbar,
+  ModuleContentCard,
+} from "@/components/layout/module";
 
 const PRIORITY_LABELS: Record<string, string> = {
   low: "Baja",
@@ -396,102 +403,94 @@ export default function ProjectTicketsPage() {
 
   if (!projectId) {
     return (
-      <div className="space-y-6">
-        <p className="text-sm text-slate-400">Identificador de proyecto no válido.</p>
+      <div className="-mx-4 sm:-mx-5 lg:-mx-6 xl:-mx-8 2xl:-mx-10">
+        <div className="w-full max-w-[1440px] mx-auto px-6 lg:px-8">
+          <div className="space-y-6">
+            <p className="text-sm text-slate-400">Identificador de proyecto no válido.</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full min-w-0 space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight text-slate-100 sm:text-2xl">Tickets</h1>
-          <p className="mt-0.5 text-sm text-slate-500 max-w-2xl">Gestiona incidencias, tareas técnicas o seguimiento del proyecto.</p>
-        </div>
-        <div className="flex shrink-0 pt-2 sm:pt-0">
-          <Link
-            href={`/projects/${projectId}/tickets/new`}
-            className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
-          >
-            <Plus className="h-4 w-4 shrink-0" />
-            Crear ticket
-          </Link>
-        </div>
-      </header>
-
-      {errorMsg && (
-        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
-          {errorMsg}
-        </div>
-      )}
-
-      {!loading && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-3 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-            <p className="text-xs uppercase tracking-wider text-slate-400">Abiertos</p>
-            <p className="text-lg font-semibold text-slate-100 mt-0.5">{summary.open}</p>
-          </div>
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-3 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-            <p className="text-xs uppercase tracking-wider text-slate-400">En progreso</p>
-            <p className="text-lg font-semibold text-slate-100 mt-0.5">{summary.inProgress}</p>
-          </div>
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-3 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-            <p className="text-xs uppercase tracking-wider text-slate-400">Vencidos</p>
-            <p className="text-lg font-semibold text-slate-100 mt-0.5">{summary.overdue}</p>
-          </div>
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-3 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-            <p className="text-xs uppercase tracking-wider text-slate-400">Sin asignar</p>
-            <p className="text-lg font-semibold text-slate-100 mt-0.5">{summary.unassigned}</p>
-          </div>
-        </div>
-      )}
-
-      {!loading && tickets.length > 0 && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-2 min-w-0">
-            {(
-              [
-                { key: "all" as FilterKind, label: "All" },
-                { key: "open" as FilterKind, label: "Open" },
-                { key: "in_progress" as FilterKind, label: "In Progress" },
-                { key: "closed" as FilterKind, label: "Closed" },
-                { key: "overdue" as FilterKind, label: "Overdue" },
-                { key: "unassigned" as FilterKind, label: "Sin asignar" },
-                { key: "my_tickets" as FilterKind, label: "Asignado a mí" },
-              ] as const
-            ).map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setFilter(key)}
-                className={`rounded-full border px-3 py-1.5 text-xs transition-colors duration-150 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0 ${
-                  filter === key
-                    ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-300"
-                    : "border-slate-700 bg-slate-800/40 text-slate-300 hover:bg-slate-800"
-                }`}
+    <div className="-mx-4 sm:-mx-5 lg:-mx-6 xl:-mx-8 2xl:-mx-10">
+      <div className="w-full max-w-[1440px] mx-auto px-6 lg:px-8">
+        <div className="min-w-0 space-y-6">
+          <ModuleHeader
+            title="Tickets"
+            subtitle="Gestiona incidencias, tareas técnicas o seguimiento del proyecto."
+            actions={
+              <Link
+                href={`/projects/${projectId}/tickets/new`}
+                className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
               >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="w-full sm:w-auto sm:min-w-[200px]">
-            <label className="relative block">
-              <span className="sr-only">Search tickets</span>
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
-              <input
-                type="search"
-                placeholder="Search tickets..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:border-indigo-500/50 min-w-0"
-              />
-            </label>
-          </div>
-        </div>
-      )}
+                <Plus className="h-4 w-4 shrink-0" />
+                Crear ticket
+              </Link>
+            }
+          />
 
-      <section className="w-full min-w-0 rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
+          {errorMsg && (
+            <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+              {errorMsg}
+            </div>
+          )}
+
+          {!loading && (
+            <ModuleKpiRow>
+              <ModuleKpiCard label="Abiertos" value={summary.open} />
+              <ModuleKpiCard label="En progreso" value={summary.inProgress} />
+              <ModuleKpiCard label="Vencidos" value={summary.overdue} />
+              <ModuleKpiCard label="Sin asignar" value={summary.unassigned} />
+            </ModuleKpiRow>
+          )}
+
+          {!loading && tickets.length > 0 && (
+            <ModuleToolbar
+              left={
+                (
+                  [
+                    { key: "all" as FilterKind, label: "Todos" },
+                    { key: "open" as FilterKind, label: "Abierto" },
+                    { key: "in_progress" as FilterKind, label: "En progreso" },
+                    { key: "closed" as FilterKind, label: "Cerrado" },
+                    { key: "overdue" as FilterKind, label: "Vencidos" },
+                    { key: "unassigned" as FilterKind, label: "Sin asignar" },
+                    { key: "my_tickets" as FilterKind, label: "Asignado a mí" },
+                  ] as const
+                ).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setFilter(key)}
+                    className={`rounded-full border px-3 py-1.5 text-xs transition-colors duration-150 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0 ${
+                      filter === key
+                        ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-300"
+                        : "border-slate-700 bg-slate-800/40 text-slate-300 hover:bg-slate-800"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))
+              }
+              right={
+                <label className="relative block">
+                  <span className="sr-only">Buscar tickets</span>
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
+                  <input
+                    type="search"
+                    placeholder="Buscar tickets…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:border-indigo-500/50 min-w-0"
+                  />
+                </label>
+              }
+            />
+          )}
+
+          <ModuleContentCard>
         {loading ? (
           <div className="px-4 sm:px-6 py-6">
             <TableSkeleton rows={6} colCount={7} />
@@ -514,83 +513,139 @@ export default function ProjectTicketsPage() {
             <p className="mt-1 text-xs text-slate-500">Prueba otro filtro o búsqueda.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto min-w-0">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-700/60 bg-slate-800/50">
-                  <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Título</th>
-                  <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-36">Asignado a</th>
-                  <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-24">Prioridad</th>
-                  <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-28">Estado</th>
-                  <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-28">Fecha límite</th>
-                  <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-32">Fecha de creación</th>
-                  <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right w-28">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/40">
-                {filteredTickets.map((t) => (
-                  <tr
-                    key={t.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => router.push(getTicketDetailHref(t.id, projectId))}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(getTicketDetailHref(t.id, projectId)); } }}
-                    className="cursor-pointer hover:bg-slate-800/50 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-inset"
-                  >
-                    <td className="px-5 py-3.5">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="inline-flex items-center font-medium text-slate-100">
-                          <Ticket className="h-4 w-4 text-slate-500 mr-2 shrink-0" aria-hidden />
-                          {t.title}
-                        </span>
-                        {t.description && (
-                          <span className="text-xs text-slate-400 line-clamp-1 pl-6">{t.description}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <AssigneeCell profileId={t.assigned_to} profilesMap={profilesMap} />
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <PriorityBadge priority={t.priority} />
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <StatusBadge status={t.status} />
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-400">
-                      {t.due_date
-                        ? new Date(t.due_date).toLocaleDateString("es-ES", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                          })
-                        : "—"}
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-400">
-                      {new Date(t.created_at).toLocaleDateString("es-ES", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                      })}
-                    </td>
-                    <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                      <TicketRowActions
-                        ticketId={t.id}
-                        viewHref={getTicketDetailHref(t.id, projectId)}
-                        editHref={getTicketDetailHref(t.id, projectId)}
-                        canEdit={canManageTickets}
-                        canDelete={canManageTickets}
-                        deleteEndpoint={canManageTickets ? `/api/tickets/${t.id}` : undefined}
-                        onDeleted={loadTickets}
-                      />
-                    </td>
+          <>
+            {/* Mobile: stacked cards — use div with role="button" to avoid nesting a button (TicketRowActions) inside a button */}
+            <div className="md:hidden divide-y divide-slate-700/40">
+              {filteredTickets.map((t) => (
+                <div
+                  key={t.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => router.push(getTicketDetailHref(t.id, projectId))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      router.push(getTicketDetailHref(t.id, projectId));
+                    }
+                  }}
+                  className="w-full text-left px-4 py-4 hover:bg-slate-800/50 transition active:bg-slate-800/70 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-inset"
+                >
+                  <div className="flex items-start gap-2">
+                    <Ticket className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-slate-100 line-clamp-2">{t.title}</p>
+                      {t.description && (
+                        <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{t.description}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <AssigneeCell profileId={t.assigned_to} profilesMap={profilesMap} tone="dark" />
+                    <PriorityBadge priority={t.priority} />
+                    <StatusBadge status={t.status} />
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {t.due_date
+                      ? `Vence ${new Date(t.due_date).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })}`
+                      : "Sin fecha límite"}
+                    {" · "}
+                    {new Date(t.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                  </p>
+                  <div className="mt-2 flex justify-end" onClick={(e) => e.stopPropagation()}>
+                    <TicketRowActions
+                      ticketId={t.id}
+                      viewHref={getTicketDetailHref(t.id, projectId)}
+                      editHref={getTicketDetailHref(t.id, projectId)}
+                      canEdit={canManageTickets}
+                      canDelete={canManageTickets}
+                      deleteEndpoint={canManageTickets ? `/api/tickets/${t.id}` : undefined}
+                      onDeleted={loadTickets}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Desktop: table */}
+            <div className="hidden md:block overflow-x-auto min-w-0">
+              <table className="w-full min-w-[640px] text-left text-sm md:table">
+                <thead>
+                  <tr className="border-b border-slate-700/60 bg-slate-800/50">
+                    <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Título</th>
+                    <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-36">Asignado a</th>
+                    <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-24">Prioridad</th>
+                    <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-28">Estado</th>
+                    <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-28">Fecha límite</th>
+                    <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-32">Fecha de creación</th>
+                    <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right w-28">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-700/40">
+                  {filteredTickets.map((t) => (
+                    <tr
+                      key={t.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => router.push(getTicketDetailHref(t.id, projectId))}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(getTicketDetailHref(t.id, projectId)); } }}
+                      className="cursor-pointer hover:bg-slate-800/50 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-inset"
+                    >
+                      <td className="px-5 py-3.5">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="inline-flex items-center font-medium text-slate-100">
+                            <Ticket className="h-4 w-4 text-slate-500 mr-2 shrink-0" aria-hidden />
+                            {t.title}
+                          </span>
+                          {t.description && (
+                            <span className="text-xs text-slate-400 line-clamp-1 pl-6">{t.description}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <AssigneeCell profileId={t.assigned_to} profilesMap={profilesMap} />
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <PriorityBadge priority={t.priority} />
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <StatusBadge status={t.status} />
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-400">
+                        {t.due_date
+                          ? new Date(t.due_date).toLocaleDateString("es-ES", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                            })
+                          : "—"}
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-400">
+                        {new Date(t.created_at).toLocaleDateString("es-ES", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}
+                      </td>
+                      <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                        <TicketRowActions
+                          ticketId={t.id}
+                          viewHref={getTicketDetailHref(t.id, projectId)}
+                          editHref={getTicketDetailHref(t.id, projectId)}
+                          canEdit={canManageTickets}
+                          canDelete={canManageTickets}
+                          deleteEndpoint={canManageTickets ? `/api/tickets/${t.id}` : undefined}
+                          onDeleted={loadTickets}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
-      </section>
+          </ModuleContentCard>
+        </div>
+      </div>
     </div>
   );
 }

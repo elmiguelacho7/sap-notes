@@ -243,6 +243,12 @@ export function CommandPalette() {
   }, []);
 
   useEffect(() => {
+    const onOpen = () => openPalette();
+    window.addEventListener("open-command-palette" as keyof WindowEventMap, onOpen);
+    return () => window.removeEventListener("open-command-palette" as keyof WindowEventMap, onOpen);
+  }, [openPalette]);
+
+  useEffect(() => {
     if (open) {
       setQuery("");
       setHighlightIndex(0);

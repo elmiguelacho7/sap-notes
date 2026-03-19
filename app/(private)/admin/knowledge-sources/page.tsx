@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import { PageShell } from "@/components/layout/PageShell";
+import { AppPageShell } from "@/components/ui/layout/AppPageShell";
 import { ChevronLeft, Cloud, FileText, Globe, Share2 } from "lucide-react";
 
 type IntegrationOption = {
@@ -114,25 +114,29 @@ export default function AdminKnowledgeSourcesPage() {
 
   if (loading) {
     return (
-      <PageShell wide={false} className="bg-slate-950">
-        <div className="py-12 text-center">
-          <p className="text-sm font-medium text-slate-300">Cargando…</p>
-        </div>
-      </PageShell>
+      <div className="bg-slate-950 min-h-full">
+        <AppPageShell>
+          <div className="py-12 text-center">
+            <p className="text-sm font-medium text-slate-300">Cargando…</p>
+          </div>
+        </AppPageShell>
+      </div>
     );
   }
 
   if (appRole !== "superadmin") {
     return (
-      <PageShell wide={false} className="bg-slate-950">
-        <div className={CARD_CLASS}>
-          <p className="text-sm font-medium text-slate-200">Acceso restringido</p>
-          <p className="mt-1 text-sm text-slate-500">Solo los administradores pueden ver esta página.</p>
-          <Link href="/admin" className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-indigo-400 hover:text-indigo-300">
-            <ChevronLeft className="h-4 w-4" /> Volver a Admin
-          </Link>
-        </div>
-      </PageShell>
+      <div className="bg-slate-950 min-h-full">
+        <AppPageShell>
+          <div className={CARD_CLASS}>
+            <p className="text-sm font-medium text-slate-200">Acceso restringido</p>
+            <p className="mt-1 text-sm text-slate-500">Solo los administradores pueden ver esta página.</p>
+            <Link href="/admin" className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-indigo-400 hover:text-indigo-300">
+              <ChevronLeft className="h-4 w-4" /> Volver a Admin
+            </Link>
+          </div>
+        </AppPageShell>
+      </div>
     );
   }
 
@@ -140,7 +144,8 @@ export default function AdminKnowledgeSourcesPage() {
   const googleIntegration = integrations[0];
 
   return (
-    <PageShell wide={false} className="bg-slate-950">
+    <div className="bg-slate-950 min-h-full">
+      <AppPageShell>
       <div className="space-y-6">
         <div className="flex flex-col gap-1">
           <Link
@@ -267,6 +272,7 @@ export default function AdminKnowledgeSourcesPage() {
           </div>
         </section>
       </div>
-    </PageShell>
+      </AppPageShell>
+    </div>
   );
 }

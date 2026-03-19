@@ -10,6 +10,8 @@ export type ProjectPageHeaderProps = {
   primaryActionHref?: string;
   primaryActionOnClick?: () => void;
   primaryActionIcon?: React.ReactNode;
+  /** Optional extra class for the primary action (e.g. shadow for emphasis) */
+  primaryActionClassName?: string;
   secondaryActionSlot?: React.ReactNode;
   /** "section" = lighter weight for use inside project workspace (section header, not main page title) */
   variant?: "page" | "section";
@@ -24,6 +26,7 @@ export function ProjectPageHeader({
   primaryActionHref,
   primaryActionOnClick,
   primaryActionIcon,
+  primaryActionClassName,
   secondaryActionSlot,
   variant = "page",
   dark = false,
@@ -42,12 +45,13 @@ export function ProjectPageHeader({
     : isSection
       ? "mt-0.5 text-sm text-slate-500 max-w-2xl"
       : "mt-1 text-sm text-slate-500 max-w-2xl";
-  const primaryBtnClass = dark
+  const primaryBtnBase = dark
     ? "inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
     : "inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-2";
+  const primaryBtnClass = primaryActionClassName ? `${primaryBtnBase} ${primaryActionClassName}` : primaryBtnBase;
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
       <div className="min-w-0">
         <h1 className={titleClass}>{title}</h1>
         {subtitle && <p className={subtitleClass}>{subtitle}</p>}
