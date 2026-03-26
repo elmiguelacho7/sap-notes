@@ -5,9 +5,11 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 /**
- * Refreshes the Supabase auth session and updates cookies on the response
- * so that API routes and server code see the current session when the user
- * opens them in the browser (e.g. /api/debug/whoami).
+ * Supabase session refresh only.
+ *
+ * next-intl routing middleware (createMiddleware) is intentionally not used — it caused
+ * routing/404 issues with our unprefixed URLs. Locale: cookie in i18n/request.ts.
+ * See docs/i18n.md.
  */
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next({

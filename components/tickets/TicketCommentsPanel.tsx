@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import type { TicketCommentDetail } from "./ticketTypes";
@@ -11,8 +12,8 @@ type TicketCommentsPanelProps = {
   onCommentAdded: () => void;
 };
 
-function formatCommentDate(iso: string): string {
-  return new Date(iso).toLocaleString("es-ES", {
+function formatCommentDate(iso: string, localeTag: string): string {
+  return new Date(iso).toLocaleString(localeTag, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -26,6 +27,9 @@ export default function TicketCommentsPanel({
   comments,
   onCommentAdded,
 }: TicketCommentsPanelProps) {
+  const t = useTranslations("tickets.comments");
+  const locale = useLocale();
+  const localeTag = locale === "es" ? "es-ES" : "en-US";
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -40,7 +44,7 @@ export default function TicketCommentsPanel({
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user?.id) {
-      setSubmitError("Debes iniciar sesión para comentar.");
+      setSubmitError(t("errors.loginRequired"));
       setSubmitting(false);
       return;
     }
@@ -53,7 +57,7 @@ export default function TicketCommentsPanel({
 
     if (error) {
       handleSupabaseError("ticket_comments insert", error);
-      setSubmitError("No se pudo añadir el comentario.");
+      setSubmitError(t("errors.addFailed"));
     } else {
       setContent("");
       onCommentAdded();
@@ -63,58 +67,53 @@ export default function TicketCommentsPanel({
   };
 
   return (
-    <section className="bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
-      <div className="border-b border-slate-200 px-5 py-4">
-        <h2 className="text-sm font-semibold text-slate-900">Comentarios</h2>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Añade comentarios y seguimiento al ticket.
-        </p>
-      </div>
-
-      <div className="flex-1 flex flex-col min-h-[260px] overflow-hidden">
-        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4 max-h-64">
+    <section className="flex flex-col gap-3">
+      <div className="rounded-xl border border-slate-700/50 bg-slate-950/40 p-3">
+        <div className="max-h-[280px] overflow-y-auto space-y-3 pr-1">
           {comments.length === 0 ? (
-            <p className="text-xs text-slate-500">Aún no hay comentarios.</p>
+            <p className="text-xs text-slate-500">{t("empty")}</p>
           ) : (
             comments.map((c) => (
-              <div
+              <article
                 key={c.id}
-                className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5"
+                className="rounded-xl border border-slate-700/50 bg-slate-900/40 px-3 py-2.5"
               >
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="text-xs font-medium text-slate-800">
-                    {c.author_name ?? "Usuario"}
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-slate-200">
+                    {c.author_name ?? t("userFallback")}
                   </span>
                   <span className="text-[11px] text-slate-500">
-                    {formatCommentDate(c.created_at)}
+                    {formatCommentDate(c.created_at, localeTag)}
                   </span>
                 </div>
-                <p className="text-xs text-slate-700 whitespace-pre-wrap">{c.content}</p>
-              </div>
+                <p className="text-sm text-slate-300 whitespace-pre-wrap">{c.content}</p>
+              </article>
             ))
           )}
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="border-t border-slate-200 p-4 space-y-3">
-          {submitError && (
-            <p className="text-xs text-red-600">{submitError}</p>
-          )}
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Escribe un comentario..."
-            rows={3}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
-          />
+      <form
+        onSubmit={handleSubmit}
+        className="rounded-xl border border-slate-700/50 bg-slate-950/40 p-3 space-y-3"
+      >
+        {submitError && <p className="text-xs text-red-300">{submitError}</p>}
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder={t("placeholder")}
+          className="w-full min-h-[110px] max-h-[220px] resize-y rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+        />
+        <div className="flex justify-end">
           <button
             type="submit"
             disabled={submitting || !content.trim()}
-            className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex items-center rounded-xl border border-indigo-500/50 bg-indigo-500/20 px-4 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/30 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
-            {submitting ? "Enviando…" : "Añadir comentario"}
+            {submitting ? t("sending") : t("add")}
           </button>
-        </form>
-      </div>
+        </div>
+      </form>
     </section>
   );
 }

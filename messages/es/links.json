@@ -1,0 +1,99 @@
+{
+  "invalidProjectId": "Identificador de proyecto no válido.",
+  "eyebrow": "Referencias",
+  "title": "Enlaces y fuentes de conocimiento",
+  "subtitle": "Enlaces operativos del proyecto y fuentes de conocimiento para Sapito.",
+  "newLink": "Nuevo enlace",
+  "projectLinks": {
+    "title": "Enlaces del proyecto",
+    "subtitle": "Enlaces operativos: Jira, Confluence, documentación y herramientas.",
+    "loading": "Cargando enlaces…",
+    "emptyTitle": "No hay enlaces registrados",
+    "emptyBody": "Añade enlaces con \"Nuevo enlace\" para accesos rápidos.",
+    "untitled": "Sin nombre"
+  },
+  "sources": {
+    "title": "Fuentes de conocimiento",
+    "subtitle": "Fuentes conectadas a este proyecto para usar en contexto de Sapito.",
+    "new": "Nueva fuente",
+    "create": "Crear fuente",
+    "loading": "Cargando fuentes…",
+    "emptyTitle": "Aún no hay fuentes de conocimiento",
+    "emptyBody": "Configura fuentes globales/Drive en Admin o registra aquí fuentes conectadas.",
+    "goAdmin": "Ir a Admin → Knowledge Sources"
+  },
+  "sync": {
+    "drive": "Sincronizar Drive",
+    "sync": "Sincronizar",
+    "syncing": "Sincronizando…",
+    "completed": "Sincronización completada",
+    "completedWithErrors": "Sincronización completada con errores.",
+    "status": "Sincronización",
+    "running": "En curso",
+    "last": "Última",
+    "enabled": "Sync activada",
+    "accountLinked": "Cuenta vinculada",
+    "availableForSapito": "Disponible para Sapito",
+    "states": {
+      "never": "Nunca",
+      "running": "En curso",
+      "success": "Correcto",
+      "partial": "Parcial",
+      "error": "Error"
+    }
+  },
+  "actions": {
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "cancel": "Cancelar",
+    "create": "Crear",
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "deleting": "Eliminando…",
+    "retry": "Reintentar"
+  },
+  "modal": {
+    "newLinkTitle": "Nuevo enlace",
+    "editLinkTitle": "Editar enlace",
+    "linkHelp": "Enlace operativo del proyecto para acceso rápido del equipo.",
+    "name": "Nombre",
+    "namePlaceholder": "Ej: Documentación SAP",
+    "url": "URL",
+    "type": "Tipo",
+    "selectType": "Seleccionar tipo"
+  },
+  "delete": {
+    "title": "Eliminar enlace",
+    "body": "¿Eliminar \"{name}\"? Esta acción no se puede deshacer."
+  },
+  "sourceModal": {
+    "title": "Nueva fuente de conocimiento",
+    "subtitle": "Registra una fuente externa para el contexto de Sapito en este proyecto.",
+    "name": "Nombre",
+    "sourceType": "Tipo de fuente",
+    "description": "Descripción (opcional)",
+    "descriptionPlaceholder": "Breve descripción de la fuente",
+    "connectAccountHint": "Conecta una cuenta en Admin → Knowledge Sources y vuelve aquí para elegir la fuente del proyecto.",
+    "syncEnabledHelp": "Sincronización activada. Esta fuente podrá sincronizarse con Sapito en un siguiente paso.",
+    "namePlaceholder": "Ej: Documentación Drive del proyecto",
+    "sections": {
+      "identification": "Identificación",
+      "connection": "Conexión",
+      "additionalContext": "Contexto adicional"
+    }
+  },
+  "errors": {
+    "loadLinks": "Error al cargar los enlaces.",
+    "loadSources": "Error al cargar las fuentes.",
+    "connection": "Error de conexión.",
+    "nameUrlRequired": "Nombre y URL son obligatorios.",
+    "urlInvalid": "La URL debe comenzar con http o https.",
+    "createLink": "Error al crear el enlace.",
+    "update": "Error al actualizar.",
+    "delete": "Error al eliminar.",
+    "nameRequired": "El nombre es obligatorio.",
+    "createSource": "Error al crear la fuente.",
+    "syncSource": "No se pudo sincronizar esta fuente.",
+    "syncDrive": "No se pudo sincronizar Google Drive."
+  }
+}

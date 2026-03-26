@@ -1,0 +1,57 @@
+{
+  "sections": {
+    "workspace": "WORKSPACE",
+    "knowledge": "KNOWLEDGE",
+    "business": "BUSINESS",
+    "system": "SYSTEM",
+    "project": "PROJECT",
+    "projectRail": "Este proyecto",
+    "platform": "Plataforma"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "projects": "Proyectos",
+    "tasks": "Tareas",
+    "tickets": "Tickets",
+    "reports": "Informes",
+    "myWork": "Mi trabajo",
+    "knowledge": "Knowledge",
+    "notes": "Notas",
+    "spaces": "Espacios",
+    "sapito": "Sapito",
+    "clients": "Clientes",
+    "admin": "Administración",
+    "knowledgeSources": "Fuentes de conocimiento",
+    "settings": "Ajustes",
+    "overview": "Resumen",
+    "planning": "Planificación",
+    "activities": "Actividades",
+    "phases": "Fases",
+    "brain": "Brain",
+    "links": "Enlaces",
+    "documents": "Documentos",
+    "timeline": "Línea de tiempo",
+    "search": "Búsqueda"
+  },
+  "allProjects": "Todos los proyectos",
+  "projectFallback": "Proyecto",
+  "projectContextLabel": "Espacio del proyecto",
+  "projectDateRange": "{start} — {end}",
+  "projectDateStartOnly": "Inicio {start}",
+  "projectDateEndOnly": "Objetivo {end}",
+  "executionHealth": {
+    "stable": "Entrega cerrada",
+    "onTrack": "En marcha",
+    "planned": "Planificado",
+    "deadlineNear": "Fecha próxima",
+    "behindSchedule": "Fuera de fecha",
+    "blocked": "Bloqueado / pausa"
+  },
+  "aria": {
+    "collapseSidebar": "Contraer barra lateral",
+    "expandSidebar": "Expandir barra lateral",
+    "closeMenu": "Cerrar menú",
+    "logout": "Cerrar sesión"
+  },
+  "logoutTitle": "Cerrar sesión"
+}

@@ -1,0 +1,57 @@
+{
+  "sections": {
+    "workspace": "WORKSPACE",
+    "knowledge": "KNOWLEDGE",
+    "business": "BUSINESS",
+    "system": "SYSTEM",
+    "project": "PROJECT",
+    "projectRail": "This project",
+    "platform": "Platform"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "tasks": "Tasks",
+    "tickets": "Tickets",
+    "reports": "Reports",
+    "myWork": "My Work",
+    "knowledge": "Knowledge",
+    "notes": "Notes",
+    "spaces": "Spaces",
+    "sapito": "Sapito",
+    "clients": "Clients",
+    "admin": "Admin",
+    "knowledgeSources": "Knowledge Sources",
+    "settings": "Settings",
+    "overview": "Overview",
+    "planning": "Planning",
+    "activities": "Activities",
+    "phases": "Phases",
+    "brain": "Brain",
+    "links": "Links",
+    "documents": "Documents",
+    "timeline": "Timeline",
+    "search": "Search"
+  },
+  "allProjects": "All projects",
+  "projectFallback": "Project",
+  "projectContextLabel": "Project workspace",
+  "projectDateRange": "{start} — {end}",
+  "projectDateStartOnly": "Starts {start}",
+  "projectDateEndOnly": "Target {end}",
+  "executionHealth": {
+    "stable": "Delivery closed",
+    "onTrack": "On track",
+    "planned": "Planned",
+    "deadlineNear": "Target soon",
+    "behindSchedule": "Past target",
+    "blocked": "Blocked / paused"
+  },
+  "aria": {
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
+    "closeMenu": "Close menu",
+    "logout": "Sign out"
+  },
+  "logoutTitle": "Sign out"
+}

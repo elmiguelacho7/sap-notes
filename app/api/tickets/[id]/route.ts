@@ -9,7 +9,7 @@ import {
 
 type RouteParams = { params: Promise<{ id: string }> };
 
-const ALLOWED_STATUSES = ["open", "in_progress", "resolved", "closed", "cancelled"] as const;
+const ALLOWED_STATUSES = ["open", "in_progress", "resolved", "closed"] as const;
 
 /**
  * PATCH /api/tickets/[id]
@@ -55,6 +55,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const body = (await request.json().catch(() => ({}))) as {
       status?: string;
+      assigned_to?: string | null;
       solution_markdown?: string | null;
       root_cause?: string | null;
       resolution_type?: string | null;
@@ -64,8 +65,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const solutionMarkdown = body.solution_markdown !== undefined ? body.solution_markdown : undefined;
     const rootCause = body.root_cause !== undefined ? body.root_cause : undefined;
     const resolutionType = body.resolution_type !== undefined ? body.resolution_type : undefined;
+    const assignedTo = body.assigned_to !== undefined ? body.assigned_to : undefined;
     const hasSolutionFields =
-      solutionMarkdown !== undefined || rootCause !== undefined || resolutionType !== undefined;
+      solutionMarkdown !== undefined || rootCause !== undefined || resolutionType !== undefined || assignedTo !== undefined;
 
     if (!hasStatus && !hasSolutionFields) {
       return NextResponse.json(
@@ -75,13 +77,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
     if (hasStatus && !ALLOWED_STATUSES.includes(status as (typeof ALLOWED_STATUSES)[number])) {
       return NextResponse.json(
-        { error: "Status válido: open, in_progress, resolved, closed, cancelled." },
+        { error: "Status válido: open, in_progress, resolved, closed." },
         { status: 400 }
       );
     }
 
     const updatePayload: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (hasStatus) updatePayload.status = status;
+    if (assignedTo !== undefined) updatePayload.assigned_to = assignedTo;
     if (solutionMarkdown !== undefined) updatePayload.solution_markdown = solutionMarkdown;
     if (rootCause !== undefined) updatePayload.root_cause = rootCause;
     if (resolutionType !== undefined) updatePayload.resolution_type = resolutionType;

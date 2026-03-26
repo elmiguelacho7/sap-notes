@@ -1,0 +1,58 @@
+{
+  "dock": {
+    "panelAria": "Sapito Project Copilot",
+    "title": "Sapito — Project",
+    "subtitle": "Project copilot (this workspace)",
+    "helper": "Answering about this project",
+    "closePanel": "Close panel",
+    "openTitle": "Project Copilot — Sapito",
+    "openAria": "Open Project Copilot",
+    "launcherTitle": "Sapito",
+    "launcherSubtitle": "Project Copilot"
+  },
+  "chat": {
+    "header": {
+      "title": "Sapito AI",
+      "subtitle": "Project copilot"
+    },
+    "intro": {
+      "whatICanDoTitle": "What I can do for you",
+      "whatICanDoBody": "I am your project assistant with tasks, tickets, and knowledge context. I can help you:",
+      "bullets": {
+        "projectStatus": "Summarize project status and overdue tasks",
+        "tickets": "Review open tickets and priorities",
+        "knowledge": "Search the project knowledge base",
+        "nextSteps": "Suggest next steps and risks"
+      },
+      "tryAsking": "Try asking:"
+    },
+    "suggestions": {
+      "overdueTasks": "What tasks are overdue?",
+      "openTickets": "What tickets are still open?",
+      "knowledgeTopic": "What knowledge do we have on this topic?"
+    },
+    "quickActions": {
+      "viewOverdueTasks": "View overdue tasks",
+      "viewOpenTickets": "View open tickets",
+      "goToTasks": "Go to Tasks"
+    },
+    "grounding": {
+      "syncedDocs": "Based on synced documentation",
+      "general": "General response (no indexed documentation)"
+    },
+    "states": {
+      "thinking": "Sapito is thinking…"
+    },
+    "input": {
+      "placeholder": "Message, SAP error, or question about this project…",
+      "aria": "Message for project Sapito",
+      "send": "Send",
+      "sending": "Sending…"
+    },
+    "errors": {
+      "noResponse": "Could not get a response.",
+      "noReplyNow": "I couldn't get a response from Sapito right now.",
+      "aiRequestFailed": "Could not get AI response. Please try again."
+    }
+  }
+}

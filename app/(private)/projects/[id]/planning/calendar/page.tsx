@@ -3,12 +3,14 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import { ChevronLeft, Calendar } from "lucide-react";
 import { RiskByPhaseStackedBar, type RiskByPhaseRow } from "@/components/charts/RiskByPhaseStackedBar";
 import { PhaseDurationBar, type PhaseDurationRow } from "@/components/charts/PhaseDurationBar";
 import ProjectGanttPro from "@/app/components/ProjectGanttPro";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 type ProjectPhase = {
   id: string;
@@ -35,9 +37,9 @@ function parseDate(dateStr: string | null): Date | null {
   return new Date(dateStr + "T00:00:00");
 }
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "Sin fecha";
-  return new Date(dateStr + "T00:00:00").toLocaleDateString("es-ES", {
+function formatDate(dateStr: string | null, localeTag: string, noDateLabel: string): string {
+  if (!dateStr) return noDateLabel;
+  return new Date(dateStr + "T00:00:00").toLocaleDateString(localeTag, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -69,6 +71,9 @@ function getTimelineBounds(
 }
 
 export default function ProjectPlanningCalendarPage() {
+  const t = useTranslations("calendar");
+  const locale = useLocale();
+  const localeTag = locale === "es" ? "es-ES" : "en-US";
   const params = useParams();
   const projectId = (params?.id ?? "") as string;
 
@@ -105,7 +110,7 @@ export default function ProjectPlanningCalendarPage() {
 
         if (phasesRes.error) {
           handleSupabaseError("project_phases", phasesRes.error);
-          setErrorMsg("No se pudo cargar el calendario de planificación.");
+          setErrorMsg(t("errors.loadFailed"));
           setPhases([]);
           setActivities([]);
           setRiskByActivityId({});
@@ -113,7 +118,7 @@ export default function ProjectPlanningCalendarPage() {
         }
         if (activitiesRes.error) {
           handleSupabaseError("project_activities", activitiesRes.error);
-          setErrorMsg("No se pudo cargar el calendario de planificación.");
+          setErrorMsg(t("errors.loadFailed"));
           setPhases([]);
           setActivities([]);
           setRiskByActivityId({});
@@ -144,7 +149,7 @@ export default function ProjectPlanningCalendarPage() {
         }
       } catch {
         if (!cancelled) {
-          setErrorMsg("No se pudo cargar el calendario de planificación.");
+          setErrorMsg(t("errors.loadFailed"));
           setPhases([]);
           setActivities([]);
           setRiskByActivityId({});
@@ -157,7 +162,7 @@ export default function ProjectPlanningCalendarPage() {
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, t]);
 
   const bounds = useMemo(
     () => getTimelineBounds(phases, activities),
@@ -213,40 +218,37 @@ export default function ProjectPlanningCalendarPage() {
 
   if (!projectId) {
     return (
-      <main className="min-h-screen bg-slate-50">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6 lg:py-8">
+      <div className="space-y-6">
           <p className="text-sm text-slate-600">
-            No se ha encontrado el identificador del proyecto.
+            {t("errors.missingProjectId")}
           </p>
-        </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6 lg:py-8 space-y-6">
+      <div className="space-y-6">
         <Link
           href={`/projects/${projectId}`}
           className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
         >
           <ChevronLeft className="h-4 w-4" />
-          Volver al proyecto
+          {t("actions.backToProject")}
         </Link>
 
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">
-              Calendario de planificación
+              {t("page.title")}
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Vista temporal de las fases y actividades del proyecto.
+              {t("page.subtitle")}
             </p>
           </div>
           {bounds && (
             <span className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500 shrink-0">
-              {formatDate(bounds.min.toISOString().slice(0, 10))} –{" "}
-              {formatDate(bounds.max.toISOString().slice(0, 10))}
+              {formatDate(bounds.min.toISOString().slice(0, 10), localeTag, t("dates.noDate"))} {t("emDash")}{" "}
+              {formatDate(bounds.max.toISOString().slice(0, 10), localeTag, t("dates.noDate"))}
             </span>
           )}
         </header>
@@ -254,10 +256,11 @@ export default function ProjectPlanningCalendarPage() {
         {loading && (
           <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
-              <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Calendario</h2>
+              <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t("sections.calendar")}</h2>
             </div>
-            <div className="p-5">
-              <p className="text-sm text-slate-500">Cargando calendario...</p>
+            <div className="p-5 space-y-3">
+              <Skeleton className="h-5 w-48" />
+              <Skeleton className="h-64 w-full" />
             </div>
           </section>
         )}
@@ -271,17 +274,17 @@ export default function ProjectPlanningCalendarPage() {
         {!loading && !errorMsg && phases.length === 0 && (
           <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
-              <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Calendario</h2>
+              <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t("sections.calendar")}</h2>
             </div>
             <div className="p-5">
               <p className="text-sm text-slate-600">
-                Aún no hay fases definidas para este proyecto.
+                {t("states.noPhases")}
               </p>
               <Link
                 href={`/projects/${projectId}/planning`}
-                className="mt-4 inline-flex rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                className="mt-4 inline-flex rounded-xl rb-btn-primary px-4 py-2 text-sm font-medium"
               >
-                Ir a fases del proyecto
+                {t("actions.goToProjectPhases")}
               </Link>
             </div>
           </section>
@@ -293,7 +296,7 @@ export default function ProjectPlanningCalendarPage() {
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
                   <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Riesgo por fase
+                    {t("sections.riskByPhase")}
                   </h2>
                 </div>
                 <div className="p-5">
@@ -303,7 +306,7 @@ export default function ProjectPlanningCalendarPage() {
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
                   <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Duración por fase (días)
+                    {t("sections.phaseDurationDays")}
                   </h2>
                 </div>
                 <div className="p-5">
@@ -315,11 +318,11 @@ export default function ProjectPlanningCalendarPage() {
             <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
               <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[rgb(var(--rb-brand-surface))] text-[rgb(var(--rb-brand-primary-active))] shrink-0 ring-1 ring-[rgb(var(--rb-brand-primary))]/20">
                     <Calendar className="h-4 w-4" />
                   </div>
                   <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Línea de tiempo del proyecto
+                    {t("sections.projectTimeline")}
                   </h2>
                 </div>
               </div>
@@ -345,7 +348,7 @@ export default function ProjectPlanningCalendarPage() {
                   }))}
                   projectStart={ganttProjectStart}
                   projectEnd={ganttProjectEnd}
-                  title="Línea de tiempo del proyecto"
+                  title={t("sections.projectTimeline")}
                   showLegend={true}
                   height={420}
                 />
@@ -355,13 +358,13 @@ export default function ProjectPlanningCalendarPage() {
             <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
               <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
                 <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Actividades por fase
+                  {t("sections.activitiesByPhase")}
                 </h2>
               </div>
               <div className="p-5 space-y-6">
               {activities.length === 0 ? (
                 <p className="text-sm text-slate-500">
-                  Todavía no hay actividades registradas para este proyecto.
+                  {t("states.noActivities")}
                 </p>
               ) : (
                 <>
@@ -386,24 +389,24 @@ export default function ProjectPlanningCalendarPage() {
                           <div className="flex flex-wrap items-center gap-2">
                             {highCount > 0 && (
                               <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700">
-                                Alto: {highCount}
+                                {t("risk.highShort", { count: highCount })}
                               </span>
                             )}
                             {medCount > 0 && (
                               <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                                Med: {medCount}
+                                {t("risk.mediumShort", { count: medCount })}
                               </span>
                             )}
                             {lowCount > 0 && (
                               <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                                Bajo: {lowCount}
+                                {t("risk.lowShort", { count: lowCount })}
                               </span>
                             )}
                             {highCount === 0 && medCount === 0 && lowCount === 0 && (
-                              <span className="text-[11px] text-slate-400">—</span>
+                              <span className="text-[11px] text-slate-400">{t("emDash")}</span>
                             )}
                             <span className="text-[11px] text-slate-500">
-                              {formatDate(phase.start_date)} – {formatDate(phase.end_date)}
+                              {formatDate(phase.start_date, localeTag, t("dates.noDate"))} {t("emDash")} {formatDate(phase.end_date, localeTag, t("dates.noDate"))}
                             </span>
                           </div>
                         </div>
@@ -421,7 +424,7 @@ export default function ProjectPlanningCalendarPage() {
                                   </span>
                                   {act.status && (
                                     <span className="mt-0.5 block text-[11px] text-slate-500">
-                                      Estado: {act.status}
+                                      {t("labels.status")}: {act.status}
                                     </span>
                                   )}
                                 </div>
@@ -437,17 +440,17 @@ export default function ProjectPlanningCalendarPage() {
                                       }
                                     >
                                       {riskLevel === "HIGH"
-                                        ? "Alto"
+                                        ? t("risk.high")
                                         : riskLevel === "MEDIUM"
-                                          ? "Medio"
-                                          : "Bajo"}
+                                          ? t("risk.medium")
+                                          : t("risk.low")}
                                     </span>
                                   ) : (
-                                    <span className="text-[11px] text-slate-400">—</span>
+                                    <span className="text-[11px] text-slate-400">{t("emDash")}</span>
                                   )}
                                   <div className="text-[11px] text-slate-500 tabular-nums">
-                                    <div>{formatDate(act.start_date)}</div>
-                                    <div>→ {formatDate(act.due_date)}</div>
+                                    <div>{formatDate(act.start_date, localeTag, t("dates.noDate"))}</div>
+                                    <div>{t("labels.toArrow")} {formatDate(act.due_date, localeTag, t("dates.noDate"))}</div>
                                   </div>
                                 </div>
                               </li>
@@ -460,7 +463,7 @@ export default function ProjectPlanningCalendarPage() {
                   {(activitiesByPhase.get("unassigned")?.length ?? 0) > 0 && (
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-slate-800">
-                        Sin fase asignada
+                        {t("sections.unassignedPhase")}
                       </h3>
                       <ul className="space-y-2">
                         {activitiesByPhase.get("unassigned")!.map((act) => {
@@ -476,7 +479,7 @@ export default function ProjectPlanningCalendarPage() {
                                 </span>
                                 {act.status && (
                                   <span className="mt-0.5 block text-[11px] text-slate-500">
-                                    Estado: {act.status}
+                                    {t("labels.status")}: {act.status}
                                   </span>
                                 )}
                               </div>
@@ -492,17 +495,17 @@ export default function ProjectPlanningCalendarPage() {
                                     }
                                   >
                                     {riskLevel === "HIGH"
-                                      ? "Alto"
+                                      ? t("risk.high")
                                       : riskLevel === "MEDIUM"
-                                        ? "Medio"
-                                        : "Bajo"}
+                                        ? t("risk.medium")
+                                        : t("risk.low")}
                                   </span>
                                 ) : (
-                                  <span className="text-[11px] text-slate-400">—</span>
+                                  <span className="text-[11px] text-slate-400">{t("emDash")}</span>
                                 )}
                                 <div className="text-[11px] text-slate-500 tabular-nums">
-                                  <div>{formatDate(act.start_date)}</div>
-                                  <div>→ {formatDate(act.due_date)}</div>
+                                  <div>{formatDate(act.start_date, localeTag, t("dates.noDate"))}</div>
+                                  <div>{t("labels.toArrow")} {formatDate(act.due_date, localeTag, t("dates.noDate"))}</div>
                                 </div>
                               </div>
                             </li>
@@ -517,9 +520,9 @@ export default function ProjectPlanningCalendarPage() {
               <div className="pt-5 border-t border-slate-100">
                 <Link
                   href={`/projects/${projectId}/planning`}
-                  className="inline-flex rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                  className="inline-flex rounded-xl rb-btn-primary px-4 py-2 text-sm font-medium"
                 >
-                  Ir a fases del proyecto
+                  {t("actions.goToProjectPhases")}
                 </Link>
               </div>
               </div>
@@ -527,6 +530,5 @@ export default function ProjectPlanningCalendarPage() {
           </>
         )}
       </div>
-    </main>
   );
 }

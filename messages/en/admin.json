@@ -1,0 +1,279 @@
+{
+  "page": {
+    "loading": "Loading…",
+    "loadingSubtext": "One moment.",
+    "restricted": "Restricted access",
+    "restrictedBody": "Only administrators can view this panel.",
+    "title": "Admin",
+    "subtitle": "Platform administration and system configuration.",
+    "tabs": {
+      "users": "Users",
+      "activations": "Activations",
+      "globalRoles": "Global roles",
+      "roleLimits": "Role limits",
+      "userLimits": "User limits",
+      "capacity": "Capacity"
+    },
+    "save": "Save",
+    "saving": "Saving…",
+    "close": "Close",
+    "quotaLabels": {
+      "maxProjects": "Max created projects",
+      "maxInvitations": "Max pending invitations per project",
+      "maxMembers": "Max members per project",
+      "maxClients": "Max created clients"
+    },
+    "roleLimits": {
+      "title": "Role limits",
+      "subtitle": "Default quotas per role (superadmin has no limit). Empty = unlimited."
+    },
+    "userLimits": {
+      "title": "User limits",
+      "subtitle": "Per-user overrides (empty = use role limit). Superadmin only.",
+      "loadingUsers": "Loading users…",
+      "configure": "Configure limits",
+      "modalTitle": "Limits",
+      "defaultRoleLimits": "Default role limits",
+      "overrideHelp": "Per-user override (empty = use role value):",
+      "effective": "Effective"
+    },
+    "capacity": {
+      "title": "Usage and limits",
+      "subtitle": "Quota usage summary by user and project. Threshold: >=80% near limit, >=100% at limit.",
+      "usersAtLimit": "Users at limit",
+      "usersNearLimit": "Users near limit",
+      "withOverrides": "With overrides",
+      "projectsAtMemberLimit": "Projects at limit (members)",
+      "invitationsAtLimit": "At limit (inv.)",
+      "views": "Views",
+      "atLimitOnly": "At limit only",
+      "nearLimitOnly": "Near limit only",
+      "all": "All",
+      "allRoles": "All roles",
+      "allStatuses": "All statuses",
+      "atLimit": "At limit",
+      "nearLimit": "Near limit",
+      "unlimited": "Unlimited",
+      "overridesOnly": "Overrides only",
+      "limitedProjectsOnly": "Limited projects only",
+      "byUser": "By user",
+      "byProject": "By project",
+      "table": {
+        "user": "User",
+        "role": "Role",
+        "projects": "Projects",
+        "clients": "Clients",
+        "overrides": "Overrides",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "projectTable": {
+        "project": "Project",
+        "client": "Client",
+        "members": "Members",
+        "pendingInvitations": "Pending inv.",
+        "status": "Status",
+        "actions": "Actions",
+        "viewProject": "View project",
+        "viewTeam": "View team"
+      }
+    },
+    "activations": {
+      "title": "User activation",
+      "subtitle": "Users registered through the public page remain pending until an admin activates them.",
+      "pending": "Pending",
+      "active": "Active",
+      "canSignIn": "Can sign in",
+      "manage": "Manage users and activations"
+    },
+    "usersRoles": {
+      "roleUpdated": "Role updated successfully.",
+      "loadingUsers": "Loading users...",
+      "untitled": "Untitled",
+      "consultant": "Consultant",
+      "manage": "Manage",
+      "table": {
+        "user": "User",
+        "role": "Role",
+        "activation": "Activation",
+        "actions": "Actions"
+      }
+    },
+    "projectAccess": {
+      "title": "Project access",
+      "subtitle": "Define which users can view and edit each project.",
+      "projects": "Projects",
+      "loadingProjects": "Loading projects...",
+      "selectProject": "Select a project to manage its members.",
+      "membersTitle": "Project members",
+      "loadingMembers": "Loading members...",
+      "unnamedUser": "Unnamed user",
+      "removing": "Removing...",
+      "removeAccess": "Remove access",
+      "addMember": "Add member",
+      "selectUser": "Select user",
+      "selectRole": "Select role",
+      "adding": "Adding...",
+      "add": "Add",
+      "table": {
+        "user": "User",
+        "role": "Role",
+        "action": "Action"
+      },
+      "roles": {
+        "owner": "Owner",
+        "editor": "Editor",
+        "viewer": "Viewer"
+      },
+      "errors": {
+        "loadData": "Could not load data.",
+        "loadMembers": "Could not load project members."
+      }
+    },
+    "knowledge": {
+      "connected": "Connected",
+      "integrationHelp": "Used for global and project sources. Connect here to manage from Admin.",
+      "connectHelp": "Connect a Google Drive account to create global or project knowledge sources.",
+      "redirecting": "Redirecting…",
+      "reconnectDrive": "Reconnect Google Drive",
+      "connectDrive": "Connect Google Drive",
+      "retry": "Retry",
+      "createGlobalSource": "Create global source",
+      "createSectionHint": "Add a curated URL or a Drive-backed source. Fields update based on type.",
+      "sourcesRegistryTitle": "Registered sources",
+      "sourcesRegistryHint": "Filter by scope. Sync and delete apply per row.",
+      "type": "Type",
+      "curatedUrlHelp": "Add the page URL (one per source). Only that page is indexed on sync.",
+      "guide": "Guide",
+      "guideBody": "SAP Help pages are indexed only when readable content exists in initial HTML. Pages that render everything via JavaScript cannot be indexed by this flow. If a URL fails, try another curated page or use a document/PDF as alternative.",
+      "sapHelpTitle": "SAP Help Portal",
+      "sapHelpBody": "Only help.sap.com URLs. Do not use community.sap.com (those pages rely on JavaScript and cannot be indexed here).",
+      "sapOfficialTitle": "SAP Official",
+      "sapOfficialBody": "Approved official SAP documentation (for example help.sap.com and other official sources).",
+      "officialWebTitle": "Official Web",
+      "officialWebBody": "Curated public pages (for example community.sap.com and other domains). If a page requires JavaScript or anti-bot verification, sync will fail with a clear message.",
+      "nameRequired": "Name *",
+      "sourceNamePlaceholder": "Source name",
+      "driveAccount": "Google Drive account",
+      "selectAccount": "Select account",
+      "connectDriveAbove": "Connect Google Drive above.",
+      "url": "URL",
+      "externalRef": "External ref (e.g. folder ID)",
+      "optional": "Optional",
+      "creating": "Creating…",
+      "list": "List",
+      "loadingSources": "Loading sources…",
+      "emptyGlobal": "No global sources yet. Create one so Sapito can use reusable knowledge (for example SAP Help or Google Drive).",
+      "syncHintSap": "Add SAP page URL in source",
+      "syncHintDrive": "Configure Google Drive account and external ref (folder ID) in source",
+      "syncNow": "Sync now",
+      "syncing": "Syncing…",
+      "syncOnlyHint": "Sync available only for Google Drive or official SAP (sap_help, sap_official, official_web)",
+      "deleting": "Deleting…",
+      "delete": "Delete",
+      "syncCompleted": "Sync completed. {docs} documents, {chunks} chunks.",
+      "syncWithErrors": "Sync completed with errors. {docs} documents, {chunks} chunks.",
+      "scope": {
+        "global": "Global",
+        "project": "Project",
+        "all": "All"
+      },
+      "table": {
+        "name": "Name",
+        "type": "Type",
+        "project": "Project",
+        "lastSync": "Last sync",
+        "actions": "Actions"
+      },
+      "errors": {
+        "startGoogle": "Could not start Google connection.",
+        "unexpectedResponse": "Unexpected server response.",
+        "loadSources": "Could not load sources.",
+        "createSource": "Could not create source.",
+        "deleteSource": "Could not delete source."
+      }
+    },
+    "errors": {
+      "saveFailed": "Could not save.",
+      "loadFailed": "Could not load.",
+      "loadConfig": "Could not load configuration.",
+      "loadData": "Could not load data.",
+      "loadUsers": "Could not load users."
+    }
+  },
+  "users": {
+    "title": "Users",
+    "loading": "Loading...",
+    "backToAdmin": "Back to admin panel",
+    "adminPanel": "Admin panel",
+    "createUser": "Create user",
+    "creating": "Creating…",
+    "existingUsers": "Existing users",
+    "emailPlaceholder": "user@example.com",
+    "fullNamePlaceholder": "Full name",
+    "active": "Active",
+    "pending": "Pending",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "deleting": "Deleting…",
+    "name": "Name",
+    "status": "Status",
+    "action": "Action",
+    "roleAria": "Role for {name}",
+    "empty": "No users yet. Create one above.",
+    "actions": {
+      "delete": "Delete",
+      "cancel": "Cancel"
+    },
+    "delete": {
+      "title": "Delete user",
+      "thisUser": "this user",
+      "bodyPrefix": "Delete ",
+      "bodySuffix": "? This removes account and profile."
+    },
+    "success": {
+      "userCreated": "User created successfully."
+    },
+    "errors": {
+      "loadUsers": "Could not load users.",
+      "createUser": "Could not create user.",
+      "deleteFailed": "Could not delete.",
+      "connection": "Connection error."
+    }
+  },
+  "roles": {
+    "title": "Roles and permissions",
+    "subtitle": "Permission matrix by role. Platform roles are assigned on the user profile; project roles are assigned per project.",
+    "platformSectionTitle": "Platform roles",
+    "platformSectionHint": "Define what a user can do across the entire platform.",
+    "projectSectionTitle": "Project roles",
+    "projectSectionHint": "Assigned inside each project to control project-specific access.",
+    "editRole": "Edit role",
+    "userCount": "Users with this role: {count}",
+    "scopeLabel": "Scope: {scope}",
+    "typePlatform": "Platform role",
+    "typeProject": "Project role",
+    "scopePlatform": "Platform",
+    "scopeProject": "Project",
+    "loading": "Loading...",
+    "loadingRoles": "Loading roles…",
+    "restricted": "Restricted access",
+    "signInRequired": "You must sign in to view this page.",
+    "backToAdmin": "Back to admin panel",
+    "footer": "This matrix is used for access control. Permissions are read from database role tables.",
+    "errors": {
+      "noPermission": "You do not have permission to view this page.",
+      "loadMatrix": "Could not load permissions matrix."
+    }
+  },
+  "knowledgeSources": {
+    "loading": "Loading…",
+    "restricted": "Restricted access",
+    "restrictedBody": "Only administrators can view this page.",
+    "backToAdmin": "Back to Admin",
+    "errors": {
+      "startGoogleConnect": "Could not start Google connection.",
+      "connection": "Connection error."
+    }
+  }
+}

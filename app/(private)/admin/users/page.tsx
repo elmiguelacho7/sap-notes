@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { ChevronLeft } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { PageShell } from "@/components/layout/PageShell";
@@ -96,6 +97,7 @@ function ActivationButton({
   onUpdated: () => void;
   getAuthHeaders: () => Promise<Record<string, string>>;
 }) {
+  const t = useTranslations("admin.users");
   const [loading, setLoading] = useState(false);
   const handleToggle = async () => {
     setLoading(true);
@@ -124,7 +126,7 @@ function ActivationButton({
           : "rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
       }
     >
-      {loading ? "…" : user.is_active ? "Desactivar" : "Activar"}
+      {loading ? "…" : user.is_active ? t("deactivate") : t("activate")}
     </button>
   );
 }
@@ -140,6 +142,7 @@ function DeleteUserButton({
   getAuthHeaders: () => Promise<Record<string, string>>;
   disabled?: boolean;
 }) {
+  const t = useTranslations("admin.users");
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
@@ -164,14 +167,14 @@ function DeleteUserButton({
         return;
       }
       if (!res.ok) {
-        setBlockedMessage(data.error ?? "Error al eliminar.");
+        setBlockedMessage(data.error ?? t("errors.deleteFailed"));
         setLoading(false);
         return;
       }
       setModalOpen(false);
       await onDeleted();
     } catch {
-      setBlockedMessage("Error de conexión.");
+      setBlockedMessage(t("errors.connection"));
     } finally {
       setLoading(false);
     }
@@ -192,16 +195,16 @@ function DeleteUserButton({
         disabled={disabled || loading}
         className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-60 transition-colors"
       >
-        Eliminar
+        {t("actions.delete")}
       </button>
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50" role="dialog" aria-modal="true" aria-labelledby="delete-user-title">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl p-6">
             <h2 id="delete-user-title" className="text-lg font-semibold text-slate-900 mb-2">
-              Eliminar usuario
+              {t("delete.title")}
             </h2>
             <p className="text-sm text-slate-600 mb-4">
-              ¿Eliminar a <strong>{user.full_name || user.email || "este usuario"}</strong>? Se borrará la cuenta y el perfil. Solo está permitido si el usuario no tiene notas, tareas, proyectos u otros datos.
+              {t("delete.bodyPrefix")} <strong>{user.full_name || user.email || t("delete.thisUser")}</strong>{t("delete.bodySuffix")}
             </p>
             {blockedMessage && (
               <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -215,7 +218,7 @@ function DeleteUserButton({
                 disabled={loading}
                 className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
               >
-                Cancelar
+                {t("actions.cancel")}
               </button>
               <button
                 type="button"
@@ -223,7 +226,7 @@ function DeleteUserButton({
                 disabled={loading}
                 className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60"
               >
-                {loading ? "Eliminando…" : "Eliminar"}
+                {loading ? t("deleting") : t("actions.delete")}
               </button>
             </div>
           </div>
@@ -234,6 +237,7 @@ function DeleteUserButton({
 }
 
 export default function AdminUsersPage() {
+  const t = useTranslations("admin.users");
   const [loading, setLoading] = useState(true);
   const [appRole, setAppRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -253,16 +257,16 @@ export default function AdminUsersPage() {
       const res = await fetch("/api/admin/users", { headers });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError((data as { error?: string }).error ?? "Error al cargar los usuarios.");
+        setError((data as { error?: string }).error ?? t("errors.loadUsers"));
         setUsers([]);
         return;
       }
       setUsers((data as { users?: AdminUser[] }).users ?? []);
     } catch {
-      setError("Error de conexión.");
+      setError(t("errors.connection"));
       setUsers([]);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -317,16 +321,16 @@ export default function AdminUsersPage() {
       });
       const data = await res.json().catch(() => ({})) as { error?: string; message?: string };
       if (!res.ok) {
-        setCreateError(data.error ?? "Error al crear el usuario.");
+        setCreateError(data.error ?? t("errors.createUser"));
         return;
       }
-      setCreateSuccess("Usuario creado correctamente.");
+      setCreateSuccess(t("success.userCreated"));
       setEmail("");
       setFullName("");
       setAppRoleNew("consultant");
       await loadUsers();
     } catch {
-      setCreateError("Error de conexión.");
+      setCreateError(t("errors.connection"));
     } finally {
       setCreating(false);
     }
@@ -336,7 +340,7 @@ export default function AdminUsersPage() {
     return (
       <PageShell wide={false}>
         <div className="py-12 text-center">
-          <p className="text-sm text-slate-500">Cargando...</p>
+          <p className="text-sm text-slate-500">{t("loading")}</p>
         </div>
       </PageShell>
     );
@@ -363,11 +367,11 @@ export default function AdminUsersPage() {
           className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-indigo-600"
         >
           <ChevronLeft className="h-4 w-4" />
-          Volver al panel de administración
+          {t("backToAdmin")}
         </Link>
 
         <PageHeader
-          title="Usuarios"
+          title={t("title")}
           description="Crear usuarios y gestionar activación. Los usuarios creados por un administrador quedan activos; los que se registran por la página pública quedan pendientes hasta activación."
           actions={
             <Link
@@ -387,7 +391,7 @@ export default function AdminUsersPage() {
 
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
-            <h2 className="text-sm font-semibold text-slate-900">Crear usuario</h2>
+            <h2 className="text-sm font-semibold text-slate-900">{t("createUser")}</h2>
             <p className="text-xs text-slate-500 mt-1">Los usuarios creados aquí quedan activos de inmediato.</p>
           </div>
           <form onSubmit={handleCreate} className="p-5 space-y-4">
@@ -401,7 +405,7 @@ export default function AdminUsersPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="usuario@ejemplo.com"
+                  placeholder={t("emailPlaceholder")}
                   className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   disabled={creating}
                   required
@@ -416,7 +420,7 @@ export default function AdminUsersPage() {
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Nombre completo"
+                  placeholder={t("fullNamePlaceholder")}
                   className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   disabled={creating}
                 />
@@ -446,7 +450,7 @@ export default function AdminUsersPage() {
                 disabled={creating || !email.trim()}
                 className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 mt-6"
               >
-                {creating ? "Creando…" : "Crear usuario"}
+                {creating ? t("creating") : t("createUser")}
               </button>
             </div>
             {createError && (
@@ -460,7 +464,7 @@ export default function AdminUsersPage() {
 
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="border-b border-slate-200 px-5 py-4 bg-slate-50/50">
-            <h2 className="text-sm font-semibold text-slate-900">Usuarios existentes</h2>
+            <h2 className="text-sm font-semibold text-slate-900">{t("existingUsers")}</h2>
             <p className="text-xs text-slate-500 mt-1">
               Nombre, email (identidad de inicio de sesión), rol global y estado de activación. Activa o desactiva el acceso desde aquí.
             </p>
@@ -504,7 +508,7 @@ export default function AdminUsersPage() {
                           </td>
                           <td className="py-3 px-4">
                             <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${u.is_active ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
-                              {u.is_active ? "Activo" : "Pendiente"}
+                              {u.is_active ? t("active") : t("pending")}
                             </span>
                           </td>
                           <td className="py-3 px-4 text-right">

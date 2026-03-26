@@ -89,13 +89,13 @@ const EMPTY_FORM: Record<string, string | boolean> = {
 function statusBadge(isActive: boolean | null | undefined) {
   if (isActive === false) {
     return (
-      <span className="inline-flex rounded-md px-2 py-0.5 text-xs font-medium bg-slate-500/20 text-slate-400 border border-slate-500/30">
+      <span className="inline-flex rounded-md px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200/80">
         Inactive
       </span>
     );
   }
   return (
-    <span className="inline-flex rounded-md px-2 py-0.5 text-xs font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+    <span className="inline-flex rounded-md px-2 py-0.5 text-xs font-medium bg-emerald-50 text-emerald-900 border border-emerald-200/80">
       Active
     </span>
   );
@@ -197,11 +197,11 @@ export default function ClientsPage() {
 
   if (loading && appRole === null) {
     return (
-      <div className="bg-slate-950 min-h-full">
+      <div className="bg-[rgb(var(--rb-shell-bg))] min-h-full">
         <AppPageShell>
           <div className="space-y-6">
-            <div className="h-8 w-48 rounded-lg bg-slate-800" />
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5">
+            <div className="h-8 w-48 rounded-lg bg-slate-200/80 animate-pulse" />
+            <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm ring-1 ring-slate-100">
               <TableSkeleton rows={5} colCount={6} />
             </div>
           </div>
@@ -212,11 +212,11 @@ export default function ClientsPage() {
 
   if (!canManage) {
     return (
-      <div className="bg-slate-950 min-h-full">
+      <div className="bg-[rgb(var(--rb-shell-bg))] min-h-full">
         <AppPageShell>
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-5 py-12 text-center">
-            <p className="text-sm font-medium text-slate-200">Acceso restringido</p>
-            <p className="mt-1 text-sm text-slate-500">
+          <div className="rounded-xl border border-slate-200/90 bg-white px-5 py-12 text-center shadow-sm ring-1 ring-slate-100">
+            <p className="text-sm font-semibold text-slate-900">Acceso restringido</p>
+            <p className="mt-1 text-sm text-slate-600">
               Solo administradores pueden gestionar clientes.
             </p>
           </div>
@@ -226,13 +226,13 @@ export default function ClientsPage() {
   }
 
   return (
-    <div className="bg-slate-950 min-h-full">
+    <div className="bg-[rgb(var(--rb-shell-bg))] min-h-full">
       <AppPageShell>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="text-xl sm:text-2xl font-semibold text-slate-100">Clients</h1>
-            <p className="text-sm text-slate-500">
+            <h1 className="text-xl sm:text-2xl font-semibold text-slate-900">Clients</h1>
+            <p className="text-sm text-slate-600">
               Manage clients for projects, reporting, and SAP context.
             </p>
           </div>
@@ -244,7 +244,7 @@ export default function ClientsPage() {
               setModalOpen(true);
             }}
             disabled={clientsQuota?.atLimit === true}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150 shrink-0"
+            className="inline-flex items-center justify-center gap-2 rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-medium disabled:opacity-50 transition-colors duration-150 shrink-0"
           >
             <Plus className="size-4" />
             New Client
@@ -252,33 +252,33 @@ export default function ClientsPage() {
         </div>
 
         {successMessage && (
-          <div className="rounded-xl border border-emerald-800/50 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             {successMessage}
           </div>
         )}
 
         {error && (
-          <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             {error}
           </div>
         )}
 
         {clientsQuota?.limit != null && clientsQuota.atLimit && (
-          <div className="rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             You have reached the maximum number of clients ({clientsQuota.current} / {clientsQuota.limit}). An administrator must increase the limit to create more.
           </div>
         )}
 
-        <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5">
+        <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm ring-1 ring-slate-100">
           <div className="flex flex-col sm:flex-row gap-3 mb-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-500" aria-hidden />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" aria-hidden />
               <input
                 type="search"
                 placeholder="Search clients..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-900 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                className="w-full rounded-lg border border-slate-200/90 bg-white pl-9 pr-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/30 focus:border-[rgb(var(--rb-brand-primary))]/30"
                 aria-label="Search clients"
               />
             </div>
@@ -287,16 +287,16 @@ export default function ClientsPage() {
           {loading ? (
             <TableSkeleton rows={5} colCount={6} />
           ) : error ? (
-            <p className="text-sm text-red-400 py-4">{error}</p>
+            <p className="text-sm text-red-700 py-4">{error}</p>
           ) : filteredClients.length === 0 ? (
-            <p className="text-sm text-slate-500 py-8 text-center">
+            <p className="text-sm text-slate-600 py-8 text-center">
               {searchQuery.trim() ? "No clients match your search." : "No clients yet. Click New Client to create one."}
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-slate-700/60">
+            <div className="overflow-x-auto rounded-xl border border-slate-200/90">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-xs uppercase tracking-wide text-slate-400">
+                  <tr className="border-b border-slate-200/90 bg-slate-50/85 text-left text-xs uppercase tracking-wide text-slate-500">
                     <th className="py-3 px-4">Client</th>
                     <th className="py-3 px-4">Industry</th>
                     <th className="py-3 px-4">Country</th>
@@ -305,18 +305,18 @@ export default function ClientsPage() {
                     <th className="py-3 px-4">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700/40">
+                <tbody className="divide-y divide-slate-100">
                   {filteredClients.map((c) => (
                     <tr
                       key={c.id}
                       onClick={() => router.push(`/clients/${c.id}`)}
-                      className="hover:bg-slate-800/50 transition-colors duration-150 cursor-pointer"
+                      className="hover:bg-slate-50 transition-colors duration-150 cursor-pointer"
                     >
-                      <td className="py-3 px-4 font-medium text-slate-200">
+                      <td className="py-3 px-4 font-medium text-slate-900">
                         {c.display_name || c.name}
                       </td>
-                      <td className="py-3 px-4 text-slate-400">{c.industry ?? "—"}</td>
-                      <td className="py-3 px-4 text-slate-400">{getCountryDisplayName(c.country) ?? "—"}</td>
+                      <td className="py-3 px-4 text-slate-600">{c.industry ?? "—"}</td>
+                      <td className="py-3 px-4 text-slate-600">{getCountryDisplayName(c.country) ?? "—"}</td>
                       <td className="py-3 px-4 text-slate-500">—</td>
                       <td className="py-3 px-4 text-slate-500">—</td>
                       <td className="py-3 px-4">{statusBadge(c.is_active)}</td>
@@ -449,31 +449,31 @@ function NewClientModal({
         value={(form[key] as string) ?? ""}
         onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
         placeholder={placeholder}
-        className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+        className="w-full rounded-md border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/30"
         disabled={saving}
       />
     </div>
   );
 
-  const inputClass = "w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60";
-  const labelClass = "block text-xs text-slate-400";
-  const sectionTitle = "text-xs font-medium text-slate-300 uppercase tracking-wide mb-3";
+  const inputClass = "w-full rounded-md border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/30 disabled:opacity-60";
+  const labelClass = "block text-xs text-slate-600";
+  const sectionTitle = "text-xs font-medium text-slate-600 uppercase tracking-wide mb-3";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="rounded-xl border border-slate-700/60 bg-slate-800/95 shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="rounded-xl border border-slate-200/90 bg-white shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto ring-1 ring-slate-100"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-700/60 bg-slate-800/95 px-5 py-4">
-          <h2 className="text-sm font-semibold text-slate-100">New Client</h2>
-          <button type="button" onClick={onClose} className="p-1 text-slate-400 hover:text-slate-200 rounded transition-colors" aria-label="Close">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200/90 bg-white px-5 py-4">
+          <h2 className="text-sm font-semibold text-slate-900">New Client</h2>
+          <button type="button" onClick={onClose} className="p-1 text-slate-500 hover:text-slate-700 rounded transition-colors" aria-label="Close">
             <X className="size-5" />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-6">
           {/* General */}
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5 space-y-3">
+          <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-5 space-y-3">
             <h3 className={sectionTitle}>General</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {field("name", "Client name", "Required")}
@@ -508,7 +508,7 @@ function NewClientModal({
           </div>
 
           {/* Business */}
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5 space-y-3">
+          <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-5 space-y-3">
             <h3 className={sectionTitle}>Business</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -531,7 +531,7 @@ function NewClientModal({
           </div>
 
           {/* SAP Context */}
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5 space-y-3">
+          <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-5 space-y-3">
             <h3 className={sectionTitle}>SAP Context</h3>
             <div className="space-y-1">
               <label className={labelClass}>SAP system / modules / landscape</label>
@@ -547,7 +547,7 @@ function NewClientModal({
           </div>
 
           {/* Notes */}
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5 space-y-3">
+          <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-5 space-y-3">
             <h3 className={sectionTitle}>Notes</h3>
             <div className="space-y-1">
               <label className={labelClass}>Client notes</label>
@@ -571,27 +571,27 @@ function NewClientModal({
                 disabled={saving}
               />
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
                 checked={form.is_active === true}
                 onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
                 disabled={saving}
-                className="rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500/40"
+                className="rounded border-slate-300 bg-white text-[rgb(var(--rb-brand-primary))] focus:ring-[rgb(var(--rb-brand-ring))]/30"
               />
               Active
             </label>
           </div>
 
-          {formError && <p className="text-sm text-red-400">{formError}</p>}
+          {formError && <p className="text-sm text-red-700">{formError}</p>}
           <div className="flex items-center justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors duration-150">
+            <button type="button" onClick={onClose} className="rounded-xl border border-slate-200/90 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors duration-150">
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving || clientsQuota?.atLimit === true}
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150"
+              className="rounded-xl rb-btn-primary px-4 py-2 text-sm font-medium disabled:opacity-50 transition-colors duration-150"
             >
               {saving ? "Creating…" : "Create client"}
             </button>

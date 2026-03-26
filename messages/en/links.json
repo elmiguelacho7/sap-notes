@@ -1,0 +1,99 @@
+{
+  "invalidProjectId": "Invalid project identifier.",
+  "eyebrow": "References",
+  "title": "Links and knowledge sources",
+  "subtitle": "Project operational links and knowledge sources for Sapito.",
+  "newLink": "New link",
+  "projectLinks": {
+    "title": "Project links",
+    "subtitle": "Operational links: Jira, Confluence, docs, and tools.",
+    "loading": "Loading links…",
+    "emptyTitle": "No links registered",
+    "emptyBody": "Add links with \"New link\" for quick access.",
+    "untitled": "Untitled"
+  },
+  "sources": {
+    "title": "Knowledge sources",
+    "subtitle": "Sources connected to this project for Sapito context.",
+    "new": "New source",
+    "create": "Create source",
+    "loading": "Loading sources…",
+    "emptyTitle": "No knowledge sources yet",
+    "emptyBody": "Configure Drive/global sources in Admin or register connected sources here.",
+    "goAdmin": "Go to Admin → Knowledge Sources"
+  },
+  "sync": {
+    "drive": "Sync Drive",
+    "sync": "Sync",
+    "syncing": "Syncing…",
+    "completed": "Sync completed",
+    "completedWithErrors": "Sync completed with errors.",
+    "status": "Sync",
+    "running": "Running",
+    "last": "Last",
+    "enabled": "Sync enabled",
+    "accountLinked": "Linked account",
+    "availableForSapito": "Available for Sapito",
+    "states": {
+      "never": "Never",
+      "running": "Running",
+      "success": "Success",
+      "partial": "Partial",
+      "error": "Error"
+    }
+  },
+  "actions": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "create": "Create",
+    "save": "Save",
+    "saving": "Saving…",
+    "deleting": "Deleting…",
+    "retry": "Retry"
+  },
+  "modal": {
+    "newLinkTitle": "New link",
+    "editLinkTitle": "Edit link",
+    "linkHelp": "Operational project link for quick team access.",
+    "name": "Name",
+    "namePlaceholder": "e.g. SAP documentation",
+    "url": "URL",
+    "type": "Type",
+    "selectType": "Select type"
+  },
+  "delete": {
+    "title": "Delete link",
+    "body": "Delete \"{name}\"? This action cannot be undone."
+  },
+  "sourceModal": {
+    "title": "New knowledge source",
+    "subtitle": "Register an external source for Sapito context in this project.",
+    "name": "Name",
+    "sourceType": "Source type",
+    "description": "Description (optional)",
+    "descriptionPlaceholder": "Short source description",
+    "connectAccountHint": "Connect an account in Admin → Knowledge Sources and come back to choose the project source.",
+    "syncEnabledHelp": "Sync enabled. This source can be synced with Sapito in a next step.",
+    "namePlaceholder": "e.g. Project Drive documentation",
+    "sections": {
+      "identification": "Identification",
+      "connection": "Connection",
+      "additionalContext": "Additional context"
+    }
+  },
+  "errors": {
+    "loadLinks": "Could not load links.",
+    "loadSources": "Could not load sources.",
+    "connection": "Connection error.",
+    "nameUrlRequired": "Name and URL are required.",
+    "urlInvalid": "URL must start with http or https.",
+    "createLink": "Could not create link.",
+    "update": "Could not update.",
+    "delete": "Could not delete.",
+    "nameRequired": "Name is required.",
+    "createSource": "Could not create source.",
+    "syncSource": "Could not sync this source.",
+    "syncDrive": "Could not sync Google Drive."
+  }
+}

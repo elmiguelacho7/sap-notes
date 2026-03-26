@@ -1,0 +1,322 @@
+{
+  "emDash": "—",
+  "page": {
+    "title": "Proyectos",
+    "subtitle": "Gestiona y abre el workspace de cada proyecto.",
+    "quotaSummary": "{current} / {limit} proyectos",
+    "createCta": "Nuevo proyecto"
+  },
+  "summary": {
+    "active": "activos",
+    "tickets": "tickets"
+  },
+  "quota": {
+    "atLimit": "Has alcanzado el máximo de proyectos permitidos ({current} / {limit}). No puedes crear más hasta que un administrador aumente el límite.",
+    "nearLimit": "Te acercas al límite de proyectos ({current} / {limit}). Cuando lo alcances no podrás crear más hasta que un administrador aumente la cuota."
+  },
+  "filters": {
+    "searchPlaceholder": "Buscar por nombre, cliente o estado...",
+    "status": {
+      "all": "Todos los estados"
+    }
+  },
+  "sort": {
+    "priority": "Activos primero",
+    "newest": "Más recientes",
+    "name": "Por nombre",
+    "recentlyUpdated": "Recientemente actualizados"
+  },
+  "status": {
+    "planned": "Planificado",
+    "in_progress": "En progreso",
+    "completed": "Completado",
+    "archived": "Archivado",
+    "blocked": "Bloqueado",
+    "paused": "En pausa"
+  },
+  "empty": {
+    "title": "No se han encontrado proyectos",
+    "description": "Ajusta el filtro o crea un nuevo proyecto para empezar."
+  },
+  "errors": {
+    "loadProjects": "No se pudieron cargar los proyectos."
+  },
+  "card": {
+    "openWorkspaceAria": "Abrir workspace de {name}",
+    "untitledProject": "Proyecto sin nombre",
+    "notes": "notas",
+    "tickets": "tickets",
+    "tasks": "tareas",
+    "openWorkspace": "Abrir workspace",
+    "planning": "Planning",
+    "tasksSection": "Tasks",
+    "health": {
+      "label": "Salud del proyecto",
+      "healthy": "En buen estado",
+      "watch": "Vigilar",
+      "at_risk": "En riesgo",
+      "aria": "{state}: {segments} de 4 barras de señal activas",
+      "tooltip": {
+        "healthy": "Señal aproximada según estado, fechas planificadas, tickets y tareas abiertas. Sin alertas fuertes.",
+        "watch": "Hay cierta presión: revisa fechas, tickets abiertos o acumulación de tareas.",
+        "at_risk": "Señales de riesgo: bloqueo o fecha vencida, o muchos tickets/tareas abiertos. Conviene revisar."
+      }
+    }
+  },
+  "tabs": {
+    "overview": "Overview",
+    "planning": "Planning",
+    "activities": "Activities",
+    "tasks": "Tasks",
+    "notes": "Notes",
+    "brain": "Brain",
+    "links": "Links",
+    "knowledge": "Knowledge",
+    "tickets": "Tickets",
+    "team": "Equipo"
+  },
+  "overview": {
+    "heroEyebrow": "Resumen ejecutivo",
+    "signals": {
+      "title": "Señales ejecutivas",
+      "subtitle": "Salud, riesgo de entrega, carga, trabajo abierto y progreso — de un vistazo.",
+      "caption": "Vista heurística con los datos ya cargados en este workspace (no es un pronóstico).",
+      "projectHealth": "Salud del proyecto",
+      "deliveryRisk": "Riesgo de entrega",
+      "teamLoad": "Carga del equipo",
+      "openIssues": "Incidencias abiertas",
+      "progress": "Progreso",
+      "teamLoadHelper": "{n} persona(s) cerca o por encima de carga cómoda",
+      "helpers": {
+        "health": "Heurística según carga y plazo",
+        "delivery": "Bloqueos, retrasos y presión",
+        "openIssues": "Tickets abiertos + tareas vencidas",
+        "progress": "Resumen de tareas / actividades"
+      }
+    },
+    "load": {
+      "title": "Carga y capacidad del equipo",
+      "subtitle": "Trabajo abierto asignado por miembro (puntuación solo informativa).",
+      "summaryManyHot": "{n} personas están cerca o por encima de carga cómoda.",
+      "summaryTwoHot": "Dos personas concentran carga elevada.",
+      "summaryOneHot": "Una persona está cerca de su capacidad.",
+      "summaryConcentrated": "La carga está concentrada en pocos asignados.",
+      "empty": "Aún no hay miembros cargados.",
+      "tasks": "Tareas",
+      "tickets": "Tickets",
+      "blocked": "Bloqueadas",
+      "overdue": "Vencidas",
+      "scoreLabel": "Carga {n}",
+      "bands": {
+        "light": "Ligera",
+        "balanced": "Equilibrada",
+        "high": "Alta",
+        "overloaded": "Sobrecarga"
+      }
+    },
+    "risks": {
+      "title": "Riesgos y cuellos de botella",
+      "subtitle": "Lista de vigilancia — lo que merece una decisión.",
+      "caption": "Generado a partir de retrasos, bloqueos, tickets, carga y ventana de plan.",
+      "severityHigh": "Escalar",
+      "severityWatch": "Vigilar",
+      "severityOk": "Estable"
+    },
+    "recent": {
+      "title": "Actividad reciente",
+      "subtitle": "Últimos eventos vinculados a este proyecto.",
+      "empty": "Aún no hay eventos recientes para este proyecto.",
+      "fallbackHint": "Entra en los módulos para generar actividad.",
+      "quick": {
+        "openTickets": "Tickets abiertos",
+        "notes": "Notas",
+        "links": "Enlaces externos"
+      },
+      "time": {
+        "unknown": "Sin hora",
+        "justNow": "Ahora mismo",
+        "minutesAgo": "Hace {n} min",
+        "hoursAgo": "Hace {n} h",
+        "daysAgo": "Hace {n} d",
+        "statsHint": "Estadísticas operativas vistas por última vez {time}"
+      },
+      "types": {
+        "project_created": "Proyecto",
+        "task_created": "Tarea",
+        "ticket_closed": "Ticket",
+        "note_created": "Nota",
+        "user_invited": "Invitación"
+      }
+    },
+    "sapito": {
+      "title": "Pregunta a Sapito sobre este proyecto",
+      "subtitle": "Copiloto del proyecto anclado a este workspace: elige un prompt o abre el asistente.",
+      "openAssistant": "Abrir asistente",
+      "promptRisks": "Resume los riesgos actuales",
+      "promptBlocking": "¿Qué está bloqueando la entrega?",
+      "promptFocus": "¿En qué debería centrarme esta semana?",
+      "promptDocs": "¿Qué áreas necesitan documentación?",
+      "footnote": "Las respuestas se generan al enviar un mensaje en el asistente."
+    },
+    "command": {
+      "addWork": "Añadir trabajo",
+      "newTask": "Nueva tarea",
+      "newTicket": "Nuevo ticket",
+      "newNote": "Nueva nota",
+      "newActivity": "Nueva actividad",
+      "openPlanning": "Abrir planning",
+      "askSapito": "Preguntar a Sapito",
+      "more": "Más"
+    },
+    "delivery": {
+      "low": "Bajo",
+      "elevated": "Elevado",
+      "high": "Alto"
+    },
+    "healthLabels": {
+      "healthy": "En buen estado",
+      "watch": "Vigilar",
+      "at_risk": "En riesgo"
+    },
+    "insight": {
+      "progressing": "La trayectoria es asumible — mantén la ejecución visible y ordenada.",
+      "pressure": "Hay margen, pero la presión de ejecución sube — prioriza bloqueos, fechas y carga.",
+      "at_risk": "El estado es frágil — bloqueos, sobrecarga o plazo necesitan atención de dirección."
+    },
+    "panels": {
+      "tasksTitle": "Resumen de tareas",
+      "tasksSubtitle": "Primero vencidas y bloqueadas, luego trabajo activo por fecha.",
+      "tasksAttention": "Qué reclama atención ahora",
+      "ticketsTitle": "Resumen de tickets",
+      "ticketsSubtitle": "Sin resolver — prioriza tickets abiertos más antiguos.",
+      "ticketsAttention": "Incidencias que frenan el flujo",
+      "ticketsRowHint": "Sin resolver — revisa prioridad y antigüedad.",
+      "overdue": "{n} vencidas",
+      "blocked": "{n} bloqueadas",
+      "open": "{n} abiertos",
+      "viewAll": "Ver todo",
+      "priorityHot": "{n} urgentes / alta"
+    }
+  },
+  "notes": {
+    "eyebrow": "Memoria operativa",
+    "title": "Notas del proyecto",
+    "subtitle": "Notas operativas y memoria funcional de este proyecto.",
+    "newNote": "Nueva nota",
+    "invalidProjectId": "Identificador de proyecto no válido.",
+    "searchPlaceholder": "Buscar en notas...",
+    "allModules": "Todos los módulos",
+    "untitled": "Sin título",
+    "error": "Error",
+    "links": "Enlaces",
+    "summary": {
+      "total": "Total",
+      "withErrorCode": "Con código error",
+      "withLinks": "Con enlaces",
+      "recent7d": "Recientes (7 d)"
+    },
+    "sort": {
+      "recent": "Más recientes",
+      "oldest": "Más antiguas",
+      "title": "Título A-Z"
+    },
+    "empty": {
+      "title": "Aún no hay notas en este proyecto",
+      "description": "Captura incidencias, soluciones, decisiones y contexto operativo.",
+      "createFirst": "Crear primera nota"
+    },
+    "filteredEmpty": {
+      "title": "Ninguna nota coincide con los filtros",
+      "description": "Prueba a cambiar la búsqueda o el módulo."
+    },
+    "actions": {
+      "view": "Ver",
+      "more": "Más opciones",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "addKb": "Añadir a KB",
+      "removeKb": "Quitar de KB"
+    },
+    "delete": {
+      "title": "Eliminar nota",
+      "body": "¿Seguro que quieres eliminar esta nota? Esta acción no se puede deshacer.",
+      "cancel": "Cancelar",
+      "confirm": "Eliminar",
+      "deleting": "Eliminando..."
+    },
+    "errors": {
+      "load": "No se pudieron cargar las notas.",
+      "actionFailed": "No se pudo completar la acción.",
+      "connection": "Error de conexión."
+    }
+  },
+  "members": {
+    "title": "Equipo",
+    "subtitle": "Miembros del proyecto y sus roles.",
+    "missingProjectId": "No se ha encontrado el identificador del proyecto.",
+    "roles": {
+      "owner": "Propietario",
+      "editor": "Editor",
+      "viewer": "Lector"
+    },
+    "action": "Acción",
+    "globalAccess": {
+      "title": "Acceso global por rol.",
+      "body": "Tienes permisos de administrador sobre este proyecto sin ser miembro del equipo."
+    },
+    "addMember": {
+      "title": "Añadir miembro",
+      "adding": "Añadiendo...",
+      "addToTeam": "Añadir al equipo",
+      "help": "Si el usuario ya existe, se añade al instante. Si no, se crea una invitación pendiente.",
+      "atLimit": "Has alcanzado el máximo de miembros para este proyecto ({current} / {limit}).",
+      "nearLimit": "Te acercas al límite de miembros ({current} / {limit})."
+    },
+    "invitation": {
+      "linkHelp": "Copia o abre el enlace para que el usuario pueda aceptar la invitación.",
+      "copied": "Copiado",
+      "copyLink": "Copiar enlace de invitación"
+    },
+    "pendingInvites": {
+      "title": "Invitaciones pendientes",
+      "subtitle": "Usuarios invitados que aún no han aceptado.",
+      "loading": "Cargando invitaciones...",
+      "pending": "Pendiente",
+      "revoke": "Revocar",
+      "maxReached": " · Has alcanzado el máximo. No puedes crear más invitaciones hasta que aumente el límite.",
+      "nearLimit": " · Te acercas al límite.",
+      "none": "No hay invitaciones pendientes.",
+      "noneHelp": "Si el email pertenece a un usuario registrado, se añade directamente y no aparece aquí."
+    },
+    "teamMembers": {
+      "title": "Miembros del equipo",
+      "subtitle": "Solo aparecen aquí membresías explícitas del proyecto.",
+      "loading": "Cargando equipo...",
+      "active": "Activo",
+      "remove": "Eliminar del equipo",
+      "removing": "Eliminando...",
+      "empty": "Aún no hay miembros en este proyecto."
+    },
+    "success": {
+      "alreadyMember": "El usuario ya pertenece a este proyecto.",
+      "directAdd": "El usuario ya existía y se añadió directamente al equipo.",
+      "memberAdded": "Usuario añadido al proyecto correctamente.",
+      "inviteSent": "Se creó una invitación pendiente y se envió el correo.",
+      "inviteNoEmailWithLink": "Se creó la invitación pendiente, pero no se pudo enviar el correo. Usa el enlace.",
+      "inviteNoEmail": "Se creó la invitación pendiente, pero no se pudo enviar el correo.",
+      "inviteCreated": "Invitación creada."
+    },
+    "errors": {
+      "loadTeam": "Error al cargar el equipo.",
+      "connection": "Error de conexión.",
+      "invalidEmail": "Introduce una dirección de correo válida.",
+      "noPermission": "No tiene permiso para gestionar miembros.",
+      "quotaReached": "Has alcanzado el máximo permitido para este proyecto ({current} / {limit}).",
+      "projectQuotaReached": "Este proyecto ha alcanzado el máximo de miembros permitidos ({current} / {limit}).",
+      "addMemberFailed": "No se pudo añadir al miembro.",
+      "unexpectedResponse": "Respuesta inesperada del servidor. Inténtalo de nuevo.",
+      "cannotRemoveLastOwner": "No se puede eliminar al último propietario del proyecto.",
+      "copyFailed": "No se pudo copiar al portapapeles."
+    }
+  }
+}

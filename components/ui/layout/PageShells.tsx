@@ -3,8 +3,12 @@
  * Use one shell per page type; do not nest shells or add conflicting outer px/max-w.
  */
 import type { ReactNode } from "react";
+import {
+  LAYOUT_WIDTH_DENSE_CLASS,
+  LAYOUT_WIDTH_STANDARD_CLASS,
+} from "@/lib/layoutSystem";
 
-const base = "mx-auto w-full min-w-0 flex flex-col";
+const base = "w-full min-w-0 flex flex-col";
 
 /** Workspace-style pages: dashboard, my-work, project overview / workspace landing. */
 export function WorkspacePageShell({
@@ -15,7 +19,7 @@ export function WorkspacePageShell({
   className?: string;
 }) {
   return (
-    <div className={`${base} max-w-[1360px] px-6 lg:px-8 py-8 gap-8 ${className}`.trim()}>
+    <div className={`${base} ${LAYOUT_WIDTH_STANDARD_CLASS} px-6 lg:px-8 py-8 gap-8 ${className}`.trim()}>
       {children}
     </div>
   );
@@ -30,7 +34,7 @@ export function ListPageShell({
   className?: string;
 }) {
   return (
-    <div className={`${base} max-w-[1440px] px-6 lg:px-8 py-8 gap-8 ${className}`.trim()}>
+    <div className={`${base} ${LAYOUT_WIDTH_STANDARD_CLASS} px-6 lg:px-8 py-8 gap-8 ${className}`.trim()}>
       {children}
     </div>
   );
@@ -45,7 +49,7 @@ export function DensePageShell({
   className?: string;
 }) {
   return (
-    <div className={`${base} max-w-[1280px] px-6 lg:px-8 py-6 gap-6 ${className}`.trim()}>
+    <div className={`${base} ${LAYOUT_WIDTH_DENSE_CLASS} px-6 lg:px-8 py-6 gap-6 ${className}`.trim()}>
       {children}
     </div>
   );

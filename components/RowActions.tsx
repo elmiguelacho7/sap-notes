@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -36,7 +37,6 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 export function RowActions({
   entity,
-  id,
   viewHref,
   editHref,
   canEdit,
@@ -44,6 +44,7 @@ export function RowActions({
   deleteEndpoint,
   onDeleted,
 }: RowActionsProps) {
+  const t = useTranslations("common.actions");
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -76,7 +77,7 @@ export function RowActions({
       const data = (await res.json().catch(() => ({}))) as { error?: string };
 
       if (!res.ok) {
-        setErrorMessage(data?.error ?? "No se pudo completar la acción.");
+        setErrorMessage(data?.error ?? t("actionFailed"));
         setLoading(false);
         return;
       }
@@ -87,7 +88,7 @@ export function RowActions({
         router.refresh();
       }
     } catch {
-      setErrorMessage("Error de conexión. Inténtalo de nuevo.");
+      setErrorMessage(t("connectionError"));
       setLoading(false);
     }
   };
@@ -102,8 +103,8 @@ export function RowActions({
           type="button"
           onClick={handleView}
           className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-          title="Ver"
-          aria-label="Ver"
+          title={t("view")}
+          aria-label={t("view")}
         >
           <Eye className="h-4 w-4" />
         </button>
@@ -112,8 +113,8 @@ export function RowActions({
             type="button"
             onClick={handleEdit}
             className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-            title="Editar"
-            aria-label="Editar"
+            title={t("edit")}
+            aria-label={t("edit")}
           >
             <Pencil className="h-4 w-4" />
           </button>
@@ -123,8 +124,8 @@ export function RowActions({
             type="button"
             onClick={() => setModalOpen(true)}
             className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-colors"
-            title="Eliminar"
-            aria-label="Eliminar"
+            title={t("delete")}
+            aria-label={t("delete")}
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -141,10 +142,10 @@ export function RowActions({
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold text-slate-900">
-              Eliminar {label}
+              {t("deleteTitle", { label })}
             </h3>
             <p className="mt-2 text-sm text-slate-600">
-              ¿Seguro que quieres eliminar esta {label}? Esta acción no se puede deshacer.
+              {t("deleteBody", { label })}
             </p>
             {errorMessage && (
               <p className="mt-3 text-sm text-rose-600 bg-rose-50 rounded-lg px-3 py-2">
@@ -158,7 +159,7 @@ export function RowActions({
                 disabled={loading}
                 className="rounded-full border border-slate-200 px-3 h-8 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
               >
-                Cancelar
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -166,7 +167,7 @@ export function RowActions({
                 disabled={loading}
                 className="rounded-full bg-rose-600 px-3 h-8 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60"
               >
-                {loading ? "Eliminando…" : "Eliminar"}
+                {loading ? t("deleting") : t("delete")}
               </button>
             </div>
           </div>

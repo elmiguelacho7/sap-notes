@@ -3,65 +3,58 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { getTicketsListHref, getTicketDetailHref } from "@/lib/routes";
-import { FileText, BookOpen, Link2, MessageSquare } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import { getTicketsListHref } from "@/lib/routes";
+import { BookOpen } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError, hasLoggableSupabaseError } from "@/lib/supabaseError";
 import { addToRecent } from "@/components/command-palette/recentStore";
-import type { Ticket, TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
+import type { TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
 import type { TicketDetailRow, TicketCommentDetail, TicketReference } from "@/components/tickets/ticketTypes";
 import { ObjectActions } from "@/components/ObjectActions";
 import TicketCommentsPanel from "@/components/tickets/TicketCommentsPanel";
+import { AssigneeSelect } from "@/components/AssigneeSelect";
 
-const PRIORITY_LABELS: Record<TicketPriority, string> = {
-  low: "Baja",
-  medium: "Media",
-  high: "Alta",
-  urgent: "Urgente",
-};
-
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  open: "Abierto",
-  in_progress: "En progreso",
-  resolved: "Resuelto",
-  closed: "Cerrado",
-  cancelled: "Cancelado",
-};
-
-function PriorityBadge({ priority }: { priority: TicketPriority }) {
+function PriorityBadge({ priority, label }: { priority: TicketPriority; label: string }) {
   const colors: Record<TicketPriority, string> = {
-    low: "bg-slate-100 text-slate-700",
-    medium: "bg-blue-50 text-blue-700",
-    high: "bg-amber-50 text-amber-700",
-    urgent: "bg-red-50 text-red-700",
+    low: "bg-slate-700/80 text-slate-300",
+    medium: "bg-blue-900/60 text-blue-300",
+    high: "bg-amber-900/60 text-amber-300",
+    urgent: "bg-red-900/60 text-red-300",
   };
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${colors[priority]}`}
     >
-      {PRIORITY_LABELS[priority]}
+      {label}
     </span>
   );
 }
 
-function StatusBadge({ status }: { status: TicketStatus }) {
+function StatusBadge({ status, label }: { status: TicketStatus; label: string }) {
   const colors: Record<TicketStatus, string> = {
-    open: "bg-slate-100 text-slate-700",
-    in_progress: "bg-blue-50 text-blue-700",
-    resolved: "bg-emerald-50 text-emerald-700",
-    closed: "bg-slate-200 text-slate-600",
-    cancelled: "bg-red-50 text-red-600",
+    open: "bg-slate-700/80 text-slate-300",
+    in_progress: "bg-blue-900/60 text-blue-300",
+    pending: "bg-slate-700/80 text-slate-300",
+    resolved: "bg-emerald-900/60 text-emerald-300",
+    closed: "bg-slate-700/60 text-slate-400",
+    cancelled: "bg-red-900/60 text-red-300",
   };
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${colors[status]}`}
     >
-      {STATUS_LABELS[status]}
+      {label}
     </span>
   );
 }
 
 export default function TicketDetailPage() {
+  const t = useTranslations("tickets.detail");
+  const tStatus = useTranslations("tickets.status");
+  const tPriority = useTranslations("tickets.priority");
+  const locale = useLocale();
+  const localeTag = locale === "es" ? "es-ES" : "en-US";
   const params = useParams();
   const searchParams = useSearchParams();
   const id = (params?.id ?? "") as string;
@@ -69,6 +62,8 @@ export default function TicketDetailPage() {
 
   const [ticket, setTicket] = useState<TicketDetailRow | null>(null);
   const [assigneeLabel, setAssigneeLabel] = useState<string | null>(null);
+  const [assignedTo, setAssignedTo] = useState<string | null>(null);
+  const [savingAssignee, setSavingAssignee] = useState(false);
   const [comments, setComments] = useState<TicketCommentDetail[]>([]);
   const [references, setReferences] = useState<TicketReference[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,41 +78,49 @@ export default function TicketDetailPage() {
 
   const loadTicket = useCallback(async () => {
     if (!id) return;
+    try {
+      const { data, error } = await supabase
+        .from("tickets")
+        .select("id, title, description, priority, status, project_id, due_date, created_at, updated_at, assigned_to, solution_markdown, root_cause, resolution_type, knowledge_page_id")
+        .eq("id", id)
+        .single();
 
-    const { data, error } = await supabase
-      .from("tickets")
-      .select("id, title, description, priority, status, project_id, due_date, created_at, updated_at, assigned_to, solution_markdown, root_cause, resolution_type, knowledge_page_id")
-      .eq("id", id)
-      .single();
-
-    if (error) {
-      handleSupabaseError("tickets", error);
-      if (hasLoggableSupabaseError(error)) {
-        setErrorMsg("No se pudo cargar el ticket. Inténtalo de nuevo más tarde.");
+      if (error) {
+        handleSupabaseError("tickets", error);
+        if (hasLoggableSupabaseError(error)) {
+          setErrorMsg(t("errors.loadTicket"));
+        }
+        setTicket(null);
+        setAssigneeLabel(null);
+      } else {
+        const row = data as TicketDetailRow;
+        setTicket(row);
+        setSolutionMarkdown(row.solution_markdown ?? "");
+        setRootCause(row.root_cause ?? "");
+        setResolutionType(row.resolution_type ?? "");
+        const nextAssignedTo = (data as { assigned_to?: string | null }).assigned_to ?? null;
+        setAssignedTo(nextAssignedTo);
+        if (nextAssignedTo) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name, email")
+            .eq("id", nextAssignedTo)
+            .single();
+          const p = profile as { full_name?: string | null; email?: string | null } | null;
+          setAssigneeLabel(p ? (p.full_name ?? p.email ?? null) : null);
+        } else {
+          setAssigneeLabel(null);
+        }
       }
+    } catch (error) {
+      console.error("Tickets error:", error);
+      setErrorMsg(t("errors.loadTicket"));
       setTicket(null);
       setAssigneeLabel(null);
-    } else {
-      const row = data as TicketDetailRow;
-      setTicket(row);
-      setSolutionMarkdown(row.solution_markdown ?? "");
-      setRootCause(row.root_cause ?? "");
-      setResolutionType(row.resolution_type ?? "");
-      const assignedTo = (data as { assigned_to?: string | null }).assigned_to;
-      if (assignedTo) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name, email")
-          .eq("id", assignedTo)
-          .single();
-        const p = profile as { full_name?: string | null; email?: string | null } | null;
-        setAssigneeLabel(p ? (p.full_name ?? p.email ?? null) : null);
-      } else {
-        setAssigneeLabel(null);
-      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [id]);
+  }, [id, t]);
 
   const loadComments = useCallback(async () => {
     if (!id) return;
@@ -183,11 +186,11 @@ export default function TicketDetailPage() {
       addToRecent({
         type: "ticket",
         id: ticket.id,
-        title: ticket.title || "Sin título",
+        title: ticket.title || t("untitled"),
         href: `/tickets/${ticket.id}`,
       });
     }
-  }, [ticket?.id, ticket?.title]);
+  }, [ticket?.id, ticket?.title, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,17 +228,43 @@ export default function TicketDetailPage() {
       });
       const json = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setErrorMsg(json?.error ?? "No se pudo cerrar el ticket.");
+        setErrorMsg(json?.error ?? t("errors.closeFailed"));
         setClosing(false);
         return;
       }
       await loadTicket();
-    } catch {
-      setErrorMsg("No se pudo cerrar el ticket.");
+    } catch (error) {
+      console.error("Tickets error:", error);
+      setErrorMsg(t("errors.closeFailed"));
     } finally {
       setClosing(false);
     }
-  }, [id, closing, loadTicket, getAuthHeaders]);
+  }, [id, closing, loadTicket, getAuthHeaders, t]);
+
+  const handleSaveAssignee = useCallback(async () => {
+    if (!id || savingAssignee) return;
+    setSavingAssignee(true);
+    setErrorMsg(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/tickets/${id}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ assigned_to: assignedTo ?? null }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setErrorMsg(json?.error ?? t("errors.updateAssigneeFailed"));
+      } else {
+        await loadTicket();
+      }
+    } catch (error) {
+      console.error("Tickets error:", error);
+      setErrorMsg(t("errors.updateAssigneeFailed"));
+    } finally {
+      setSavingAssignee(false);
+    }
+  }, [id, assignedTo, savingAssignee, getAuthHeaders, loadTicket, t]);
 
   const handleSaveSolution = useCallback(async () => {
     if (!id || savingSolution) return;
@@ -254,16 +283,17 @@ export default function TicketDetailPage() {
       });
       const json = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setErrorMsg(json?.error ?? "No se pudo guardar.");
+        setErrorMsg(json?.error ?? t("errors.saveFailed"));
       } else {
         await loadTicket();
       }
-    } catch {
-      setErrorMsg("No se pudo guardar la solución.");
+    } catch (error) {
+      console.error("Tickets error:", error);
+      setErrorMsg(t("errors.saveSolutionFailed"));
     } finally {
       setSavingSolution(false);
     }
-  }, [id, savingSolution, ticket?.project_id, solutionMarkdown, rootCause, resolutionType, getAuthHeaders, loadTicket]);
+  }, [id, savingSolution, solutionMarkdown, rootCause, resolutionType, getAuthHeaders, loadTicket, t]);
 
   const handleConvertToKnowledge = useCallback(async () => {
     if (!id || converting || !ticket?.project_id) return;
@@ -277,34 +307,39 @@ export default function TicketDetailPage() {
       });
       const json = (await res.json().catch(() => ({}))) as { error?: string; knowledge_page_id?: string };
       if (!res.ok) {
-        setErrorMsg(json?.error ?? "No se pudo convertir.");
+        setErrorMsg(json?.error ?? t("errors.convertFailed"));
       } else {
         await loadTicket();
       }
-    } catch {
-      setErrorMsg("No se pudo convertir en página de conocimiento.");
+    } catch (error) {
+      console.error("Tickets error:", error);
+      setErrorMsg(t("errors.convertKnowledgeFailed"));
     } finally {
       setConverting(false);
     }
-  }, [id, converting, ticket?.project_id, getAuthHeaders, loadTicket]);
+  }, [id, converting, ticket?.project_id, getAuthHeaders, loadTicket, t]);
 
   const backHref = getTicketsListHref(ticket?.project_id ?? projectIdFromQuery);
 
   if (!id) {
     return (
-      <div className="p-4 md:p-6 lg:p-8">
-        <p className="text-sm text-slate-600">
-          No se ha encontrado el identificador del ticket.
-        </p>
+      <div className="w-full min-w-0 rb-workspace-bg px-4 sm:px-5 lg:px-6 xl:px-8 2xl:px-10 py-8">
+        <div className="mx-auto w-full max-w-7xl">
+          <p className="text-sm text-slate-600">
+          {t("missingId")}
+          </p>
+        </div>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="p-4 md:p-6 lg:p-8">
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
-          Cargando ticket…
+      <div className="w-full min-w-0 rb-workspace-bg px-4 sm:px-5 lg:px-6 xl:px-8 2xl:px-10 py-8">
+        <div className="mx-auto w-full max-w-7xl">
+          <div className="rounded-xl border border-slate-200/90 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm ring-1 ring-slate-100">
+            {t("loading")}
+          </div>
         </div>
       </div>
     );
@@ -312,15 +347,17 @@ export default function TicketDetailPage() {
 
   if (errorMsg && !ticket) {
     return (
-      <div className="p-4 md:p-6 lg:p-8 space-y-4">
-        <Link
-          href={backHref}
-          className="inline-flex items-center text-[11px] text-slate-500 hover:text-slate-700"
-        >
-          ← Volver a tickets
-        </Link>
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {errorMsg}
+      <div className="w-full min-w-0 rb-workspace-bg px-4 sm:px-5 lg:px-6 xl:px-8 2xl:px-10 py-8">
+        <div className="mx-auto w-full max-w-7xl space-y-4">
+          <Link
+            href={backHref}
+            className="inline-flex items-center text-[11px] text-slate-500 hover:text-slate-900"
+          >
+            {t("backToTickets")}
+          </Link>
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm ring-1 ring-red-100">
+            {errorMsg}
+          </div>
         </div>
       </div>
     );
@@ -328,65 +365,84 @@ export default function TicketDetailPage() {
 
   if (!ticket) {
     return (
-      <div className="p-4 md:p-6 lg:p-8 space-y-4">
-        <Link
-          href={backHref}
-          className="inline-flex items-center text-[11px] text-slate-500 hover:text-slate-700"
-        >
-          ← Volver a tickets
-        </Link>
-        <p className="text-sm text-slate-600">No se encontró el ticket.</p>
+      <div className="w-full min-w-0 rb-workspace-bg px-4 sm:px-5 lg:px-6 xl:px-8 2xl:px-10 py-8">
+        <div className="mx-auto w-full max-w-7xl space-y-4">
+          <Link
+            href={backHref}
+            className="inline-flex items-center text-[11px] text-slate-500 hover:text-slate-900"
+          >
+            {t("backToTickets")}
+          </Link>
+          <p className="text-sm text-slate-600">{t("notFound")}</p>
+        </div>
       </div>
     );
   }
 
+  const cardClass =
+    "rounded-2xl border border-slate-200/90 bg-white p-5 space-y-4 shadow-sm ring-1 ring-slate-100";
+  const inputClass =
+    "w-full rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/25 focus:border-[rgb(var(--rb-brand-primary))]/30";
+
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-6">
-      <div>
+    <div className="w-full min-w-0 rb-workspace-bg px-4 sm:px-5 lg:px-6 xl:px-8 2xl:px-10 py-6">
+      <div className="mx-auto w-full max-w-7xl space-y-6">
         <Link
           href={backHref}
-          className="inline-flex items-center text-[11px] text-slate-500 hover:text-slate-700"
+          className="inline-flex items-center text-[11px] text-slate-500 hover:text-slate-900"
         >
-          ← Volver a tickets
+          {t("backToTickets")}
         </Link>
-      </div>
 
-      {errorMsg && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {errorMsg}
-        </div>
-      )}
+        {errorMsg && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm ring-1 ring-red-100">
+            {errorMsg}
+          </div>
+        )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 px-4 py-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-xl font-semibold text-slate-900">{ticket.title}</h1>
-              <div className="flex flex-wrap items-center gap-2 mt-2">
-                <PriorityBadge priority={(ticket.priority ?? "medium") as TicketPriority} />
-                <StatusBadge status={(ticket.status ?? "open") as TicketStatus} />
-                {ticket.project_id && (
+        <section className={cardClass}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-semibold text-slate-100 truncate">
+                {ticket.title}
+              </h1>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <PriorityBadge
+                  priority={(ticket.priority ?? "medium") as TicketPriority}
+                  label={tPriority((ticket.priority ?? "medium") as TicketPriority)}
+                />
+                <StatusBadge
+                  status={(ticket.status ?? "open") as TicketStatus}
+                  label={tStatus((ticket.status ?? "open") as TicketStatus)}
+                />
+                {ticket.project_id ? (
                   <Link
                     href={`/projects/${ticket.project_id}`}
-                    className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
+                    className="inline-flex items-center rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-[11px] font-medium text-indigo-300 hover:bg-indigo-500/25 transition-colors"
                   >
-                    Vinculado al proyecto · Ver proyecto
+                    {t("linkedProject")}
                   </Link>
-                )}
-                <span className="text-[11px] text-slate-500">
-                  Creado el {new Date(ticket.created_at).toLocaleDateString("es-ES")}
-                </span>
+                ) : null}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                <span>{t("created")}: {new Date(ticket.created_at).toLocaleString(localeTag)}</span>
+                {ticket.due_date ? (
+                  <span>{t("due")}: {new Date(ticket.due_date).toLocaleDateString(localeTag)}</span>
+                ) : null}
+                {ticket.updated_at ? (
+                  <span>{t("updated")}: {new Date(ticket.updated_at).toLocaleString(localeTag)}</span>
+                ) : null}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               {ticket.status !== "closed" && (
                 <button
                   type="button"
                   onClick={handleCloseTicket}
                   disabled={closing}
-                  className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 h-8 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  className="inline-flex items-center rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors disabled:opacity-60"
                 >
-                  {closing ? "Cerrando…" : "Cerrar ticket"}
+                  {closing ? t("closing") : t("closeTicket")}
                 </button>
               )}
               <ObjectActions
@@ -400,148 +456,172 @@ export default function TicketDetailPage() {
               />
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Overview */}
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 px-4 py-3 flex items-center gap-2">
-          <FileText className="h-4 w-4 text-slate-500" />
-          <h2 className="text-sm font-semibold text-slate-900">Overview</h2>
-        </div>
-        <div className="px-4 py-4 space-y-4">
-          {ticket.description && (
-            <div>
-              <h3 className="text-xs font-semibold text-slate-700 mb-1">Descripción</h3>
-              <p className="text-sm text-slate-600 whitespace-pre-wrap">{ticket.description}</p>
-            </div>
-          )}
-          <div>
-            <h3 className="text-xs font-semibold text-slate-700 mb-1">Asignado a</h3>
-            <p className="text-sm text-slate-600">{assigneeLabel ?? "Sin asignar"}</p>
-          </div>
-          {ticket.due_date && (
-            <div>
-              <h3 className="text-xs font-semibold text-slate-700 mb-1">Fecha límite</h3>
-              <p className="text-sm text-slate-600">
-                {new Date(ticket.due_date).toLocaleDateString("es-ES")}
-              </p>
-            </div>
-          )}
-          <div className="flex flex-wrap gap-4 text-xs text-slate-500">
-            <span>Creado: {new Date(ticket.created_at).toLocaleString("es-ES")}</span>
-            {ticket.updated_at && (
-              <span>Actualizado: {new Date(ticket.updated_at).toLocaleString("es-ES")}</span>
-            )}
-          </div>
-        </div>
-      </section>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-2 space-y-6">
+            <section className={cardClass}>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-100">Overview</h2>
+                  <p className="text-xs text-slate-400">{t("overviewSubtitle")}</p>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xs font-medium text-slate-400">{t("description")}</h3>
+                {ticket.description ? (
+                  <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-sm text-slate-200 whitespace-pre-wrap min-h-[120px]">
+                    {ticket.description}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">{t("noDescription")}</p>
+                )}
+              </div>
+            </section>
 
-      {/* Discussion */}
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 px-4 py-3 flex items-center gap-2">
-          <MessageSquare className="h-4 w-4 text-slate-500" />
-          <h2 className="text-sm font-semibold text-slate-900">Discussion</h2>
-        </div>
-        <TicketCommentsPanel
-          ticketId={id}
-          comments={comments}
-          onCommentAdded={loadComments}
-        />
-      </section>
-
-      {/* Solution */}
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 px-4 py-3 flex items-center gap-2">
-          <FileText className="h-4 w-4 text-slate-500" />
-          <h2 className="text-sm font-semibold text-slate-900">Solution</h2>
-        </div>
-        <div className="px-4 py-4 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Solution (Markdown)</label>
-            <textarea
-              value={solutionMarkdown}
-              onChange={(e) => setSolutionMarkdown(e.target.value)}
-              placeholder="Describe the solution in Markdown..."
-              rows={8}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y font-mono"
-            />
+            <section className={cardClass}>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-100">Comments</h2>
+                <p className="text-xs text-slate-400">{t("commentsSubtitle")}</p>
+              </div>
+              <TicketCommentsPanel
+                ticketId={id}
+                comments={comments}
+                onCommentAdded={loadComments}
+              />
+            </section>
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Root cause</label>
-            <input
-              type="text"
-              value={rootCause}
-              onChange={(e) => setRootCause(e.target.value)}
-              placeholder="Brief root cause"
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Resolution type</label>
-            <input
-              type="text"
-              value={resolutionType}
-              onChange={(e) => setResolutionType(e.target.value)}
-              placeholder="e.g. workaround, fix, configuration"
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={handleSaveSolution}
-            disabled={savingSolution}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
-          >
-            {savingSolution ? "Guardando…" : "Save solution"}
-          </button>
-        </div>
-      </section>
 
-      {/* References */}
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 px-4 py-3 flex items-center gap-2">
-          <Link2 className="h-4 w-4 text-slate-500" />
-          <h2 className="text-sm font-semibold text-slate-900">References</h2>
-        </div>
-        <div className="px-4 py-4">
-          <ReferencesList
-            ticketId={id}
-            references={references}
-            onRefresh={loadReferences}
-          />
-        </div>
-      </section>
+          <div className="space-y-6">
+            <section className={cardClass}>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-100">Assignment</h2>
+                <p className="text-xs text-slate-400">{t("assignmentSubtitle")}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 px-3 py-2.5 ring-1 ring-slate-100">
+                <p className="text-sm text-slate-200">{assigneeLabel ?? t("unassigned")}</p>
+              </div>
+              <div className="space-y-3">
+                <AssigneeSelect
+                  contextType={ticket.project_id ? "project" : "global"}
+                  projectId={ticket.project_id ?? undefined}
+                  value={assignedTo}
+                  onChange={setAssignedTo}
+                  placeholder={t("unassigned")}
+                  className="w-full"
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSaveAssignee}
+                    disabled={savingAssignee}
+                    className="inline-flex items-center rounded-xl border border-slate-600 bg-slate-800/80 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors"
+                  >
+                    {savingAssignee ? t("saving") : t("saveAssignee")}
+                  </button>
+                </div>
+              </div>
+            </section>
 
-      {/* Knowledge */}
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 px-4 py-3 flex items-center gap-2">
-          <BookOpen className="h-4 w-4 text-slate-500" />
-          <h2 className="text-sm font-semibold text-slate-900">Knowledge</h2>
+            <section className={cardClass}>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-100">Resolution</h2>
+                <p className="text-xs text-slate-400">Causa raíz y resolución del incidente.</p>
+              </div>
+              <div className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Root cause</label>
+                  <input
+                    type="text"
+                    value={rootCause}
+                    onChange={(e) => setRootCause(e.target.value)}
+                    placeholder={t("rootCausePlaceholder")}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Resolution type</label>
+                  <input
+                    type="text"
+                    value={resolutionType}
+                    onChange={(e) => setResolutionType(e.target.value)}
+                    placeholder={t("resolutionTypePlaceholder")}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Resolution summary</label>
+                  <textarea
+                    value={solutionMarkdown}
+                    onChange={(e) => setSolutionMarkdown(e.target.value)}
+                    placeholder={t("resolutionSummaryPlaceholder")}
+                    className={`${inputClass} min-h-[140px] resize-y font-mono`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveSolution}
+                  disabled={savingSolution}
+                  className="inline-flex items-center rounded-xl border border-indigo-500/50 bg-indigo-500/20 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-500/30 disabled:opacity-60 transition-colors"
+                >
+                  {savingSolution ? t("saving") : t("saveResolution")}
+                </button>
+              </div>
+            </section>
+
+            <section className={cardClass}>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-100">References</h2>
+                <p className="text-xs text-slate-400">{t("referencesSubtitle")}</p>
+              </div>
+              <ReferencesList
+                ticketId={id}
+                references={references}
+                onRefresh={loadReferences}
+              />
+            </section>
+
+            <section className={cardClass}>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-100">Knowledge</h2>
+                <p className="text-xs text-slate-400">
+                  {t("knowledgeSubtitle")}
+                </p>
+              </div>
+              {ticket.knowledge_page_id ? (
+                <div className="space-y-2.5">
+                  <p className="text-xs text-slate-500">
+                    {t("knowledgeAlreadyLinked")}
+                  </p>
+                  <Link
+                    href={`/knowledge/${ticket.knowledge_page_id}${(ticket.project_id ?? projectIdFromQuery) ? `?projectId=${ticket.project_id ?? projectIdFromQuery}` : ""}`}
+                    className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/40 bg-indigo-500/15 px-3 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/25 transition-colors"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    Open Knowledge Page
+                  </Link>
+                </div>
+              ) : ticket.project_id ? (
+                <div className="space-y-2.5">
+                  <p className="text-xs text-slate-500">
+                    {t("knowledgePublishHint")}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleConvertToKnowledge}
+                    disabled={converting}
+                    className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/20 px-3 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/30 disabled:opacity-60 transition-colors"
+                  >
+                    {converting ? t("converting") : t("convertToKnowledge")}
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  {t("knowledgeNeedsProject")}
+                </p>
+              )}
+            </section>
+          </div>
         </div>
-        <div className="px-4 py-4">
-          {ticket.knowledge_page_id ? (
-            <Link
-              href={`/knowledge/${ticket.knowledge_page_id}${(ticket.project_id ?? projectIdFromQuery) ? `?projectId=${ticket.project_id ?? projectIdFromQuery}` : ""}`}
-              className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
-            >
-              <BookOpen className="h-4 w-4" />
-              Open Knowledge Page
-            </Link>
-          ) : ticket.project_id ? (
-            <button
-              type="button"
-              onClick={handleConvertToKnowledge}
-              disabled={converting}
-              className="inline-flex items-center gap-2 rounded-lg border border-indigo-500 bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
-            >
-              {converting ? "Converting…" : "Convert to Knowledge Page"}
-            </button>
-          ) : (
-            <p className="text-sm text-slate-500">Link a project to convert this ticket into a knowledge page.</p>
-          )}
-        </div>
-      </section>
+      </div>
     </div>
   );
 }
@@ -555,6 +635,7 @@ function ReferencesList({
   references: TicketReference[];
   onRefresh: () => void;
 }) {
+  const t = useTranslations("tickets.detail.references");
   const [type, setType] = useState<TicketReference["type"]>("link");
   const [value, setValue] = useState("");
   const [adding, setAdding] = useState(false);
@@ -587,20 +668,20 @@ function ReferencesList({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {references.length === 0 ? (
-        <p className="text-sm text-slate-500">No references yet.</p>
+        <p className="text-sm text-slate-500">{t("empty")}</p>
       ) : (
         <ul className="space-y-2">
           {references.map((ref) => (
             <li
               key={ref.id}
-              className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2"
+              className="flex items-center justify-between gap-2 rounded-xl border border-slate-700/60 bg-slate-800/40 px-3 py-2"
             >
-              <span className="text-[11px] font-medium text-slate-600 uppercase">{ref.type.replace("_", " ")}</span>
-              <span className="min-w-0 flex-1 truncate text-sm text-slate-800" title={ref.value}>
+              <span className="text-[11px] font-medium text-slate-400 uppercase">{ref.type.replace("_", " ")}</span>
+              <span className="min-w-0 flex-1 truncate text-sm text-slate-200" title={ref.value}>
                 {ref.type === "link" && ref.value.startsWith("http") ? (
-                  <a href={ref.value} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                  <a href={ref.value} target="_blank" rel="noopener noreferrer" className="text-indigo-300 hover:underline">
                     {ref.value}
                   </a>
                 ) : (
@@ -611,38 +692,45 @@ function ReferencesList({
                 type="button"
                 onClick={() => handleDelete(ref.id)}
                 disabled={deletingId === ref.id}
-                className="text-xs text-slate-500 hover:text-red-600 disabled:opacity-50"
+                className="text-xs text-slate-500 hover:text-red-300 disabled:opacity-50"
               >
-                Remove
+                {t("remove")}
               </button>
             </li>
           ))}
         </ul>
       )}
-      <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-2">
-        <select
-          value={type}
-          onChange={(e) => setType(e.target.value as TicketReference["type"])}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-        >
-          <option value="sap_note">SAP Note</option>
-          <option value="link">Link</option>
-          <option value="document">Document</option>
-        </select>
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={type === "link" ? "https://..." : "Value"}
-          className="min-w-[200px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={adding || !value.trim()}
-          className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
-        >
-          {adding ? "Adding…" : "Add"}
-        </button>
+      <form
+        onSubmit={handleAdd}
+        className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-3 space-y-2.5 ring-1 ring-slate-100"
+      >
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[140px_minmax(0,1fr)]">
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value as TicketReference["type"])}
+            className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+          >
+            <option value="sap_note">SAP Note</option>
+            <option value="link">Link</option>
+            <option value="document">{t("document")}</option>
+          </select>
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={type === "link" ? "https://..." : t("value")}
+            className="w-full rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+          />
+        </div>
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={adding || !value.trim()}
+            className="rounded-xl border border-indigo-500/50 bg-indigo-500/20 px-4 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/30 disabled:opacity-50 transition-colors"
+          >
+            {adding ? t("adding") : t("add")}
+          </button>
+        </div>
       </form>
     </div>
   );

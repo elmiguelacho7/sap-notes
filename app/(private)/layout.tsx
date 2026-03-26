@@ -3,7 +3,9 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { supabase } from "../../lib/supabaseClient";
+import { buildShellBreadcrumbs } from "@/lib/privateShellTitles";
 import { UserMenu } from "@/components/UserMenu";
 import { GlobalAssistantBubble } from "@/components/ai/GlobalAssistantBubble";
 import { AppShell } from "@/components/ui/layout/AppShell";
@@ -12,64 +14,6 @@ import { Header } from "@/components/ui/header/Header";
 import { HeaderCommandTrigger, HeaderCommandTriggerIcon } from "@/components/ui/header/HeaderCommandTrigger";
 import { QuickActionMenu } from "@/components/ui/actions/QuickActionMenu";
 import { CommandPalette } from "@/components/command-palette/CommandPalette";
-import type { BreadcrumbItem } from "@/components/ui/header/Breadcrumbs";
-
-const PAGE_TITLES: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/my-work": "My Work",
-  "/notes": "Notas",
-  "/tasks": "Tasks",
-  "/projects": "Proyectos",
-  "/knowledge": "Knowledge Explorer",
-  "/knowledge/search": "Search",
-  "/knowledge/documents": "Spaces",
-  "/knowledge/spaces": "Documents",
-  "/search": "Búsqueda",
-  "/tickets": "Tickets",
-  "/process-flows": "Flujos de proceso",
-  "/account": "Settings",
-  "/admin": "Administración",
-};
-
-function getPageTitle(pathname: string): string {
-  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
-  if (pathname.startsWith("/projects/") && pathname !== "/projects") return "Proyecto";
-  if (pathname.startsWith("/notes/")) return "Nota";
-  if (pathname.startsWith("/knowledge/")) return "Knowledge";
-  if (pathname.startsWith("/tickets")) return "Tickets";
-  if (pathname.startsWith("/tasks")) return "Tareas";
-  if (pathname.startsWith("/my-work")) return "My Work";
-  return "Project Hub";
-}
-
-function buildBreadcrumbs(pathname: string): BreadcrumbItem[] {
-  if (!pathname || pathname === "/") return [{ label: "Dashboard", href: "/dashboard" }];
-  // Project workspace: show only "Proyectos" — project name lives in the workspace header
-  if (pathname.startsWith("/projects/") && pathname !== "/projects") {
-    return [{ label: "Proyectos", href: "/projects" }];
-  }
-  const segments = pathname.split("/").filter(Boolean);
-  if (segments.length === 0) return [{ label: getPageTitle(pathname) }];
-  const items: BreadcrumbItem[] = [];
-  let acc = "";
-  for (let i = 0; i < segments.length; i++) {
-    acc += `/${segments[i]}`;
-    const isLast = i === segments.length - 1;
-    items.push({
-      label: getPageTitle(acc),
-      href: isLast ? undefined : acc,
-    });
-  }
-  return items;
-}
-
-/** Standard (narrow) workspace: account, admin. Wide for all other private pages. */
-function isWideWorkspacePage(pathname: string): boolean {
-  if (!pathname) return true;
-  if (pathname === "/account") return false;
-  if (pathname === "/admin" || pathname.startsWith("/admin/")) return false;
-  return true;
-}
 
 type AppRole = "superadmin" | "consultant";
 
@@ -86,6 +30,11 @@ export default function PrivateLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const tShell = useTranslations("common.shell");
+  const breadcrumbs = buildShellBreadcrumbs(
+    pathname ?? "/",
+    tShell as (key: string) => string
+  );
   const [isReady, setIsReady] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [hoverExpanded, setHoverExpanded] = useState(false);
@@ -95,13 +44,22 @@ export default function PrivateLayout({
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [sidebarProjectName, setSidebarProjectName] = useState<string | null>(null);
   const [sidebarProjectSubtitle, setSidebarProjectSubtitle] = useState<string | null>(null);
+  const [sidebarProjectClientName, setSidebarProjectClientName] = useState<string | null>(null);
+  const [sidebarProjectStartDate, setSidebarProjectStartDate] = useState<string | null>(null);
+  const [sidebarProjectPlannedEnd, setSidebarProjectPlannedEnd] = useState<string | null>(null);
   const projectId = getProjectIdFromPath(pathname ?? "");
 
+  /** Only persist user preference for collapsed; never persist hover/overlay state. */
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem("ph-sidebar-collapsed");
     if (stored === "true") setCollapsed(true);
   }, []);
+
+  /** Route change: drop transient hover-expand so timers/state cannot desync across navigation. */
+  useEffect(() => {
+    setHoverExpanded(false);
+  }, [pathname]);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user }, error: userError }) => {
@@ -184,6 +142,9 @@ export default function PrivateLayout({
     if (!projectId) {
       setSidebarProjectName(null);
       setSidebarProjectSubtitle(null);
+      setSidebarProjectClientName(null);
+      setSidebarProjectStartDate(null);
+      setSidebarProjectPlannedEnd(null);
       return;
     }
     let cancelled = false;
@@ -191,17 +152,42 @@ export default function PrivateLayout({
       try {
         const { data } = await supabase
           .from("projects")
-          .select("name, status")
+          .select("name, status, client_id, start_date, planned_end_date")
           .eq("id", projectId)
           .single();
         if (cancelled) return;
-        const row = data as { name?: string | null; status?: string | null } | null;
-        setSidebarProjectName(row?.name?.trim() || "Project");
+        const row = data as {
+          name?: string | null;
+          status?: string | null;
+          client_id?: string | null;
+          start_date?: string | null;
+          planned_end_date?: string | null;
+        } | null;
+        setSidebarProjectName(row?.name?.trim() || null);
         setSidebarProjectSubtitle(row?.status?.trim() || null);
+        setSidebarProjectStartDate(row?.start_date?.trim() || null);
+        setSidebarProjectPlannedEnd(row?.planned_end_date?.trim() || null);
+        if (row?.client_id) {
+          const { data: clientRow } = await supabase
+            .from("clients")
+            .select("name, display_name")
+            .eq("id", row.client_id)
+            .single();
+          if (cancelled) return;
+          const c = clientRow as { display_name?: string | null; name?: string | null } | null;
+          setSidebarProjectClientName(
+            (c?.display_name || c?.name || "").trim() || null
+          );
+        } else {
+          setSidebarProjectClientName(null);
+        }
       } catch {
         if (cancelled) return;
-        setSidebarProjectName("Project");
+        setSidebarProjectName(null);
         setSidebarProjectSubtitle(null);
+        setSidebarProjectClientName(null);
+        setSidebarProjectStartDate(null);
+        setSidebarProjectPlannedEnd(null);
       }
     })();
     return () => {
@@ -215,11 +201,12 @@ export default function PrivateLayout({
   };
 
   if (!isReady) {
-    return <div className="min-h-screen bg-slate-950 flex items-center justify-center" />;
+    return <div className="min-h-screen rb-shell-bg flex items-center justify-center" />;
   }
 
   return (
     <AppShell
+      scrollOnRouteChangeKey={pathname ?? "/"}
       mobileMenuOpen={mobileMenuOpen}
       onMobileMenuClose={() => setMobileMenuOpen(false)}
       sidebarCollapsed={collapsed}
@@ -235,6 +222,9 @@ export default function PrivateLayout({
           userEmail={userEmail}
           projectName={sidebarProjectName}
           projectSubtitle={sidebarProjectSubtitle}
+          projectClientName={sidebarProjectClientName}
+          projectStartDate={sidebarProjectStartDate}
+          projectPlannedEndDate={sidebarProjectPlannedEnd}
           onNavigate={handleNavigate}
           pathname={pathname ?? ""}
           onLogout={handleLogout}
@@ -250,6 +240,9 @@ export default function PrivateLayout({
             userEmail={userEmail}
             projectName={sidebarProjectName}
             projectSubtitle={sidebarProjectSubtitle}
+            projectClientName={sidebarProjectClientName}
+            projectStartDate={sidebarProjectStartDate}
+            projectPlannedEndDate={sidebarProjectPlannedEnd}
             onNavigate={handleNavigate}
             pathname={pathname ?? ""}
             onLogout={handleLogout}
@@ -260,7 +253,7 @@ export default function PrivateLayout({
       }
       header={
         <Header
-          breadcrumbs={buildBreadcrumbs(pathname ?? "/")}
+          breadcrumbs={breadcrumbs}
           center={<HeaderCommandTrigger />}
           right={
             <>

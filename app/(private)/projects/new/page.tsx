@@ -7,6 +7,17 @@ import { handleSupabaseError } from "@/lib/supabaseError";
 import { createDefaultPhasesForProject } from "@/lib/services/projectPhaseService";
 import { INDUSTRY_OPTIONS, ACCOUNT_TIER_OPTIONS } from "@/lib/constants/clientOptions";
 import { getAllCountryOptions, getStateOptions, getCountryDisplayName } from "@/lib/countryStateCity";
+import {
+  FORM_FOOTER_ACTIONS_CLASS,
+  FORM_PAGE_BLOCK_CLASS,
+  FORM_PAGE_SHELL_CLASS,
+  FORM_PAGE_SUBTITLE_CLASS,
+  FORM_PAGE_TITLE_BLOCK_CLASS,
+  FORM_PAGE_TITLE_CLASS,
+  FORM_SECTION_DIVIDER_CLASS,
+  FORM_SECTION_HELPER_CLASS,
+  FORM_SECTION_TITLE_CLASS,
+} from "@/components/layout/formPageClasses";
 
 type Client = {
   id: string;
@@ -30,10 +41,10 @@ const ENVIRONMENT_OPTIONS = [
 ];
 
 const STATUS_OPTIONS = [
-  { label: "Planeado", value: "planned" },
-  { label: "En progreso", value: "in_progress" },
-  { label: "Completado", value: "completed" },
-  { label: "Archivado", value: "archived" },
+  { label: "Planned", value: "planned" },
+  { label: "In progress", value: "in_progress" },
+  { label: "Completed", value: "completed" },
+  { label: "Archived", value: "archived" },
 ];
 
 export default function NewProjectPage() {
@@ -191,7 +202,7 @@ export default function NewProjectPage() {
         client?: { id: string; name: string; display_name?: string | null; country?: string | null; industry?: string | null; account_tier?: string | null; sap_relevance_summary?: string | null };
       };
       if (!res.ok) {
-        setCreateClientError(data.error ?? "Error al crear el cliente.");
+        setCreateClientError(data.error ?? "Could not create the client.");
         return;
       }
       if (data.client) {
@@ -208,7 +219,7 @@ export default function NewProjectPage() {
         setClientId(c.id);
       }
     } catch {
-      setCreateClientError("Error de conexión.");
+      setCreateClientError("Connection error. Please try again.");
     } finally {
       setCreatingClient(false);
     }
@@ -220,12 +231,12 @@ export default function NewProjectPage() {
 
     // Validaciones básicas
     if (!name.trim()) {
-      setErrorMsg("El nombre del proyecto es obligatorio.");
+      setErrorMsg("Project name is required.");
       return;
     }
 
     if (!environmentType) {
-      setErrorMsg("Debes indicar el tipo de entorno SAP.");
+      setErrorMsg("Please specify the SAP environment type.");
       return;
     }
 
@@ -266,11 +277,16 @@ export default function NewProjectPage() {
 
       if (!createRes.ok || !createData.id) {
         if (createRes.status === 403) {
-          setErrorMsg("No tienes permiso para crear proyectos.");
+          setErrorMsg("You don't have permission to create projects.");
         } else if (createRes.status === 409 && createData.quota?.limit != null) {
-          setErrorMsg(`Has alcanzado el máximo de proyectos permitidos (${createData.quota.current ?? 0} / ${createData.quota.limit}).`);
+          setErrorMsg(
+            `You’ve reached the maximum number of allowed projects (${createData.quota.current ?? 0} / ${createData.quota.limit}).`
+          );
         } else {
-          setErrorMsg(createData.error ?? "Error creando el proyecto. Revisa los datos del formulario o contacta soporte.");
+          setErrorMsg(
+            createData.error ??
+              "Could not create the project. Review the form details or contact support."
+          );
         }
         setSaving(false);
         return;
@@ -298,12 +314,16 @@ export default function NewProjectPage() {
           };
           if (!planRes.ok || planJson.error) {
             planFailed = true;
-            setPlanWarning(planJson.message ?? planJson.error ?? "No se pudo generar el plan de actividades.");
+            setPlanWarning(
+              planJson.message ??
+                planJson.error ??
+                "Could not generate the activity plan."
+            );
           }
         } catch (planErr) {
           console.warn("Plan generation error", planErr);
           planFailed = true;
-          setPlanWarning("No se pudo generar el plan de actividades.");
+          setPlanWarning("Could not generate the activity plan.");
         }
       } else {
         await createDefaultPhasesForProject(projectId);
@@ -333,7 +353,7 @@ export default function NewProjectPage() {
       }
     } catch (err) {
       handleSupabaseError("projects new submit", err);
-      setErrorMsg("Se ha producido un error inesperado.");
+      setErrorMsg("An unexpected error occurred.");
       setSaving(false);
     }
   };
@@ -343,31 +363,33 @@ export default function NewProjectPage() {
   // ==========================
   if (createAllowed === null) {
     return (
-      <div className="w-full px-6 py-8">
-        <div className="max-w-4xl mx-auto">
-          <p className="text-sm text-slate-600">Comprobando permisos…</p>
+      <div className="w-full min-w-0 bg-[rgb(var(--rb-shell-bg))]">
+        <div className={FORM_PAGE_SHELL_CLASS}>
+          <div className={FORM_PAGE_BLOCK_CLASS}>
+          <p className="text-sm text-[rgb(var(--rb-text-secondary))]">Checking permissions…</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full px-6 py-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="w-full min-w-0 bg-[rgb(var(--rb-shell-bg))]">
+      <div className={FORM_PAGE_SHELL_CLASS}>
+        <div className={FORM_PAGE_BLOCK_CLASS}>
         {/* HEADER */}
-        <header className="mb-6">
-          <h1 className="text-2xl font-semibold text-slate-900">
-            Nuevo proyecto
-          </h1>
-          <p className="mt-1 text-sm text-slate-600 max-w-2xl">
-            Define los datos clave del proyecto SAP. Esta información se
-            utilizará en el dashboard, en las notas y en el contexto del
-            asistente de IA.
-          </p>
+        <header className="mb-8">
+          <div className={FORM_PAGE_TITLE_BLOCK_CLASS}>
+            <h1 className={FORM_PAGE_TITLE_CLASS}>New project</h1>
+            <p className={FORM_PAGE_SUBTITLE_CLASS}>
+            Define the key details of your SAP project. This information powers the dashboard,
+            notes, and the AI assistant context.
+            </p>
+          </div>
         </header>
 
         {/* CARD PRINCIPAL */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-6">
+        <div className="bg-[rgb(var(--rb-surface))] rounded-2xl shadow-md border border-[rgb(var(--rb-surface-border))]/70 p-6 space-y-7">
           {errorMsg && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-2">
               {errorMsg}
@@ -379,41 +401,37 @@ export default function NewProjectPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-7">
             {/* DATOS BÁSICOS */}
-            <section className="space-y-3">
-              <h2 className="text-sm font-semibold text-slate-900">
-                Datos básicos
-              </h2>
-              <p className="text-xs text-slate-500">
-                Nombre, cliente y descripción general del proyecto.
-              </p>
+            <section className="space-y-4">
+              <h2 className={FORM_SECTION_TITLE_CLASS}>Basic information</h2>
+              <p className={FORM_SECTION_HELPER_CLASS}>Project name, client, and a brief overview.</p>
 
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700">
-                    Nombre del proyecto <span className="text-red-500">*</span>
+                  <label className="text-xs font-medium text-[rgb(var(--rb-text-secondary))]">
+                    Project name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Implementación S/4HANA Public Cloud · Entidades TP"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    placeholder="e.g. S/4HANA Public Cloud implementation · TP entities"
+                    className="w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700">
-                    Cliente
+                  <label className="text-xs font-medium text-[rgb(var(--rb-text-secondary))]">
+                    Client
                   </label>
                   <div className="flex gap-2">
                     <select
                       value={clientId}
                       onChange={(e) => setClientId(e.target.value)}
-                      className="flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                      className="flex-1 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
                     >
-                      <option value="">Sin cliente asignado todavía</option>
+                      <option value="">No client assigned yet</option>
                       {clients.map((client) => (
                         <option key={client.id} value={client.id}>
                           {client.display_name || client.name}
@@ -428,27 +446,27 @@ export default function NewProjectPage() {
                         setNewClientName("");
                         setCreateClientModalOpen(true);
                       }}
-                      className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                      className="rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-3 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface))]/80 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--rb-shell-bg))] focus:border-[rgb(var(--rb-brand-primary))]/30"
                     >
-                      Crear cliente
+                      Create client
                     </button>
                   </div>
-                  <p className="text-[11px] text-slate-400">
-                    Si es un proyecto interno o aún no está definido, puedes dejarlo vacío.
+                  <p className="text-[11px] text-[rgb(var(--rb-text-secondary))]">
+                    If this is an internal project or not defined yet, you can leave it blank.
                   </p>
                   {clientId && (() => {
                     const client = clients.find((c) => c.id === clientId);
                     if (!client) return null;
                     return (
-                      <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-sm">
-                        <p className="font-medium text-slate-800">{client.display_name || client.name}</p>
-                        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-600">
-                          {client.country && <span>País: {getCountryDisplayName(client.country)}</span>}
-                          {client.industry && <span>Industria: {client.industry}</span>}
+                      <div className="mt-3 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface-3))]/40 p-3 text-sm">
+                        <p className="font-medium text-[rgb(var(--rb-text-primary))]">{client.display_name || client.name}</p>
+                        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-[rgb(var(--rb-text-secondary))]">
+                          {client.country && <span>Country: {getCountryDisplayName(client.country)}</span>}
+                          {client.industry && <span>Industry: {client.industry}</span>}
                           {client.account_tier && <span>Tier: {client.account_tier}</span>}
                         </div>
                         {client.sap_relevance_summary && (
-                          <p className="mt-2 text-xs text-slate-600 line-clamp-2">{client.sap_relevance_summary}</p>
+                          <p className="mt-2 text-xs text-[rgb(var(--rb-text-secondary))] line-clamp-2">{client.sap_relevance_summary}</p>
                         )}
                       </div>
                     );
@@ -456,38 +474,36 @@ export default function NewProjectPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700">
-                    Descripción
+                  <label className="text-xs font-medium text-[rgb(var(--rb-text-secondary))]">
+                    Description
                   </label>
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={3}
-                    placeholder="Breve resumen del alcance funcional, módulos implicados y objetivo principal del proyecto."
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500 resize-none"
+                    placeholder="Briefly describe the functional scope, modules involved, and the main goal."
+                    className="w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30 resize-none"
                   />
                 </div>
               </div>
             </section>
 
             {/* CONTEXTO SAP */}
-            <section className="space-y-3 pt-4 border-t border-slate-100">
-              <h2 className="text-sm font-semibold text-slate-900">
-                Contexto SAP
-              </h2>
-              <p className="text-xs text-slate-500">
-                Información técnica básica del entorno donde se ejecuta el proyecto.
+            <section className={`space-y-4 ${FORM_SECTION_DIVIDER_CLASS}`}>
+              <h2 className={FORM_SECTION_TITLE_CLASS}>SAP context</h2>
+              <p className={FORM_SECTION_HELPER_CLASS}>
+                Technical basics of the environment where the project will run.
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700">
-                    Tipo de entorno <span className="text-red-500">*</span>
+                  <label className="text-xs font-medium text-[rgb(var(--rb-text-secondary))]">
+                    Environment type <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={environmentType}
                     onChange={(e) => setEnvironmentType(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    className="w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
                   >
                     {ENVIRONMENT_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -498,56 +514,56 @@ export default function NewProjectPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700">
-                    Versión / release SAP
+                  <label className="text-xs font-medium text-[rgb(var(--rb-text-secondary))]">
+                    SAP version / release
                   </label>
                   <input
                     type="text"
                     value={sapVersion}
                     onChange={(e) => setSapVersion(e.target.value)}
-                    placeholder="Ej: S/4HANA 2023 FPS01 · Public Cloud 2408"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    placeholder="e.g. S/4HANA 2023 FPS01 · Public Cloud 2408"
+                    className="w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
                   />
-                  <p className="text-[11px] text-slate-400">
-                    Útil para diferenciar proyectos ECC vs S/4, releases de Public Cloud, etc.
+                  <p className="text-[11px] text-[rgb(var(--rb-text-secondary))]">
+                    Helps distinguish ECC vs S/4, Public Cloud releases, and more.
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700">
-                    Fecha de inicio prevista
+                  <label className="text-xs font-medium text-[rgb(var(--rb-text-secondary))]">
+                    Planned start date
                   </label>
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    className="w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700">
-                    Fecha de fin planificada
+                  <label className="text-xs font-medium text-[rgb(var(--rb-text-secondary))]">
+                    Planned end date
                   </label>
                   <input
                     type="date"
                     value={plannedEndDate}
                     onChange={(e) => setPlannedEndDate(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    className="w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
                   />
-                  <p className="text-[11px] text-slate-400">
-                    Si indicas inicio y fin, se generará un plan inicial de actividades según SAP Activate.
+                  <p className="text-[11px] text-[rgb(var(--rb-text-secondary))]">
+                    If you provide both dates, we’ll generate an initial SAP Activate activity plan.
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700">
-                    Estado del proyecto <span className="text-red-500">*</span>
+                  <label className="text-xs font-medium text-[rgb(var(--rb-text-secondary))]">
+                    Project status <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    className="w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
                   >
                     {STATUS_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -560,38 +576,36 @@ export default function NewProjectPage() {
             </section>
 
             {/* MÓDULOS RELACIONADOS */}
-            <section className="space-y-3 pt-4 border-t border-slate-100">
-              <h2 className="text-sm font-semibold text-slate-900">
-                Módulos relacionados
-              </h2>
-              <p className="text-xs text-slate-500">
-                Selecciona los módulos SAP que están dentro del alcance del proyecto.
-                Esto se utilizará en el dashboard, en los resúmenes y en el contexto de IA.
+            <section className={`space-y-4 ${FORM_SECTION_DIVIDER_CLASS}`}>
+              <h2 className={FORM_SECTION_TITLE_CLASS}>Related modules</h2>
+              <p className={FORM_SECTION_HELPER_CLASS}>
+                Select the SAP modules included in this project scope. This will be used in the dashboard,
+                summaries, and AI context.
               </p>
 
               {modules.length === 0 ? (
-                <p className="text-xs text-slate-400">
-                  No hay módulos configurados todavía en la tabla <code>modules</code>.
+                <p className="text-xs text-[rgb(var(--rb-text-secondary))]">
+                  No modules are configured yet in the <code>modules</code> table.
                 </p>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-60 overflow-y-auto pr-1">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 max-h-60 overflow-y-auto pr-2">
                   {modules.map((m) => {
                     const checked = selectedModuleIds.includes(m.id);
                     return (
                       <label
                         key={m.id}
-                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs cursor-pointer transition
+                        className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-xs cursor-pointer transition-[border-color,background-color,transform,box-shadow] duration-150 hover:shadow-sm hover:-translate-y-[1px]
                           ${
                             checked
-                              ? "border-blue-500 bg-blue-50 text-blue-900"
-                              : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-slate-300"
+                              ? "border-[rgb(var(--rb-brand-primary))]/35 bg-[rgb(var(--rb-brand-primary))]/10 text-[rgb(var(--rb-brand-primary))]"
+                              : "border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/50 text-[rgb(var(--rb-text-primary))] hover:border-[rgb(var(--rb-brand-primary-hover))]/60"
                           }`}
                       >
                         <input
                           type="checkbox"
                           checked={checked}
                           onChange={() => toggleModuleSelection(m.id)}
-                          className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          className="h-3.5 w-3.5 rounded border-[rgb(var(--rb-surface-border))]/70 text-[rgb(var(--rb-brand-primary))] focus:ring-[rgb(var(--rb-brand-ring))]/35"
                         />
                         <span className="truncate">
                           <span className="font-medium">{m.code}</span>
@@ -603,27 +617,26 @@ export default function NewProjectPage() {
                 </div>
               )}
 
-              <p className="text-[11px] text-slate-400">
-                Puedes añadir o quitar módulos más adelante desde la ficha del proyecto
-                si ampliáis el alcance.
+              <p className="text-[11px] text-[rgb(var(--rb-text-secondary))]">
+                You can add or remove modules later from the project page if you expand the scope.
               </p>
             </section>
 
             {/* ACCIONES */}
-            <div className="pt-4 flex items-center justify-between gap-3 border-t border-slate-100">
+            <div className={FORM_FOOTER_ACTIONS_CLASS}>
               <button
                 type="button"
                 onClick={() => router.push("/projects")}
-                className="text-sm text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-100"
+                className="inline-flex items-center rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-secondary))] transition-colors hover:bg-[rgb(var(--rb-surface))]/80"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 rounded-xl border border-transparent bg-[rgb(var(--rb-brand-primary))] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[rgb(var(--rb-brand-primary-hover))] active:bg-[rgb(var(--rb-brand-primary-active))] disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/40"
               >
-                {saving ? "Guardando..." : "Crear proyecto"}
+                {saving ? "Saving..." : "Create project"}
               </button>
             </div>
           </form>
@@ -632,42 +645,42 @@ export default function NewProjectPage() {
         {/* Modal Crear cliente rápido */}
         {createClientModalOpen && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
             onClick={() => !creatingClient && setCreateClientModalOpen(false)}
           >
             <div
-              className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-6"
+              className="w-full max-w-md rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-6 shadow-lg"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-lg font-semibold text-slate-900 mb-1">
-                Crear cliente rápido
+              <h3 className="text-lg font-semibold text-[rgb(var(--rb-text-primary))] mb-1">
+                Create client
               </h3>
-              <p className="text-xs text-slate-500 mb-4">
-                Puedes completar más información del cliente más adelante en la sección Clientes.
+              <p className="text-xs text-[rgb(var(--rb-text-muted))] mb-4">
+                You can add more client details later in the Clients section.
               </p>
               <form onSubmit={handleCreateClient} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Nombre del cliente <span className="text-red-500">*</span>
+                  <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1">
+                    Client name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={newClientName}
                     onChange={(e) => setNewClientName(e.target.value)}
-                    placeholder="Ej: Acme Corp"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    placeholder="e.g. Acme Corp"
+                    className="w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-3 py-2.5 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/35 disabled:opacity-60 disabled:cursor-not-allowed"
                     disabled={creatingClient}
                     autoFocus
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Industria
+                  <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1">
+                    Industry
                   </label>
                   <select
                     value={newClientIndustry}
                     onChange={(e) => setNewClientIndustry(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    className="w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-3 py-2.5 text-sm shadow-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/35 disabled:opacity-60 disabled:cursor-not-allowed"
                     disabled={creatingClient}
                   >
                     {INDUSTRY_OPTIONS.map((o) => (
@@ -676,13 +689,13 @@ export default function NewProjectPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    País
+                  <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1">
+                    Country
                   </label>
                   <select
                     value={newClientCountry}
                     onChange={(e) => { setNewClientCountry(e.target.value); setNewClientRegion(""); }}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    className="w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-3 py-2.5 text-sm shadow-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/35 disabled:opacity-60 disabled:cursor-not-allowed"
                     disabled={creatingClient}
                   >
                     <option value="">—</option>
@@ -692,13 +705,13 @@ export default function NewProjectPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Región / Estado
+                  <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1">
+                    Region / State
                   </label>
                   <select
                     value={newClientRegion}
                     onChange={(e) => setNewClientRegion(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    className="w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-3 py-2.5 text-sm shadow-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/35 disabled:opacity-60 disabled:cursor-not-allowed"
                     disabled={creatingClient}
                   >
                     <option value="">—</option>
@@ -708,13 +721,13 @@ export default function NewProjectPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1">
                     Tier
                   </label>
                   <select
                     value={newClientAccountTier}
                     onChange={(e) => setNewClientAccountTier(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500"
+                    className="w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-3 py-2.5 text-sm shadow-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/35 disabled:opacity-60 disabled:cursor-not-allowed"
                     disabled={creatingClient}
                   >
                     {ACCOUNT_TIER_OPTIONS.map((o) => (
@@ -729,16 +742,16 @@ export default function NewProjectPage() {
                   <button
                     type="button"
                     onClick={() => !creatingClient && setCreateClientModalOpen(false)}
-                    className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    className="rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-secondary))] transition-colors hover:bg-[rgb(var(--rb-surface))]/80"
                   >
-                    Cancelar
+                    Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={!newClientName.trim() || creatingClient}
-                    className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    className="rounded-xl bg-[rgb(var(--rb-brand-primary))] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[rgb(var(--rb-brand-primary-hover))] active:bg-[rgb(var(--rb-brand-primary-active))] disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/40"
                   >
-                    {creatingClient ? "Creando…" : "Crear"}
+                    {creatingClient ? "Creating…" : "Create"}
                   </button>
                 </div>
               </form>
@@ -746,6 +759,7 @@ export default function NewProjectPage() {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

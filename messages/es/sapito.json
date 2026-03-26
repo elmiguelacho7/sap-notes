@@ -1,0 +1,58 @@
+{
+  "dock": {
+    "panelAria": "Sapito Copiloto del proyecto",
+    "title": "Sapito — Proyecto",
+    "subtitle": "Copiloto del proyecto (este espacio)",
+    "helper": "Respondiendo sobre este proyecto",
+    "closePanel": "Cerrar panel",
+    "openTitle": "Project Copilot — Sapito",
+    "openAria": "Abrir Project Copilot",
+    "launcherTitle": "Sapito",
+    "launcherSubtitle": "Project Copilot"
+  },
+  "chat": {
+    "header": {
+      "title": "Sapito AI",
+      "subtitle": "Copiloto del proyecto"
+    },
+    "intro": {
+      "whatICanDoTitle": "Qué puedo hacer por ti",
+      "whatICanDoBody": "Soy tu asistente de proyecto con contexto de tareas, tickets y conocimiento. Puedo ayudarte a:",
+      "bullets": {
+        "projectStatus": "Resumir el estado del proyecto y tareas vencidas",
+        "tickets": "Revisar tickets abiertos y prioridades",
+        "knowledge": "Buscar en la base de conocimiento del proyecto",
+        "nextSteps": "Sugerir siguientes pasos y riesgos"
+      },
+      "tryAsking": "Prueba preguntando:"
+    },
+    "suggestions": {
+      "overdueTasks": "¿Qué tareas están vencidas?",
+      "openTickets": "¿Qué tickets siguen abiertos?",
+      "knowledgeTopic": "¿Qué conocimiento tenemos sobre este tema?"
+    },
+    "quickActions": {
+      "viewOverdueTasks": "Ver tareas vencidas",
+      "viewOpenTickets": "Ver tickets abiertos",
+      "goToTasks": "Ir a Tasks"
+    },
+    "grounding": {
+      "syncedDocs": "Según la documentación sincronizada",
+      "general": "Respuesta general (sin documentación indexada)"
+    },
+    "states": {
+      "thinking": "Sapito está pensando…"
+    },
+    "input": {
+      "placeholder": "Mensaje, error SAP o consulta sobre este proyecto…",
+      "aria": "Mensaje para Sapito del proyecto",
+      "send": "Enviar",
+      "sending": "Enviando…"
+    },
+    "errors": {
+      "noResponse": "No se pudo obtener respuesta.",
+      "noReplyNow": "No he podido obtener una respuesta de Sapito ahora mismo.",
+      "aiRequestFailed": "No se pudo obtener respuesta de la IA. Inténtalo de nuevo."
+    }
+  }
+}

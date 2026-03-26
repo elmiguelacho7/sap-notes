@@ -2,12 +2,15 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabaseClient";
 import { AppPageShell } from "@/components/ui/layout/AppPageShell";
+import { FORM_PAGE_BLOCK_CLASS, FORM_PAGE_SHELL_CLASS } from "@/components/layout/formPageClasses";
 
 const MIN_PASSWORD_LENGTH = 8;
 
 export default function AccountPage() {
+  const t = useTranslations("account");
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState<string | null>(null);
@@ -61,13 +64,13 @@ export default function AccountPage() {
     const confirm = confirmNewPassword.trim();
 
     const errors: Record<string, string> = {};
-    if (!current) errors.currentPassword = "La contraseña actual es obligatoria.";
-    if (!newPwd) errors.newPassword = "La nueva contraseña es obligatoria.";
+    if (!current) errors.currentPassword = t("errors.currentRequired");
+    if (!newPwd) errors.newPassword = t("errors.newRequired");
     else if (newPwd.length < MIN_PASSWORD_LENGTH)
-      errors.newPassword = `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`;
-    if (!confirm) errors.confirmNewPassword = "Repite la nueva contraseña.";
+      errors.newPassword = t("errors.minLength", { min: MIN_PASSWORD_LENGTH });
+    if (!confirm) errors.confirmNewPassword = t("errors.confirmRequired");
     else if (newPwd !== confirm)
-      errors.confirmNewPassword = "Las contraseñas no coinciden.";
+      errors.confirmNewPassword = t("errors.passwordMismatch");
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -78,7 +81,7 @@ export default function AccountPage() {
 
     const userEmail = email;
     if (!userEmail) {
-      setErrorMsg("No se pudo obtener tu correo. Cierra sesión y vuelve a entrar.");
+      setErrorMsg(t("errors.noEmail"));
       setSaving(false);
       return;
     }
@@ -89,7 +92,7 @@ export default function AccountPage() {
     });
 
     if (signInError) {
-      setErrorMsg("La contraseña actual no es correcta.");
+      setErrorMsg(t("errors.currentIncorrect"));
       setSaving(false);
       return;
     }
@@ -101,11 +104,11 @@ export default function AccountPage() {
     setSaving(false);
 
     if (updateError) {
-      setErrorMsg("No se pudo actualizar la contraseña. Inténtalo de nuevo.");
+      setErrorMsg(t("errors.updateFailed"));
       return;
     }
 
-    setSuccessMsg("Contraseña actualizada correctamente.");
+    setSuccessMsg(t("success.updated"));
     setCurrentPassword("");
     setNewPassword("");
     setConfirmNewPassword("");
@@ -115,173 +118,238 @@ export default function AccountPage() {
     router.push("/?message=password-updated");
   };
 
-  const cardClass = "rounded-xl border border-slate-700/60 bg-slate-800/40 p-5";
+  const cardClass =
+    "rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-5 shadow-sm";
+  const labelClass = "block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1.5";
   const inputClass =
-    "w-full rounded-xl border border-slate-600/80 bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 disabled:opacity-60";
-  const labelClass = "block text-sm font-medium text-slate-300 mb-1.5";
+    "w-full h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface-3))]/20 px-3 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30 focus:border-[rgb(var(--rb-brand-primary))]/30 disabled:opacity-60";
 
   if (loading) {
     return (
-      <div className="bg-slate-950 min-h-full">
-        <AppPageShell>
-          <div className="py-12 text-center">
-            <p className="text-sm font-medium text-slate-300">Cargando…</p>
-            <p className="mt-1 text-sm text-slate-500">Un momento.</p>
+      <AppPageShell>
+        <div className={FORM_PAGE_SHELL_CLASS}>
+          <div className={`${FORM_PAGE_BLOCK_CLASS} py-12 text-center`}>
+            <p className="text-sm font-medium text-[rgb(var(--rb-text-primary))]">{t("loading")}</p>
+            <p className="mt-1 text-sm text-[rgb(var(--rb-text-muted))]">{t("loadingSubtext")}</p>
           </div>
-        </AppPageShell>
-      </div>
+        </div>
+      </AppPageShell>
     );
   }
 
+  const initials = (() => {
+    const base = (fullName ?? email ?? "").trim();
+    if (!base) return "U";
+    const parts = base.split(/\s+/).filter(Boolean);
+    const first = (parts[0] ?? base).charAt(0).toUpperCase();
+    const last = parts.length > 1 ? parts[parts.length - 1].charAt(0).toUpperCase() : "";
+    return `${first}${last}`.slice(0, 2);
+  })();
+
   return (
-    <div className="bg-slate-950 min-h-full">
-      <AppPageShell>
-        <div className="space-y-6">
-          <div className="mb-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-100">Cuenta</h1>
-            <p className="mt-1 text-sm text-slate-400">Información de tu cuenta, seguridad y preferencias.</p>
-          </div>
-
-        {/* Profile */}
-        <section className={cardClass}>
-          <h2 className="text-sm font-semibold text-slate-200 mb-4">Profile</h2>
-          <dl className="space-y-4">
-            <div>
-              <dt className={labelClass}>Name</dt>
-              <dd className="text-slate-100">{fullName ?? "—"}</dd>
+    <AppPageShell>
+      <div className={FORM_PAGE_SHELL_CLASS}>
+        <div className={`${FORM_PAGE_BLOCK_CLASS} space-y-6`}>
+          <header className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight text-[rgb(var(--rb-text-primary))]">
+                Settings
+              </h1>
+              <p className="mt-1 text-sm text-[rgb(var(--rb-text-muted))] max-w-3xl">
+                Personal account, security, and preferences.
+              </p>
             </div>
-            <div>
-              <dt className={labelClass}>Email</dt>
-              <dd className="text-slate-100">{email ?? "—"}</dd>
+          </header>
+
+          {/* Profile */}
+          <section className={cardClass}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">Profile</h2>
+                <p className="mt-1 text-sm text-[rgb(var(--rb-text-muted))]">
+                  Your identity and account details.
+                </p>
+              </div>
+              <span className="shrink-0 inline-flex items-center rounded-full border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/25 px-2.5 py-1 text-[11px] font-medium text-[rgb(var(--rb-text-muted))]">
+                Avatar editing planned
+              </span>
             </div>
-            <div>
-              <dt className={labelClass}>Avatar</dt>
-              <dd className="text-sm text-slate-500">Coming soon</dd>
+
+            <div className="mt-5 flex items-start gap-4">
+              <div className="h-12 w-12 rounded-2xl border border-[rgb(var(--rb-brand-primary))]/20 bg-[rgb(var(--rb-brand-primary))]/10 flex items-center justify-center text-sm font-semibold text-[rgb(var(--rb-brand-primary))]">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-[rgb(var(--rb-text-primary))] truncate">
+                  {fullName ?? "Unnamed user"}
+                </p>
+                <p className="mt-0.5 text-sm text-[rgb(var(--rb-text-muted))] truncate">
+                  {email ?? "—"}
+                </p>
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <dt className={labelClass}>Name</dt>
+                    <dd className="text-sm text-[rgb(var(--rb-text-primary))]">{fullName ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className={labelClass}>Email</dt>
+                    <dd className="text-sm text-[rgb(var(--rb-text-primary))]">{email ?? "—"}</dd>
+                  </div>
+                </div>
+              </div>
             </div>
-          </dl>
-        </section>
+          </section>
 
-        {/* Security */}
-        <section className={cardClass}>
-          <h2 className="text-sm font-semibold text-slate-200 mb-4">Security</h2>
+          {/* Security */}
+          <section className={`${cardClass} ring-1 ring-[rgb(var(--rb-surface-border))]/30`}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">Security</h2>
+                <p className="mt-1 text-sm text-[rgb(var(--rb-text-muted))]">
+                  {t("securityHelp")}
+                </p>
+              </div>
+            </div>
 
-          <div className="space-y-4 mb-6">
-            <p className="text-sm text-slate-400">
-              Introduce tu contraseña actual y la nueva contraseña. Tras actualizarla, tendrás que iniciar sesión de nuevo.
-            </p>
-            {errorMsg && (
-              <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
-                {errorMsg}
-              </div>
-            )}
-            {successMsg && (
-              <div className="rounded-xl border border-emerald-800/50 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
-                {successMsg}
-              </div>
-            )}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="account-current-password" className={labelClass}>
-                  Contraseña actual *
-                </label>
-                <input
-                  id="account-current-password"
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className={inputClass}
-                  placeholder="Tu contraseña actual"
-                  required
-                  autoComplete="current-password"
-                  disabled={saving}
-                />
-                {fieldErrors.currentPassword && (
-                  <p className="mt-1 text-xs text-red-400">{fieldErrors.currentPassword}</p>
-                )}
-              </div>
-              <div>
-                <label htmlFor="account-new-password" className={labelClass}>
-                  Nueva contraseña *
-                </label>
-                <input
-                  id="account-new-password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className={inputClass}
-                  placeholder={`Mínimo ${MIN_PASSWORD_LENGTH} caracteres`}
-                  required
-                  minLength={MIN_PASSWORD_LENGTH}
-                  autoComplete="new-password"
-                  disabled={saving}
-                />
-                {fieldErrors.newPassword && (
-                  <p className="mt-1 text-xs text-red-400">{fieldErrors.newPassword}</p>
-                )}
-              </div>
-              <div>
-                <label htmlFor="account-confirm-password" className={labelClass}>
-                  Repetir nueva contraseña *
-                </label>
-                <input
-                  id="account-confirm-password"
-                  type="password"
-                  value={confirmNewPassword}
-                  onChange={(e) => setConfirmNewPassword(e.target.value)}
-                  className={inputClass}
-                  placeholder="Vuelve a escribir la nueva contraseña"
-                  required
-                  autoComplete="new-password"
-                  disabled={saving}
-                />
-                {fieldErrors.confirmNewPassword && (
-                  <p className="mt-1 text-xs text-red-400">{fieldErrors.confirmNewPassword}</p>
-                )}
-              </div>
-              <div className="pt-1">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
-                >
-                  {saving ? "Guardando..." : "Actualizar contraseña"}
-                </button>
-              </div>
-            </form>
-            <p className="text-xs text-slate-500 border-t border-slate-700/60 pt-3">
-              ¿Olvidaste tu contraseña?{" "}
-              <a href="/update-password" className="text-indigo-400 font-medium hover:text-indigo-300">
-                Restablecer contraseña
-              </a>
-            </p>
-          </div>
+            <div className="mt-5 space-y-4">
+              {errorMsg && (
+                <div className="rounded-xl border border-red-200/90 bg-red-50 px-4 py-3 text-sm text-red-800">
+                  {errorMsg}
+                </div>
+              )}
+              {successMsg && (
+                <div className="rounded-xl border border-emerald-200/90 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                  {successMsg}
+                </div>
+              )}
 
-          <div className="border-t border-slate-700/60 pt-4">
-            <p className="text-sm font-medium text-slate-400">Two-factor authentication</p>
-            <p className="mt-0.5 text-xs text-slate-500">Coming soon</p>
-          </div>
-        </section>
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <label htmlFor="account-current-password" className={labelClass}>
+                    {t("currentPassword")} *
+                  </label>
+                  <input
+                    id="account-current-password"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className={inputClass}
+                    placeholder={t("currentPasswordPlaceholder")}
+                    required
+                    autoComplete="current-password"
+                    disabled={saving}
+                  />
+                  {fieldErrors.currentPassword && (
+                    <p className="mt-1.5 text-xs text-rose-700">{fieldErrors.currentPassword}</p>
+                  )}
+                </div>
 
-        {/* Preferences */}
-        <section className={cardClass}>
-          <h2 className="text-sm font-semibold text-slate-200 mb-4">Preferences</h2>
-          <ul className="space-y-4">
-            <li>
-              <span className={labelClass}>Language</span>
-              <p className="text-sm text-slate-500">Coming soon</p>
-            </li>
-            <li>
-              <span className={labelClass}>Timezone</span>
-              <p className="text-sm text-slate-500">Coming soon</p>
-            </li>
-            <li>
-              <span className={labelClass}>Notifications</span>
-              <p className="text-sm text-slate-500">Coming soon</p>
-            </li>
-          </ul>
-        </section>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="account-new-password" className={labelClass}>
+                      {t("newPassword")} *
+                    </label>
+                    <input
+                      id="account-new-password"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className={inputClass}
+                      placeholder={t("newPasswordPlaceholder", { min: MIN_PASSWORD_LENGTH })}
+                      required
+                      minLength={MIN_PASSWORD_LENGTH}
+                      autoComplete="new-password"
+                      disabled={saving}
+                    />
+                    {fieldErrors.newPassword && (
+                      <p className="mt-1.5 text-xs text-rose-700">{fieldErrors.newPassword}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label htmlFor="account-confirm-password" className={labelClass}>
+                      {t("confirmPassword")} *
+                    </label>
+                    <input
+                      id="account-confirm-password"
+                      type="password"
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      className={inputClass}
+                      placeholder={t("confirmPasswordPlaceholder")}
+                      required
+                      autoComplete="new-password"
+                      disabled={saving}
+                    />
+                    {fieldErrors.confirmNewPassword && (
+                      <p className="mt-1.5 text-xs text-rose-700">{fieldErrors.confirmNewPassword}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 pt-2 border-t border-[rgb(var(--rb-surface-border))]/60">
+                  <p className="text-xs text-[rgb(var(--rb-text-muted))]">
+                    {t("forgotPassword")}{" "}
+                    <a
+                      href="/update-password"
+                      className="text-[rgb(var(--rb-brand-primary))] font-medium hover:text-[rgb(var(--rb-brand-primary-hover))]"
+                    >
+                      {t("resetPassword")}
+                    </a>
+                  </p>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-transparent bg-[rgb(var(--rb-brand-primary))] px-4 text-sm font-medium text-white shadow-sm hover:bg-[rgb(var(--rb-brand-primary-hover))] active:bg-[rgb(var(--rb-brand-primary-active))] disabled:opacity-60 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35"
+                  >
+                    {saving ? t("saving") : t("updatePassword")}
+                  </button>
+                </div>
+              </form>
+
+              <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/15 px-4 py-3">
+                <p className="text-sm font-medium text-[rgb(var(--rb-text-secondary))]">Two-factor authentication</p>
+                <p className="mt-0.5 text-xs text-[rgb(var(--rb-text-muted))]">
+                  This will be available in a future update.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Preferences */}
+          <section className={cardClass}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">Preferences</h2>
+                <p className="mt-1 text-sm text-[rgb(var(--rb-text-muted))]">
+                  Personalize how Ribbit looks and behaves for you.
+                </p>
+              </div>
+            </div>
+
+            <ul className="mt-5 divide-y divide-[rgb(var(--rb-surface-border))]/60">
+              {[
+                { title: "Language", detail: "Control the UI language and formats." },
+                { title: "Timezone", detail: "Used for dates, due times, and reporting." },
+                { title: "Notifications", detail: "Choose how you receive updates." },
+              ].map((row) => (
+                <li key={row.title} className="py-4 first:pt-0 last:pb-0">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-[rgb(var(--rb-text-secondary))]">{row.title}</p>
+                      <p className="mt-0.5 text-xs text-[rgb(var(--rb-text-muted))] leading-relaxed">
+                        {row.detail}
+                      </p>
+                    </div>
+                    <span className="shrink-0 inline-flex items-center rounded-full border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/25 px-2.5 py-1 text-[11px] font-medium text-[rgb(var(--rb-text-muted))]">
+                      Planned
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
-      </AppPageShell>
-    </div>
+      </div>
+    </AppPageShell>
   );
 }

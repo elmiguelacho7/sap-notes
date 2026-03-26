@@ -1,0 +1,30 @@
+{
+  "title": "Cuenta",
+  "subtitle": "Información de tu cuenta, seguridad y preferencias.",
+  "loading": "Cargando…",
+  "loadingSubtext": "Un momento.",
+  "securityHelp": "Introduce tu contraseña actual y la nueva contraseña. Tras actualizarla, tendrás que iniciar sesión de nuevo.",
+  "currentPassword": "Contraseña actual",
+  "currentPasswordPlaceholder": "Tu contraseña actual",
+  "newPassword": "Nueva contraseña",
+  "newPasswordPlaceholder": "Mínimo {min} caracteres",
+  "confirmPassword": "Repetir nueva contraseña",
+  "confirmPasswordPlaceholder": "Vuelve a escribir la nueva contraseña",
+  "updatePassword": "Actualizar contraseña",
+  "saving": "Guardando...",
+  "forgotPassword": "¿Olvidaste tu contraseña?",
+  "resetPassword": "Restablecer contraseña",
+  "success": {
+    "updated": "Contraseña actualizada correctamente."
+  },
+  "errors": {
+    "currentRequired": "La contraseña actual es obligatoria.",
+    "newRequired": "La nueva contraseña es obligatoria.",
+    "minLength": "La contraseña debe tener al menos {min} caracteres.",
+    "confirmRequired": "Repite la nueva contraseña.",
+    "passwordMismatch": "Las contraseñas no coinciden.",
+    "noEmail": "No se pudo obtener tu correo. Cierra sesión y vuelve a entrar.",
+    "currentIncorrect": "La contraseña actual no es correcta.",
+    "updateFailed": "No se pudo actualizar la contraseña. Inténtalo de nuevo."
+  }
+}

@@ -1,0 +1,165 @@
+{
+  "projectPage": {
+    "title": "Tareas",
+    "subtitle": "Seguimiento operativo del proyecto: tablero y lista enlazados a actividades, con el mismo flujo de trabajo que el espacio global.",
+    "createBanner": "Preparando nueva tarea…",
+    "scopeHint": "Ámbito: actividad filtrada.",
+    "seeAllTasks": "Ver todas las tareas",
+    "missingProjectId": "No se ha encontrado el identificador del proyecto.",
+    "loadError": "No se pudieron cargar las tareas del proyecto."
+  },
+  "globalPage": {
+    "title": "Tareas",
+    "subtitle": "Gestiona tareas globales y tareas asignadas a ti.",
+    "boardTitle": "Tablero",
+    "boardSubtitle": "Tareas globales (sin proyecto). Crea y mueve tarjetas por estado."
+  },
+  "blockers": {
+    "noActivitiesTitle": "Aún no hay actividades",
+    "noActivitiesBody": "Las tareas del proyecto se vinculan a actividades. Crea actividades en Planificación → Actividades por fase; después podrás añadir tareas aquí.",
+    "planning": "Planificación",
+    "activitiesByPhase": "Actividades por fase",
+    "filteredEmptyTitle": "Ninguna tarea coincide con los filtros",
+    "filteredEmptySub": "Ajusta la búsqueda, el ámbito o los filtros de estado, prioridad o responsable para ver resultados."
+  },
+  "filters": {
+    "searchProject": "Buscar tareas del proyecto…",
+    "searchGlobal": "Buscar tareas…",
+    "defaultSearch": "Buscar tareas…",
+    "allActivities": "Todas las actividades",
+    "allStatuses": "Todos los estados",
+    "allPriorities": "Todas las prioridades",
+    "allAssignees": "Todos los responsables",
+    "tasksGlobal": "Tareas globales",
+    "assignedToMeFilter": "Asignado a mí"
+  },
+  "status": {
+    "pending": "Por hacer",
+    "in_progress": "En progreso",
+    "blocked": "Bloqueado",
+    "review": "En revisión",
+    "done": "Hecho"
+  },
+  "priority": {
+    "high": "Alta",
+    "medium": "Media",
+    "low": "Baja"
+  },
+  "view": {
+    "kanban": "Tablero",
+    "list": "Lista"
+  },
+  "board": {
+    "defaultTitle": "Tablero de tareas",
+    "subtitleProject": "Tareas vinculadas a actividades. Arrastra las tarjetas para cambiar el estado.",
+    "subtitleWithProject": "Tareas asociadas a este proyecto",
+    "subtitleGlobalGeneral": "Tareas generales (no asociadas a un proyecto)",
+    "emptyColumnTitle": "Sin tareas en esta etapa",
+    "emptyColumnBody": "Las tareas de esta etapa aparecen aquí. Puedes arrastrarlas desde otras columnas.",
+    "emptyGlobalColumn": "Sin tareas.",
+    "newTask": "Nueva tarea",
+    "createModalTitle": "Nueva tarea",
+    "titleLabel": "Título",
+    "titlePlaceholder": "Ej. Crear flujo de presupuestos",
+    "activityLabel": "Actividad",
+    "selectActivity": "Selecciona actividad",
+    "assigneeLabel": "Responsable",
+    "priorityLabel": "Prioridad",
+    "dueDateLabel": "Fecha límite",
+    "cancel": "Cancelar",
+    "add": "Añadir",
+    "creating": "Creando…",
+    "phaseLabel": "Fase SAP Activate",
+    "phases": {
+      "all": "Todas las fases",
+      "discover": "Discover",
+      "prepare": "Prepare",
+      "explore": "Explore",
+      "realize": "Realize",
+      "deploy": "Deploy",
+      "run": "Run"
+    },
+    "dueInline": "Límite:",
+    "assigneeColumn": "Responsable",
+    "refPrefix": "Ref:"
+  },
+  "errors": {
+    "loadTasks": "No se pudieron cargar las tareas. Inténtalo de nuevo.",
+    "selectActivity": "Selecciona una actividad.",
+    "createFailedGeneric": "No se pudo crear la tarea. Revisa consola para más detalles.",
+    "createFailedPrefix": "No se pudo crear la tarea:",
+    "updateStatus": "No se pudo actualizar el estado.",
+    "updateStatusDrag": "No se pudo actualizar el estado al mover la tarjeta."
+  },
+  "summary": {
+    "total": "Total",
+    "active": "Activas",
+    "blocked": "Bloqueadas",
+    "inReview": "En revisión",
+    "overdue": "Vencidas",
+    "completed": "Completado",
+    "assignedToMe": "Asignado a mí",
+    "risk": "Riesgo",
+    "riskHigh": "Alto",
+    "riskMedium": "Medio",
+    "riskLow": "Bajo"
+  },
+  "taskCard": {
+    "activity": "Actividad",
+    "assigneeAbbr": "Resp.",
+    "unassigned": "Sin asignar",
+    "open": "Abrir",
+    "openDetailTitle": "Abrir detalle",
+    "status": "Estado",
+    "changeStatusTitle": "Cambiar estado",
+    "changeStatusAria": "Cambiar estado de la tarea"
+  },
+  "due": {
+    "overdue": "Vencida",
+    "dueToday": "Vence hoy",
+    "dueTomorrow": "Vence mañana",
+    "inDays": "En {n} días",
+    "limit": "Límite"
+  },
+  "list": {
+    "emptyTitle": "Sin tareas en esta vista",
+    "emptySubtitle": "No hay tareas que coincidan con los filtros actuales. Ajusta filtros o cambia a tablero para ver el conjunto completo.",
+    "colTask": "Tarea",
+    "colScope": "Ámbito",
+    "colProject": "Proyecto",
+    "colActivity": "Actividad",
+    "colStatus": "Estado",
+    "colPriority": "Prioridad",
+    "colAssignee": "Responsable",
+    "colDue": "Vencimiento",
+    "colUpdated": "Actualizado",
+    "colActions": "Acciones",
+    "open": "Abrir",
+    "scopeGlobal": "Global",
+    "scopeMy": "Asignado a mí",
+    "emDash": "—"
+  },
+  "drawer": {
+    "title": "Detalle de tarea",
+    "closeAria": "Cerrar",
+    "titleLabel": "Título",
+    "titleRequired": "Título *",
+    "titlePlaceholder": "Título de la tarea",
+    "description": "Descripción",
+    "descriptionPlaceholder": "Descripción opcional",
+    "status": "Estado",
+    "priority": "Prioridad",
+    "assignee": "Responsable",
+    "unassigned": "Sin asignar",
+    "dueDate": "Fecha límite",
+    "activity": "Actividad",
+    "project": "Proyecto",
+    "emptySelect": "—",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "saving": "Guardando…"
+  },
+  "loading": {
+    "projectTasksComment": "Carga del módulo Tareas dentro del workspace de proyecto (misma cadencia que Overview / Planificación)."
+  }
+}

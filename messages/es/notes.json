@@ -1,0 +1,90 @@
+{
+  "searchPlaceholder": "Buscar en notas...",
+  "allModules": "Todos los módulos",
+  "untitled": "Sin título",
+  "links": "Enlaces",
+  "sort": {
+    "recent": "Más recientes",
+    "oldest": "Más antiguas",
+    "title": "Título A-Z"
+  },
+  "actions": {
+    "view": "Ver",
+    "more": "Más opciones",
+    "edit": "Editar",
+    "delete": "Eliminar"
+  },
+  "delete": {
+    "title": "Eliminar nota",
+    "body": "¿Seguro que quieres eliminar esta nota? Esta acción no se puede deshacer.",
+    "cancel": "Cancelar",
+    "confirm": "Eliminar",
+    "deleting": "Eliminando..."
+  },
+  "errors": {
+    "actionFailed": "No se pudo completar la acción.",
+    "connection": "Error de conexión. Inténtalo de nuevo.",
+    "loginRequired": "Debes iniciar sesión para ver las notas.",
+    "sessionExpired": "Sesión expirada. Inicia sesión de nuevo.",
+    "load": "No se pudieron cargar las notas."
+  },
+  "new": {
+    "title": "Nueva nota",
+    "projectNoteBadge": "Nota de proyecto",
+    "creatingBanner": "Creando...",
+    "subtitleProject": "Crea una nota para este proyecto. Aparecerá en la pestaña Notas del proyecto.",
+    "subtitleGlobal": "Nota global: conocimiento transversal reutilizable (patrones SAP, incidencias recurrentes, estándares, decisiones). No ligada a un proyecto concreto.",
+    "sectionMain": "Información principal",
+    "sectionSap": "Clasificación SAP",
+    "sectionRefs": "Referencias y contexto",
+    "fieldTitle": "Título",
+    "fieldDescription": "Descripción / detalle",
+    "titlePlaceholder": "Ejemplo: Error KI100 al contabilizar en ES25",
+    "descriptionPlaceholder": "Describe el problema, el análisis (causa raíz) y la solución aplicada, incluyendo transacciones, customizing, condiciones, etc.",
+    "descriptionHint": "Documenta aquí problemas, decisiones, soluciones y contexto útil.",
+    "descriptionHintProject": "Las notas bien documentadas refuerzan el conocimiento del proyecto.",
+    "fieldNoteType": "Tipo de nota",
+    "fieldSystem": "Sistema / entorno (opcional)",
+    "systemUnspecified": "No especificar",
+    "fieldClient": "Cliente (opcional)",
+    "clientGeneric": "Nota genérica (sin cliente)",
+    "fieldModule": "Módulo (opcional)",
+    "fieldScopeItem": "Scope item / proceso (opcional)",
+    "optionalUnspecified": "No especificar",
+    "fieldTransaction": "Transacción / app (opcional)",
+    "transactionPlaceholder": "Ejemplo: VA01, VK11, app Fiori…",
+    "fieldErrorCode": "Código de error (opcional)",
+    "errorCodePlaceholder": "Ejemplo: KI100, CK701, M7064…",
+    "fieldLink1": "Enlace 1",
+    "fieldLink2": "Enlace 2",
+    "linkPlaceholder": "https://… (SAP Note, Jira, Confluence…)",
+    "link2Placeholder": "https://…",
+    "fieldExtraInfo": "Información adicional",
+    "extraInfoPlaceholder": "Notas internas, referencias a comités, dependencias con otros flujos, etc.",
+    "noteTypes": {
+      "incident": "Incidencia / error",
+      "configuration": "Configuración",
+      "functional": "Funcional",
+      "technical": "Técnico",
+      "process": "Proceso",
+      "idea": "Idea / pendiente",
+      "other": "Otro"
+    },
+    "systemTypes": {
+      "ecc": "SAP ECC",
+      "s4op": "S/4HANA on-premise",
+      "s4public": "S/4HANA public cloud",
+      "s4private": "S/4HANA private cloud",
+      "bw": "BW / analytics",
+      "other": "Otro sistema"
+    },
+    "cancel": "Cancelar",
+    "saveNote": "Guardar nota",
+    "saving": "Guardando...",
+    "errors": {
+      "titleRequired": "El título de la nota es obligatorio.",
+      "createFailed": "No se pudo crear la nota.",
+      "unexpected": "Se ha producido un error inesperado."
+    }
+  }
+}

@@ -59,12 +59,28 @@ function blockquoteNode(text: string): TiptapNodeJSON {
   };
 }
 
-function sapCalloutNode(variant: string, text: string): TiptapNodeJSON {
+function sapCalloutNode(variant: string, text: string, pageId?: string | null): TiptapNodeJSON {
+  const attrs: Record<string, unknown> = { variant };
+  if (typeof pageId === "string" && pageId.length > 0) attrs.pageId = pageId;
   return {
     type: "sapCallout",
-    attrs: { variant },
+    attrs,
     // sapCallout contains block children (paragraphs).
     content: [paragraphNode(text)],
+  };
+}
+
+function sapCalloutNodeWithChildren(
+  variant: string,
+  children: TiptapNodeJSON[],
+  pageId?: string | null
+): TiptapNodeJSON {
+  const attrs: Record<string, unknown> = { variant };
+  if (typeof pageId === "string" && pageId.length > 0) attrs.pageId = pageId;
+  return {
+    type: "sapCallout",
+    attrs,
+    content: children.length > 0 ? children : [paragraphNode("")],
   };
 }
 
@@ -203,7 +219,23 @@ export function blockNoteBlocksToTiptapDoc(blocks: BlockNoteBlock[] | null | und
       case "blockquote":
         {
           const variant = typeof block.props?.variant === "string" ? (block.props?.variant as string) : null;
-          if (variant) nodes.push(sapCalloutNode(variant, getBlockTextRecursive(block)));
+          const pageId = typeof block.props?.page_id === "string" ? block.props.page_id : null;
+          if (variant) {
+            const nestedNodes = blockNoteSapCalloutChildrenToTiptapNodes(block.children as BlockNoteBlock[] | undefined);
+            if (nestedNodes.length > 0) {
+              nodes.push(sapCalloutNodeWithChildren(variant, nestedNodes, pageId));
+              if (process.env.NODE_ENV !== "production") {
+                const nestedImageCount = nestedNodes.filter((n) => n.type === "image").length;
+                console.debug("[Knowledge adapter] Restored sapCallout with nested content", {
+                  variant,
+                  childCount: nestedNodes.length,
+                  nestedImageCount,
+                });
+              }
+            } else {
+              nodes.push(sapCalloutNode(variant, getBlockTextRecursive(block), pageId));
+            }
+          }
           else nodes.push(blockquoteNode(getBlockTextRecursive(block)));
         }
         break;
@@ -228,13 +260,20 @@ export function blockNoteBlocksToTiptapDoc(blocks: BlockNoteBlock[] | null | und
       case "image": {
         const src =
           (block.props?.src as string) ??
+          (block.props?.url as string) ??
           ((block.content as { src?: string } | undefined)?.src as string) ??
+          ((block.content as { url?: string } | undefined)?.url as string) ??
           "";
         const alt =
           (block.props?.alt as string) ??
           ((block.content as { alt?: string } | undefined)?.alt as string) ??
           "";
-        if (src) nodes.push(imageNode(src, alt));
+        if (src) {
+          nodes.push(imageNode(src, alt));
+          if (process.env.NODE_ENV !== "production") {
+            console.debug("[Knowledge adapter] Restored image block", { src });
+          }
+        }
         break;
       }
       case "paragraph":
@@ -270,6 +309,56 @@ function tiptapNodeToPlainTextBlocks(node: TiptapNodeJSON): string {
   return extractTextFromTiptapNode(node).trim();
 }
 
+function tiptapSapCalloutChildrenToBlocks(node: TiptapNodeJSON): BlockNoteBlock[] {
+  const out: BlockNoteBlock[] = [];
+  const children = Array.isArray(node.content) ? node.content : [];
+  for (const child of children) {
+    const t = child.type as string | undefined;
+    if (t === "paragraph") {
+      out.push({ type: "paragraph", content: extractTextFromTiptapNode(child).trim() });
+      continue;
+    }
+    if (t === "image") {
+      const src = typeof child.attrs?.src === "string" ? child.attrs.src : "";
+      const alt = typeof child.attrs?.alt === "string" ? child.attrs.alt : "";
+      if (!src) continue;
+      out.push({
+        type: "image",
+        content: { src, url: src, alt },
+        props: { src, url: src, alt },
+      });
+      continue;
+    }
+    // Backward-safe fallback for unsupported nested block types.
+    out.push({ type: "paragraph", content: extractTextFromTiptapNode(child).trim() });
+  }
+  return out;
+}
+
+function blockNoteSapCalloutChildrenToTiptapNodes(children: BlockNoteBlock[] | undefined): TiptapNodeJSON[] {
+  const out: TiptapNodeJSON[] = [];
+  const safeChildren = Array.isArray(children) ? children : [];
+  for (const child of safeChildren) {
+    const t = (child.type as string) || "paragraph";
+    if (t === "image") {
+      const src =
+        (child.props?.src as string) ??
+        (child.props?.url as string) ??
+        ((child.content as { src?: string } | undefined)?.src as string) ??
+        ((child.content as { url?: string } | undefined)?.url as string) ??
+        "";
+      const alt =
+        (child.props?.alt as string) ??
+        ((child.content as { alt?: string } | undefined)?.alt as string) ??
+        "";
+      if (src) out.push(imageNode(src, alt));
+      continue;
+    }
+    out.push(paragraphNode(getBlockTextRecursive(child)));
+  }
+  return out;
+}
+
 /**
  * Convert a Tiptap document JSON back to the existing BlockNote blocks JSON contract.
  * This is the primary compatibility layer for storage + indexing.
@@ -301,11 +390,22 @@ export function tiptapDocToBlockNoteBlocks(docJSON: unknown): BlockNoteBlock[] {
       }
       case "sapCallout": {
         const variant = typeof node.attrs?.variant === "string" ? node.attrs!.variant : "quote";
+        const pageId = typeof node.attrs?.pageId === "string" ? node.attrs.pageId : null;
+        const nestedChildren = tiptapSapCalloutChildrenToBlocks(node);
         blocks.push({
           type: "blockquote",
           content: extractTextFromTiptapNode(node).trim(),
-          props: { variant },
+          props: pageId ? { variant, page_id: pageId } : { variant },
+          children: nestedChildren,
         });
+        if (process.env.NODE_ENV !== "production") {
+          const nestedImageCount = nestedChildren.filter((c) => c.type === "image").length;
+          console.debug("[Knowledge adapter] Serialized sapCallout with nested content", {
+            variant,
+            childCount: nestedChildren.length,
+            nestedImageCount,
+          });
+        }
         break;
       }
       case "codeBlock": {
@@ -324,7 +424,11 @@ export function tiptapDocToBlockNoteBlocks(docJSON: unknown): BlockNoteBlock[] {
       case "image": {
         const src = typeof node.attrs?.src === "string" ? node.attrs!.src : "";
         const alt = typeof node.attrs?.alt === "string" ? node.attrs!.alt : "";
-        blocks.push({ type: "image", content: { src, alt }, props: { src, alt } });
+        // Keep both src and url for backward compatibility with older readers.
+        blocks.push({ type: "image", content: { src, url: src, alt }, props: { src, url: src, alt } });
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[Knowledge adapter] Serialized image node", { src });
+        }
         break;
       }
       case "bulletList": {

@@ -1,0 +1,59 @@
+{
+  "emDash": "—",
+  "page": {
+    "eyebrow": "Conocimiento consolidado",
+    "title": "Cerebro del proyecto",
+    "subtitle": "Conocimiento extraído de las notas: problemas resueltos, soluciones aplicadas, lecciones y decisiones.",
+    "lastUpdated": "Última actualización: {date}",
+    "askSapito": "Preguntar a Sapito",
+    "quickSuggestionsAria": "Sugerencias de consulta"
+  },
+  "quickActions": {
+    "problemSummary": "What problems have we solved in this project?",
+    "lessonsSummary": "What lessons should we remember from this project?",
+    "decisionsSummary": "What decisions have we made in this project?",
+    "knowledgeSummary": "Summarize the most important project knowledge."
+  },
+  "groups": {
+    "problem": "Problemas resueltos",
+    "solution": "Soluciones aplicadas",
+    "lesson": "Lecciones aprendidas",
+    "decision": "Decisiones tomadas",
+    "workaround": "Workarounds",
+    "configuration": "Conocimiento de configuración"
+  },
+  "chips": {
+    "total": "{count, plural, one {# conocimiento} other {# conocimientos}}",
+    "problem": "{count, plural, one {# problema} other {# problemas}}",
+    "solution": "{count, plural, one {# solución} other {# soluciones}}",
+    "lesson": "{count, plural, one {# lección} other {# lecciones}}",
+    "decision": "{count, plural, one {# decisión} other {# decisiones}}",
+    "workaround": "{count, plural, one {# workaround} other {# workarounds}}",
+    "configuration": "configuración"
+  },
+  "insights": {
+    "title": "Insights del proyecto",
+    "problemOne": "Se ha documentado al menos 1 problema resuelto en este proyecto.",
+    "problemMany": "Se han documentado {count} problemas resueltos en este proyecto.",
+    "solution": "Ya existe memoria de soluciones aplicadas.",
+    "lesson": "Las lecciones aprendidas ya están quedando registradas.",
+    "decisionOne": "Hay al menos 1 decisión documentada.",
+    "decisionMany": "Hay {count} decisiones documentadas.",
+    "noDecision": "Todavía no hay decisiones documentadas.",
+    "workaround": "Se han registrado {count} workaround(s).",
+    "configuration": "Hay conocimiento de configuración documentado."
+  },
+  "empty": {
+    "title": "Aún no hay memoria en el Cerebro del proyecto",
+    "description": "Se irá llenando cuando documentes en las notas problemas, soluciones, decisiones o lecciones aprendidas.",
+    "helper": "Crea notas en la pestaña Notas del proyecto para que el sistema extraiga y muestre aquí el conocimiento."
+  },
+  "states": {
+    "loading": "Cargando…"
+  },
+  "errors": {
+    "invalidProjectId": "Identificador de proyecto no válido.",
+    "loadFailed": "Error al cargar el Project Brain.",
+    "connection": "Error de conexión."
+  }
+}

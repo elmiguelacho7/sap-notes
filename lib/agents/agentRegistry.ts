@@ -1,10 +1,10 @@
 /**
  * Central registry for agent visual identity and copy.
  * Sapito imagery is agent-only; no SAP trademarks in assets.
- * Paths are under /agents/sapito/; size-specific assets: sapito-avatar-{24,32,40,64,128,256}.png and sapito-thinking-{24,32,40,64,128,256}.png.
+ * Paths are under /agents/sapito/; size-specific assets are `.svg`.
  */
 
-const SAPITO_BASE = "/agents/sapito";
+import { getSapitoDefault, getSapitoThinking } from "@/lib/ui/sapito";
 
 export type AgentAssetPaths = {
   avatarImage: string;
@@ -24,21 +24,19 @@ export type AgentDefinition = {
   smallIcon: string;
 };
 
-/** Returns the image path for Sapito avatar or thinking state at the given pixel size. Avatar 24px uses 32px asset if sapito-avatar-24.png is missing. */
+/** Returns the image path for Sapito avatar or thinking state at the given pixel size. */
 export function getSapitoAvatarSrc(sizePx: number, thinking?: boolean): string {
-  const base = thinking ? "sapito-thinking" : "sapito-avatar";
-  const size = sizePx === 24 && !thinking ? 32 : sizePx;
-  return `${SAPITO_BASE}/${base}-${size}.png`;
+  return thinking ? getSapitoThinking(sizePx) : getSapitoDefault(sizePx);
 }
 
-const sapitoAvatarDefault = `${SAPITO_BASE}/sapito-avatar-40.png`;
-const sapitoThinkingDefault = `${SAPITO_BASE}/sapito-thinking-40.png`;
+const sapitoAvatarDefault = getSapitoDefault(40);
+const sapitoThinkingDefault = getSapitoThinking(40);
 
 const sapitoAssets: AgentAssetPaths = {
   avatarImage: sapitoAvatarDefault,
-  mainImage: `${SAPITO_BASE}/sapito-avatar-64.png`,
+  mainImage: getSapitoDefault(64),
   thinkingImage: sapitoThinkingDefault,
-  smallIcon: `${SAPITO_BASE}/sapito-avatar-32.png`,
+  smallIcon: getSapitoDefault(32),
 };
 
 /**

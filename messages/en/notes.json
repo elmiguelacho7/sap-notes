@@ -1,0 +1,90 @@
+{
+  "searchPlaceholder": "Search in notes...",
+  "allModules": "All modules",
+  "untitled": "Untitled",
+  "links": "Links",
+  "sort": {
+    "recent": "Most recent",
+    "oldest": "Oldest",
+    "title": "Title A-Z"
+  },
+  "actions": {
+    "view": "View",
+    "more": "More options",
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "delete": {
+    "title": "Delete note",
+    "body": "Are you sure you want to delete this note? This action cannot be undone.",
+    "cancel": "Cancel",
+    "confirm": "Delete",
+    "deleting": "Deleting..."
+  },
+  "errors": {
+    "actionFailed": "Could not complete action.",
+    "connection": "Connection error. Try again.",
+    "loginRequired": "You must sign in to view notes.",
+    "sessionExpired": "Session expired. Sign in again.",
+    "load": "Could not load notes."
+  },
+  "new": {
+    "title": "New note",
+    "projectNoteBadge": "Project note",
+    "creatingBanner": "Creating...",
+    "subtitleProject": "Create a note for this project. It will appear on the project Notes tab.",
+    "subtitleGlobal": "Global note: cross-project knowledge you can reuse (SAP patterns, recurring issues, configuration standards, decisions). Not tied to a single project.",
+    "sectionMain": "Main information",
+    "sectionSap": "SAP classification",
+    "sectionRefs": "References and context",
+    "fieldTitle": "Title",
+    "fieldDescription": "Description / details",
+    "titlePlaceholder": "Example: KI100 error when posting in ES25",
+    "descriptionPlaceholder": "Describe the issue, analysis (root cause), and solution, including transactions, customizing, conditions, etc.",
+    "descriptionHint": "Capture problems, decisions, solutions, and useful context here.",
+    "descriptionHintProject": "Well-documented notes strengthen project knowledge.",
+    "fieldNoteType": "Note type",
+    "fieldSystem": "System / environment (optional)",
+    "systemUnspecified": "Do not specify",
+    "fieldClient": "Client (optional)",
+    "clientGeneric": "Generic note (no client)",
+    "fieldModule": "Module (optional)",
+    "fieldScopeItem": "Scope item / process (optional)",
+    "optionalUnspecified": "Do not specify",
+    "fieldTransaction": "Transaction / app (optional)",
+    "transactionPlaceholder": "Example: VA01, VK11, Fiori app…",
+    "fieldErrorCode": "Error code (optional)",
+    "errorCodePlaceholder": "Example: KI100, CK701, M7064…",
+    "fieldLink1": "Link 1",
+    "fieldLink2": "Link 2",
+    "linkPlaceholder": "https://… (SAP Note, Jira, Confluence…)",
+    "link2Placeholder": "https://…",
+    "fieldExtraInfo": "Additional information",
+    "extraInfoPlaceholder": "Internal notes, committee references, dependencies with other flows, etc.",
+    "noteTypes": {
+      "incident": "Incident / Error",
+      "configuration": "Configuration",
+      "functional": "Functional",
+      "technical": "Technical",
+      "process": "Process",
+      "idea": "Idea / backlog",
+      "other": "Other"
+    },
+    "systemTypes": {
+      "ecc": "SAP ECC",
+      "s4op": "S/4HANA on-premise",
+      "s4public": "S/4HANA public cloud",
+      "s4private": "S/4HANA private cloud",
+      "bw": "BW / analytics",
+      "other": "Other system"
+    },
+    "cancel": "Cancel",
+    "saveNote": "Save note",
+    "saving": "Saving...",
+    "errors": {
+      "titleRequired": "Note title is required.",
+      "createFailed": "Could not create note.",
+      "unexpected": "An unexpected error occurred."
+    }
+  }
+}

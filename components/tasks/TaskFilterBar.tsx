@@ -1,6 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export type TaskFilterBarProps = {
   searchQuery: string;
@@ -30,13 +31,13 @@ export type TaskFilterBarProps = {
 };
 
 /**
- * Compact filter bar for task workspace. Dark premium style.
+ * Compact filter bar for task workspace. Ribbit light control strip.
  * All filters optional so global and project pages can use incrementally.
  */
 export function TaskFilterBar({
   searchQuery,
   onSearchChange,
-  searchPlaceholder = "Buscar tareas…",
+  searchPlaceholder,
   scopeOptions,
   scopeValue = "",
   onScopeChange,
@@ -54,18 +55,21 @@ export function TaskFilterBar({
   onProjectChange,
   children,
 }: TaskFilterBarProps) {
+  const t = useTranslations("tasks.filters");
+  const placeholder = searchPlaceholder ?? t("defaultSearch");
   const selectClass =
-    "rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 w-full sm:w-auto min-w-0";
+    "h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30 w-full sm:w-auto min-w-0";
   return (
-    <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
+    <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-3 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
       <div className="relative flex-1 min-w-0 w-full sm:max-w-xs">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[rgb(var(--rb-text-muted))]" />
         <input
           type="search"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={searchPlaceholder}
-          className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+          placeholder={placeholder}
+          className="h-10 w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 pl-9 pr-3 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
         />
       </div>
       {scopeOptions != null && scopeOptions.length > 0 && onScopeChange != null && (
@@ -114,6 +118,7 @@ export function TaskFilterBar({
         </select>
       )}
       {children}
+      </div>
     </div>
   );
 }

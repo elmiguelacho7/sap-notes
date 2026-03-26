@@ -4,33 +4,51 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabaseClient";
 import {
   handleSupabaseError,
 } from "@/lib/supabaseError";
-import { ObjectActions } from "@/components/ObjectActions";
 import { useProjectWorkspace } from "@/components/projects/ProjectWorkspaceContext";
 import type { TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
-import { FileText, BookOpen, Link as LinkIcon, Ticket, CalendarDays, Plus, CheckSquare, ListTodo } from "lucide-react";
 import { getSuggestedKnowledgeForProject, listSpaces } from "@/lib/knowledgeService";
-import { getTicketDetailHref } from "@/lib/routes";
-import type { KnowledgePage } from "@/lib/types/knowledge";
 import { ProjectOverviewSkeleton } from "@/components/skeletons/ProjectOverviewSkeleton";
-import { ProjectHealthStrip } from "@/components/projects/ProjectHealthStrip";
-import { ProjectActionZone } from "@/components/projects/ProjectActionZone";
-import { ProjectRecentActivity } from "@/components/projects/ProjectRecentActivity";
-import type { ProjectRecentActivityItem } from "@/components/projects/ProjectRecentActivity";
-import { ProjectAnalyticsSection } from "@/components/projects/ProjectAnalyticsSection";
-import { ProjectKnowledgeSummaryCompact } from "@/components/projects/ProjectKnowledgeSummaryCompact";
-import type { ActivityItem } from "@/components/projects/ProjectActivityFeed";
-import { Skeleton } from "@/components/ui/Skeleton";
-import type { EChartsOption } from "echarts";
-import ReactECharts from "echarts-for-react";
+import { ProjectOverviewCommandBar } from "@/components/projects/ProjectOverviewCommandBar";
+import { ProjectExecutiveSignalsStrip } from "@/components/projects/ProjectExecutiveSignalsStrip";
+import {
+  ProjectTeamLoadPanel,
+  type TeamLoadRow,
+} from "@/components/projects/ProjectTeamLoadPanel";
+import { ProjectRisksBottlenecksPanel } from "@/components/projects/ProjectRisksBottlenecksPanel";
+import {
+  ProjectTasksPreviewPanel,
+  type ProjectTaskPreviewRow,
+} from "@/components/projects/ProjectTasksPreviewPanel";
+import {
+  ProjectTicketsPreviewPanel,
+  type ProjectTicketPreviewRow,
+} from "@/components/projects/ProjectTicketsPreviewPanel";
+import { ProjectKnowledgePanel } from "@/components/projects/ProjectKnowledgePanel";
+import { ProjectAIQuickPanel } from "@/components/projects/ProjectAIQuickPanel";
+import {
+  ProjectRecentWorkPanel,
+  type ProjectRecentActivityEvent,
+} from "@/components/projects/ProjectRecentWorkPanel";
+import type { KnowledgePage } from "@/lib/types/knowledge";
+import type { ExecutiveSignalLevel } from "@/lib/projectOverviewExecutive";
+import {
+  buildRiskBullets,
+  daysUntilPlannedEnd,
+  executiveDeliveryRisk,
+  executiveInsightVariant,
+  executiveProjectHealth,
+  memberLoadBand,
+  memberLoadScore,
+} from "@/lib/projectOverviewExecutive";
+import { PROJECT_WORKSPACE_PAGE, PROJECT_WORKSPACE_SECTION_STACK } from "@/lib/projectWorkspaceUi";
 
 // ==========================
 // Tipos
@@ -45,25 +63,6 @@ type Project = {
   planned_end_date: string | null;
   created_at: string;
   client_id?: string | null;
-};
-
-type NoteRow = {
-  id: string;
-  title: string;
-  body: string | null;
-  module: string | null;
-  module_id: string | null;
-  scope_item: string | null;
-  scope_item_id: string | null;
-  system_type: string | null;
-  transaction: string | null;
-  error_code: string | null;
-  note_type: string | null;
-  web_link_1: string | null;
-  web_link_2: string | null;
-  extra_info: string | null;
-  project_id: string | null;
-  created_at: string;
 };
 
 /** Shape returned by GET /api/projects/[id]/notes (list only) */
@@ -102,6 +101,7 @@ type TicketSummary = {
   priority: TicketPriority;
   status: TicketStatus;
   created_at: string;
+  due_date?: string | null;
 };
 
 type ProjectPhaseRow = {
@@ -125,21 +125,6 @@ type DashboardProjectActivity = {
   progress_pct: number | null;
 };
 
-/** Display-only mapping: task status -> Spanish label (unified workflow). */
-function getTaskStatusLabel(status: string | null | undefined): string {
-  const s = String((status ?? "").toLowerCase().trim());
-  const map: Record<string, string> = {
-    pending: "Por hacer",
-    in_progress: "En progreso",
-    blocked: "Bloqueado",
-    review: "En revisión",
-    done: "Hecho",
-  };
-  if (map[s]) return map[s];
-  if (!s) return "—";
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
 // ==========================
 // Componente principal
 // ==========================
@@ -150,7 +135,9 @@ export default function ProjectDashboardPage() {
   const searchParams = useSearchParams();
   const projectId = (params?.id ?? "") as string;
   const planGeneratedFailed = searchParams?.get("planGenerated") === "false";
+  const tOverview = useTranslations("projects.overview");
 
+  /* eslint-disable @typescript-eslint/no-unused-vars -- full fetch graph retained; overview v2 shows a subset */
   // Datos principales
   const [project, setProject] = useState<Project | null>(null);
   const [projectLoadFailed, setProjectLoadFailed] = useState(false);
@@ -168,7 +155,6 @@ export default function ProjectDashboardPage() {
   const [todayTickets, setTodayTickets] = useState<TicketSummary[]>([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
 
-  const [membersCount, setMembersCount] = useState<number>(0);
   const [knowledgeSpacesCount, setKnowledgeSpacesCount] = useState<number>(0);
   const [knowledgePagesCount, setKnowledgePagesCount] = useState<number>(0);
   const [loadingKnowledgeCounts, setLoadingKnowledgeCounts] = useState(false);
@@ -190,10 +176,10 @@ export default function ProjectDashboardPage() {
     completed: number;
     completionRate: number;
   } | null>(null);
-  const [loadingActivityStats, setLoadingActivityStats] = useState(false);
+  const [_loadingActivityStats, setLoadingActivityStats] = useState(false);
 
   // SAP Activate plan (phases + dates + counts)
-  const [activatePlan, setActivatePlan] = useState<{
+  const [_activatePlan, setActivatePlan] = useState<{
     phases: Array<{
       phase_key: string;
       name: string;
@@ -239,29 +225,22 @@ export default function ProjectDashboardPage() {
     canManageMembers?: boolean;
   } | null>(null);
 
-  // Quick Actions "Crear" dropdown (UI only)
-  const [createMenuOpen, setCreateMenuOpen] = useState(false);
-  const createMenuRef = useRef<HTMLDivElement>(null);
-
   const [suggestedKnowledge, setSuggestedKnowledge] = useState<KnowledgePage[]>([]);
+  /* eslint-enable @typescript-eslint/no-unused-vars */
 
-  useEffect(() => {
-    if (!createMenuOpen) return;
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setCreateMenuOpen(false);
-    };
-    const handleClickOutside = (e: MouseEvent) => {
-      if (createMenuRef.current && !createMenuRef.current.contains(e.target as Node)) {
-        setCreateMenuOpen(false);
-      }
-    };
-    document.addEventListener("keydown", handleEscape);
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [createMenuOpen]);
+  type TeamMemberRow = {
+    user_id: string;
+    user_full_name: string | null;
+    user_email: string | null;
+  };
+  const [teamMembers, setTeamMembers] = useState<TeamMemberRow[]>([]);
+
+  const [projectActivityFeed, setProjectActivityFeed] = useState<ProjectRecentActivityEvent[]>([]);
+  const [loadingProjectActivity, setLoadingProjectActivity] = useState(false);
+
+  const [openTicketsList, setOpenTicketsList] = useState<
+    (TicketSummary & { due_date?: string | null; assigned_to?: string | null })[]
+  >([]);
 
   const [clientName, setClientName] = useState<string | null>(null);
 
@@ -303,86 +282,21 @@ export default function ProjectDashboardPage() {
     return true;
   }, [projectId]);
 
-  const { setHeaderActions } = useProjectWorkspace();
+  const { openProjectCopilotWithMessage, setHeaderActions } = useProjectWorkspace();
+
+  // Project mode: surface project-scoped actions in the shared workspace header.
   useEffect(() => {
-    if (!project) return;
+    if (!projectId) return;
     setHeaderActions(
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-        <div className="relative" ref={createMenuRef}>
-          <button
-            type="button"
-            onClick={() => setCreateMenuOpen((o) => !o)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-600/80 bg-slate-800/80 px-2.5 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:border-slate-500 hover:text-white transition-colors"
-            aria-expanded={createMenuOpen}
-            aria-haspopup="true"
-          >
-            <Plus className="h-3.5 w-3.5 shrink-0" />
-            <span>Create</span>
-          </button>
-          {createMenuOpen && (
-            <div
-              className="absolute right-0 top-full z-50 mt-1.5 min-w-[180px] rounded-xl border border-slate-700 bg-slate-800 py-1 shadow-xl shadow-black/20"
-              role="menu"
-            >
-              <Link
-                href={`/projects/${projectId}/tasks?new=1`}
-                role="menuitem"
-                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700/80 transition-colors"
-                onClick={() => setCreateMenuOpen(false)}
-              >
-                <CheckSquare className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                New task
-              </Link>
-              <Link
-                href={`/projects/${projectId}/notes?new=1`}
-                role="menuitem"
-                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700/80 transition-colors"
-                onClick={() => setCreateMenuOpen(false)}
-              >
-                <FileText className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                New note
-              </Link>
-              <Link
-                href={`/projects/${projectId}/tickets?new=1`}
-                role="menuitem"
-                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700/80 transition-colors"
-                onClick={() => setCreateMenuOpen(false)}
-              >
-                <Ticket className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                New ticket
-              </Link>
-              <Link
-                href={`/projects/${projectId}/planning/activities?new=1`}
-                role="menuitem"
-                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700/80 transition-colors"
-                onClick={() => setCreateMenuOpen(false)}
-              >
-                <ListTodo className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                New activity
-              </Link>
-            </div>
-          )}
-        </div>
-        {permissions && (
-          <span className="inline-block h-4 w-px bg-slate-700" aria-hidden />
-        )}
-        {permissions && (
-          <ObjectActions
-            entity="project"
-            id={projectId}
-            canEdit={permissions.canEdit}
-            canDelete={permissions.canDelete}
-            canArchive={permissions.canArchive}
-            archiveEndpoint={`/api/projects/${projectId}/archive`}
-            deleteEndpoint={`/api/projects/${projectId}`}
-            onArchived={() => void loadProject()}
-            variant="dark"
-          />
-        )}
-      </div>
+      <ProjectOverviewCommandBar
+        projectId={projectId}
+        permissions={permissions}
+        loadProject={loadProject}
+        onAskSapito={() => openProjectCopilotWithMessage("")}
+      />
     );
     return () => setHeaderActions(null);
-  }, [project, permissions, createMenuOpen, setHeaderActions, projectId, loadProject]);
+  }, [setHeaderActions, projectId, permissions, loadProject, openProjectCopilotWithMessage]);
 
   // ==========================
   // Carga: proyecto primero, luego datos relacionados
@@ -407,7 +321,7 @@ export default function ProjectDashboardPage() {
     };
 
     void run();
-  }, [projectId, projectLoadFailed]);
+  }, [projectId, projectLoadFailed, loadProject]);
 
   // Fetch project permissions (canEdit, canArchive, canDelete, canManageMembers) from API.
   useEffect(() => {
@@ -438,6 +352,59 @@ export default function ProjectDashboardPage() {
     return () => { cancelled = true; };
   }, [projectId, projectLoadFailed]);
 
+  // Recent activity (existing /api/activity — filter to this project on the client)
+  useEffect(() => {
+    if (!projectId || projectLoadFailed) return;
+    let cancelled = false;
+    setLoadingProjectActivity(true);
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const res = await fetch("/api/activity", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (cancelled) return;
+        const data = await res.json().catch(() => ({}));
+        const events = (data as { events?: ProjectRecentActivityEvent[] }).events ?? [];
+        setProjectActivityFeed(events.filter((e) => e.projectId === projectId));
+      } catch {
+        if (!cancelled) setProjectActivityFeed([]);
+      } finally {
+        if (!cancelled) setLoadingProjectActivity(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, projectLoadFailed]);
+
+  useEffect(() => {
+    if (!projectId || projectLoadFailed) return;
+    let cancelled = false;
+    setLoadingProjectActivity(true);
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const res = await fetch("/api/activity", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (cancelled) return;
+        const data = await res.json().catch(() => ({}));
+        const events = (data as { events?: ProjectRecentActivityEvent[] }).events ?? [];
+        setProjectActivityFeed(events.filter((e) => e.projectId === projectId));
+      } catch {
+        if (!cancelled) setProjectActivityFeed([]);
+      } finally {
+        if (!cancelled) setLoadingProjectActivity(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, projectLoadFailed]);
+
   // Suggested Knowledge (pages linked to this project via knowledge_page_projects)
   useEffect(() => {
     if (!projectId || projectLoadFailed) return;
@@ -461,10 +428,10 @@ export default function ProjectDashboardPage() {
         });
         if (cancelled) return;
         const data = await res.json().catch(() => ({}));
-        const members = (data as { members?: unknown[] }).members ?? [];
-        setMembersCount(Array.isArray(members) ? members.length : 0);
+        const members = (data as { members?: TeamMemberRow[] }).members ?? [];
+        setTeamMembers(Array.isArray(members) ? members : []);
       } catch {
-        if (!cancelled) setMembersCount(0);
+        if (!cancelled) setTeamMembers([]);
       }
     })();
     return () => { cancelled = true; };
@@ -609,12 +576,19 @@ export default function ProjectDashboardPage() {
 
       if (cancelled) return;
       const list = (listRes.data ?? []) as (TicketSummary & { due_date?: string | null; assigned_to?: string | null })[];
+      setOpenTicketsList(list);
       setOpenTicketsCount(countRes.count ?? 0);
       const today = new Date().toISOString().slice(0, 10);
       setOverdueTicketsCount(list.filter((t) => t.due_date && t.due_date < today).length);
       setUnassignedTicketsCount(list.filter((t) => !t.assigned_to).length);
       setUrgentTicketsCount(list.filter((t) => t.priority === "urgent" || t.priority === "high").length);
-      setTodayTickets(list.slice(0, 5));
+      const sortedForPreview = [...list].sort((a, b) => {
+        const ac = a.created_at ?? "";
+        const bc = b.created_at ?? "";
+        if (ac !== bc) return ac.localeCompare(bc);
+        return a.title.localeCompare(b.title);
+      });
+      setTodayTickets(sortedForPreview.slice(0, 5) as TicketSummary[]);
       setLoadingTickets(false);
     };
 
@@ -854,107 +828,8 @@ export default function ProjectDashboardPage() {
   }, [projectId, projectLoadFailed]);
 
   // ==========================
-  // KPIs (datos desde API; placeholders mientras loading)
+  // Derived metrics (executive summary + previews; same underlying data as before)
   // ==========================
-
-  // Project health score 0–100 (heuristic)
-  const projectHealth = useMemo(() => {
-    const totalNotes = stats?.total_notes ?? 0;
-    const errorNotes = stats?.error_notes ?? 0;
-    const modulesImpacted = stats?.modules_impacted ?? 0;
-    const openTickets = openTicketsCount;
-    const lastUpdate = stats?.last_update_at ?? null;
-
-    let score = 100;
-    // Error notes: up to 30 points (by % of notes with error)
-    if (totalNotes > 0 && errorNotes > 0) {
-      const ratio = errorNotes / totalNotes;
-      score -= Math.min(30, Math.round(ratio * 30));
-    }
-    // Open tickets: up to 40 points (e.g. 10+ = full penalty)
-    if (openTickets > 0) {
-      score -= Math.min(40, openTickets * 4);
-    }
-    // Stale activity: up to 30 points if no update in 30+ days
-    if (lastUpdate) {
-      const daysSince = (Date.now() - new Date(lastUpdate).getTime()) / (1000 * 60 * 60 * 24);
-      if (daysSince > 30) score -= Math.min(30, Math.round((daysSince - 30) / 10) * 10);
-    } else if (totalNotes === 0 && openTickets === 0) {
-      score = Math.max(0, score - 15); // new project, slight penalty
-    }
-    return Math.max(0, Math.min(100, score));
-  }, [stats, openTicketsCount]);
-
-  // Planning summary: current phase, time progress, next phase (from project_phases + project dates)
-  const planningSummary = useMemo(() => {
-    const phases = projectPhases;
-    const startDate = project?.start_date ?? null;
-    const plannedEndDate = project?.planned_end_date ?? null;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const phasesWithDates = phases.filter(
-      (p): p is ProjectPhaseRow & { start_date: string; end_date: string } =>
-        !!p.start_date && !!p.end_date
-    );
-
-    let currentPhase: ProjectPhaseRow | null = null;
-    if (phasesWithDates.length > 0) {
-      const inRange = phasesWithDates.find((p) => {
-        const s = new Date(p.start_date);
-        const e = new Date(p.end_date);
-        s.setHours(0, 0, 0, 0);
-        e.setHours(23, 59, 59, 999);
-        return today >= s && today <= e;
-      });
-      if (inRange) {
-        currentPhase = inRange;
-      } else {
-        const minStart = phasesWithDates.reduce(
-          (min, p) => (p.start_date < min ? p.start_date : min),
-          phasesWithDates[0].start_date
-        );
-        const maxEnd = phasesWithDates.reduce(
-          (max, p) => (p.end_date > max ? p.end_date : max),
-          phasesWithDates[0].end_date
-        );
-        const todayStr = today.toISOString().slice(0, 10);
-        if (todayStr < minStart) currentPhase = phasesWithDates[0];
-        else if (todayStr > maxEnd) currentPhase = phasesWithDates[phasesWithDates.length - 1];
-      }
-    }
-
-    let projectTimeProgress: number | null = null;
-    if (startDate && plannedEndDate) {
-      const start = new Date(startDate);
-      const end = new Date(plannedEndDate);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(0, 0, 0, 0);
-      const totalDurationDays = Math.max(
-        1,
-        (end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)
-      );
-      const elapsedDays = Math.max(
-        0,
-        Math.min(
-          totalDurationDays,
-          (today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)
-        )
-      );
-      projectTimeProgress = Math.round((elapsedDays / totalDurationDays) * 100);
-    }
-
-    let nextPhaseStart: { name: string; start_date: string } | null = null;
-    const todayStr = today.toISOString().slice(0, 10);
-    const upcoming = phasesWithDates
-      .filter((p) => p.start_date > todayStr)
-      .sort((a, b) => (a.start_date < b.start_date ? -1 : 1));
-    if (upcoming.length > 0) {
-      nextPhaseStart = { name: upcoming[0].name, start_date: upcoming[0].start_date };
-    }
-
-    return { currentPhase, projectTimeProgress, nextPhaseStart };
-  }, [projectPhases, project?.start_date, project?.planned_end_date]);
 
   // Activity KPIs from project_activities (total, in progress, blocked, done, delayed, avg progress)
   const projectActivityStats = useMemo(() => {
@@ -975,7 +850,7 @@ export default function ProjectDashboardPage() {
     const today = new Date();
     const parse = (d: string | null) => (d ? new Date(d) : null);
 
-    let total = activities.length;
+    const total = activities.length;
     let inProgress = 0;
     let blocked = 0;
     let done = 0;
@@ -1104,308 +979,241 @@ export default function ProjectDashboardPage() {
     };
   }, [projectTasks, riskMetricsList, dashboardActivities.length, projectActivityStats.avgProgress]);
 
-  // Activity feed items for Project HQ (last 10: tasks, tickets, pages)
-  const projectHQActivityItems = useMemo((): ActivityItem[] => {
-    const items: ActivityItem[] = [];
-    const projectIdVal = projectId;
-    projectTasks.forEach((t) => {
-      items.push({
-        id: t.id,
-        type: String((t.status ?? "").toLowerCase()) === "done" ? "task_completed" : "task_created",
-        title: t.title ?? "Tarea",
-        date: t.created_at,
-        href: `/projects/${projectIdVal}/tasks`,
-      });
-    });
-    todayTickets.forEach((t) => {
-      items.push({
-        id: t.id,
-        type: "ticket_created",
-        title: t.title ?? "Ticket",
-        date: t.created_at,
-        href: getTicketDetailHref(t.id, projectIdVal),
-      });
-    });
-    suggestedKnowledge.forEach((p) => {
-      items.push({
-        id: p.id,
-        type: "page_updated",
-        title: p.title ?? "Página",
-        date: p.updated_at ?? p.created_at ?? "",
-        href: `/knowledge/${p.id}${projectIdVal ? `?projectId=${projectIdVal}` : ""}`,
-      });
-    });
-    items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    return items.slice(0, 10);
-  }, [projectId, projectTasks, todayTickets, suggestedKnowledge]);
-
-  // Priority tasks for Action Zone: overdue or blocked, max 3
-  const priorityTasksForAction = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+  const taskPreviewRows = useMemo((): ProjectTaskPreviewRow[] => {
+    const norm = (s: string) => String(s ?? "").toLowerCase().trim();
+    const isDone = (s: string) => norm(s) === "done";
+    const isBlocked = (s: string) => norm(s) === "blocked";
+    const isOverdue = (due: string | null, status: string) => {
+      if (!due || isDone(status)) return false;
+      const d = new Date(due);
+      d.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return d < today;
+    };
     return projectTasks
-      .filter((t) => {
-        const s = String((t.status ?? "").toLowerCase().trim());
-        if (s === "done") return false;
-        if (s === "blocked") return true;
-        return t.due_date != null && t.due_date < today;
+      .filter((t) => !isDone(t.status))
+      .slice()
+      .sort((a, b) => {
+        const aOver = isOverdue(a.due_date, a.status) ? 0 : 1;
+        const bOver = isOverdue(b.due_date, b.status) ? 0 : 1;
+        if (aOver !== bOver) return aOver - bOver;
+        const aBl = isBlocked(a.status) ? 0 : 1;
+        const bBl = isBlocked(b.status) ? 0 : 1;
+        if (aBl !== bBl) return aBl - bBl;
+        const aIp = norm(a.status) === "in_progress" ? 0 : 1;
+        const bIp = norm(b.status) === "in_progress" ? 0 : 1;
+        if (aIp !== bIp) return aIp - bIp;
+        const aDue = a.due_date || "\uffff";
+        const bDue = b.due_date || "\uffff";
+        if (aDue !== bDue) return aDue.localeCompare(bDue);
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       })
-      .sort((a, b) => (a.due_date || "").localeCompare(b.due_date || ""))
-      .slice(0, 3);
-  }, [projectTasks]);
-
-  // Merged recent activity (tasks, tickets, pages, notes) for dashboard, max 8
-  const recentActivityMerged = useMemo((): ProjectRecentActivityItem[] => {
-    const list: ProjectRecentActivityItem[] = [
-      ...projectHQActivityItems.map((item) => ({
-        id: item.id,
-        type: item.type,
-        title: item.title,
-        date: item.date,
-        href: item.href,
-      })),
-      ...notes.map((n) => ({
-        id: n.id,
-        type: "note_created" as const,
-        title: n.title ?? "Sin título",
-        date: n.created_at,
-        href: `/notes/${n.id}`,
-      })),
-    ];
-    list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    return list.slice(0, 8);
-  }, [projectHQActivityItems, notes]);
-
-  // Project Health Score (client-side from existing metrics; 0–100)
-  const projectHealthScore = useMemo(() => {
-    const totalActivities = Math.max(1, dashboardActivities.length);
-    const overdueRatio = healthMetrics.totalTasks > 0 ? healthMetrics.overdueTasks / healthMetrics.totalTasks : 0;
-    const blockedRatio = healthMetrics.totalTasks > 0 ? healthMetrics.blockedTasks / healthMetrics.totalTasks : 0;
-    const highRiskRatio = healthMetrics.highRiskActivitiesCount / totalActivities;
-
-    const raw =
-      healthMetrics.progressGeneral * 0.3 +
-      (1 - overdueRatio) * 100 * 0.25 +
-      (1 - blockedRatio) * 100 * 0.2 +
-      (1 - highRiskRatio) * 100 * 0.25;
-    const score = Math.round(Math.max(0, Math.min(100, raw)));
-    const label = score >= 80 ? "Healthy" : score >= 60 ? "Attention" : "At Risk";
-    return { score, label };
-  }, [healthMetrics, dashboardActivities.length]);
-
-  // Risk by phase: from projectPhases + dashboardActivities + riskMetricsList (read-only)
-  const riskByPhase = useMemo(() => {
-    const riskMap = new Map<string, string>();
-    riskMetricsList.forEach((r) => riskMap.set(r.activity_id, r.risk_level));
-    return projectPhases.map((phase) => {
-      const phaseActivities = dashboardActivities.filter((a) => a.phase_id === phase.id);
-      let high = 0;
-      let medium = 0;
-      let low = 0;
-      phaseActivities.forEach((a) => {
-        const level = riskMap.get(a.id);
-        if (level === "HIGH") high++;
-        else if (level === "MEDIUM") medium++;
-        else if (level === "LOW") low++;
-      });
-      return { phaseId: phase.id, phaseName: phase.name, high, medium, low };
-    });
-  }, [projectPhases, dashboardActivities, riskMetricsList]);
-
-  // Project Intelligence: derive insights from already-loaded data (max 3)
-  const projectInsights = useMemo(() => {
-    const insights: { type: string; text: string; details?: string }[] = [];
-    const activityById = new Map(dashboardActivities.map((a) => [a.id, a]));
-
-    const highRisk = riskMetricsList.filter((r) => r.risk_level === "HIGH");
-    for (const r of highRisk) {
-      if (insights.length >= 3) break;
-      const name = activityById.get(r.activity_id)?.name ?? "Actividad";
-      insights.push({ type: "high_risk_activity", text: "Actividad en riesgo alto", details: name });
-    }
-
-    if (insights.length < 3 && healthMetrics.overdueTasks > 0) {
-      insights.push({
-        type: "overdue_tasks",
-        text: `${healthMetrics.overdueTasks} tareas vencidas`,
-      });
-    }
-    if (insights.length < 3 && healthMetrics.blockedTasks > 0) {
-      insights.push({
-        type: "blocked_tasks",
-        text: `${healthMetrics.blockedTasks} tareas bloqueadas`,
-      });
-    }
-
-    return insights.slice(0, 3);
-  }, [healthMetrics.overdueTasks, healthMetrics.blockedTasks, riskMetricsList, dashboardActivities]);
-
-  // Recent activity: notes + tickets merged by created_at
-  const recentActivity = useMemo(() => {
-    const items: { type: "note" | "ticket"; id: string; title: string; created_at: string; href: string }[] = [];
-    notes.forEach((n) => {
-      items.push({
-        type: "note",
-        id: n.id,
-        title: n.title ?? "Sin título",
-        created_at: n.created_at,
-        href: `/notes/${n.id}`,
-      });
-    });
-    todayTickets.forEach((t) => {
-      items.push({
-        type: "ticket",
+      .slice(0, 5)
+      .map((t) => ({
         id: t.id,
         title: t.title,
-        created_at: t.created_at,
-        href: getTicketDetailHref(t.id, projectId),
-      });
+        status: t.status,
+        dueDate: t.due_date,
+        assigneeLabel: t.assignee_profile_id ? "Assigned" : "Unassigned",
+        assigneeInitial: t.assignee_profile_id
+          ? t.assignee_profile_id.replace(/-/g, "").slice(0, 2).toUpperCase()
+          : null,
+      }));
+  }, [projectTasks]);
+
+  const teamLoadRows = useMemo((): TeamLoadRow[] => {
+    const norm = (s: string) => String(s ?? "").toLowerCase().trim();
+    const isDone = (s: string) => norm(s) === "done";
+    const isBlocked = (s: string) => norm(s) === "blocked";
+    const isOverdue = (due: string | null, status: string) => {
+      if (!due || isDone(status)) return false;
+      const d = new Date(due);
+      d.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return d < today;
+    };
+    const byUser = new Map<string, { tasks: number; tickets: number; blocked: number; overdue: number }>();
+    for (const m of teamMembers) {
+      byUser.set(m.user_id, { tasks: 0, tickets: 0, blocked: 0, overdue: 0 });
+    }
+    for (const task of projectTasks) {
+      if (isDone(task.status)) continue;
+      const uid = task.assignee_profile_id;
+      if (!uid || !byUser.has(uid)) continue;
+      const row = byUser.get(uid)!;
+      row.tasks += 1;
+      if (isBlocked(task.status)) row.blocked += 1;
+      if (isOverdue(task.due_date, task.status)) row.overdue += 1;
+    }
+    for (const tk of openTicketsList) {
+      const uid = tk.assigned_to;
+      if (!uid || !byUser.has(uid)) continue;
+      byUser.get(uid)!.tickets += 1;
+    }
+    return teamMembers
+      .map((m) => {
+        const acc = byUser.get(m.user_id)!;
+        const score = memberLoadScore({
+          openTasks: acc.tasks,
+          openTickets: acc.tickets,
+          blockedItems: acc.blocked,
+          overdueItems: acc.overdue,
+        });
+        const band = memberLoadBand(score);
+        return {
+          userId: m.user_id,
+          displayName: (m.user_full_name || m.user_email || "Member").trim(),
+          openTasks: acc.tasks,
+          openTickets: acc.tickets,
+          blocked: acc.blocked,
+          overdue: acc.overdue,
+          score,
+          band,
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+  }, [teamMembers, projectTasks, openTicketsList]);
+
+  const daysToEnd = useMemo(
+    () => daysUntilPlannedEnd(project?.planned_end_date ?? null),
+    [project?.planned_end_date]
+  );
+
+  const executiveStrip = useMemo(() => {
+    const health = executiveProjectHealth({
+      openTickets: openTicketsCount,
+      overdueTasks: healthMetrics.overdueTasks,
+      blockedTasks: healthMetrics.blockedTasks,
+      blockedActivities: projectActivityStats.blocked,
+      plannedEndDate: project?.planned_end_date ?? null,
+      projectStatus: project?.status ?? null,
     });
-    items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    return items.slice(0, 10);
-  }, [notes, todayTickets]);
+    const delivery = executiveDeliveryRisk({
+      overdueTasks: healthMetrics.overdueTasks,
+      blockedTasks: healthMetrics.blockedTasks,
+      blockedActivities: projectActivityStats.blocked,
+      overdueTickets: overdueTicketsCount,
+      highRiskActivities: healthMetrics.highRiskActivitiesCount,
+      mediumRiskActivities: healthMetrics.mediumRiskActivitiesCount,
+      daysToEnd,
+    });
+    const worst = teamLoadRows[0]?.band ?? "light";
+    const teamLoadLevel: ExecutiveSignalLevel =
+      worst === "overloaded" || worst === "high" ? "watch" : "good";
+    const hotMembers = teamLoadRows.filter((r) => r.band === "high" || r.band === "overloaded").length;
+    const openIssues = openTicketsCount + healthMetrics.overdueTasks;
+    const openIssuesLevel: ExecutiveSignalLevel =
+      openIssues > 10 ? "risk" : openIssues > 4 ? "watch" : "good";
+    return {
+      health,
+      delivery,
+      teamLoadLevel,
+      teamLoadLabel: tOverview(`load.bands.${worst}`),
+      teamLoadHelper:
+        hotMembers > 0 ? tOverview("signals.teamLoadHelper", { n: hotMembers }) : undefined,
+      openIssues,
+      openIssuesLevel,
+    };
+  }, [
+    openTicketsCount,
+    healthMetrics,
+    projectActivityStats.blocked,
+    project?.planned_end_date,
+    project?.status,
+    overdueTicketsCount,
+    daysToEnd,
+    teamLoadRows,
+    tOverview,
+  ]);
 
-  // Visual Insights: tasks by status (from projectTasks / healthMetrics)
-  const tasksByStatusChartData = useMemo(() => {
-    const data = [
-      { name: getTaskStatusLabel("pending"), count: healthMetrics.openOrPending, fill: "#94a3b8" },
-      { name: getTaskStatusLabel("in_progress"), count: healthMetrics.inProgressTasks, fill: "#3b82f6" },
-      { name: getTaskStatusLabel("review"), count: healthMetrics.reviewTasks, fill: "#8b5cf6" },
-      { name: getTaskStatusLabel("blocked"), count: healthMetrics.blockedTasks, fill: "#ef4444" },
-      { name: getTaskStatusLabel("done"), count: healthMetrics.doneTasks, fill: "#10b981" },
-    ];
-    return data.filter((d) => d.count > 0).length > 0 ? data : [];
-  }, [healthMetrics.openOrPending, healthMetrics.inProgressTasks, healthMetrics.reviewTasks, healthMetrics.blockedTasks, healthMetrics.doneTasks]);
+  const executiveInsightKey = useMemo(() => {
+    const worst = teamLoadRows[0]?.band ?? "light";
+    return executiveInsightVariant({
+      healthLevel: executiveStrip.health.level,
+      deliveryLevel: executiveStrip.delivery.level,
+      worstLoadBand: worst,
+      openIssues: executiveStrip.openIssues,
+    });
+  }, [
+    executiveStrip.delivery.level,
+    executiveStrip.health.level,
+    executiveStrip.openIssues,
+    teamLoadRows,
+  ]);
 
-  // Visual Insights: activities per phase (from dashboardActivities + projectPhases)
-  const activitiesByPhaseChartData = useMemo(() => {
-    return projectPhases.map((phase) => ({
-      name: phase.name,
-      count: dashboardActivities.filter((a) => a.phase_id === phase.id).length,
+  const teamLoadSummaryLine = useMemo(() => {
+    const hot = teamLoadRows.filter((r) => r.band === "high" || r.band === "overloaded").length;
+    if (hot >= 3) return tOverview("load.summaryManyHot", { n: hot });
+    if (hot === 2) return tOverview("load.summaryTwoHot");
+    if (hot === 1) return tOverview("load.summaryOneHot");
+    const [a, b] = teamLoadRows;
+    if (a && b && a.score >= 7 && b.score >= 7 && teamLoadRows.length >= 2) {
+      return tOverview("load.summaryConcentrated");
+    }
+    return undefined;
+  }, [teamLoadRows, tOverview]);
+
+  const riskBullets = useMemo(() => {
+    const overloadedMemberCount = teamLoadRows.filter((r) => r.score >= 9).length;
+    const onTrack =
+      healthMetrics.overdueTasks === 0 &&
+      projectActivityStats.blocked === 0 &&
+      overdueTicketsCount === 0;
+    return buildRiskBullets({
+      overdueTasks: healthMetrics.overdueTasks,
+      blockedActivities: projectActivityStats.blocked,
+      openTickets: openTicketsCount,
+      overloadedMemberCount,
+      daysToEnd,
+      onTrack,
+    });
+  }, [
+    teamLoadRows,
+    healthMetrics.overdueTasks,
+    projectActivityStats.blocked,
+    openTicketsCount,
+    overdueTicketsCount,
+    daysToEnd,
+  ]);
+
+  const openTasksNotDone = useMemo(
+    () => projectTasks.filter((t) => String(t.status ?? "").toLowerCase().trim() !== "done").length,
+    [projectTasks]
+  );
+
+  const currentPhaseLabel = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const sorted = [...projectPhases].sort((a, b) => a.sort_order - b.sort_order);
+    const active = sorted.find((p) => p.start_date && p.end_date && today >= p.start_date && today <= p.end_date);
+    if (active) return active.name;
+    const next = sorted.find((p) => p.start_date && today < p.start_date);
+    if (next) return `${next.name} (upcoming)`;
+    return sorted[sorted.length - 1]?.name ?? "Not configured";
+  }, [projectPhases]);
+
+  const keySignalLabel = useMemo(() => {
+    if (healthMetrics.blockedTasks > 0) return `${healthMetrics.blockedTasks} blocked tasks`;
+    if (healthMetrics.overdueTasks > 0) return `${healthMetrics.overdueTasks} overdue tasks`;
+    if (overdueTicketsCount > 0) return `${overdueTicketsCount} overdue tickets`;
+    if (openTicketsCount > 0) return `${openTicketsCount} open tickets`;
+    return "No active blockers";
+  }, [
+    healthMetrics.blockedTasks,
+    healthMetrics.overdueTasks,
+    overdueTicketsCount,
+    openTicketsCount,
+  ]);
+
+  const ticketPreviewRows = useMemo((): ProjectTicketPreviewRow[] => {
+    return todayTickets.map((t) => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
     }));
-  }, [projectPhases, dashboardActivities]);
-
-  // ECharts options: Tasks by status (donut) — aligned with Dashboard quality
-  const tasksByStatusEChartsOption = useMemo((): EChartsOption | null => {
-    if (tasksByStatusChartData.length === 0) return null;
-    const total = tasksByStatusChartData.reduce((acc, d) => acc + d.count, 0);
-    const TOOLTIP = {
-      backgroundColor: "#1e293b",
-      borderColor: "#334155",
-      textStyle: { color: "#e2e8f0", fontSize: 12 },
-      padding: [10, 12],
-      extraCssText: "line-height: 1.5;",
-    };
-    return {
-      tooltip: {
-        ...TOOLTIP,
-        trigger: "item",
-        formatter: (params: unknown) => {
-          const p = params as { name: string; value: number; percent?: number };
-          const pc = typeof p.percent === "number" ? p.percent.toFixed(1) : "0";
-          return `<span style="color:#94a3b8">Status</span><br/><span style="color:#f1f5f9;font-weight:600">${p.name}</span><br/><span style="color:#94a3b8">Tasks</span><br/><span style="color:#e2e8f0;font-weight:600">${p.value}</span><br/><span style="color:#94a3b8">% of total</span><br/><span style="color:#e2e8f0;font-weight:600">${pc}%</span>`;
-        },
-      },
-      legend: { show: false },
-      graphic: [
-        {
-          type: "text",
-          left: "50%",
-          top: "46%",
-          style: {
-            text: total.toString(),
-            textAlign: "center",
-            fill: "#e2e8f0",
-            fontSize: 20,
-            fontWeight: 600,
-            lineHeight: 24,
-          } as Record<string, unknown>,
-          z: 10,
-        },
-        {
-          type: "text",
-          left: "50%",
-          top: "58%",
-          style: {
-            text: "Tasks",
-            textAlign: "center",
-            fill: "#94a3b8",
-            fontSize: 11,
-            fontWeight: 500,
-          } as Record<string, unknown>,
-          z: 10,
-        },
-      ] as EChartsOption["graphic"],
-      series: [
-        {
-          type: "pie",
-          radius: ["54%", "78%"],
-          center: ["50%", "52%"],
-          avoidLabelOverlap: true,
-          itemStyle: { borderColor: "#1e293b", borderWidth: 2 },
-          label: { show: false },
-          emphasis: { scale: false, itemStyle: { shadowBlur: 8, shadowColor: "rgba(0,0,0,0.2)" } },
-          data: tasksByStatusChartData.map((d) => ({
-            name: d.name,
-            value: d.count,
-            itemStyle: { color: d.fill },
-          })),
-        },
-      ],
-    };
-  }, [tasksByStatusChartData]);
-
-  // ECharts options: Activities by phase (horizontal bar)
-  const activitiesByPhaseEChartsOption = useMemo((): EChartsOption | null => {
-    if (activitiesByPhaseChartData.length === 0) return null;
-    const GRID = { left: "0%", right: "8%", top: "8%", bottom: "8%", containLabel: true };
-    const AXIS_LABEL = { color: "#94a3b8", fontSize: 11 };
-    const SPLIT_LINE = { lineStyle: { color: "#334155", type: "dashed" as const } };
-    const TOOLTIP = {
-      backgroundColor: "#1e293b",
-      borderColor: "#334155",
-      textStyle: { color: "#e2e8f0", fontSize: 12 },
-      padding: [10, 12],
-      extraCssText: "line-height: 1.5;",
-    };
-    return {
-      color: ["#6366f1"],
-      tooltip: {
-        ...TOOLTIP,
-        trigger: "axis",
-        axisPointer: { type: "shadow" },
-        formatter: (params: unknown) => {
-          const p = Array.isArray(params) ? params[0] : params;
-          const payload = p as { name?: string; value?: number };
-          const name = payload.name ?? "";
-          const count = payload.value ?? 0;
-          return `<span style="color:#94a3b8">Phase</span><br/><span style="color:#f1f5f9;font-weight:600">${name}</span><br/><span style="color:#94a3b8">Activities</span><br/><span style="color:#e2e8f0;font-weight:600">${count}</span>`;
-        },
-      },
-      grid: { ...GRID, left: "22%" },
-      xAxis: {
-        type: "value",
-        axisLabel: AXIS_LABEL,
-        splitLine: SPLIT_LINE,
-        axisLine: { show: true, lineStyle: { color: "#334155" } },
-      },
-      yAxis: {
-        type: "category",
-        data: activitiesByPhaseChartData.map((d) => d.name),
-        axisLabel: { ...AXIS_LABEL, width: 76, overflow: "truncate" },
-        axisLine: { show: false },
-        axisTick: { show: false },
-      },
-      series: [
-        {
-          type: "bar",
-          barWidth: "58%",
-          barMaxWidth: 20,
-          data: activitiesByPhaseChartData.map((d) => d.count),
-          itemStyle: { borderRadius: [0, 4, 4, 0] },
-        },
-      ],
-    };
-  }, [activitiesByPhaseChartData]);
+  }, [todayTickets]);
 
   // ==========================
   // Render
@@ -1417,22 +1225,20 @@ export default function ProjectDashboardPage() {
 
   if (projectLoadFailed || !project) {
     return (
-      <div className="-mx-4 sm:-mx-5 lg:-mx-6 xl:-mx-8 2xl:-mx-10 bg-slate-950">
-        <div className="w-full max-w-[1440px] mx-auto px-6 lg:px-8">
-          <div className="flex items-center justify-center min-h-[40vh] w-full min-w-0">
-            <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900/60 p-6 text-center">
-              <h1 className="text-lg font-semibold text-slate-100 mb-2">Proyecto no encontrado</h1>
-              <p className="text-sm text-slate-500 mb-4">
-                No hemos podido cargar la información de este proyecto. Es posible que haya sido eliminado o que la URL no sea correcta.
-              </p>
-              <button
-                type="button"
-                onClick={() => router.push("/projects")}
-                className="rounded-xl border border-slate-600 bg-slate-700 px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-600 transition-colors"
-              >
-                Volver a proyectos
-              </button>
-            </div>
+      <div className={PROJECT_WORKSPACE_PAGE}>
+        <div className="flex items-center justify-center min-h-[40vh] w-full min-w-0">
+          <div className="w-full max-w-md rounded-xl border border-[rgb(var(--rb-surface-border))]/85 bg-[rgb(var(--rb-surface))]/95 p-6 text-center">
+            <h1 className="text-lg font-semibold text-[rgb(var(--rb-text-primary))] mb-2">Proyecto no encontrado</h1>
+            <p className="text-sm text-[rgb(var(--rb-text-muted))] mb-4">
+              No hemos podido cargar la información de este proyecto. Es posible que haya sido eliminado o que la URL no sea correcta.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/projects")}
+              className="rounded-xl border border-[rgb(var(--rb-brand-primary))]/35 bg-[rgb(var(--rb-brand-primary))] px-4 py-2 text-sm font-medium text-white hover:bg-[rgb(var(--rb-brand-primary-hover))] transition-colors"
+            >
+              Volver a proyectos
+            </button>
           </div>
         </div>
       </div>
@@ -1440,194 +1246,144 @@ export default function ProjectDashboardPage() {
   }
 
   return (
-    <div className="-mx-4 sm:-mx-5 lg:-mx-6 xl:-mx-8 2xl:-mx-10 bg-slate-950">
-      <div className="w-full max-w-[1440px] mx-auto px-6 lg:px-8">
-        <div className="min-w-0 space-y-6">
-        {errorMsg && (
-          <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
-            {errorMsg}
-          </div>
-        )}
+    <div className={PROJECT_WORKSPACE_PAGE}>
+      {errorMsg && (
+        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+          {errorMsg}
+        </div>
+      )}
 
-        {planGeneratedFailed && (
-          <div className="rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
-            No se pudo generar el plan inicial de actividades SAP Activate. El proyecto se creó correctamente; puedes añadir actividades manualmente o volver a intentar más tarde.
-          </div>
-        )}
+      {planGeneratedFailed && (
+        <div className="rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+          No se pudo generar el plan inicial de actividades SAP Activate. El proyecto se creó correctamente; puedes añadir actividades manualmente o volver a intentar más tarde.
+        </div>
+      )}
 
-        {/* Section 1 — Project Header */}
-        <header className="rounded-xl border border-slate-700/80 bg-slate-900/60 px-4 py-4 sm:px-5 sm:py-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 space-y-2">
-              <h1 className="text-lg font-semibold text-slate-100 sm:text-xl">{project?.name ?? "—"}</h1>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-400">
-                {project?.status && (
-                  <span className="inline-flex items-center rounded-lg border border-slate-600/80 bg-slate-800/90 px-2.5 py-0.5 text-xs font-medium text-slate-200">
-                    {STATUS_LABELS[project.status] ?? project.status}
-                  </span>
-                )}
-                <span className="tabular-nums text-slate-300">{healthMetrics.progressGeneral}% completado</span>
-                {clientName && <span className="text-slate-500">{clientName}</span>}
-              </div>
-              <p className="text-xs text-slate-500">
-                {projectTasksLoading || loadingTickets ? "—" : (
-                  <>
-                    {membersCount} miembros · {healthMetrics.totalTasks} tareas · {openTicketsCount} tickets abiertos
-                    {healthMetrics.overdueTasks > 0 && ` · ${healthMetrics.overdueTasks} vencidos`}
-                  </>
-                )}
+      {executiveInsightKey ? (
+        <div className="rounded-2xl border border-slate-200/85 bg-white p-5 sm:p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ring-1 ring-slate-100">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            {tOverview("heroEyebrow")}
+          </p>
+          <p className="mt-2 text-sm font-medium leading-relaxed text-slate-800">
+            {tOverview(`insight.${executiveInsightKey}`)}
+          </p>
+        </div>
+      ) : null}
+
+      <section className={PROJECT_WORKSPACE_SECTION_STACK}>
+        <div className="space-y-1">
+          <h2 className="text-sm font-semibold tracking-tight text-slate-900">Project health</h2>
+          <p className="text-xs text-slate-500">Executive snapshot of delivery risk and immediate attention areas.</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200/85 bg-white p-5 sm:p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ring-1 ring-slate-100">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Status</p>
+              <p className="mt-1.5 text-base font-semibold text-slate-900">
+                {tOverview(`healthLabels.${executiveStrip.health.labelKey}`)}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <Link href={`/projects/${projectId}/planning`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-800/80 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700 transition-colors">
-                <CalendarDays className="h-3.5 w-3.5" /> Planning
-              </Link>
-              <Link href={`/projects/${projectId}/tasks`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-800/80 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700 transition-colors">
-                <CheckSquare className="h-3.5 w-3.5" /> Tasks
-              </Link>
-              <Link href={`/projects/${projectId}/tickets`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-800/80 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700 transition-colors">
-                <Ticket className="h-3.5 w-3.5" /> Tickets
-              </Link>
-              <Link href={`/projects/${projectId}/notes?new=1`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-800/80 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700 transition-colors">
-                <FileText className="h-3.5 w-3.5" /> Nota
-              </Link>
+            <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Progress</p>
+              <p className="mt-1.5 text-base font-semibold tabular-nums text-slate-900">{healthMetrics.progressGeneral}%</p>
+            </div>
+            <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Current phase</p>
+              <p className="mt-1.5 text-base font-semibold text-slate-900">{currentPhaseLabel}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Key signal</p>
+              <p className="mt-1.5 text-base font-semibold text-slate-900">{keySignalLabel}</p>
             </div>
           </div>
-        </header>
-
-        {/* Section 2 — Project Health */}
-        <ProjectHealthStrip
-          projectId={projectId}
-          overdueTasks={healthMetrics.overdueTasks}
-          openTickets={openTicketsCount}
-          blockedTasks={healthMetrics.blockedTasks}
-          loading={projectTasksLoading || loadingTickets}
-        />
-
-        {/* Section 3 — Action Zone */}
-        <ProjectActionZone
-          projectId={projectId}
-          priorityTasks={priorityTasksForAction}
-          openTickets={todayTickets}
-          tasksLoading={projectTasksLoading}
-          ticketsLoading={loadingTickets}
-        />
-
-        {/* Section 4 — Recent Activity */}
-        <ProjectRecentActivity
-          items={recentActivityMerged}
-          loading={projectTasksLoading && todayTickets.length === 0 && suggestedKnowledge.length === 0 && notes.length === 0}
-          maxItems={8}
-        />
-
-        {/* Section 5 — Analytics */}
-        <ProjectAnalyticsSection
-          projectId={projectId}
-          taskChartOption={tasksByStatusEChartsOption}
-          ticketsOpen={openTicketsCount}
-          ticketsOverdue={overdueTicketsCount}
-          ticketsUrgent={urgentTicketsCount}
-          loading={projectTasksLoading || loadingTickets}
-        />
-
-        {/* Section 6 — Knowledge Summary */}
-        <ProjectKnowledgeSummaryCompact
-          projectId={projectId}
-          spaces={knowledgeSpacesCount}
-          pages={knowledgePagesCount}
-          notesCount={stats?.total_notes}
-          loading={loadingKnowledgeCounts || loadingStats}
-        />
+          <div className="mt-4">
+            <ProjectExecutiveSignalsStrip
+              healthLabel={tOverview(`healthLabels.${executiveStrip.health.labelKey}`)}
+              healthLevel={executiveStrip.health.level}
+              deliveryLabel={tOverview(`delivery.${executiveStrip.delivery.labelKey}`)}
+              deliveryLevel={executiveStrip.delivery.level}
+              teamLoadLabel={executiveStrip.teamLoadLabel}
+              teamLoadLevel={executiveStrip.teamLoadLevel}
+              teamLoadHelper={executiveStrip.teamLoadHelper}
+              openIssues={executiveStrip.openIssues}
+              openIssuesLevel={executiveStrip.openIssuesLevel}
+              progressPct={healthMetrics.progressGeneral}
+              loading={projectTasksLoading || loadingTickets}
+            />
+          </div>
         </div>
-      </div>
+      </section>
+
+      <section className={PROJECT_WORKSPACE_SECTION_STACK}>
+        <div className="space-y-1">
+          <h2 className="text-sm font-semibold tracking-tight text-slate-900">Key risks & blockers</h2>
+          <p className="text-xs text-slate-500">Top issues that can impact delivery in the current phase.</p>
+        </div>
+        <ProjectRisksBottlenecksPanel
+          bullets={
+            riskBullets.length > 0
+              ? riskBullets.slice(0, 5)
+              : [{ tone: "good", text: "No major risks detected. This project is running smoothly." }]
+          }
+        />
+      </section>
+
+      <section className={PROJECT_WORKSPACE_SECTION_STACK}>
+        <div className="space-y-1">
+          <h2 className="text-sm font-semibold tracking-tight text-slate-900">Execution snapshot</h2>
+          <p className="text-xs text-slate-500">Tasks, tickets, and team capacity in one view.</p>
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <ProjectTasksPreviewPanel
+            projectId={projectId}
+            tasks={taskPreviewRows}
+            loading={projectTasksLoading}
+            overdueCount={healthMetrics.overdueTasks}
+            blockedCount={healthMetrics.blockedTasks}
+            openTotal={openTasksNotDone}
+          />
+          <ProjectTicketsPreviewPanel
+            projectId={projectId}
+            tickets={ticketPreviewRows}
+            loading={loadingTickets}
+            openCount={openTicketsCount}
+            urgentCount={urgentTicketsCount}
+          />
+          <ProjectTeamLoadPanel rows={teamLoadRows} loading={false} summaryLine={teamLoadSummaryLine} />
+        </div>
+      </section>
+
+      <section className={PROJECT_WORKSPACE_SECTION_STACK}>
+        <div className="space-y-1">
+          <h2 className="text-sm font-semibold tracking-tight text-slate-900">Recent activity</h2>
+          <p className="text-xs text-slate-500">Latest project movements and updates.</p>
+        </div>
+        <ProjectRecentWorkPanel
+          projectId={projectId}
+          events={projectActivityFeed}
+          loading={loadingProjectActivity}
+          openTickets={openTicketsCount}
+          notesCount={notes.length}
+          linksCount={links.length}
+          lastUpdatedAt={stats?.last_update_at}
+        />
+      </section>
+
+      <section className={PROJECT_WORKSPACE_SECTION_STACK}>
+        <div className="space-y-1">
+          <h2 className="text-sm font-semibold tracking-tight text-slate-900">Knowledge &amp; insights</h2>
+          <p className="text-xs text-slate-500">Project context, key documentation, and Sapito prompts.</p>
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <ProjectKnowledgePanel
+            projectId={projectId}
+            knowledgeItemsCount={knowledgePagesCount}
+            lastUpdatedAt={stats?.last_update_at}
+            loading={loadingKnowledgeCounts || loadingStats}
+          />
+          <ProjectAIQuickPanel />
+        </div>
+      </section>
     </div>
-  );
-}
-
-
-// ==========================
-// Componentes auxiliares
-// ==========================
-
-const STATUS_LABELS: Record<string, string> = {
-  planned: "Planificado",
-  in_progress: "En progreso",
-  completed: "Completado",
-  archived: "Archivado",
-  paused: "En pausa",
-};
-
-const STATUS_STYLES: Record<string, string> = {
-  in_progress: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  completed: "bg-blue-50 text-blue-700 ring-blue-200",
-  paused: "bg-amber-50 text-amber-700 ring-amber-200",
-};
-
-function ProjectStatusBadge({ status }: { status: string }) {
-  const friendlyStatus = STATUS_LABELS[status] ?? status;
-  const style = STATUS_STYLES[status] ?? "bg-slate-50 text-slate-700 ring-slate-200";
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ${style}`}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {friendlyStatus}
-    </span>
-  );
-}
-
-function KpiCard({
-  title,
-  value,
-  subtitle,
-  error,
-}: {
-  title: string;
-  value: string;
-  subtitle: string;
-  error?: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm flex flex-col justify-between">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1">{title}</p>
-      <p className="text-2xl font-semibold text-slate-900">{value}</p>
-      {error ? (
-        <p className="text-[11px] text-red-600 mt-1">{error}</p>
-      ) : (
-        <p className="text-[11px] text-slate-500 mt-1">{subtitle}</p>
-      )}
-    </div>
-  );
-}
-
-function MetricActionCard({
-  title,
-  value,
-  subtitle,
-  href,
-  icon,
-}: {
-  title: string;
-  value: string;
-  subtitle: string;
-  href: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm flex flex-col gap-2 hover:border-slate-300 hover:shadow transition"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-slate-400">{icon}</span>
-        <span className="text-2xl font-semibold text-slate-900">{value}</span>
-      </div>
-      <p className="text-[11px] font-medium text-slate-700">{title}</p>
-      <p className="text-[11px] text-slate-400">{subtitle}</p>
-      <span className="text-[11px] font-medium text-indigo-600 mt-auto">
-        Ir →
-      </span>
-    </Link>
   );
 }

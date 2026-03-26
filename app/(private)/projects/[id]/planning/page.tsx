@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import {
@@ -11,7 +12,13 @@ import {
   type ProjectPhase,
 } from "@/lib/services/projectPhaseService";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { ProjectPlanningGantt } from "@/components/projects/ProjectPlanningGantt";
+import { ProjectPlanningGantt } from "@/components/projects/planning/ProjectPlanningGantt";
+import {
+  PROJECT_WORKSPACE_PAGE,
+  PROJECT_WORKSPACE_HERO,
+  PROJECT_WORKSPACE_SECTION_STACK,
+  PROJECT_WORKSPACE_CARD_FRAME,
+} from "@/lib/projectWorkspaceUi";
 
 type Project = {
   id: string;
@@ -58,7 +65,55 @@ function getDurationDays(start: string | null, end: string | null): number | nul
   return Math.round((b - a) / (24 * 60 * 60 * 1000)) + 1;
 }
 
+function formatPlanningDate(iso: string | null, localeTag: string, emDash: string): string {
+  if (!iso) return emDash;
+  try {
+    return new Date(iso).toLocaleDateString(localeTag, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return emDash;
+  }
+}
+
+function PlanningLoadingSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      <div className="space-y-4 rounded-2xl border border-slate-200/85 bg-white p-5 shadow-sm ring-1 ring-slate-100">
+        <div className="h-8 max-w-md w-2/3 rounded-lg bg-slate-100" />
+        <div className="h-4 max-w-sm w-1/2 rounded bg-slate-100/90" />
+        <div className="flex flex-wrap gap-2 pt-1">
+          <div className="h-7 w-28 rounded-lg bg-slate-100" />
+          <div className="h-7 w-40 rounded-lg bg-slate-100/90" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-xl border border-slate-200/85 bg-white p-4 shadow-sm ring-1 ring-slate-100/90"
+          >
+            <div className="h-3 w-20 rounded bg-slate-100" />
+            <div className="mt-3 h-6 w-16 rounded bg-slate-100/90" />
+          </div>
+        ))}
+      </div>
+      <div className="rounded-2xl border border-slate-200/85 bg-white p-5 shadow-sm ring-1 ring-slate-100">
+        <div className="h-52 w-full rounded-xl bg-slate-100/90" />
+      </div>
+      <div className="rounded-2xl border border-slate-200/85 bg-white p-5 shadow-sm ring-1 ring-slate-100">
+        <div className="h-36 w-full rounded-xl bg-slate-100/90" />
+      </div>
+    </div>
+  );
+}
+
 export default function ProjectPlanningPage() {
+  const t = useTranslations("planning");
+  const locale = useLocale();
+  const localeTag = locale === "es" ? "es-ES" : "en-US";
   const params = useParams();
   const projectId =
     typeof params?.id === "string"
@@ -76,6 +131,7 @@ export default function ProjectPlanningPage() {
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
   const [saveAllMessage, setSaveAllMessage] = useState<string | null>(null);
+  const [saveAllError, setSaveAllError] = useState(false);
 
   const loadProject = useCallback(async () => {
     if (!projectId) return;
@@ -112,7 +168,7 @@ export default function ProjectPlanningPage() {
         if (!cancelled) setErrorMsg(null);
       })
       .catch(() => {
-        if (!cancelled) setErrorMsg("No se pudieron cargar los datos.");
+        if (!cancelled) setErrorMsg(t("errors.loadData"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -120,7 +176,7 @@ export default function ProjectPlanningPage() {
     return () => {
       cancelled = true;
     };
-  }, [projectId, loadProject, loadPhases]);
+  }, [projectId, loadProject, loadPhases, t]);
 
   const handleSavePhase = async (
     phaseId: string,
@@ -199,6 +255,7 @@ export default function ProjectPlanningPage() {
   const handleSaveAll = async () => {
     setSavingAll(true);
     setSaveAllMessage(null);
+    setSaveAllError(false);
     try {
       for (const phase of phases) {
         const { error } = await supabase
@@ -234,12 +291,14 @@ export default function ProjectPlanningPage() {
 
       setSaveAllMessage(
         minStartDate && maxEndDate
-          ? "Planificación guardada y fechas del proyecto actualizadas."
-          : "Planificación guardada correctamente."
+          ? t("save.successWithProjectDates")
+          : t("save.success")
       );
+      setSaveAllError(false);
       setTimeout(() => setSaveAllMessage(null), 3000);
     } catch {
-      setSaveAllMessage("Error al guardar la planificación. Inténtalo de nuevo.");
+      setSaveAllMessage(t("save.error"));
+      setSaveAllError(true);
     } finally {
       setSavingAll(false);
     }
@@ -268,13 +327,13 @@ export default function ProjectPlanningPage() {
       const { error } = await supabase.from("project_phases").insert(mappedPhases);
       if (error) {
         console.error("Error generating default phases", error);
-        alert("No se pudieron crear las fases. Comprueba que tienes permiso o inténtalo más tarde.");
+        alert(t("errors.createPhases"));
         return;
       }
       await loadPhases();
     } catch (err) {
       console.error("Error generating default phases", err);
-      alert("Se produjo un error al generar las fases. Inténtalo de nuevo.");
+      alert(t("errors.generatePhases"));
     } finally {
       setGeneratingPhases(false);
     }
@@ -293,11 +352,11 @@ export default function ProjectPlanningPage() {
       if (json.ok && !json.skipped) {
         await loadPhases();
       } else if (json.error) {
-        setErrorMsg(json.error === "missing_dates" ? "Indica fechas de inicio y fin en el proyecto." : json.error);
+        setErrorMsg(json.error === "missing_dates" ? t("errors.missingDates") : json.error);
       }
     } catch (err) {
       console.error("Generate activate plan error", err);
-      setErrorMsg("No se pudo generar el plan.");
+      setErrorMsg(t("errors.generatePlan"));
     } finally {
       setGeneratingPlan(false);
     }
@@ -305,8 +364,8 @@ export default function ProjectPlanningPage() {
 
   if (!projectId) {
     return (
-      <div className="w-full min-w-0 bg-slate-950">
-        <p className="text-sm text-slate-400">No se ha encontrado el identificador del proyecto.</p>
+      <div className="w-full min-w-0">
+        <p className="text-sm text-slate-600">{t("errors.missingProjectId")}</p>
       </div>
     );
   }
@@ -317,182 +376,259 @@ export default function ProjectPlanningPage() {
     minStartDate && maxEndDate ? getDurationDays(minStartDate, maxEndDate) : null;
   const projectDateRange =
     minStartDate && maxEndDate
-      ? `${new Date(minStartDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })} – ${new Date(maxEndDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}`
+      ? `${new Date(minStartDate).toLocaleDateString(localeTag, { day: "numeric", month: "short", year: "numeric" })} ${t("emDash")} ${new Date(maxEndDate).toLocaleDateString(localeTag, { day: "numeric", month: "short", year: "numeric" })}`
       : null;
 
   const ganttProjectStart = minStartDate ?? project?.start_date ?? new Date().toISOString().slice(0, 10);
   const ganttProjectEnd = maxEndDate ?? project?.planned_end_date ?? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const completedPhases = phases.filter((p) => p.end_date && p.end_date < todayIso).length;
+  const upcomingMilestones = phases.filter((p) => p.start_date && p.start_date >= todayIso).length;
+  const delayedPhases = phases.filter((p) => p.end_date && p.end_date < todayIso && (currentPhase ? p.id !== currentPhase.id : true)).length;
 
   return (
-    <div className="w-full min-w-0 space-y-8 bg-slate-950">
-        {/* Planning header */}
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold text-slate-100 sm:text-2xl">Planificación del proyecto</h1>
-            <p className="mt-0.5 text-sm text-slate-500">Estructura del proyecto basada en SAP Activate.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 shrink-0 pt-2 sm:pt-0">
-            {phases.length > 0 ? (
-              <span className="inline-flex items-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-emerald-400">
-                Plan configurado
-              </span>
-            ) : (
-              <span className="inline-flex items-center rounded-lg border border-slate-600/80 bg-slate-800/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                Plan pendiente
-              </span>
-            )}
-            {projectDateRange && (
-              <span className="inline-flex items-center rounded-lg border border-slate-600/80 bg-slate-800/60 px-3 py-1.5 text-[11px] font-medium text-slate-300">
-                {projectDateRange}
-              </span>
-            )}
-          </div>
-        </header>
+    <div className={PROJECT_WORKSPACE_PAGE}>
+      {errorMsg && (
+        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-5 py-3 text-sm text-red-200">
+          {errorMsg}
+        </div>
+      )}
 
-        {/* Planning summary block */}
-        {phases.length > 0 && (
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5">
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-3">Resumen</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Fase actual</p>
-                <p className="mt-0.5 text-sm font-medium text-slate-200">{currentPhase?.name ?? "—"}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Inicio previsto</p>
-                <p className="mt-0.5 text-sm font-medium text-slate-300">{minStartDate ? new Date(minStartDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) : "—"}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Fin previsto</p>
-                <p className="mt-0.5 text-sm font-medium text-slate-300">{maxEndDate ? new Date(maxEndDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) : "—"}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Duración</p>
-                <p className="mt-0.5 text-sm font-medium text-slate-300">{totalDurationDays != null ? `${totalDurationDays} días` : "—"}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Fases</p>
-                <p className="mt-0.5 text-sm font-medium text-slate-300">{phases.length}</p>
-              </div>
+      {loading ? (
+        <PlanningLoadingSkeleton />
+      ) : (
+        <>
+          <div className={`${PROJECT_WORKSPACE_HERO} space-y-5`}>
+            <div className="min-w-0 space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                {t("page.eyebrow")}
+              </p>
+              <h1 className="text-2xl sm:text-[1.65rem] font-semibold tracking-tight text-slate-900">
+                {t("page.title")}
+              </h1>
+              <p className="text-sm text-slate-600 leading-relaxed max-w-3xl font-medium">
+                {t("page.subtitle")}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {phases.length > 0 ? (
+                <span className="inline-flex items-center rounded-lg border border-emerald-200/90 bg-emerald-50/95 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-900">
+                  {t("status.configured")}
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-lg border border-slate-200/90 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                  {t("status.pending")}
+                </span>
+              )}
+              {projectDateRange && (
+                <span className="inline-flex items-center rounded-lg border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 tabular-nums shadow-sm">
+                  {projectDateRange}
+                </span>
+              )}
+              {currentPhase ? (
+                <span className="inline-flex items-center rounded-lg border border-[rgb(var(--rb-brand-primary))]/25 bg-[rgb(var(--rb-brand-surface))] px-2.5 py-1 text-[11px] font-semibold text-[rgb(var(--rb-brand-primary-active))]">
+                  Current phase: {currentPhase.name}
+                </span>
+              ) : null}
             </div>
           </div>
-        )}
 
-        {errorMsg && (
-          <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-5 py-3 text-sm text-red-200">
-            {errorMsg}
-          </div>
-        )}
+          {phases.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+              <div className="rounded-xl border border-slate-200/85 bg-white p-4 shadow-sm ring-1 ring-slate-100/90">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  {t("kpi.plannedStart")}
+                </p>
+                <p className="mt-2 text-lg font-semibold tabular-nums tracking-tight text-slate-900">
+                  {formatPlanningDate(minStartDate, localeTag, t("emDash"))}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-200/85 bg-white p-4 shadow-sm ring-1 ring-slate-100/90">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  {t("kpi.plannedEnd")}
+                </p>
+                <p className="mt-2 text-lg font-semibold tabular-nums tracking-tight text-slate-900">
+                  {formatPlanningDate(maxEndDate, localeTag, t("emDash"))}
+                </p>
+              </div>
+              <div className="rounded-xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/90 to-white p-4 shadow-sm ring-1 ring-emerald-100/80">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-900/70">
+                  {t("kpi.duration")}
+                </p>
+                <p className="mt-2 text-lg font-semibold tracking-tight text-slate-900">
+                  {totalDurationDays != null ? t("kpi.days", { count: totalDurationDays }) : t("emDash")}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-200/85 bg-white p-4 shadow-sm ring-1 ring-slate-100/90">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  {t("kpi.phases")}
+                </p>
+                <p className="mt-2 text-lg font-semibold tabular-nums tracking-tight text-slate-900">{phases.length}</p>
+              </div>
+            </div>
+          )}
 
-        {loading ? (
-          <p className="text-sm text-slate-500">Cargando fases…</p>
-        ) : phases.length === 0 ? (
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-6 md:p-8">
-            <h2 className="text-lg font-semibold text-slate-100">Aún no hay fases de planificación</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Genera solo las fases SAP Activate o el plan completo (fases, actividades, tareas) cuando el proyecto tenga fechas de inicio y fin.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              {project?.start_date && project?.planned_end_date && (
+          {phases.length > 0 && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-slate-200/90 bg-white px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Completed</p>
+                <p className="mt-1.5 text-sm font-semibold text-slate-900 tabular-nums">{completedPhases}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200/90 bg-white px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Upcoming milestones</p>
+                <p className="mt-1.5 text-sm font-semibold text-slate-900 tabular-nums">{upcomingMilestones}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200/90 bg-white px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Schedule risk</p>
+                <p className="mt-1.5 text-sm font-semibold text-slate-900">
+                  {delayedPhases > 0 ? `${delayedPhases} delayed phase${delayedPhases === 1 ? "" : "s"}` : "No schedule delays detected"}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {phases.length === 0 ? (
+            <div className="space-y-5 rounded-2xl border border-slate-200/85 bg-white p-6 md:p-8 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ring-1 ring-slate-100">
+              <div className="space-y-2">
+                <h2 className="text-xl font-semibold tracking-tight text-slate-900">
+                  {t("empty.title")}
+                </h2>
+                <p className="max-w-2xl text-sm leading-relaxed text-slate-600 font-medium">
+                  {t("empty.description")}
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                {project?.start_date && project?.planned_end_date ? (
+                  <button
+                    type="button"
+                    onClick={generateActivatePlanFromTemplate}
+                    disabled={generatingPlan}
+                    className="inline-flex items-center justify-center rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {generatingPlan ? t("actions.generating") : t("actions.generateFromTemplate")}
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  onClick={generateActivatePlanFromTemplate}
-                  disabled={generatingPlan}
-                  className="inline-flex items-center justify-center rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
+                  onClick={generateDefaultPhases}
+                  disabled={generatingPhases}
+                  className={
+                    project?.start_date && project?.planned_end_date
+                      ? "inline-flex items-center justify-center rounded-xl border border-slate-200/90 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+                      : "inline-flex items-center justify-center rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
+                  }
                 >
-                  {generatingPlan ? "Generando…" : "Generar plan desde plantilla"}
+                  {generatingPhases ? t("actions.generating") : t("actions.generatePhasesOnly")}
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={generateDefaultPhases}
-                disabled={generatingPhases}
-                className="inline-flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors duration-150 disabled:opacity-50"
-              >
-                {generatingPhases ? "Generando…" : "Generar solo fases"}
-              </button>
-              <Link
-                href={`/projects/${projectId}`}
-                className="inline-flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors duration-150"
-              >
-                Volver al proyecto
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Timeline hero — scrollable, no overflow */}
-            <section className="w-full min-w-0 overflow-x-auto">
-              <ProjectPlanningGantt
-                phases={phases}
-                projectStart={ganttProjectStart}
-                projectEnd={ganttProjectEnd}
-                height={420}
-              />
-            </section>
-
-            {/* Phase editor — structured card */}
-            <section className="w-full min-w-0">
-              <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
-                <div className="border-b border-slate-700/60 px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div>
-                    <h2 className="text-sm font-medium text-slate-200">Editor de fases</h2>
-                    <p className="mt-0.5 text-xs text-slate-400">Edita nombres y fechas. Los cambios se reflejan en el timeline.</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {saveAllMessage && (
-                      <span
-                        className={
-                          saveAllMessage.startsWith("Error")
-                            ? "text-xs text-rose-400"
-                            : "text-xs text-emerald-400"
-                        }
-                      >
-                        {saveAllMessage}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleSaveAll}
-                      disabled={savingAll}
-                      className="inline-flex items-center justify-center rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
-                    >
-                      {savingAll ? "Guardando…" : "Guardar planificación"}
-                    </button>
-                  </div>
-                </div>
-                <div className="min-w-0 overflow-x-auto">
-                  <table className="w-full text-left min-w-[540px]">
-                    <thead className="bg-slate-800/50 border-b border-slate-700/50">
-                      <tr>
-                        <th className="px-4 sm:px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-20 whitespace-nowrap">Orden</th>
-                        <th className="px-4 sm:px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[200px]">Fase</th>
-                        <th className="px-4 sm:px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-40">Inicio</th>
-                        <th className="px-4 sm:px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-40">Fin</th>
-                        <th className="px-4 sm:px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-24 text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-700/40">
-                      {phases.map((phase, index) => (
-                        <PhaseRow
-                          key={phase.id}
-                          phase={phase}
-                          index={index}
-                          total={phases.length}
-                          onMove={movePhase}
-                          onSave={handleSavePhase}
-                          onPhaseDateChange={handlePhaseDateChange}
-                          onPhaseNameChange={handlePhaseNameChange}
-                          saving={savingId === phase.id}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <Link
+                  href={`/projects/${projectId}`}
+                  className="inline-flex items-center justify-center text-sm font-medium text-slate-500 underline-offset-4 transition-colors hover:text-slate-300"
+                >
+                  {t("actions.backToProject")}
+                </Link>
               </div>
-            </section>
-          </>
-        )}
+            </div>
+          ) : (
+            <>
+              <section className={`w-full min-w-0 ${PROJECT_WORKSPACE_SECTION_STACK}`}>
+                <div className="space-y-1">
+                  <h2 className="text-sm font-semibold tracking-tight text-slate-900">Timeline control</h2>
+                  <p className="text-xs text-slate-500">Current phase is highlighted, and past/upcoming phases are visually separated.</p>
+                </div>
+                <ProjectPlanningGantt
+                  phases={phases}
+                  projectStart={ganttProjectStart}
+                  projectEnd={ganttProjectEnd}
+                  height={420}
+                />
+              </section>
+
+              <section className="w-full min-w-0">
+                <div className={`overflow-hidden ${PROJECT_WORKSPACE_CARD_FRAME}`}>
+                  <div className="flex flex-col gap-4 border-b border-slate-200/90 bg-slate-50/60 px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 space-y-2">
+                      <h2 className="text-base font-semibold tracking-tight text-slate-900">{t("editor.title")}</h2>
+                      <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                        {t("editor.subtitle")}
+                      </p>
+                      <ul className="list-inside list-disc space-y-1 text-xs text-slate-600">
+                        <li>
+                          <span className="font-medium text-slate-700">{t("editor.saveAllLabel")}</span> {t("emDash")}{" "}
+                          {t("editor.saveAllHelp")}
+                        </li>
+                        <li>
+                          <span className="font-medium text-slate-700">{t("editor.rowSaveLabel")}</span>{" "}
+                          {t("editor.rowSaveHelpPrefix")} {t("emDash")} {t("editor.rowSaveHelpSuffix")}
+                        </li>
+                      </ul>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                      {saveAllMessage && (
+                        <span
+                          className={
+                            saveAllError
+                              ? "text-right text-xs font-medium text-rose-700"
+                              : "text-right text-xs font-medium text-emerald-800"
+                          }
+                        >
+                          {saveAllMessage}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleSaveAll}
+                        disabled={savingAll}
+                        className="inline-flex items-center justify-center rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
+                      >
+                        {savingAll ? t("save.saving") : t("save.saveAll")}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="min-w-0 overflow-x-auto">
+                    <table className="w-full min-w-[540px] text-left">
+                      <thead className="border-b border-slate-200/90 bg-slate-50/90">
+                        <tr>
+                          <th className="w-20 whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:px-5">
+                            {t("table.order")}
+                          </th>
+                          <th className="min-w-[200px] px-4 py-3.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500 sm:px-5">
+                            {t("table.phase")}
+                          </th>
+                          <th className="w-40 px-4 py-3.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500 sm:px-5">
+                            {t("table.start")}
+                          </th>
+                          <th className="w-40 px-4 py-3.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500 sm:px-5">
+                            {t("table.end")}
+                          </th>
+                          <th className="w-24 px-4 py-3.5 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500 sm:px-5">
+                            {t("table.actions")}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {phases.map((phase, index) => (
+                          <PhaseRow
+                            key={phase.id}
+                            phase={phase}
+                            index={index}
+                            total={phases.length}
+                            onMove={movePhase}
+                            onSave={handleSavePhase}
+                            onPhaseDateChange={handlePhaseDateChange}
+                            onPhaseNameChange={handlePhaseNameChange}
+                            saving={savingId === phase.id}
+                            t={t}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -506,6 +642,7 @@ function PhaseRow({
   onPhaseDateChange,
   onPhaseNameChange,
   saving,
+  t,
 }: {
   phase: ProjectPhase;
   index: number;
@@ -518,6 +655,7 @@ function PhaseRow({
   onPhaseDateChange: (phaseId: string, field: "start_date" | "end_date", value: string) => void;
   onPhaseNameChange: (phaseId: string, value: string) => void;
   saving: boolean;
+  t: (key: string) => string;
 }) {
   const name = phase.name;
   const startDate = phase.start_date ?? "";
@@ -532,21 +670,21 @@ function PhaseRow({
   };
 
   const textInputClass =
-    "w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 transition-colors";
+    "w-full rounded-xl border border-slate-200/90 bg-white px-2.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/40 transition-colors";
   const dateInputClass =
-    "w-full rounded-xl border border-slate-500 bg-slate-800/80 px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-400 transition-colors";
+    "w-full rounded-xl border border-slate-200/90 bg-white px-2.5 py-2 text-sm text-slate-800 tabular-nums shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/30 focus:border-[rgb(var(--rb-brand-primary))]/35 transition-colors";
 
   return (
-    <tr className="hover:bg-slate-800/50 transition-colors duration-150">
-      <td className="px-4 sm:px-5 py-3 align-middle whitespace-nowrap">
-        <div className="flex items-center gap-2">
-          <div className="inline-flex flex-col rounded-lg border border-slate-600/50 bg-slate-800/40 p-0.5 shrink-0">
+    <tr className="transition-colors duration-150 hover:bg-slate-50/90">
+      <td className="whitespace-nowrap px-4 py-3.5 align-middle sm:px-5">
+        <div className="flex items-center gap-1.5">
+          <div className="inline-flex shrink-0 flex-col gap-px rounded-md border border-slate-200/90 bg-white p-px shadow-sm">
             <button
               type="button"
               onClick={() => onMove(index, "up")}
               disabled={index === 0}
-              className="rounded-md p-1 text-slate-500 hover:bg-slate-700/60 hover:text-slate-300 disabled:opacity-30 disabled:pointer-events-none transition-colors duration-150"
-              aria-label="Move up"
+              className="rounded p-0.5 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 disabled:pointer-events-none disabled:opacity-25"
+              aria-label={t("row.moveUp")}
             >
               <ChevronUp className="h-3.5 w-3.5" />
             </button>
@@ -554,25 +692,25 @@ function PhaseRow({
               type="button"
               onClick={() => onMove(index, "down")}
               disabled={index === total - 1}
-              className="rounded-md p-1 text-slate-500 hover:bg-slate-700/60 hover:text-slate-300 disabled:opacity-30 disabled:pointer-events-none transition-colors duration-150"
-              aria-label="Move down"
+              className="rounded-md p-0.5 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 disabled:pointer-events-none disabled:opacity-25"
+              aria-label={t("row.moveDown")}
             >
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
           </div>
-          <span className="text-xs font-medium text-slate-500 tabular-nums">{phase.sort_order}</span>
+          <span className="text-xs font-medium tabular-nums text-slate-500">{phase.sort_order}</span>
         </div>
       </td>
-      <td className="px-4 sm:px-5 py-3 align-middle">
+      <td className="px-4 py-3.5 align-middle sm:px-5">
         <input
           type="text"
           value={name}
           onChange={(e) => onPhaseNameChange(phase.id, e.target.value)}
           className={`${textInputClass} max-w-[220px]`}
-          placeholder="Nombre de fase"
+          placeholder={t("row.phaseNamePlaceholder")}
         />
       </td>
-      <td className="px-4 sm:px-5 py-3 align-middle">
+      <td className="px-4 py-3.5 align-middle sm:px-5">
         <input
           type="date"
           value={startDate}
@@ -580,7 +718,7 @@ function PhaseRow({
           className={dateInputClass}
         />
       </td>
-      <td className="px-4 sm:px-5 py-3 align-middle">
+      <td className="px-4 py-3.5 align-middle sm:px-5">
         <input
           type="date"
           value={endDate}
@@ -588,14 +726,14 @@ function PhaseRow({
           className={dateInputClass}
         />
       </td>
-      <td className="px-4 sm:px-5 py-3 align-middle text-right w-24">
+      <td className="w-24 px-4 py-3.5 text-right align-middle sm:px-5">
         <button
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="rounded-lg border border-indigo-500/50 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="rounded-xl border border-slate-200/90 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving ? "…" : "Guardar"}
+          {saving ? "…" : t("row.save")}
         </button>
       </td>
     </tr>

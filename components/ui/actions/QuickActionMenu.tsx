@@ -1,8 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Plus, FolderKanban, CheckSquare, FileText, Ticket, BookOpen } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -12,23 +13,14 @@ export type QuickActionItem = {
   icon?: ReactNode;
 };
 
-const ALL_ITEMS: QuickActionItem[] = [
-  { label: "Create Project", href: "/projects/new", icon: <FolderKanban className="h-[18px] w-[18px]" /> },
-  { label: "Create Task", href: "/tasks", icon: <CheckSquare className="h-[18px] w-[18px]" /> },
-  { label: "Create Note", href: "/notes/new", icon: <FileText className="h-[18px] w-[18px]" /> },
-  { label: "Create Ticket", href: "/tickets/new", icon: <Ticket className="h-[18px] w-[18px]" /> },
-  { label: "Create Knowledge Page", href: "/knowledge", icon: <BookOpen className="h-[18px] w-[18px]" /> },
-];
-
 export function QuickActionMenu({
-  label = "New",
   items: itemsProp,
   className = "",
 }: {
-  label?: string;
   items?: QuickActionItem[];
   className?: string;
 }) {
+  const t = useTranslations("common.quickActions");
   const [open, setOpen] = useState(false);
   const [canCreateProject, setCanCreateProject] = useState(false);
   const [itemsReady, setItemsReady] = useState(false);
@@ -36,10 +28,43 @@ export function QuickActionMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<(HTMLAnchorElement | null)[]>([]);
 
+  const defaultItems = useMemo<QuickActionItem[]>(
+    () => [
+      {
+        label: t("createProject"),
+        href: "/projects/new",
+        icon: <FolderKanban className="h-[18px] w-[18px]" />,
+      },
+      {
+        label: t("createTask"),
+        href: "/tasks",
+        icon: <CheckSquare className="h-[18px] w-[18px]" />,
+      },
+      {
+        label: t("createNote"),
+        href: "/notes/new",
+        icon: <FileText className="h-[18px] w-[18px]" />,
+      },
+      {
+        label: t("createTicket"),
+        href: "/tickets/new",
+        icon: <Ticket className="h-[18px] w-[18px]" />,
+      },
+      {
+        label: t("createKnowledgePage"),
+        href: "/knowledge",
+        icon: <BookOpen className="h-[18px] w-[18px]" />,
+      },
+    ],
+    [t]
+  );
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) {
         setCanCreateProject(false);
@@ -53,16 +78,18 @@ export function QuickActionMenu({
       setCanCreateProject(perms?.createProject ?? false);
       setItemsReady(true);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const defaultItems =
+  const resolvedDefaultItems =
     itemsReady
       ? canCreateProject
-        ? ALL_ITEMS
-        : ALL_ITEMS.filter((i) => i.href !== "/projects/new")
-      : ALL_ITEMS;
-  const items = itemsProp ?? defaultItems;
+        ? defaultItems
+        : defaultItems.filter((i) => i.href !== "/projects/new")
+      : defaultItems;
+  const items = itemsProp ?? resolvedDefaultItems;
 
   // When opening, focus first menu item after DOM update
   useEffect(() => {
@@ -119,28 +146,34 @@ export function QuickActionMenu({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-100 hover:bg-slate-700 hover:border-slate-600 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:ring-offset-2 focus:ring-offset-slate-950"
+        className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-transparent bg-[rgb(var(--rb-brand-primary))] px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors duration-150 hover:bg-[rgb(var(--rb-brand-primary-hover))] active:bg-[rgb(var(--rb-brand-primary-active))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--rb-shell-bg))]"
       >
         <Plus className="h-4 w-4 shrink-0" />
-        <span className="hidden md:inline">{label}</span>
+        <span className="hidden md:inline">{t("trigger")}</span>
       </button>
 
       {open ? (
         <div
-          className="absolute right-0 top-full z-50 mt-2 min-w-[220px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-lg"
+          className="absolute right-0 top-full z-50 mt-2 min-w-[220px] overflow-hidden rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 backdrop-blur-sm shadow-md"
           role="menu"
         >
           <div className="p-1">
             {items.map((item, i) => (
               <Link
                 key={item.href}
-                ref={(node) => { itemRefs.current[i] = node; }}
+                ref={(node) => {
+                  itemRefs.current[i] = node;
+                }}
                 href={item.href}
                 role="menuitem"
                 onClick={() => closeAndFocusTrigger()}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] transition-all duration-150 hover:bg-[rgb(var(--rb-surface))]/80 hover:translate-x-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-inset ${
+                  i === 0 ? "font-medium bg-[rgb(var(--rb-brand-primary))]/5" : ""
+                }`}
               >
-                {item.icon ? <span className="text-slate-500">{item.icon}</span> : null}
+                {item.icon ? (
+                  <span className="shrink-0 text-[rgb(var(--rb-brand-primary))] [&_svg]:block">{item.icon}</span>
+                ) : null}
                 <span className="truncate">{item.label}</span>
               </Link>
             ))}

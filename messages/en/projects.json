@@ -1,0 +1,322 @@
+{
+  "emDash": "—",
+  "page": {
+    "title": "Projects",
+    "subtitle": "Manage and open each project workspace.",
+    "quotaSummary": "{current} / {limit} projects",
+    "createCta": "New project"
+  },
+  "summary": {
+    "active": "active",
+    "tickets": "tickets"
+  },
+  "quota": {
+    "atLimit": "You have reached the maximum allowed projects ({current} / {limit}). You cannot create more until an administrator increases the limit.",
+    "nearLimit": "You are approaching the project limit ({current} / {limit}). Once reached, you will not be able to create more until an administrator increases the quota."
+  },
+  "filters": {
+    "searchPlaceholder": "Search by name, client, or status...",
+    "status": {
+      "all": "All statuses"
+    }
+  },
+  "sort": {
+    "priority": "Active first",
+    "newest": "Newest",
+    "name": "By name",
+    "recentlyUpdated": "Recently updated"
+  },
+  "status": {
+    "planned": "Planned",
+    "in_progress": "In progress",
+    "completed": "Completed",
+    "archived": "Archived",
+    "blocked": "Blocked",
+    "paused": "Paused"
+  },
+  "empty": {
+    "title": "No projects found",
+    "description": "Adjust the filter or create a new project to get started."
+  },
+  "errors": {
+    "loadProjects": "Could not load projects."
+  },
+  "card": {
+    "openWorkspaceAria": "Open workspace for {name}",
+    "untitledProject": "Untitled project",
+    "notes": "notes",
+    "tickets": "tickets",
+    "tasks": "tasks",
+    "openWorkspace": "Open workspace",
+    "planning": "Planning",
+    "tasksSection": "Tasks",
+    "health": {
+      "label": "Project health",
+      "healthy": "Healthy",
+      "watch": "Watch",
+      "at_risk": "At risk",
+      "aria": "{state}: {segments} of 4 signal bars active",
+      "tooltip": {
+        "healthy": "Approximate signal from status, planned dates, open tickets, and open tasks. No strong risk flags.",
+        "watch": "Some pressure detected—review dates, open tickets, or task backlog.",
+        "at_risk": "Strong risk signals: blocked or overdue plan, or elevated open tickets/tasks. Worth a closer look."
+      }
+    }
+  },
+  "tabs": {
+    "overview": "Overview",
+    "planning": "Planning",
+    "activities": "Activities",
+    "tasks": "Tasks",
+    "notes": "Notes",
+    "brain": "Brain",
+    "links": "Links",
+    "knowledge": "Knowledge",
+    "tickets": "Tickets",
+    "team": "Team"
+  },
+  "overview": {
+    "heroEyebrow": "Executive overview",
+    "signals": {
+      "title": "Executive signals",
+      "subtitle": "Health, delivery risk, load, open work, and progress — in one glance.",
+      "caption": "Heuristic view from data already in this workspace (not a forecast).",
+      "projectHealth": "Project health",
+      "deliveryRisk": "Delivery risk",
+      "teamLoad": "Team load",
+      "openIssues": "Open issues",
+      "progress": "Progress",
+      "teamLoadHelper": "{n} teammate(s) near or over comfortable load",
+      "helpers": {
+        "health": "Heuristic from workload and timeline",
+        "delivery": "Blockers, delays, and pressure",
+        "openIssues": "Open tickets + overdue tasks",
+        "progress": "Tasks / activity rollup"
+      }
+    },
+    "load": {
+      "title": "Team load & capacity",
+      "subtitle": "Assigned open work per member (display-only scoring).",
+      "summaryManyHot": "{n} people are near or above comfortable load.",
+      "summaryTwoHot": "Two teammates are carrying elevated load.",
+      "summaryOneHot": "One teammate is near capacity.",
+      "summaryConcentrated": "Workload is concentrated across top assignees.",
+      "empty": "No team members loaded yet.",
+      "tasks": "Tasks",
+      "tickets": "Tickets",
+      "blocked": "Blocked",
+      "overdue": "Overdue",
+      "scoreLabel": "Load {n}",
+      "bands": {
+        "light": "Light",
+        "balanced": "Balanced",
+        "high": "High",
+        "overloaded": "Overloaded"
+      }
+    },
+    "risks": {
+      "title": "Risks & bottlenecks",
+      "subtitle": "Executive watchlist — escalations worth a decision.",
+      "caption": "Generated from overdue work, blocks, tickets, load, and plan window.",
+      "severityHigh": "Escalate",
+      "severityWatch": "Monitor",
+      "severityOk": "Stable"
+    },
+    "recent": {
+      "title": "Recent activity",
+      "subtitle": "Latest events tied to this project.",
+      "empty": "No recent events for this project yet.",
+      "fallbackHint": "Jump into modules to create movement.",
+      "quick": {
+        "openTickets": "Open tickets",
+        "notes": "Notes",
+        "links": "External links"
+      },
+      "time": {
+        "unknown": "Unknown time",
+        "justNow": "Just now",
+        "minutesAgo": "{n}m ago",
+        "hoursAgo": "{n}h ago",
+        "daysAgo": "{n}d ago",
+        "statsHint": "Operational stats last reflected {time}"
+      },
+      "types": {
+        "project_created": "Project",
+        "task_created": "Task",
+        "ticket_closed": "Ticket",
+        "note_created": "Note",
+        "user_invited": "Invite"
+      }
+    },
+    "sapito": {
+      "title": "Ask Sapito about this project",
+      "subtitle": "Project copilot grounded in this workspace — pick a prompt or open the assistant.",
+      "openAssistant": "Open assistant",
+      "promptRisks": "Summarize current risks",
+      "promptBlocking": "What is blocking delivery?",
+      "promptFocus": "What should I focus on this week?",
+      "promptDocs": "Which areas need documentation?",
+      "footnote": "Replies run when you send a message in the assistant."
+    },
+    "command": {
+      "addWork": "Add work",
+      "newTask": "New task",
+      "newTicket": "New ticket",
+      "newNote": "New note",
+      "newActivity": "New activity",
+      "openPlanning": "Open planning",
+      "askSapito": "Ask Sapito",
+      "more": "More"
+    },
+    "delivery": {
+      "low": "Low",
+      "elevated": "Elevated",
+      "high": "High"
+    },
+    "healthLabels": {
+      "healthy": "Healthy",
+      "watch": "Watch",
+      "at_risk": "At risk"
+    },
+    "insight": {
+      "progressing": "Trajectory looks workable — keep execution tight and visible.",
+      "pressure": "Progress is possible, but execution pressure is rising — prioritize blockers, dates, and load.",
+      "at_risk": "Status is fragile — unresolved blockers, overload, or timeline stress need leadership attention."
+    },
+    "panels": {
+      "tasksTitle": "Tasks snapshot",
+      "tasksSubtitle": "Overdue and blocked first, then active work by due date.",
+      "tasksAttention": "What needs attention now",
+      "ticketsTitle": "Tickets snapshot",
+      "ticketsSubtitle": "Unresolved items — prioritize older open tickets.",
+      "ticketsAttention": "Open issues blocking flow",
+      "ticketsRowHint": "Unresolved — review priority and age.",
+      "overdue": "{n} overdue",
+      "blocked": "{n} blocked",
+      "open": "{n} open",
+      "viewAll": "View all",
+      "priorityHot": "{n} urgent / high"
+    }
+  },
+  "notes": {
+    "eyebrow": "Operational memory",
+    "title": "Project notes",
+    "subtitle": "Operational notes and functional memory for this project.",
+    "newNote": "New note",
+    "invalidProjectId": "Invalid project identifier.",
+    "searchPlaceholder": "Search in notes...",
+    "allModules": "All modules",
+    "untitled": "Untitled",
+    "error": "Error",
+    "links": "Links",
+    "summary": {
+      "total": "Total",
+      "withErrorCode": "With error code",
+      "withLinks": "With links",
+      "recent7d": "Recent (7 d)"
+    },
+    "sort": {
+      "recent": "Most recent",
+      "oldest": "Oldest",
+      "title": "Title A-Z"
+    },
+    "empty": {
+      "title": "No notes in this project yet",
+      "description": "Capture incidents, solutions, decisions, and operational context.",
+      "createFirst": "Create first note"
+    },
+    "filteredEmpty": {
+      "title": "No notes match filters",
+      "description": "Try changing search or module."
+    },
+    "actions": {
+      "view": "View",
+      "more": "More options",
+      "edit": "Edit",
+      "delete": "Delete",
+      "addKb": "Add to KB",
+      "removeKb": "Remove from KB"
+    },
+    "delete": {
+      "title": "Delete note",
+      "body": "Are you sure you want to delete this note? This action cannot be undone.",
+      "cancel": "Cancel",
+      "confirm": "Delete",
+      "deleting": "Deleting..."
+    },
+    "errors": {
+      "load": "Could not load notes.",
+      "actionFailed": "Could not complete action.",
+      "connection": "Connection error."
+    }
+  },
+  "members": {
+    "title": "Team",
+    "subtitle": "Project members and their roles.",
+    "missingProjectId": "Project identifier not found.",
+    "roles": {
+      "owner": "Owner",
+      "editor": "Editor",
+      "viewer": "Viewer"
+    },
+    "action": "Action",
+    "globalAccess": {
+      "title": "Global role access.",
+      "body": "You have admin access to this project without being a team member."
+    },
+    "addMember": {
+      "title": "Add member",
+      "adding": "Adding...",
+      "addToTeam": "Add to team",
+      "help": "If the user exists, they are added immediately. Otherwise a pending invitation is created.",
+      "atLimit": "You reached the member limit for this project ({current} / {limit}).",
+      "nearLimit": "You are approaching member limit ({current} / {limit})."
+    },
+    "invitation": {
+      "linkHelp": "Copy or open the link so the user can accept the invitation.",
+      "copied": "Copied",
+      "copyLink": "Copy invitation link"
+    },
+    "pendingInvites": {
+      "title": "Pending invitations",
+      "subtitle": "Invited users who have not accepted yet.",
+      "loading": "Loading invitations...",
+      "pending": "Pending",
+      "revoke": "Revoke",
+      "maxReached": " - Maximum reached. You cannot create more invitations until limit is increased.",
+      "nearLimit": " - Near the limit.",
+      "none": "No pending invitations.",
+      "noneHelp": "If email belongs to registered user, they are added directly and do not appear here."
+    },
+    "teamMembers": {
+      "title": "Team members",
+      "subtitle": "Only explicit project memberships are shown here.",
+      "loading": "Loading team...",
+      "active": "Active",
+      "remove": "Remove from team",
+      "removing": "Removing...",
+      "empty": "No members in this project yet."
+    },
+    "success": {
+      "alreadyMember": "User already belongs to this project.",
+      "directAdd": "User existed and was added directly to the team.",
+      "memberAdded": "User added to project successfully.",
+      "inviteSent": "Pending invitation created and email sent.",
+      "inviteNoEmailWithLink": "Invitation created, but email failed. Use invitation link.",
+      "inviteNoEmail": "Invitation created, but email failed.",
+      "inviteCreated": "Invitation created."
+    },
+    "errors": {
+      "loadTeam": "Could not load team.",
+      "connection": "Connection error.",
+      "invalidEmail": "Enter a valid email address.",
+      "noPermission": "You do not have permission to manage members.",
+      "quotaReached": "You have reached this project's limit ({current} / {limit}).",
+      "projectQuotaReached": "This project has reached the maximum members allowed ({current} / {limit}).",
+      "addMemberFailed": "Could not add member.",
+      "unexpectedResponse": "Unexpected server response. Please try again.",
+      "cannotRemoveLastOwner": "Cannot remove the last project owner.",
+      "copyFailed": "Could not copy to clipboard."
+    }
+  }
+}

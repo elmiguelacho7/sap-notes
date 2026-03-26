@@ -1,0 +1,110 @@
+{
+  "loading": "Loading…",
+  "retry": "Retry",
+  "cancel": "Cancel",
+  "actions": {
+    "view": "View",
+    "edit": "Edit",
+    "delete": "Delete",
+    "archive": "Archive",
+    "cancel": "Cancel",
+    "deleting": "Deleting…",
+    "archiving": "Archiving…",
+    "actionFailed": "Could not complete the action.",
+    "connectionError": "Connection error. Please try again.",
+    "archiveFailed": "Could not archive.",
+    "deleteTitle": "Delete {label}",
+    "deleteBody": "Are you sure you want to delete this {label}? This action cannot be undone.",
+    "archiveTitle": "Archive {label}",
+    "archiveBody": "Are you sure you want to archive this {label}? It will stop appearing in active lists."
+  },
+  "footerInternalUse": "Internal use · Do not share your ribbit credentials.",
+  "sessionActive": "Active session",
+  "userFallback": "User",
+  "accountFallback": "Account",
+  "requiredStar": "*",
+  "search": {
+    "commandPlaceholder": "Search projects, notes, tickets…",
+    "commandAria": "Search projects, notes, tickets",
+    "iconAria": "Search",
+    "headerInputPlaceholder": "Search projects, tickets, notes…",
+    "headerInputAria": "Search"
+  },
+  "shell": {
+    "defaultTitle": "ribbit",
+    "openMenu": "Open menu",
+    "breadcrumbNav": "Breadcrumb",
+    "pages": {
+      "dashboard": "Dashboard",
+      "myWork": "My work",
+      "notes": "Notes",
+      "tasks": "Tasks",
+      "projects": "Projects",
+      "knowledgeExplorer": "Knowledge Explorer",
+      "knowledgeSearch": "Search",
+      "spaces": "Spaces",
+      "documents": "Documents",
+      "search": "Search",
+      "tickets": "Tickets",
+      "reports": "Reports",
+      "processFlows": "Process flows",
+      "settings": "Settings",
+      "administration": "Administration",
+      "project": "Project",
+      "note": "Note",
+      "knowledge": "Knowledge",
+      "clients": "Clients"
+    }
+  },
+  "quickActions": {
+    "trigger": "New",
+    "createProject": "Create project",
+    "createTask": "Create task",
+    "createNote": "Create note",
+    "createTicket": "Create ticket",
+    "createKnowledgePage": "Create knowledge page"
+  },
+  "commandPalette": {
+    "aria": "Command palette",
+    "placeholder": "Search or run a command…",
+    "noResults": "No commands match \"{query}\"",
+    "groups": {
+      "create": "Create",
+      "navigation": "Navigation",
+      "recent": "Recent"
+    },
+    "recentNote": "Note",
+    "recentTicket": "Ticket",
+    "newTicket": "New ticket",
+    "newActivity": "New activity",
+    "newNote": "New note",
+    "navDashboard": "Go to Dashboard",
+    "navProjects": "Go to Projects",
+    "navPlanning": "Go to Planning",
+    "navActivities": "Go to Activities",
+    "navTasks": "Go to Tasks",
+    "navNotes": "Go to Notes",
+    "navBrain": "Go to Brain",
+    "navLinks": "Go to Links",
+    "navKnowledge": "Go to Knowledge",
+    "navTickets": "Go to Tickets",
+    "navMembers": "Go to Team"
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "es": "Español"
+  },
+  "userMenu": {
+    "aria": "User menu",
+    "account": "Account",
+    "admin": "Administration",
+    "logout": "Sign out",
+    "roles": {
+      "superadmin": "Superadmin",
+      "admin": "Administrator",
+      "consultant": "Consultant",
+      "viewer": "Viewer"
+    }
+  }
+}

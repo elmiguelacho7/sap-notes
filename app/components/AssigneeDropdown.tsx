@@ -21,6 +21,11 @@ type AssigneeDropdownProps = {
   placeholder?: string;
   /** Visual style: unassigned uses muted slate. */
   variant?: "assigned" | "unassigned";
+  /**
+   * `light` = Ribbit shell form controls (light surface, brand focus).
+   * Default preserves dark styling for Kanban / legacy surfaces.
+   */
+  appearance?: "default" | "light";
 };
 
 /**
@@ -36,11 +41,14 @@ export function AssigneeDropdown({
   className = "",
   placeholder = "Sin asignar",
   variant = "assigned",
+  appearance = "default",
 }: AssigneeDropdownProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  const isLight = appearance === "light";
 
   const selectedLabel = value
     ? options.find((o) => o.value === value)?.label ?? placeholder
@@ -122,11 +130,15 @@ export function AssigneeDropdown({
     setOpen(false);
   };
 
+  const panelClass = isLight
+    ? "fixed rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] py-1 shadow-lg max-h-[280px] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgb(var(--rb-surface-border))_transparent]"
+    : "fixed rounded-lg border border-slate-600 bg-slate-800 shadow-xl ring-1 ring-slate-600/50 py-1 max-h-[280px] overflow-y-auto";
+
   const dropdownContent =
     open && position && typeof document !== "undefined" ? (
       <div
         ref={listRef}
-        className="fixed rounded-lg border border-slate-600 bg-slate-800 shadow-xl ring-1 ring-slate-600/50 py-1 max-h-[280px] overflow-y-auto"
+        className={panelClass}
         style={{
           zIndex: DROPDOWN_Z_INDEX,
           top: position.top,
@@ -140,16 +152,35 @@ export function AssigneeDropdown({
           role="option"
           aria-selected={!value}
           onClick={() => handleSelect(null)}
-          className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:bg-slate-700/80 hover:text-slate-300 flex items-center gap-2.5 min-w-0"
+          className={
+            isLight
+              ? "flex w-full min-w-0 items-center gap-2.5 px-3 py-2 text-left text-xs text-[rgb(var(--rb-text-secondary))] transition-colors hover:bg-[rgb(var(--rb-surface))]/80 hover:text-[rgb(var(--rb-text-primary))]"
+              : "flex w-full min-w-0 items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-400 hover:bg-slate-700/80 hover:text-slate-300"
+          }
         >
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-700/80 text-slate-500" aria-hidden>
+          <span
+            className={
+              isLight
+                ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/40 text-[rgb(var(--rb-text-muted))]"
+                : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-700/80 text-slate-500"
+            }
+            aria-hidden
+          >
             <User className="h-3 w-3" />
           </span>
-          <span className="truncate min-w-0" title={placeholder}>{placeholder}</span>
+          <span className="min-w-0 truncate" title={placeholder}>
+            {placeholder}
+          </span>
         </button>
         {options.length === 0 && (
-          <p className="px-3 py-2 text-[11px] text-slate-500 border-t border-slate-700/60">
-            No hay usuarios disponibles
+          <p
+            className={
+              isLight
+                ? "border-t border-[rgb(var(--rb-surface-border))]/60 px-3 py-2 text-[11px] text-[rgb(var(--rb-text-muted))]"
+                : "border-t border-slate-700/60 px-3 py-2 text-[11px] text-slate-500"
+            }
+          >
+            {isLight ? "No users available" : "No hay usuarios disponibles"}
           </p>
         )}
         {options.map((opt) => {
@@ -163,31 +194,74 @@ export function AssigneeDropdown({
               aria-selected={isSelected}
               onClick={() => handleSelect(opt.value)}
               title={opt.label}
-              className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2.5 min-w-0 ${
-                isSelected
-                  ? "bg-indigo-500/20 text-indigo-200"
-                  : "text-slate-300 hover:bg-slate-700/80 hover:text-slate-200"
-              }`}
+              className={
+                isLight
+                  ? `flex w-full min-w-0 items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors ${
+                      isSelected
+                        ? "bg-[rgb(var(--rb-brand-primary))]/12 text-[rgb(var(--rb-text-primary))]"
+                        : "text-[rgb(var(--rb-text-primary))] hover:bg-[rgb(var(--rb-surface))]/80"
+                    }`
+                  : `flex w-full min-w-0 items-center gap-2.5 px-3 py-2 text-left text-xs ${
+                      isSelected
+                        ? "bg-indigo-500/20 text-indigo-200"
+                        : "text-slate-300 hover:bg-slate-700/80 hover:text-slate-200"
+                    }`
+              }
             >
               <span
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-medium ${
-                  isSelected ? "bg-indigo-500/40 text-indigo-200" : "bg-slate-700/80 text-slate-400"
-                }`}
+                className={
+                  isLight
+                    ? `flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-medium ${
+                        isSelected
+                          ? "border border-[rgb(var(--rb-brand-primary))]/30 bg-[rgb(var(--rb-brand-primary))]/15 text-[rgb(var(--rb-brand-primary))]"
+                          : "border border-[rgb(var(--rb-surface-border))]/50 bg-[rgb(var(--rb-surface-3))]/40 text-[rgb(var(--rb-text-muted))]"
+                      }`
+                    : `flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-medium ${
+                        isSelected ? "bg-indigo-500/40 text-indigo-200" : "bg-slate-700/80 text-slate-400"
+                      }`
+                }
                 aria-hidden
               >
                 {initial}
               </span>
-              <span className="truncate min-w-0">{opt.label}</span>
+              <span className="min-w-0 truncate">{opt.label}</span>
             </button>
           );
         })}
       </div>
     ) : null;
 
-  const triggerClass =
+  const darkTriggerClass =
     variant === "unassigned"
       ? "border-slate-600 bg-slate-800/70 text-slate-500 hover:bg-slate-700/70 hover:text-slate-400"
       : "border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700/80";
+
+  const lightTriggerClass =
+    variant === "unassigned"
+      ? "border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/90 text-[rgb(var(--rb-text-muted))] hover:border-[rgb(var(--rb-surface-border))]/85 hover:bg-[rgb(var(--rb-surface))] hover:text-[rgb(var(--rb-text-secondary))]"
+      : "border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 text-[rgb(var(--rb-text-primary))] hover:border-[rgb(var(--rb-surface-border))]/85 hover:bg-[rgb(var(--rb-surface))]";
+
+  const triggerLayout = isLight
+    ? `inline-flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-sm font-normal ${lightTriggerClass}`
+    : `inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${darkTriggerClass}`;
+
+  const avatarClass = isLight
+    ? value
+      ? variant === "assigned"
+        ? "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[rgb(var(--rb-brand-primary))]/22 bg-[rgb(var(--rb-brand-primary))]/12 text-xs font-medium text-[rgb(var(--rb-brand-primary))]"
+        : "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/40 text-xs font-medium text-[rgb(var(--rb-text-muted))]"
+      : "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/35 text-[rgb(var(--rb-text-muted))]"
+    : value
+      ? variant === "assigned"
+        ? "flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-600 text-[10px] font-medium leading-none text-slate-200"
+        : "flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-700/80 text-[10px] font-medium leading-none text-slate-500"
+      : "flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-700/80 text-slate-500";
+
+  const chevronClass = isLight
+    ? `h-4 w-4 shrink-0 transition-transform ${variant === "unassigned" ? "text-[rgb(var(--rb-text-muted))]" : "text-[rgb(var(--rb-text-secondary))]"} ${open ? "rotate-180" : ""}`
+    : `h-3.5 w-3.5 shrink-0 transition-transform ${variant === "unassigned" ? "text-slate-500" : "text-slate-400"} ${open ? "rotate-180" : ""}`;
+
+  const labelSpanClass = isLight ? "min-w-0 flex-1 truncate text-left" : "min-w-0 max-w-[90px] truncate";
 
   return (
     <>
@@ -200,26 +274,22 @@ export function AssigneeDropdown({
           e.stopPropagation();
           if (!disabled) setOpen((prev) => !prev);
         }}
-        className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500/50 disabled:opacity-50 transition-colors min-w-0 max-w-full ${triggerClass} ${className}`}
+        className={`${triggerLayout} focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-colors ${
+          isLight
+            ? "focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--rb-shell-bg))]"
+            : "focus:ring-1 focus:ring-indigo-500/50"
+        } ${className}`}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={`Responsable: ${selectedLabel}`}
+        aria-label={isLight ? `Assignee: ${selectedLabel}` : `Responsable: ${selectedLabel}`}
       >
-        <span
-          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-medium leading-none ${
-            value ? (variant === "assigned" ? "bg-slate-600 text-slate-200" : "bg-slate-700/80 text-slate-500") : "bg-slate-700/80 text-slate-500"
-          }`}
-          aria-hidden
-        >
-          {value ? (selectedLabel.trim() || "?").charAt(0).toUpperCase() : <User className="h-3 w-3" />}
+        <span className={avatarClass} aria-hidden>
+          {value ? (selectedLabel.trim() || "?").charAt(0).toUpperCase() : <User className="h-3.5 w-3.5" />}
         </span>
-        <span className="min-w-0 truncate max-w-[90px]" title={selectedLabel}>
+        <span className={labelSpanClass} title={selectedLabel}>
           {selectedLabel}
         </span>
-        <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 transition-transform ${variant === "unassigned" ? "text-slate-500" : "text-slate-400"} ${open ? "rotate-180" : ""}`}
-          aria-hidden
-        />
+        <ChevronDown className={chevronClass} aria-hidden />
       </button>
       {typeof document !== "undefined" && createPortal(dropdownContent, document.body)}
     </>

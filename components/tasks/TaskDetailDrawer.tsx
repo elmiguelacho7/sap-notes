@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { X } from "lucide-react";
 import type { BoardTask } from "@/app/components/TasksBoard";
-import { STATUS_LABELS_ES, PRIORITY_LABELS } from "@/lib/taskWorkflow";
-import type { ProjectStatusKey, TaskPriorityKey } from "@/lib/taskWorkflow";
+import type { TaskPriorityKey } from "@/lib/taskWorkflow";
 
 export type TaskDetailDrawerContext = "global" | "project";
 
@@ -25,7 +25,6 @@ export type TaskDetailDrawerProps = {
   onSave: (taskId: string, payload: TaskDetailPayload) => void | Promise<void>;
   context: TaskDetailDrawerContext;
   statusOptions: { value: string; label: string }[];
-  priorityOptions: { value: string; label: string }[];
   assigneeOptions?: { value: string; label: string }[];
   activityOptions?: { value: string; label: string }[];
   /** Project name (read-only in project context). */
@@ -42,12 +41,13 @@ export function TaskDetailDrawer({
   onSave,
   context,
   statusOptions,
-  priorityOptions,
   assigneeOptions = [],
   activityOptions = [],
   projectName = null,
   saving = false,
 }: TaskDetailDrawerProps) {
+  const t = useTranslations("tasks.drawer");
+  const tPriority = useTranslations("tasks.priority");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState("");
@@ -56,6 +56,7 @@ export function TaskDetailDrawer({
   const [dueDate, setDueDate] = useState("");
   const [activityId, setActivityId] = useState("");
 
+  /* eslint-disable react-hooks/set-state-in-effect -- sync form fields when drawer opens for a task */
   useEffect(() => {
     if (task && open) {
       setTitle(task.title ?? "");
@@ -71,6 +72,7 @@ export function TaskDetailDrawer({
       setActivityId(task.activity_id ?? "");
     }
   }, [task, open]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -110,13 +112,13 @@ export function TaskDetailDrawer({
       >
         <div className="flex items-center justify-between shrink-0 border-b border-slate-700/60 px-4 py-3">
           <h2 id="task-detail-title" className="text-lg font-semibold text-slate-100">
-            Detalle de tarea
+            {t("title")}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-            aria-label="Cerrar"
+            aria-label={t("closeAria")}
           >
             <X className="h-5 w-5" />
           </button>
@@ -124,30 +126,30 @@ export function TaskDetailDrawer({
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           <div>
-            <label className={labelClass}>Título *</label>
+            <label className={labelClass}>{t("titleRequired")}</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className={inputClass}
-              placeholder="Título de la tarea"
+              placeholder={t("titlePlaceholder")}
               required
             />
           </div>
 
           <div>
-            <label className={labelClass}>Descripción</label>
+            <label className={labelClass}>{t("description")}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               className={inputClass}
-              placeholder="Descripción opcional"
+              placeholder={t("descriptionPlaceholder")}
             />
           </div>
 
           <div>
-            <label className={labelClass}>Estado</label>
+            <label className={labelClass}>{t("status")}</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
@@ -162,7 +164,7 @@ export function TaskDetailDrawer({
           </div>
 
           <div>
-            <label className={labelClass}>Prioridad</label>
+            <label className={labelClass}>{t("priority")}</label>
             <select
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
@@ -170,7 +172,7 @@ export function TaskDetailDrawer({
             >
               {PRIORITY_KEYS.map((p) => (
                 <option key={p} value={p}>
-                  {PRIORITY_LABELS[p]}
+                  {tPriority(p)}
                 </option>
               ))}
             </select>
@@ -178,13 +180,13 @@ export function TaskDetailDrawer({
 
           {assigneeOptions.length > 0 && (
             <div>
-              <label className={labelClass}>Responsable</label>
+              <label className={labelClass}>{t("assignee")}</label>
               <select
                 value={assigneeId ?? ""}
                 onChange={(e) => setAssigneeId(e.target.value || null)}
                 className={inputClass}
               >
-                <option value="">Sin asignar</option>
+                <option value="">{t("unassigned")}</option>
                 {assigneeOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
@@ -195,7 +197,7 @@ export function TaskDetailDrawer({
           )}
 
           <div>
-            <label className={labelClass}>Fecha límite</label>
+            <label className={labelClass}>{t("dueDate")}</label>
             <input
               type="date"
               value={dueDate}
@@ -206,13 +208,13 @@ export function TaskDetailDrawer({
 
           {context === "project" && activityOptions.length > 0 && (
             <div>
-              <label className={labelClass}>Actividad</label>
+              <label className={labelClass}>{t("activity")}</label>
               <select
                 value={activityId}
                 onChange={(e) => setActivityId(e.target.value)}
                 className={inputClass}
               >
-                <option value="">—</option>
+                <option value="">{t("emptySelect")}</option>
                 {activityOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
@@ -224,7 +226,7 @@ export function TaskDetailDrawer({
 
           {context === "project" && projectName != null && (
             <div>
-              <label className={labelClass}>Proyecto</label>
+              <label className={labelClass}>{t("project")}</label>
               <p className="text-sm text-slate-400">{projectName}</p>
             </div>
           )}
@@ -235,14 +237,14 @@ export function TaskDetailDrawer({
               onClick={onClose}
               className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors"
             >
-              Cancelar
+              {t("cancel")}
             </button>
             <button
               type="submit"
               disabled={saving || !title.trim()}
               className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50 transition-colors"
             >
-              {saving ? "Guardando…" : "Guardar"}
+              {saving ? t("saving") : t("save")}
             </button>
           </div>
         </form>

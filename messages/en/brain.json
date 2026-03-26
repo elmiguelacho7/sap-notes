@@ -1,0 +1,59 @@
+{
+  "emDash": "—",
+  "page": {
+    "eyebrow": "Consolidated knowledge",
+    "title": "Project brain",
+    "subtitle": "Knowledge extracted from notes: solved problems, applied solutions, lessons, and decisions.",
+    "lastUpdated": "Last update: {date}",
+    "askSapito": "Ask Sapito",
+    "quickSuggestionsAria": "Query suggestions"
+  },
+  "quickActions": {
+    "problemSummary": "What problems have we solved in this project?",
+    "lessonsSummary": "What lessons should we remember from this project?",
+    "decisionsSummary": "What decisions have we made in this project?",
+    "knowledgeSummary": "Summarize the most important project knowledge."
+  },
+  "groups": {
+    "problem": "Solved problems",
+    "solution": "Applied solutions",
+    "lesson": "Lessons learned",
+    "decision": "Decisions made",
+    "workaround": "Workarounds",
+    "configuration": "Configuration knowledge"
+  },
+  "chips": {
+    "total": "{count, plural, one {# knowledge item} other {# knowledge items}}",
+    "problem": "{count, plural, one {# problem} other {# problems}}",
+    "solution": "{count, plural, one {# solution} other {# solutions}}",
+    "lesson": "{count, plural, one {# lesson} other {# lessons}}",
+    "decision": "{count, plural, one {# decision} other {# decisions}}",
+    "workaround": "{count, plural, one {# workaround} other {# workarounds}}",
+    "configuration": "configuration"
+  },
+  "insights": {
+    "title": "Project insights",
+    "problemOne": "At least 1 solved problem has been documented in this project.",
+    "problemMany": "{count} solved problems have been documented in this project.",
+    "solution": "Applied solutions are already being captured.",
+    "lesson": "Lessons learned are already being recorded.",
+    "decisionOne": "There is at least 1 documented decision.",
+    "decisionMany": "There are {count} documented decisions.",
+    "noDecision": "There are no documented decisions yet.",
+    "workaround": "{count} workaround(s) have been recorded.",
+    "configuration": "Configuration knowledge has been documented."
+  },
+  "empty": {
+    "title": "No memory in the project brain yet",
+    "description": "It will be filled as you document problems, solutions, decisions, or lessons learned in notes.",
+    "helper": "Create notes in the project Notes tab so the system can extract and show knowledge here."
+  },
+  "states": {
+    "loading": "Loading…"
+  },
+  "errors": {
+    "invalidProjectId": "Invalid project identifier.",
+    "loadFailed": "Error loading Project Brain.",
+    "connection": "Connection error."
+  }
+}

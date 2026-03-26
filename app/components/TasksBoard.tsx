@@ -1,6 +1,15 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, FormEvent, useCallback, useRef } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  FormEvent,
+  useCallback,
+  useRef,
+} from "react";
+import { useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import { STANDARD_STATUS_ORDER } from "@/lib/taskWorkflow";
@@ -23,9 +32,12 @@ import {
   DragOverlay,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { User } from "lucide-react";
 import { TaskCard } from "@/app/components/TaskCard";
 import { TaskSummary } from "@/app/components/TaskSummary";
+import {
+  getTaskDuePresentation,
+  type TaskDuePresentationLabels,
+} from "@/app/components/taskDuePresentation";
 import { TaskList } from "@/components/tasks/TaskList";
 import { TasksBoardSkeleton } from "@/components/skeletons/TasksBoardSkeleton";
 import { AssigneeDropdown } from "@/app/components/AssigneeDropdown";
@@ -153,41 +165,31 @@ function serializeUnknownError(e: unknown): Record<string, unknown> {
 
 /** Status code → Tailwind class for column dot and task left bar (dark mode) */
 const COLUMN_COLOR_MAP: Record<string, string> = {
-  TODO: "bg-slate-500",
-  IN_PROGRESS: "bg-indigo-500",
-  BLOCKED: "bg-red-500",
-  IN_REVIEW: "bg-violet-500",
+  TODO: "bg-slate-400",
+  IN_PROGRESS: "bg-[rgb(var(--rb-brand-primary))]",
+  BLOCKED: "bg-red-400",
+  IN_REVIEW: "bg-amber-400",
   DONE: "bg-emerald-500",
-  pending: "bg-slate-500",
-  in_progress: "bg-indigo-500",
-  blocked: "bg-red-500",
-  review: "bg-violet-500",
+  pending: "bg-slate-400",
+  in_progress: "bg-[rgb(var(--rb-brand-primary))]",
+  blocked: "bg-red-400",
+  review: "bg-amber-400",
   done: "bg-emerald-500",
 };
 
 /** Status code → Tailwind border-top class for column accent (dark) */
 const COLUMN_BORDER_MAP: Record<string, string> = {
-  TODO: "border-t-slate-500",
-  IN_PROGRESS: "border-t-indigo-500",
-  BLOCKED: "border-t-red-500",
-  IN_REVIEW: "border-t-violet-500",
-  DONE: "border-t-emerald-500",
-  pending: "border-t-slate-500",
-  in_progress: "border-t-indigo-500",
-  blocked: "border-t-red-500",
-  review: "border-t-violet-500",
-  done: "border-t-emerald-500",
+  TODO: "before:bg-slate-300/70",
+  IN_PROGRESS: "before:bg-[rgb(var(--rb-brand-primary))]/65",
+  BLOCKED: "before:bg-red-400/60",
+  IN_REVIEW: "before:bg-amber-400/65",
+  DONE: "before:bg-emerald-500/65",
+  pending: "before:bg-slate-300/70",
+  in_progress: "before:bg-[rgb(var(--rb-brand-primary))]/65",
+  blocked: "before:bg-red-400/60",
+  review: "before:bg-amber-400/65",
+  done: "before:bg-emerald-500/65",
 };
-
-const ACTIVATE_PHASE_OPTIONS: { value: string; label: string }[] = [
-  { value: "", label: "Todas las fases" },
-  { value: "discover", label: "Discover" },
-  { value: "prepare", label: "Prepare" },
-  { value: "explore", label: "Explore" },
-  { value: "realize", label: "Realize" },
-  { value: "deploy", label: "Deploy" },
-  { value: "run", label: "Run" },
-];
 
 function ColumnDroppable({
   id,
@@ -203,7 +205,11 @@ function ColumnDroppable({
     <div
       ref={setNodeRef}
       id={id}
-      className={`${className ?? ""} ${isOver ? "ring-2 ring-slate-500 bg-slate-800/40" : ""}`}
+      className={`${className ?? ""} ${
+        isOver
+          ? "ring-1 ring-[rgb(var(--rb-brand-ring))]/35 bg-[rgb(var(--rb-surface))]/70 shadow-[inset_0_0_0_1px_rgba(46,204,113,0.12)]"
+          : ""
+      }`}
     >
       {children}
     </div>
@@ -237,27 +243,35 @@ const ProjectBoardColumn = React.memo(function ProjectBoardColumn({
   onAssigneeChange,
   onOpenDetail,
 }: ProjectBoardColumnProps) {
-  const accentBorder = COLUMN_BORDER_MAP[id] ?? "border-t-slate-500";
-  const dotClass = COLUMN_COLOR_MAP[id] ?? "bg-slate-500";
+  const tBoard = useTranslations("tasks.board");
+  const emptyTitle = tBoard("emptyColumnTitle");
+  const emptyColumnMessage = tBoard("emptyColumnBody");
+  const accentBorder = COLUMN_BORDER_MAP[id] ?? "before:bg-slate-300/70";
+  const dotClass = COLUMN_COLOR_MAP[id] ?? "bg-slate-400";
   return (
     <ColumnDroppable
       id={id}
-      className={`flex flex-col rounded-xl border border-slate-700 bg-slate-900 p-4 min-h-[220px] min-w-[260px] sm:min-w-[272px] lg:min-w-[280px] flex-shrink-0 transition-colors border-t-4 overflow-visible w-[260px] sm:w-[272px] lg:w-[280px] max-w-full ${accentBorder}`}
+      className={`relative flex flex-col rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-3.5 sm:p-4 min-h-[220px] min-w-[220px] sm:min-w-[232px] lg:min-w-0 lg:w-full flex-shrink-0 transition-[background-color,box-shadow,border-color] duration-200 overflow-visible w-[220px] sm:w-[232px] lg:max-w-none max-w-full shadow-sm before:absolute before:left-0 before:right-0 before:top-0 before:h-[2px] before:rounded-t-xl ${accentBorder}`}
     >
-      <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotClass}`} />
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+      <div className="flex items-start justify-between gap-3 mb-3 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <span className={`mt-1 h-2 w-2 rounded-full shrink-0 ring-1 ring-[rgb(var(--rb-surface-border))]/60 ${dotClass}`} />
+          <span className="text-[13px] font-semibold leading-snug text-[rgb(var(--rb-text-primary))] tracking-tight truncate">
             {label}
           </span>
         </div>
-        <span className="rounded-full bg-slate-700/80 px-2 py-0.5 text-xs font-medium text-slate-300">
+        <span className="tabular-nums rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/40 px-2 py-0.5 text-[11px] font-semibold text-[rgb(var(--rb-text-muted))] shrink-0 leading-none">
           {colTasks.length}
         </span>
       </div>
-      <div className="space-y-2 min-h-[180px] min-w-0">
+      <div className="space-y-2.5 min-h-[168px] min-w-0 flex-1">
         {colTasks.length === 0 && (
-          <p className="text-xs text-slate-500 px-1 py-2">Sin tareas.</p>
+          <div className="rounded-lg border border-dashed border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))]/70 px-3 py-5 text-center">
+            <p className="text-xs font-medium text-[rgb(var(--rb-text-muted))] tracking-tight">{emptyTitle}</p>
+            <p className="text-[10px] text-[rgb(var(--rb-text-muted))] mt-2 leading-relaxed max-w-[200px] mx-auto">
+              {emptyColumnMessage}
+            </p>
+          </div>
         )}
         <SortableContext
           items={colTasks.map((t) => t.id)}
@@ -287,6 +301,7 @@ const ProjectBoardColumn = React.memo(function ProjectBoardColumn({
                 assigneeOptions={assigneeOptions}
                 onAssigneeChange={onAssigneeChange}
                 onOpenDetail={onOpenDetail}
+                demoteStatusSelect
               />
             );
           })}
@@ -298,7 +313,7 @@ const ProjectBoardColumn = React.memo(function ProjectBoardColumn({
 
 export default function TasksBoard({
   projectId = null,
-  title = "Tablero de tareas",
+  title,
   subtitle,
   tasks: controlledTasks,
   columns: controlledColumns,
@@ -333,9 +348,57 @@ export default function TasksBoard({
     controlledOnCreateTask !== undefined &&
     controlledOnStatusChange !== undefined;
 
+  const tBoard = useTranslations("tasks.board");
+  const tErrors = useTranslations("tasks.errors");
+  const tPriority = useTranslations("tasks.priority");
+  const tTaskCard = useTranslations("tasks.taskCard");
+  const tDue = useTranslations("tasks.due");
+  const tList = useTranslations("tasks.list");
+
+  const activatePhaseOptions = useMemo(
+    () => [
+      { value: "", label: tBoard("phases.all") },
+      { value: "discover", label: tBoard("phases.discover") },
+      { value: "prepare", label: tBoard("phases.prepare") },
+      { value: "explore", label: tBoard("phases.explore") },
+      { value: "realize", label: tBoard("phases.realize") },
+      { value: "deploy", label: tBoard("phases.deploy") },
+      { value: "run", label: tBoard("phases.run") },
+    ],
+    [tBoard]
+  );
+
+  const duePresentationLabels: TaskDuePresentationLabels = useMemo(
+    () => ({
+      overdue: tDue("overdue"),
+      dueToday: tDue("dueToday"),
+      dueTomorrow: tDue("dueTomorrow"),
+      inDays: (n: number) => tDue("inDays", { n }),
+      limit: tDue("limit"),
+    }),
+    [tDue]
+  );
+
+  const prioritySelectOptions = useMemo(
+    () => [
+      { value: "high", label: tPriority("high") },
+      { value: "medium", label: tPriority("medium") },
+      { value: "low", label: tPriority("low") },
+    ],
+    [tPriority]
+  );
+
+  const headerTitle = title ?? tBoard("defaultTitle");
+
+  const boardSubtitle = useMemo(() => {
+    if (subtitle != null && subtitle !== "") return subtitle;
+    return projectId ? tBoard("subtitleWithProject") : tBoard("subtitleGlobalGeneral");
+  }, [subtitle, projectId, tBoard]);
+
   const [statuses, setStatuses] = useState<TaskStatus[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -351,20 +414,27 @@ export default function TasksBoard({
   const [newPriority, setNewPriority] = useState<TaskPriority>("medium");
   const [newDueDate, setNewDueDate] = useState<string | null>(null);
   const [newExternalRef, setNewExternalRef] = useState<string>("");
-  const [newAssigneeId, setNewAssigneeId] = useState<string>("");
+  const [newAssigneeId, setNewAssigneeId] = useState<string | null>(null);
+  const [createAttempted, setCreateAttempted] = useState(false);
 
   /** Active task id during drag (controlled mode only); used for DragOverlay. */
   const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null);
 
   /** Ref to latest controlled tasks so handleControlledDragEnd can stay stable (no controlledTasks in deps). */
   const controlledTasksRef = useRef<BoardTask[] | undefined>(undefined);
+  const hasCompletedInitialLoadRef = useRef(false);
   const newTitleInputRef = useRef<HTMLInputElement>(null);
-  if (isControlled && controlledTasks !== undefined) {
-    controlledTasksRef.current = controlledTasks;
-  }
+
+  useLayoutEffect(() => {
+    if (isControlled && controlledTasks !== undefined) {
+      controlledTasksRef.current = controlledTasks;
+    }
+  }, [isControlled, controlledTasks]);
 
   useEffect(() => {
     if (openCreateInitially) {
+      // URL flag ?new=1 after replace — abrir modal una vez al montar / al cambiar el flag
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sincronización deliberada con searchParams
       setShowCreateModal(true);
     }
   }, [openCreateInitially]);
@@ -387,7 +457,12 @@ export default function TasksBoard({
   useEffect(() => {
     if (isControlled) return;
     const loadData = async () => {
-      setLoading(true);
+      const isBackgroundRefresh = hasCompletedInitialLoadRef.current;
+      if (isBackgroundRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
 
       const [{ data: statusData, error: statusError }, { data: taskData, error: taskError }] =
@@ -418,19 +493,23 @@ export default function TasksBoard({
       if (taskError) handleSupabaseError("tasks", taskError);
 
       if (statusError || taskError) {
-        setError("No se pudieron cargar las tareas. Inténtalo de nuevo.");
-        setStatuses([]);
-        setTasks([]);
+        setError(tErrors("loadTasks"));
+        if (!isBackgroundRefresh) {
+          setStatuses([]);
+          setTasks([]);
+        }
       } else {
         setStatuses(statusData ?? []);
         setTasks((taskData ?? []) as Task[]);
       }
 
+      hasCompletedInitialLoadRef.current = true;
       setLoading(false);
+      setIsRefreshing(false);
     };
 
     loadData();
-  }, [projectId, isControlled, refreshTrigger]);
+  }, [projectId, isControlled, refreshTrigger, tErrors]);
 
   // Datos para modo controlled
   const controlledGrouped = useMemo(() => {
@@ -465,9 +544,9 @@ export default function TasksBoard({
     }
     const total = controlledTasks.length;
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
-    let riskLevel: "Alto" | "Medio" | "Bajo" = "Bajo";
-    if (blocked > 0 || overdue > 0) riskLevel = "Alto";
-    else if (completionRate < 50) riskLevel = "Medio";
+    let riskLevel: "high" | "medium" | "low" = "low";
+    if (blocked > 0 || overdue > 0) riskLevel = "high";
+    else if (completionRate < 50) riskLevel = "medium";
     return {
       totalActivities: total,
       activeActivities: active,
@@ -549,9 +628,9 @@ export default function TasksBoard({
         ? Math.round((completedActivities / totalActivities) * 100)
         : 0;
 
-    let riskLevel: "Alto" | "Medio" | "Bajo" = "Bajo";
-    if (blockedActivities > 0 || overdueActivities > 0) riskLevel = "Alto";
-    else if (completionRate < 50) riskLevel = "Medio";
+    let riskLevel: "high" | "medium" | "low" = "low";
+    if (blockedActivities > 0 || overdueActivities > 0) riskLevel = "high";
+    else if (completionRate < 50) riskLevel = "medium";
 
     const assignedToMeCount =
       currentUserId != null && currentUserId !== ""
@@ -573,31 +652,6 @@ export default function TasksBoard({
     };
   }, [filteredTasks, statuses, tasks, currentUserId]);
 
-  const getPriorityLabel = (priority: TaskPriority) => {
-    switch (priority) {
-      case "high":
-        return "Alta";
-      case "medium":
-        return "Media";
-      case "low":
-        return "Baja";
-      default:
-        return priority;
-    }
-  };
-
-  const getPriorityBadgeClass = (priority: TaskPriority) => {
-    switch (priority) {
-      case "high":
-        return "bg-red-100 text-red-800 border-red-200";
-      case "medium":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "low":
-      default:
-        return "bg-emerald-100 text-emerald-800 border-emerald-200";
-    }
-  };
-
   /** Submit create task from modal (or programmatically). Resets form state on success. */
   const submitCreateTask = useCallback(
     async (payload: {
@@ -612,7 +666,7 @@ export default function TasksBoard({
 
       if (isControlled && controlledOnCreateTask) {
         if (showActivityField && !(payload as CreateTaskPayload).activity_id?.trim()) {
-          setError("Selecciona una actividad.");
+          setError(tErrors("selectActivity"));
           return;
         }
         setCreating(true);
@@ -636,11 +690,11 @@ export default function TasksBoard({
           setNewDueDate(null);
           setNewExternalRef("");
           setNewActivityId("");
-          setNewAssigneeId("");
+          setNewAssigneeId(null);
           setShowCreateModal(false);
         } catch (err) {
           console.error("createTask caught", serializeUnknownError(err));
-          setError(err instanceof Error ? err.message : "No se pudo crear la tarea. Revisa consola para más detalles.");
+          setError(err instanceof Error ? err.message : tErrors("createFailedGeneric"));
         }
         setCreating(false);
         return;
@@ -663,6 +717,9 @@ export default function TasksBoard({
         project_id: isGeneralBoard ? null : projectId,
       };
       if (isGeneralBoard && user?.id) insertPayload.created_by = user.id;
+      if (payload.assignee_profile_id !== undefined) {
+        insertPayload.assignee_id = payload.assignee_profile_id ?? null;
+      }
 
       const { data, error: insertError } = await supabase
         .from("tasks")
@@ -679,7 +736,7 @@ export default function TasksBoard({
           hint: (insertError as { hint?: string }).hint,
         };
         setError(
-          `No se pudo crear la tarea: ${meta.message}${meta.code ? ` (${meta.code})` : ""}`
+          `${tErrors("createFailedPrefix")} ${meta.message}${meta.code ? ` (${meta.code})` : ""}`
         );
       } else if (data) {
         setTasks((prev) => [...prev, data as Task]);
@@ -688,7 +745,7 @@ export default function TasksBoard({
         setNewPriority("medium");
         setNewDueDate(null);
         setNewExternalRef("");
-        setNewAssigneeId("");
+        setNewAssigneeId(null);
         setShowCreateModal(false);
       }
 
@@ -701,6 +758,7 @@ export default function TasksBoard({
       defaultStatusId,
       projectId,
       newExternalRef,
+      tErrors,
     ]
   );
 
@@ -716,7 +774,7 @@ export default function TasksBoard({
       .eq("id", taskId);
     if (updateError) {
       handleSupabaseError("tasks update status", updateError);
-      setError("No se pudo actualizar el estado.");
+      setError(tErrors("updateStatus"));
     }
   };
 
@@ -800,16 +858,10 @@ export default function TasksBoard({
 
     if (updateError) {
       handleSupabaseError("tasks update drag", updateError);
-      setError("No se pudo actualizar el estado al mover la tarjeta.");
+      setError(tErrors("updateStatusDrag"));
       // si quisieras, aquí podrías recargar las tareas desde BD
     }
   };
-
-  const boardSubtitle =
-    subtitle ??
-    (projectId
-      ? "Tareas asociadas a este proyecto"
-      : "Tareas generales (no asociadas a un proyecto)");
 
   const effectiveLoading = isControlled ? controlledLoading : loading;
   const effectiveError = isControlled ? controlledError : error;
@@ -860,30 +912,35 @@ export default function TasksBoard({
   }, []);
 
   return (
-    <div className="flex flex-col gap-6 rounded-2xl border border-slate-700/80 bg-slate-900/90 pt-4 pb-4 pl-4 pr-4 sm:pl-6 sm:pr-6 sm:pt-6 sm:pb-5">
+    <div className="flex flex-col gap-5 rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] pt-4 pb-4 pl-4 pr-4 sm:pl-6 sm:pr-6 sm:pt-6 sm:pb-5 shadow-sm">
       {/* Header + Nueva tarea button */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pb-4 border-b border-[rgb(var(--rb-surface-border))]/50">
         <div>
-          <h2 className="text-xl font-semibold text-slate-100">
-            {title}
+          <h2 className="text-xl font-semibold text-[rgb(var(--rb-text-primary))]">
+            {headerTitle}
           </h2>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-[rgb(var(--rb-text-muted))]">
             {boardSubtitle}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {isRefreshing && !isControlled ? (
+            <span className="text-xs font-medium text-[rgb(var(--rb-text-muted))]">
+              Actualizando...
+            </span>
+          ) : null}
           {projectId && !isControlled && (
             <div className="w-full sm:w-44">
-              <label className="block text-xs font-medium text-slate-400 mb-1">
-                Fase SAP Activate
+              <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1">
+                {tBoard("phaseLabel")}
               </label>
               <select
                 value={phaseFilter}
                 onChange={(e) => setPhaseFilter(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500/50"
+                className="w-full h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
               >
-                {ACTIVATE_PHASE_OPTIONS.map((opt) => (
+                {activatePhaseOptions.map((opt) => (
                   <option key={opt.value || "all"} value={opt.value}>
                     {opt.label}
                   </option>
@@ -894,18 +951,22 @@ export default function TasksBoard({
 
           <button
             type="button"
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => {
+              setError(null);
+              setCreateAttempted(false);
+              setShowCreateModal(true);
+            }}
             disabled={!isControlled && !defaultStatusId}
-            className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="text-lg leading-none">+</span>
-            Nueva tarea
+            {tBoard("newTask")}
           </button>
         </div>
       </div>
 
       {effectiveError && (
-        <div className="rounded-lg border border-red-800/50 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200/90 bg-red-50 px-3 py-2 text-sm text-red-800">
           {effectiveError}
         </div>
       )}
@@ -913,52 +974,94 @@ export default function TasksBoard({
       {/* Create task modal */}
       {showCreateModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
           onClick={() => !creating && setShowCreateModal(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-xl ring-1 ring-slate-700/50"
+            className="w-full max-w-lg rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-slate-100 mb-4">Nueva tarea</h3>
+            <div className="mb-5">
+              <h3 className="text-lg font-semibold tracking-tight text-[rgb(var(--rb-text-primary))]">
+                {tBoard("createModalTitle")}
+              </h3>
+              <p className="mt-1 text-sm text-[rgb(var(--rb-text-muted))]">
+                Create a task and assign ownership from the start.
+              </p>
+            </div>
             <form
               onSubmit={async (e: FormEvent) => {
                 e.preventDefault();
+                setCreateAttempted(true);
+                if (!newTitle.trim()) {
+                  newTitleInputRef.current?.focus();
+                  return;
+                }
                 await submitCreateTask({
                   title: newTitle,
                   description: newDescription || null,
                   priority: newPriority,
                   due_date: newDueDate ?? null,
                   ...(showActivityField ? { activity_id: newActivityId || undefined } : {}),
-                  ...(isControlled && showActivityField
-                    ? { assignee_profile_id: newAssigneeId.trim() || null }
-                    : {}),
+                  assignee_profile_id: newAssigneeId ?? null,
                 });
               }}
-              className="space-y-4"
+              className="space-y-5"
             >
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Título</label>
+                <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1.5">
+                  {tBoard("titleLabel")}
+                </label>
                 <input
                   ref={newTitleInputRef}
                   type="text"
                   required
                   value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="Ej. Crear flujo de presupuestos"
-                  className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500/50"
+                  onChange={(e) => {
+                    setNewTitle(e.target.value);
+                    if (createAttempted && e.target.value.trim()) setError(null);
+                  }}
+                  placeholder={tBoard("titlePlaceholder")}
+                  aria-invalid={createAttempted && !newTitle.trim() ? "true" : "false"}
+                  className={`w-full h-10 rounded-xl border bg-[rgb(var(--rb-surface))]/95 px-3 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:outline-none focus:ring-2 ${
+                    createAttempted && !newTitle.trim()
+                      ? "border-red-300/90 focus:ring-red-500/20 focus:border-red-400"
+                      : "border-[rgb(var(--rb-surface-border))]/70 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
+                  }`}
                 />
+                {createAttempted && !newTitle.trim() ? (
+                  <p className="mt-1.5 text-xs text-red-700">Title is required.</p>
+                ) : null}
               </div>
+              {assigneeOptions?.length ? (
+                <div>
+                  <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1.5">
+                    Responsible / {tBoard("assigneeLabel")}
+                  </label>
+                  <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+                    <AssigneeDropdown
+                      options={assigneeOptions}
+                      value={newAssigneeId}
+                      onChange={(profileId) => setNewAssigneeId(profileId)}
+                      placeholder={tTaskCard("unassigned")}
+                      variant={newAssigneeId ? "assigned" : "unassigned"}
+                      appearance="light"
+                    />
+                  </div>
+                </div>
+              ) : null}
               {showActivityField && (
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Actividad</label>
+                  <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1.5">
+                    {tBoard("activityLabel")}
+                  </label>
                   <select
                     value={newActivityId}
                     onChange={(e) => setNewActivityId(e.target.value)}
                     required={showActivityField}
-                    className="w-full rounded-lg border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
                   >
-                    <option value="">Selecciona actividad</option>
+                    <option value="">{tBoard("selectActivity")}</option>
                     {activityOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
@@ -967,53 +1070,47 @@ export default function TasksBoard({
                   </select>
                 </div>
               )}
-              {isControlled && showActivityField && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Responsable</label>
+                  <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1.5">
+                    {tBoard("priorityLabel")}
+                  </label>
                   <select
-                    value={newAssigneeId}
-                    onChange={(e) => setNewAssigneeId(e.target.value)}
-                    className="w-full rounded-lg border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Sin asignar</option>
-                    {assigneeOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Prioridad</label>
-                  <select
-                    className="w-full rounded-lg border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
                     value={newPriority}
                     onChange={(e) => setNewPriority(e.target.value as TaskPriority)}
                   >
-                    <option value="high">Alta</option>
-                    <option value="medium">Media</option>
-                    <option value="low">Baja</option>
+                    <option value="high">{tPriority("high")}</option>
+                    <option value="medium">{tPriority("medium")}</option>
+                    <option value="low">{tPriority("low")}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Fecha límite</label>
-                  <input
-                    type="date"
-                    value={newDueDate ?? ""}
-                    onChange={(e) => setNewDueDate(e.target.value || null)}
-                    className="w-full rounded-lg border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1.5">
+                    {tBoard("dueDateLabel")}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={newDueDate ?? ""}
+                      onChange={(e) => setNewDueDate(e.target.value || null)}
+                      className="w-full h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => !creating && setShowCreateModal(false)}
-                  className="rounded-xl border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors"
+                  onClick={() => {
+                    if (creating) return;
+                    setCreateAttempted(false);
+                    setError(null);
+                    setShowCreateModal(false);
+                  }}
+                  className="h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-transparent px-4 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/25 transition-colors"
                 >
-                  Cancelar
+                  {tBoard("cancel")}
                 </button>
                 <button
                   type="submit"
@@ -1022,9 +1119,9 @@ export default function TasksBoard({
                     (!isControlled && !defaultStatusId) ||
                     (showActivityField && !newActivityId.trim())
                   }
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="h-10 rounded-xl bg-[rgb(var(--rb-brand-primary))] px-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[rgb(var(--rb-brand-primary-hover))] active:bg-[rgb(var(--rb-brand-primary-active))] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {creating ? "Creando..." : "Añadir"}
+                  {creating ? tBoard("creating") : "Create task"}
                 </button>
               </div>
             </form>
@@ -1061,11 +1158,7 @@ export default function TasksBoard({
             statusOptions={(controlledColumns ?? []).map((c) => ({ value: c.id, label: c.label }))}
             getStatusKey={controlledGetStatusKey!}
             onStatusChange={controlledOnStatusChange!}
-            priorityOptions={[
-              { value: "high", label: "Alta" },
-              { value: "medium", label: "Media" },
-              { value: "low", label: "Baja" },
-            ]}
+            priorityOptions={prioritySelectOptions}
             onPriorityChange={controlledOnPriorityChange}
             assigneeOptions={assigneeOptions}
             onAssigneeChange={onAssigneeChange}
@@ -1079,7 +1172,7 @@ export default function TasksBoard({
 
       {/* Board: controlled mode (project tasks) - Kanban */}
       {isControlled && viewMode !== "list" && (
-        <div className="relative w-full min-w-0">
+        <div className="relative w-full min-w-0 -mx-0.5">
           {effectiveLoading ? (
             <TasksBoardSkeleton columnCount={controlledGrouped?.length ?? 5} />
           ) : (
@@ -1089,34 +1182,38 @@ export default function TasksBoard({
               onDragStart={handleControlledDragStart}
               onDragEnd={handleControlledDragEnd}
             >
-              <div
-                className="overflow-x-auto overflow-y-visible w-full -mx-2 px-2 pb-1 touch-pan-x [scrollbar-width:thin] [scrollbar-color:#475569_#1e293b] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500"
-              >
-                <div className="flex gap-4 items-start pb-2 pt-0.5 min-w-0 w-max min-h-[260px] pr-3">
-                {controlledGrouped.map(({ id, label, tasks: colTasks }) => (
-                  <ProjectBoardColumn
-                    key={id}
-                    id={id}
-                    label={label}
-                    tasks={colTasks}
-                    columns={controlledColumns!}
-                    getStatusKey={controlledGetStatusKey!}
-                    onStatusChange={controlledOnStatusChange!}
-                    showActivityField={showActivityField}
-                    activityOptions={activityOptions}
-                    assigneeOptions={assigneeOptions}
-                    onAssigneeChange={onAssigneeChange}
-                    onOpenDetail={onOpenDetail}
-                  />
-                ))}
+              <div className="relative w-full min-w-0">
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[rgb(var(--rb-surface))] to-transparent lg:hidden" />
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[rgb(var(--rb-surface))] to-transparent lg:hidden" />
+                <div
+                  className="overflow-x-auto overflow-y-visible w-full pb-1 touch-pan-x lg:overflow-x-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0"
+                >
+                  <div className="flex lg:grid lg:grid-cols-5 gap-3.5 sm:gap-4 items-start pb-2 pt-1 min-w-0 w-max lg:w-full min-h-[268px] pr-2 lg:pr-0">
+                  {controlledGrouped.map(({ id, label, tasks: colTasks }) => (
+                    <ProjectBoardColumn
+                      key={id}
+                      id={id}
+                      label={label}
+                      tasks={colTasks}
+                      columns={controlledColumns!}
+                      getStatusKey={controlledGetStatusKey!}
+                      onStatusChange={controlledOnStatusChange!}
+                      showActivityField={showActivityField}
+                      activityOptions={activityOptions}
+                      assigneeOptions={assigneeOptions}
+                      onAssigneeChange={onAssigneeChange}
+                      onOpenDetail={onOpenDetail}
+                    />
+                  ))}
+                  </div>
                 </div>
               </div>
               <DragOverlay>
                 {activeDragTaskId && controlledTasks ? (() => {
                   const task = controlledTasks.find((t) => t.id === activeDragTaskId);
                   if (!task) return null;
-                  const leftBarClass =
-                    COLUMN_COLOR_MAP[controlledGetStatusKey?.(task) ?? "pending"] ?? "bg-slate-500";
+                  const statusKey = controlledGetStatusKey?.(task) ?? "pending";
+                  const leftBarClass = COLUMN_COLOR_MAP[statusKey] ?? "bg-slate-400";
                   const activityLabel =
                     showActivityField && task.activity_id
                       ? activityOptions.find((a) => a.value === task.activity_id)?.label ?? null
@@ -1125,37 +1222,53 @@ export default function TasksBoard({
                     assigneeOptions?.length && task.assignee_profile_id
                       ? assigneeOptions.find((a) => a.value === task.assignee_profile_id)?.label ?? null
                       : null;
+                  const dueOverlay = getTaskDuePresentation(task.due_date, duePresentationLabels);
+                  const statusHuman =
+                    controlledColumns?.find((c) => c.id === statusKey)?.label ?? statusKey;
                   return (
                     <div
-                      className="relative rounded-lg bg-slate-900 border border-slate-700 shadow-lg flex flex-col min-w-0 cursor-grabbing ring-2 ring-indigo-500 opacity-95 select-none touch-none"
-                      style={{ minWidth: 280 }}
+                      className="relative rounded-xl bg-[rgb(var(--rb-surface))] border border-[rgb(var(--rb-surface-border))]/70 shadow-lg flex flex-col min-w-0 cursor-grabbing ring-1 ring-[rgb(var(--rb-brand-primary))]/12 select-none touch-none"
+                      style={{ minWidth: 276 }}
                     >
-                      <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-lg ${leftBarClass}`} />
-                      <div className="pl-4">
-                        <div className="px-3 py-2.5 space-y-1">
-                          <p className="text-sm font-semibold text-slate-100">{task.title}</p>
-                          {activityLabel && (
-                            <p className="text-[11px] text-slate-500">Actividad: <span className="text-slate-400">{activityLabel}</span></p>
-                          )}
-                          {(assigneeOptions?.length || assigneeLabel) && (
-                            <p className="text-[11px] text-slate-500">
-                              Responsable: <span className={assigneeLabel ? "text-slate-300" : "text-slate-500"}>👤 {assigneeLabel ?? "Sin asignar"}</span>
-                            </p>
-                          )}
-                          {task.due_date && (
-                            <p className="text-xs text-slate-400">
-                              Límite: {new Date(task.due_date).toLocaleDateString()}
-                            </p>
-                          )}
-                          {task.description && (
-                            <p className="text-xs text-slate-400 line-clamp-2 mt-0.5">{task.description}</p>
-                          )}
-                        </div>
-                        <div className="px-3 py-2 border-t border-slate-700 rounded-b-lg">
-                          <span className="text-[11px] text-slate-500">
-                            {controlledGetStatusKey?.(task) ?? "—"}
-                          </span>
-                        </div>
+                      <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-[10px] ${leftBarClass}`} />
+                      <div className="pl-3.5 pr-3 pt-3 pb-2.5 space-y-1.5">
+                        <p className="text-[15px] font-semibold leading-snug text-[rgb(var(--rb-text-primary))] pr-1">
+                          {task.title}
+                        </p>
+                        {activityLabel && (
+                          <p className="text-[10px] text-[rgb(var(--rb-text-muted))] leading-tight">
+                            <span className="text-[rgb(var(--rb-text-muted))]">{tTaskCard("activity")}</span>{" "}
+                            <span className="text-[rgb(var(--rb-text-secondary))]">{activityLabel}</span>
+                          </p>
+                        )}
+                        {(assigneeOptions?.length || assigneeLabel) && (
+                          <p className="text-[10px] text-[rgb(var(--rb-text-muted))]">
+                            {tTaskCard("assigneeAbbr")}{" "}
+                            <span
+                              className={
+                                assigneeLabel
+                                  ? "text-[rgb(var(--rb-text-secondary))]"
+                                  : "text-[rgb(var(--rb-text-muted))]"
+                              }
+                            >
+                              {assigneeLabel ?? tTaskCard("unassigned")}
+                            </span>
+                          </p>
+                        )}
+                        {dueOverlay && (
+                          <p className={`text-[11px] tabular-nums flex flex-wrap gap-x-1.5 ${dueOverlay.className}`}>
+                            <span className="font-medium">{dueOverlay.line}</span>
+                            {dueOverlay.sub ? (
+                              <span className="font-normal opacity-90">{dueOverlay.sub}</span>
+                            ) : null}
+                          </p>
+                        )}
+                        {task.description && (
+                          <p className="text-[10px] text-[rgb(var(--rb-text-secondary))] line-clamp-2 leading-relaxed">
+                            {task.description}
+                          </p>
+                        )}
+                        <p className="text-[9px] text-[rgb(var(--rb-text-muted))] pt-1">{statusHuman}</p>
                       </div>
                     </div>
                   );
@@ -1185,17 +1298,13 @@ export default function TasksBoard({
             statusOptions={statuses.map((s) => ({ value: s.id, label: s.name }))}
             getStatusKey={(t) => t.status_id ?? ""}
             onStatusChange={handleStatusChange}
-            priorityOptions={[
-              { value: "high", label: "Alta" },
-              { value: "medium", label: "Media" },
-              { value: "low", label: "Baja" },
-            ]}
+            priorityOptions={prioritySelectOptions}
             onPriorityChange={handlePriorityChange}
             assigneeOptions={assigneeOptions?.length ? assigneeOptions : undefined}
             onAssigneeChange={assigneeOptions?.length ? handleAssigneeChange : undefined}
             onDueDateChange={handleDueDateChange}
             onOpenDetail={onOpenDetail ?? undefined}
-            scopeLabel={filterByUserId ? "Asignado a mí" : "Global"}
+            scopeLabel={filterByUserId ? tList("scopeMy") : tList("scopeGlobal")}
             getProjectName={() => null}
             loading={loading}
           />
@@ -1209,43 +1318,52 @@ export default function TasksBoard({
           <TasksBoardSkeleton />
         ) : (
           <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="overflow-x-auto overflow-y-visible w-full -mx-2 px-2 pb-1 touch-pan-x [scrollbar-width:thin] [scrollbar-color:#475569_#1e293b] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500">
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 pb-2 pr-3 min-w-0 w-max">
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[rgb(var(--rb-surface))] to-transparent lg:hidden" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[rgb(var(--rb-surface))] to-transparent lg:hidden" />
+              <div className="overflow-x-auto overflow-y-visible w-full -mx-2 px-2 pb-1 touch-pan-x lg:overflow-x-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4 pb-2 pr-3 lg:pr-0 min-w-0 w-max lg:w-full">
               {groupedByStatus.map(({ status, tasks }) => (
                 <Droppable droppableId={status.id} key={status.id}>
                   {(provided, snapshot) => {
                     const code = status.code ?? "TODO";
-                    const accentBorder = COLUMN_BORDER_MAP[code] ?? "border-t-slate-500";
-                    const dotClass = COLUMN_COLOR_MAP[code] ?? "bg-slate-500";
+                    const accentBorder = COLUMN_BORDER_MAP[code] ?? "before:bg-slate-300/70";
+                    const dotClass = COLUMN_COLOR_MAP[code] ?? "bg-slate-400";
                     return (
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`flex flex-col rounded-xl border border-slate-700 bg-slate-900 p-4 min-h-[240px] transition-colors border-t-4 ${accentBorder} ${
+                      className={`relative flex flex-col rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-3.5 sm:p-4 min-h-[228px] transition-[background-color,border-color,box-shadow] duration-150 shadow-sm before:absolute before:left-0 before:right-0 before:top-0 before:h-[3px] before:rounded-t-xl ${accentBorder} ${
                         snapshot.isDraggingOver
-                          ? "ring-2 ring-slate-500 bg-slate-800/40"
+                          ? "ring-2 ring-[rgb(var(--rb-brand-ring))]/25 bg-[rgb(var(--rb-surface))]/80"
                           : ""
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center justify-between gap-2 mb-2.5">
                         <div className="flex items-center gap-2">
                           <span
                             className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotClass}`}
                           />
-                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--rb-text-secondary))]">
                             {status.name}
                           </span>
                         </div>
-                        <span className="rounded-full bg-slate-700/80 px-2 py-0.5 text-xs font-medium text-slate-300">
+                        <span className="rounded-full border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/40 px-2 py-0.5 text-xs font-medium text-[rgb(var(--rb-text-muted))]">
                           {tasks.length}
                         </span>
                       </div>
 
                       <div className="space-y-2 min-h-[200px]">
                         {tasks.length === 0 && (
-                          <p className="text-xs text-slate-500 px-1 py-2">
-                            Sin tareas.
-                          </p>
+                          <div className="rounded-lg border border-dashed border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-6 text-center">
+                            <div className="mx-auto mb-2 h-7 w-7 rounded-full border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] grid place-items-center text-[rgb(var(--rb-text-muted))]">
+                              <span className="text-sm leading-none">—</span>
+                            </div>
+                            <p className="text-xs font-medium text-[rgb(var(--rb-text-muted))]">No tasks</p>
+                            <p className="text-[10px] text-[rgb(var(--rb-text-muted))] mt-1 leading-relaxed">
+                              Drag a task here, or create a new one.
+                            </p>
+                          </div>
                         )}
 
                         {tasks.map((task, index) => (
@@ -1257,64 +1375,63 @@ export default function TasksBoard({
                             {(dragProvided, dragSnapshot) => {
                               const taskStatus = statuses.find((s) => s.id === task.status_id);
                               const statusCode = taskStatus?.code ?? "TODO";
-                              const leftBarClass = COLUMN_COLOR_MAP[statusCode] ?? "bg-slate-500";
+                              const leftBarClass = COLUMN_COLOR_MAP[statusCode] ?? "bg-slate-400";
                               return (
                               <div
                                 ref={dragProvided.innerRef}
                                 {...dragProvided.draggableProps}
                                 {...dragProvided.dragHandleProps}
-                                className={`relative rounded-lg bg-slate-900 border border-slate-700 p-3 hover:bg-slate-800 transition flex flex-col gap-1.5 overflow-hidden ${
+                                className={`relative rounded-lg bg-[rgb(var(--rb-surface))] border border-[rgb(var(--rb-surface-border))]/65 p-3 hover:bg-[rgb(var(--rb-surface))]/80 transition-[background-color,border-color,box-shadow,transform] duration-150 flex flex-col gap-2.5 overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-[1px] ${
                                   dragSnapshot.isDragging
-                                    ? "ring-2 ring-indigo-500 shadow-lg z-10"
+                                    ? "ring-2 ring-[rgb(var(--rb-brand-ring))]/35 shadow-md z-10"
                                     : ""
                                 }`}
                               >
                                 <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-lg ${leftBarClass}`} />
                                 <div className="pl-4">
                                 <div className="px-0 py-0">
-                                  <p className="text-sm font-semibold text-slate-100">
+                                  <p className="text-sm font-semibold tracking-tight text-[rgb(var(--rb-text-primary))] leading-snug">
                                     {task.title}
                                   </p>
 
-                                  {task.external_ref && (
-                                    <p className="text-xs text-slate-400 mt-0.5">
-                                      Ref:{" "}
-                                      <span className="font-mono">
-                                        {task.external_ref}
-                                      </span>
-                                    </p>
-                                  )}
-
-                                  {task.due_date && (
-                                    <p className="text-xs text-slate-400">
-                                      Límite:{" "}
-                                      {new Date(
-                                        task.due_date
-                                      ).toLocaleDateString()}
-                                    </p>
+                                  {(task.due_date || task.external_ref) && (
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[rgb(var(--rb-text-muted))]">
+                                      {task.due_date ? (
+                                        <span className="inline-flex items-center rounded-full border border-[rgb(var(--rb-surface-border))]/45 bg-[rgb(var(--rb-surface-3))]/12 px-2 py-0.5 text-[11px] tabular-nums">
+                                          {tBoard("dueInline")} {new Date(task.due_date).toLocaleDateString()}
+                                        </span>
+                                      ) : null}
+                                      {task.external_ref ? (
+                                        <span className="inline-flex items-center rounded-full border border-[rgb(var(--rb-surface-border))]/40 bg-[rgb(var(--rb-surface-3))]/10 px-2 py-0.5 text-[11px] truncate">
+                                          {tBoard("refPrefix")} <span className="ml-1 font-mono">{task.external_ref}</span>
+                                        </span>
+                                      ) : null}
+                                    </div>
                                   )}
 
                                   {assigneeOptions?.length ? (
-                                    <div className="mt-2">
-                                      <p className="text-[11px] text-slate-500 mb-1">Responsable</p>
+                                    <div className="mt-1.5">
+                                      <p className="text-[10px] uppercase tracking-wide text-[rgb(var(--rb-text-muted))] mb-1">{tBoard("assigneeColumn")}</p>
                                       <AssigneeDropdown
                                         options={assigneeOptions}
                                         value={task.assignee_id ?? null}
                                         onChange={(profileId) => handleAssigneeChange(task.id, profileId)}
-                                        placeholder="Sin asignar"
+                                        placeholder={tTaskCard("unassigned")}
                                         variant={task.assignee_id ? "assigned" : "unassigned"}
+                                        appearance="light"
+                                        className="h-8 rounded-full px-2.5 py-1 text-xs border-[rgb(var(--rb-surface-border))]/45 bg-[rgb(var(--rb-surface-3))]/10 hover:bg-[rgb(var(--rb-surface-3))]/20"
                                       />
                                     </div>
                                   ) : null}
 
                                   {task.description && (
-                                    <p className="text-xs text-slate-400 line-clamp-2 mt-0.5">
+                                    <p className="text-xs text-[rgb(var(--rb-text-secondary))] line-clamp-2 mt-1 leading-relaxed">
                                       {task.description}
                                     </p>
                                   )}
                                 </div>
 
-                                <div className="px-0 pt-2 mt-1 border-t border-slate-700 flex items-center justify-between gap-2">
+                                <div className="px-0 pt-2.5 mt-2 border-t border-[rgb(var(--rb-surface-border))]/45 flex items-center justify-between gap-2">
                                   <select
                                     value={task.status_id}
                                     onChange={(e) =>
@@ -1323,7 +1440,7 @@ export default function TasksBoard({
                                         e.target.value
                                       )
                                     }
-                                    className="flex-1 min-w-0 rounded-lg border border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className="h-8 flex-1 min-w-0 cursor-pointer rounded-full border border-[rgb(var(--rb-surface-border))]/45 bg-[rgb(var(--rb-surface-3))]/10 px-2.5 text-[11px] text-[rgb(var(--rb-text-primary))] hover:border-[rgb(var(--rb-surface-border))]/75 hover:bg-[rgb(var(--rb-surface-3))]/20 focus:outline-none focus:ring-1 focus:ring-[rgb(var(--rb-brand-ring))]/35"
                                   >
                                     {statuses.map((s) => (
                                       <option key={s.id} value={s.id}>
@@ -1332,7 +1449,7 @@ export default function TasksBoard({
                                     ))}
                                   </select>
 
-                                  <span className="text-[11px] text-slate-500 shrink-0">
+                                  <span className="text-[11px] text-[rgb(var(--rb-text-muted))] tabular-nums shrink-0">
                                     {new Date(
                                       task.created_at
                                     ).toLocaleDateString()}
@@ -1352,6 +1469,7 @@ export default function TasksBoard({
                   }}
                 </Droppable>
               ))}
+              </div>
               </div>
             </div>
           </DragDropContext>

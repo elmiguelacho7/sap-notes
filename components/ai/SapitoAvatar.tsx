@@ -6,8 +6,7 @@
  * When styledContainer is true, wraps in a premium emerald-tinted ring for Project Copilot.
  * When showOnlineIndicator is true, shows a small emerald dot (e.g. in chat header).
  */
-import Image from "next/image";
-import { getSapitoAvatarSrc } from "@/lib/agents/agentRegistry";
+import { SapitoAvatar as UiSapitoAvatar } from "@/components/ui/SapitoAvatar";
 
 export function SapitoAvatar({
   className = "",
@@ -26,19 +25,8 @@ export function SapitoAvatar({
 }) {
   const sizePx = { sm: 28, md: 32, lg: 40 };
   const px = sizePx[size];
-  const src = getSapitoAvatarSrc(px, thinking);
 
-  const img = (
-    <Image
-      src={src}
-      alt="Sapito"
-      width={px}
-      height={px}
-      className={`shrink-0 rounded-full object-cover ${className}`}
-      style={{ width: px, height: px, minWidth: px, minHeight: px }}
-      aria-hidden
-    />
-  );
+  const img = <UiSapitoAvatar size={px} animated={thinking} className={className} />;
 
   if (styledContainer) {
     const containerPx = size === "sm" ? 36 : size === "md" ? 40 : 48;

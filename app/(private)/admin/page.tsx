@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Users, Zap, Brain, Shield, BarChart2, Sliders, UserCog } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { AppPageShell } from "@/components/ui/layout/AppPageShell";
+import { FORM_PAGE_BLOCK_CLASS, FORM_PAGE_SHELL_CLASS } from "@/components/layout/formPageClasses";
 import { getSapitoGeneral } from "@/lib/agents/agentRegistry";
 import {
   INDUSTRY_OPTIONS,
@@ -36,6 +38,7 @@ async function getAdminAuthHeaders(): Promise<Record<string, string>> {
 type TabId = "users" | "activations" | "knowledge" | "limits" | "userLimits" | "capacity";
 
 export default function AdminPage() {
+  const t = useTranslations("admin.page");
   const [loading, setLoading] = useState(true);
   const [appRole, setAppRole] = useState<string | null>(null);
 
@@ -78,33 +81,33 @@ export default function AdminPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   if (loading) {
     return (
-      <div className="bg-slate-950 min-h-full">
-        <AppPageShell>
-          <div className="py-12 text-center">
-            <p className="text-sm font-medium text-slate-300">Cargando…</p>
-            <p className="mt-1 text-sm text-slate-500">Un momento.</p>
+      <AppPageShell>
+        <div className={FORM_PAGE_SHELL_CLASS}>
+          <div className={`${FORM_PAGE_BLOCK_CLASS} py-12 text-center`}>
+            <p className="text-sm font-medium text-[rgb(var(--rb-text-primary))]">{t("loading")}</p>
+            <p className="mt-1 text-sm text-[rgb(var(--rb-text-muted))]">{t("loadingSubtext")}</p>
           </div>
-        </AppPageShell>
-      </div>
+        </div>
+      </AppPageShell>
     );
   }
 
   if (appRole !== "superadmin") {
     return (
-      <div className="bg-slate-950 min-h-full">
-        <AppPageShell>
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-5 py-12 text-center">
-            <p className="text-sm font-medium text-slate-200">Acceso restringido</p>
-            <p className="mt-1 text-sm text-slate-500">
-              Solo los administradores pueden ver este panel.
-            </p>
+      <AppPageShell>
+        <div className={FORM_PAGE_SHELL_CLASS}>
+          <div
+            className={`${FORM_PAGE_BLOCK_CLASS} rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] px-5 py-12 text-center shadow-sm`}
+          >
+            <p className="text-sm font-medium text-[rgb(var(--rb-text-primary))]">{t("restricted")}</p>
+            <p className="mt-1 text-sm text-[rgb(var(--rb-text-muted))]">{t("restrictedBody")}</p>
           </div>
-        </AppPageShell>
-      </div>
+        </div>
+      </AppPageShell>
     );
   }
 
@@ -119,6 +122,7 @@ type OverviewStats = {
 };
 
 function AdminPanel() {
+  const t = useTranslations("admin.page");
   const [activeTab, setActiveTab] = useState<TabId>("users");
   const [overview, setOverview] = useState<OverviewStats>({
     usersActive: null,
@@ -175,141 +179,127 @@ function AdminPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
-  const iconClass = "size-4 shrink-0 text-slate-400";
+  const iconClass = "size-4 shrink-0 text-[rgb(var(--rb-text-muted))]";
+  const iconClassActive = "size-4 shrink-0 text-[rgb(var(--rb-brand-primary))]";
+  const tabBase =
+    "inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-[color,background-color,box-shadow,transform] duration-150";
+  const tabActive =
+    "bg-[rgb(var(--rb-surface))] text-[rgb(var(--rb-text-primary))] shadow-md ring-2 ring-[rgb(var(--rb-brand-primary))]/30";
+  const tabInactive =
+    "text-[rgb(var(--rb-text-muted))] hover:bg-[rgb(var(--rb-surface))]/90 hover:text-[rgb(var(--rb-text-primary))] hover:shadow-sm active:scale-[0.99]";
+  const kpiLabel = "text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--rb-text-muted))]";
+  const kpiValue = "mt-1.5 text-xl font-semibold tabular-nums tracking-tight text-[rgb(var(--rb-text-primary))]";
+  const kpiHint = "mt-1 text-xs leading-snug text-[rgb(var(--rb-text-muted))]";
+  const kpiCell =
+    "relative min-w-0 overflow-hidden rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 py-3.5 pl-4 pr-3 shadow-sm before:absolute before:left-0 before:top-3 before:bottom-3 before:w-[3px] before:rounded-full before:bg-[rgb(var(--rb-brand-primary))]/35 before:content-['']";
 
   return (
-    <div className="bg-slate-950 min-h-full">
-      <AppPageShell>
-      <div className="space-y-6">
-        <div className="space-y-1">
-          <h1 className="text-xl sm:text-2xl font-semibold text-slate-100">Admin</h1>
-          <p className="text-sm text-slate-500">Platform administration and system configuration.</p>
-        </div>
+    <AppPageShell>
+      <div className={FORM_PAGE_SHELL_CLASS}>
+        <div className={`${FORM_PAGE_BLOCK_CLASS} space-y-6`}>
+          <header className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-[rgb(var(--rb-text-primary))]">
+              {t("title")}
+            </h1>
+            <p className="text-sm text-[rgb(var(--rb-text-muted))] max-w-3xl">{t("subtitle")}</p>
+          </header>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Users</p>
-            <p className="text-lg font-semibold text-slate-100 mt-0.5">
-              {overview.usersActive !== null ? overview.usersActive : "—"}
-            </p>
-            <p className="text-xs text-slate-500 mt-0.5">Active users in the system</p>
+          <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-3 shadow-sm sm:p-4">
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3.5">
+              <div className={kpiCell}>
+                <p className={kpiLabel}>Users</p>
+                <p className={kpiValue}>{overview.usersActive !== null ? overview.usersActive : "—"}</p>
+                <p className={kpiHint}>Active users in the system</p>
+              </div>
+              <div className={kpiCell}>
+                <p className={kpiLabel}>Projects</p>
+                <p className={kpiValue}>{overview.projectsTotal !== null ? overview.projectsTotal : "—"}</p>
+                <p className={kpiHint}>Total projects</p>
+              </div>
+              <div className={kpiCell}>
+                <p className={kpiLabel}>Knowledge sources</p>
+                <p className={kpiValue}>
+                  {overview.knowledgeIntegrations !== null ? overview.knowledgeIntegrations : "—"}
+                </p>
+                <p className={kpiHint}>Connected integrations</p>
+              </div>
+              <div className={kpiCell}>
+                <p className={kpiLabel}>Capacity</p>
+                <p className={kpiValue}>{overview.capacityPct !== null ? `${overview.capacityPct}%` : "—"}</p>
+                <p className={kpiHint}>Usage / near limit</p>
+              </div>
+            </div>
           </div>
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Projects</p>
-            <p className="text-lg font-semibold text-slate-100 mt-0.5">
-              {overview.projectsTotal !== null ? overview.projectsTotal : "—"}
-            </p>
-            <p className="text-xs text-slate-500 mt-0.5">Total projects</p>
-          </div>
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Knowledge Sources</p>
-            <p className="text-lg font-semibold text-slate-100 mt-0.5">
-              {overview.knowledgeIntegrations !== null ? overview.knowledgeIntegrations : "—"}
-            </p>
-            <p className="text-xs text-slate-500 mt-0.5">Connected integrations</p>
-          </div>
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Capacity</p>
-            <p className="text-lg font-semibold text-slate-100 mt-0.5">
-              {overview.capacityPct !== null ? `${overview.capacityPct}%` : "—"}
-            </p>
-            <p className="text-xs text-slate-500 mt-0.5">Usage / near limit</p>
-          </div>
-        </div>
 
-        <div className="flex flex-wrap gap-2 rounded-lg border border-slate-700/60 bg-slate-900 p-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab("users")}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
-              activeTab === "users"
-                ? "bg-slate-800 text-slate-100"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-            }`}
+          <nav
+            className="flex flex-wrap gap-1 rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/22 p-1 shadow-inner"
+            aria-label="Admin sections"
           >
-            <Users className={iconClass} aria-hidden />
-            Usuarios
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("activations")}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
-              activeTab === "activations"
-                ? "bg-slate-800 text-slate-100"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-            }`}
-          >
-            <Zap className={iconClass} aria-hidden />
-            Activaciones
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("knowledge")}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
-              activeTab === "knowledge"
-                ? "bg-slate-800 text-slate-100"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-            }`}
-          >
-            <Brain className={iconClass} aria-hidden />
-            Knowledge Sources
-          </button>
-          <a
-            href="/admin/roles"
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors"
-          >
-            <Shield className={iconClass} aria-hidden />
-            Roles globales
-          </a>
-          <button
-            type="button"
-            onClick={() => setActiveTab("limits")}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
-              activeTab === "limits"
-                ? "bg-slate-800 text-slate-100"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-            }`}
-          >
-            <Sliders className={iconClass} aria-hidden />
-            Límites por rol
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("userLimits")}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
-              activeTab === "userLimits"
-                ? "bg-slate-800 text-slate-100"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-            }`}
-          >
-            <UserCog className={iconClass} aria-hidden />
-            Límites por usuario
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("capacity")}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
-              activeTab === "capacity"
-                ? "bg-slate-800 text-slate-100"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-            }`}
-          >
-            <BarChart2 className={iconClass} aria-hidden />
-            Capacidad
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab("users")}
+              className={`${tabBase} ${activeTab === "users" ? tabActive : tabInactive}`}
+            >
+              <Users className={activeTab === "users" ? iconClassActive : iconClass} aria-hidden />
+              {t("tabs.users")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("activations")}
+              className={`${tabBase} ${activeTab === "activations" ? tabActive : tabInactive}`}
+            >
+              <Zap className={activeTab === "activations" ? iconClassActive : iconClass} aria-hidden />
+              {t("tabs.activations")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("knowledge")}
+              className={`${tabBase} ${activeTab === "knowledge" ? tabActive : tabInactive}`}
+            >
+              <Brain className={activeTab === "knowledge" ? iconClassActive : iconClass} aria-hidden />
+              Knowledge Sources
+            </button>
+            <a href="/admin/roles" className={`${tabBase} ${tabInactive}`}>
+              <Shield className={iconClass} aria-hidden />
+              {t("tabs.globalRoles")}
+            </a>
+            <button
+              type="button"
+              onClick={() => setActiveTab("limits")}
+              className={`${tabBase} ${activeTab === "limits" ? tabActive : tabInactive}`}
+            >
+              <Sliders className={activeTab === "limits" ? iconClassActive : iconClass} aria-hidden />
+              {t("tabs.roleLimits")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("userLimits")}
+              className={`${tabBase} ${activeTab === "userLimits" ? tabActive : tabInactive}`}
+            >
+              <UserCog className={activeTab === "userLimits" ? iconClassActive : iconClass} aria-hidden />
+              {t("tabs.userLimits")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("capacity")}
+              className={`${tabBase} ${activeTab === "capacity" ? tabActive : tabInactive}`}
+            >
+              <BarChart2 className={activeTab === "capacity" ? iconClassActive : iconClass} aria-hidden />
+              {t("tabs.capacity")}
+            </button>
+          </nav>
 
-        {activeTab === "users" && <UsersRolesPanel />}
-        {activeTab === "activations" && <ActivationsPanel />}
-        {activeTab === "knowledge" && <GlobalKnowledgeSourcesPanel />}
-        {activeTab === "limits" && <RoleLimitsPanel />}
-        {activeTab === "userLimits" && <UserLimitsPanel />}
-        {activeTab === "capacity" && <CapacityDashboard />}
+          {activeTab === "users" && <UsersRolesPanel />}
+          {activeTab === "activations" && <ActivationsPanel />}
+          {activeTab === "knowledge" && <GlobalKnowledgeSourcesPanel />}
+          {activeTab === "limits" && <RoleLimitsPanel />}
+          {activeTab === "userLimits" && <UserLimitsPanel />}
+          {activeTab === "capacity" && <CapacityDashboard />}
+        </div>
       </div>
-      </AppPageShell>
-    </div>
+    </AppPageShell>
   );
 }
 
@@ -321,6 +311,7 @@ type RoleLimitsEntry = {
 };
 
 function RoleLimitsPanel() {
+  const t = useTranslations("admin.page");
   const [roleLimits, setRoleLimits] = useState<RoleLimitsEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingRoleKey, setSavingRoleKey] = useState<string | null>(null);
@@ -356,10 +347,10 @@ function RoleLimitsPanel() {
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        setMessage(data.error ?? "Error al guardar.");
+        setMessage(data.error ?? t("errors.saveFailed"));
         return;
       }
-      setMessage("Límites guardados.");
+      setMessage("Limits saved.");
       void load();
     } finally {
       setSavingRoleKey(null);
@@ -369,19 +360,19 @@ function RoleLimitsPanel() {
   const appRoles = roleLimits.filter((r) => r.roleKey !== "superadmin");
 
   return (
-    <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden shadow-sm ring-1 ring-slate-700/50">
-      <div className="border-b border-slate-700/60 px-5 py-4 bg-slate-800/50">
-        <h2 className="text-sm font-medium text-slate-200">Límites por rol</h2>
-        <p className="text-xs text-slate-500 mt-1">
-          Cuotas por defecto para cada rol (superadmin no tiene límite). Vacío = sin límite.
+    <section className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] overflow-hidden shadow-sm ring-1 ring-[rgb(var(--rb-surface-border))]/35">
+      <div className="border-b border-[rgb(var(--rb-surface-border))]/60 px-5 py-4 bg-[rgb(var(--rb-surface-3))]/20">
+        <h2 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">{t("roleLimits.title")}</h2>
+        <p className="text-xs text-[rgb(var(--rb-text-muted))] mt-1">
+          {t("roleLimits.subtitle")}
         </p>
       </div>
       <div className="p-5 space-y-6">
         {message && (
-          <p className="text-sm text-emerald-400">{message}</p>
+          <p className="text-sm text-emerald-800">{message}</p>
         )}
         {loading ? (
-          <p className="text-sm text-slate-500">Cargando…</p>
+          <p className="text-sm text-[rgb(var(--rb-text-muted))]">{t("loading")}</p>
         ) : (
           appRoles.map((entry) => (
             <RoleLimitForm
@@ -406,6 +397,7 @@ function RoleLimitForm({
   saving: boolean;
   onSave: (roleKey: string, limits: Record<string, number>) => Promise<void>;
 }) {
+  const t = useTranslations("admin.page");
   const [maxProjects, setMaxProjects] = useState<string>(String(entry.limits.max_projects_created ?? ""));
   const [maxInvitations, setMaxInvitations] = useState<string>(String(entry.limits.max_pending_invitations_per_project ?? ""));
   const [maxMembers, setMaxMembers] = useState<string>(String(entry.limits.max_members_per_project ?? ""));
@@ -433,54 +425,54 @@ function RoleLimitForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-4 space-y-4">
-      <h3 className="text-sm font-medium text-slate-200">{entry.roleName}</h3>
+    <form onSubmit={handleSubmit} className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/15 p-4 space-y-4">
+      <h3 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">{entry.roleName}</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Máx. proyectos creados</label>
+          <label className="block text-xs text-[rgb(var(--rb-text-muted))] mb-1">{t("quotaLabels.maxProjects")}</label>
           <input
             type="number"
             min={1}
             value={maxProjects}
             onChange={(e) => setMaxProjects(e.target.value)}
-            placeholder="Sin límite"
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            placeholder="Unlimited"
+            className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
             disabled={saving}
           />
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Máx. invitaciones pendientes por proyecto</label>
+          <label className="block text-xs text-[rgb(var(--rb-text-muted))] mb-1">{t("quotaLabels.maxInvitations")}</label>
           <input
             type="number"
             min={1}
             value={maxInvitations}
             onChange={(e) => setMaxInvitations(e.target.value)}
-            placeholder="Sin límite"
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            placeholder="Unlimited"
+            className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
             disabled={saving}
           />
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Máx. miembros por proyecto</label>
+          <label className="block text-xs text-[rgb(var(--rb-text-muted))] mb-1">{t("quotaLabels.maxMembers")}</label>
           <input
             type="number"
             min={1}
             value={maxMembers}
             onChange={(e) => setMaxMembers(e.target.value)}
-            placeholder="Sin límite"
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            placeholder="Unlimited"
+            className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
             disabled={saving}
           />
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Máx. clientes creados</label>
+          <label className="block text-xs text-[rgb(var(--rb-text-muted))] mb-1">{t("quotaLabels.maxClients")}</label>
           <input
             type="number"
             min={1}
             value={maxClients}
             onChange={(e) => setMaxClients(e.target.value)}
-            placeholder="Sin límite"
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            placeholder="Unlimited"
+            className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
             disabled={saving}
           />
         </div>
@@ -488,9 +480,9 @@ function RoleLimitForm({
       <button
         type="submit"
         disabled={saving}
-        className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150"
+        className="rounded-xl bg-[rgb(var(--rb-brand-primary))] px-4 py-2 text-sm font-medium text-white hover:bg-[rgb(var(--rb-brand-primary-hover))] disabled:opacity-50 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35"
       >
-        {saving ? "Guardando…" : "Guardar"}
+        {saving ? t("saving") : t("save")}
       </button>
     </form>
   );
@@ -505,13 +497,14 @@ type UserQuotaConfig = {
 };
 
 const USER_QUOTA_LABELS: Record<string, string> = {
-  max_projects_created: "Máx. proyectos creados",
-  max_pending_invitations_per_project: "Máx. invitaciones pendientes por proyecto",
-  max_members_per_project: "Máx. miembros por proyecto",
-  max_clients_created: "Máx. clientes creados",
+  max_projects_created: "Max created projects",
+  max_pending_invitations_per_project: "Max pending invitations per project",
+  max_members_per_project: "Max members per project",
+  max_clients_created: "Max created clients",
 };
 
 function UserLimitsPanel() {
+  const t = useTranslations("admin.page");
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalUserId, setModalUserId] = useState<string | null>(null);
@@ -537,7 +530,7 @@ function UserLimitsPanel() {
     }
     fetchUsers();
     return () => { cancelled = true; };
-  }, []);
+  }, [t]);
 
   const openModal = useCallback(async (userId: string) => {
     setModalUserId(userId);
@@ -549,11 +542,11 @@ function UserLimitsPanel() {
       const res = await fetch(`/api/admin/quotas/user/${userId}`, { headers });
       const data = (await res.json()) as UserQuotaConfig | { error?: string };
       if (res.ok && "userId" in data) setQuotaData(data as UserQuotaConfig);
-      else setMessage((data as { error?: string }).error ?? "Error al cargar.");
+      else setMessage((data as { error?: string }).error ?? t("errors.loadFailed"));
     } finally {
       setQuotaLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const closeModal = useCallback(() => {
     setModalUserId(null);
@@ -562,40 +555,40 @@ function UserLimitsPanel() {
   }, []);
 
   return (
-    <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden shadow-sm ring-1 ring-slate-700/50">
-      <div className="border-b border-slate-700/60 px-5 py-4 bg-slate-800/50">
-        <h2 className="text-sm font-medium text-slate-200">Límites por usuario</h2>
-        <p className="text-xs text-slate-500 mt-1">
-          Overrides por usuario (vacío = usar límite del rol). Solo superadmin.
+    <section className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] overflow-hidden shadow-sm ring-1 ring-[rgb(var(--rb-surface-border))]/35">
+      <div className="border-b border-[rgb(var(--rb-surface-border))]/60 px-5 py-4 bg-[rgb(var(--rb-surface-3))]/20">
+        <h2 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">{t("userLimits.title")}</h2>
+        <p className="text-xs text-[rgb(var(--rb-text-muted))] mt-1">
+          {t("userLimits.subtitle")}
         </p>
       </div>
       <div className="p-5">
         {loading ? (
-          <p className="text-sm text-slate-500">Cargando usuarios…</p>
+          <p className="text-sm text-[rgb(var(--rb-text-muted))]">{t("userLimits.loadingUsers")}</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-700/60">
+          <div className="overflow-x-auto rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] shadow-sm">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr className="border-b border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/18 text-left text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">
                   <th className="py-2 pr-4">Nombre</th>
                   <th className="py-2 pr-4">Email</th>
-                  <th className="py-2 pr-4">Rol</th>
+                  <th className="py-2 pr-4">{t("capacity.table.role")}</th>
                   <th className="py-2"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/40">
+              <tbody className="divide-y divide-[rgb(var(--rb-surface-border))]/45">
                 {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-800/50 transition-colors duration-150">
-                    <td className="py-2 pr-4 text-slate-200">{u.full_name ?? "—"}</td>
-                    <td className="py-2 pr-4 text-slate-200">{u.email ?? "—"}</td>
-                    <td className="py-2 pr-4 text-slate-200">{u.app_role}</td>
+                  <tr key={u.id} className="hover:bg-[rgb(var(--rb-surface-3))]/25 transition-colors duration-150">
+                    <td className="py-2 pr-4 text-[rgb(var(--rb-text-primary))]">{u.full_name ?? "—"}</td>
+                    <td className="py-2 pr-4 text-[rgb(var(--rb-text-primary))]">{u.email ?? "—"}</td>
+                    <td className="py-2 pr-4 text-[rgb(var(--rb-text-primary))]">{u.app_role}</td>
                     <td className="py-2">
                       <button
                         type="button"
                         onClick={() => openModal(u.id)}
-                        className="text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors duration-150"
+                        className="text-[rgb(var(--rb-brand-primary))] hover:text-[rgb(var(--rb-brand-primary-hover))] text-xs font-medium transition-colors duration-150"
                       >
-                        Configurar límites
+                        {t("userLimits.configure")}
                       </button>
                     </td>
                   </tr>
@@ -628,13 +621,13 @@ function UserLimitsPanel() {
               });
               const data = (await res.json()) as { error?: string };
               if (res.ok) {
-                setMessage("Límites guardados.");
+                setMessage("Limits saved.");
                 const getRes = await fetch(`/api/admin/quotas/user/${modalUserId}`, { headers });
                 if (getRes.ok) {
                   const updated = (await getRes.json()) as UserQuotaConfig;
                   setQuotaData(updated);
                 }
-              } else setMessage(data.error ?? "Error al guardar.");
+              } else setMessage(data.error ?? t("errors.saveFailed"));
             } finally {
               setSaving(false);
             }
@@ -664,6 +657,7 @@ function UserQuotaModal({
   onClose: () => void;
   onSave: (overrides: Record<string, number>) => Promise<void>;
 }) {
+  const t = useTranslations("admin.page");
   const [overrides, setOverrides] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -672,6 +666,7 @@ function UserQuotaModal({
     for (const key of Object.keys(USER_QUOTA_LABELS)) {
       o[key] = String(quotaData.userOverrides[key] ?? "");
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOverrides(o);
   }, [quotaData]);
 
@@ -687,63 +682,63 @@ function UserQuotaModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="rounded-xl border border-slate-700/60 bg-slate-800/95 shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="border-b border-slate-700/60 px-5 py-4 flex items-center justify-between">
-          <h3 className="text-sm font-medium text-slate-200">
-            Límites: {user?.full_name || user?.email || userId}
+      <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-[rgb(var(--rb-surface-border))]/60 px-5 py-4 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">
+            {t("userLimits.modalTitle")}: {user?.full_name || user?.email || userId}
           </h3>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-200 text-xl leading-none transition-colors">&times;</button>
+          <button type="button" onClick={onClose} className="text-[rgb(var(--rb-text-muted))] hover:text-[rgb(var(--rb-text-primary))] text-xl leading-none transition-colors">&times;</button>
         </div>
         <div className="p-5">
           {loading ? (
-            <p className="text-sm text-slate-500">Cargando…</p>
+            <p className="text-sm text-[rgb(var(--rb-text-muted))]">{t("loading")}</p>
           ) : quotaData ? (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <p className="text-xs text-slate-400">Rol: <strong className="text-slate-200">{quotaData.appRole ?? "—"}</strong></p>
-              <div className="rounded-lg border border-slate-700/60 p-3 bg-slate-900/50">
-                <p className="text-xs font-medium text-slate-400 mb-2">Límites por defecto del rol</p>
-                <ul className="text-xs text-slate-300 space-y-1">
+              <p className="text-xs text-[rgb(var(--rb-text-muted))]">{t("usersRoles.table.role")}: <strong className="text-[rgb(var(--rb-text-primary))]">{quotaData.appRole ?? "—"}</strong></p>
+              <div className="rounded-lg border border-[rgb(var(--rb-surface-border))]/55 p-3 bg-[rgb(var(--rb-surface-3))]/12">
+                <p className="text-xs font-medium text-[rgb(var(--rb-text-muted))] mb-2">{t("userLimits.defaultRoleLimits")}</p>
+                <ul className="text-xs text-[rgb(var(--rb-text-secondary))] space-y-1">
                   {Object.entries(USER_QUOTA_LABELS).map(([key, label]) => (
-                    <li key={key}>{label}: {quotaData.roleLimits[key] ?? "sin límite"}</li>
+                    <li key={key}>{label}: {quotaData.roleLimits[key] ?? "unlimited"}</li>
                   ))}
                 </ul>
               </div>
-              <p className="text-xs text-slate-400">Override por usuario (vacío = usar valor del rol):</p>
+              <p className="text-xs text-[rgb(var(--rb-text-muted))]">{t("userLimits.overrideHelp")}</p>
               <div className="grid grid-cols-1 gap-3">
                 {Object.entries(USER_QUOTA_LABELS).map(([key, label]) => (
                   <div key={key}>
-                    <label className="block text-xs text-slate-400 mb-0.5">{label}</label>
+                    <label className="block text-xs text-[rgb(var(--rb-text-muted))] mb-0.5">{label}</label>
                     <input
                       type="number"
                       min={1}
                       value={overrides[key] ?? ""}
                       onChange={(e) => setOverrides((o) => ({ ...o, [key]: e.target.value }))}
-                      placeholder={quotaData.roleLimits[key] != null ? String(quotaData.roleLimits[key]) : "Sin límite"}
-                      className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                      placeholder={quotaData.roleLimits[key] != null ? String(quotaData.roleLimits[key]) : "Unlimited"}
+                      className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
                       disabled={saving}
                     />
                     {quotaData.effectiveLimits[key] != null && (
-                      <p className="text-xs text-slate-500 mt-0.5">Efectivo: {quotaData.effectiveLimits[key]}</p>
+                      <p className="text-xs text-[rgb(var(--rb-text-muted))] mt-0.5">{t("userLimits.effective")}: {quotaData.effectiveLimits[key]}</p>
                     )}
                   </div>
                 ))}
               </div>
-              {message && <p className="text-sm text-emerald-400">{message}</p>}
+              {message && <p className="text-sm text-emerald-800">{message}</p>}
               <div className="flex gap-2">
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150"
+                  className="rounded-xl bg-[rgb(var(--rb-brand-primary))] px-4 py-2 text-sm font-medium text-white hover:bg-[rgb(var(--rb-brand-primary-hover))] disabled:opacity-50 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35"
                 >
-                  {saving ? "Guardando…" : "Guardar"}
+                  {saving ? t("saving") : t("save")}
                 </button>
-                <button type="button" onClick={onClose} className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 transition-colors duration-150">
-                  Cerrar
+                <button type="button" onClick={onClose} className="rounded-xl border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-4 py-2 text-sm font-medium text-[rgb(var(--rb-text-primary))] hover:bg-[rgb(var(--rb-surface-3))]/35 transition-colors duration-150">
+                  {t("close")}
                 </button>
               </div>
             </form>
           ) : (
-            <p className="text-sm text-slate-500">No se pudo cargar la configuración.</p>
+            <p className="text-sm text-[rgb(var(--rb-text-muted))]">{t("errors.loadConfig")}</p>
           )}
         </div>
       </div>
@@ -787,13 +782,14 @@ type ProjectCapacityRow = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  unlimited: "Sin límite",
+  unlimited: "Unlimited",
   normal: "Normal",
-  near_limit: "Cerca del límite",
-  at_limit: "Al límite",
+  near_limit: "Near limit",
+  at_limit: "At limit",
 };
 
 function CapacityDashboard() {
+  const t = useTranslations("admin.page");
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<{
     summary: CapacitySummary;
@@ -854,7 +850,7 @@ function CapacityDashboard() {
       }
     })();
     return () => { cancelled = true; };
-  }, [quotaModalUserId]);
+  }, [quotaModalUserId, t]);
 
   const handleSaveQuotaFromCapacity = useCallback(async (overrides: Record<string, number>) => {
     if (!quotaModalUserId) return;
@@ -870,10 +866,10 @@ function CapacityDashboard() {
       });
       const data = (await res.json()) as { error?: string };
       if (res.ok) {
-        setQuotaModalMessage("Límites guardados.");
+        setQuotaModalMessage("Limits saved.");
         const getRes = await fetch(`/api/admin/quotas/user/${quotaModalUserId}`, { headers });
         if (getRes.ok) setQuotaModalData((await getRes.json()) as UserQuotaConfig);
-      } else setQuotaModalMessage(data.error ?? "Error al guardar.");
+      } else setQuotaModalMessage(data.error ?? t("errors.saveFailed"));
     } finally {
       setQuotaModalSaving(false);
     }
@@ -881,79 +877,79 @@ function CapacityDashboard() {
 
   return (
     <section className="space-y-6">
-      <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden shadow-sm ring-1 ring-slate-700/50">
-        <div className="border-b border-slate-700/60 px-5 py-4 bg-slate-800/50">
-          <h2 className="text-sm font-medium text-slate-200">Uso y límites</h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Resumen de uso de cuotas por usuario y por proyecto. Umbral: ≥80% cerca del límite, ≥100% al límite.
+      <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] overflow-hidden shadow-sm ring-1 ring-[rgb(var(--rb-surface-border))]/35">
+        <div className="border-b border-[rgb(var(--rb-surface-border))]/60 px-5 py-4 bg-[rgb(var(--rb-surface-3))]/20">
+          <h2 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">{t("capacity.title")}</h2>
+          <p className="text-xs text-[rgb(var(--rb-text-muted))] mt-1">
+            {t("capacity.subtitle")}
           </p>
         </div>
         <div className="p-5">
           {loading ? (
-            <p className="text-sm text-slate-500">Cargando…</p>
+            <p className="text-sm text-[rgb(var(--rb-text-muted))]">{t("loading")}</p>
           ) : data ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-6">
                 <div className="rounded-xl border border-red-500/30 bg-red-500/15 p-3">
-                  <p className="text-lg font-semibold text-red-400">{data.summary.usersAtLimit}</p>
-                  <p className="text-xs text-red-400/80">Usuarios al límite</p>
+                  <p className="text-lg font-semibold text-red-600">{data.summary.usersAtLimit}</p>
+                  <p className="text-xs text-red-600/90">{t("capacity.usersAtLimit")}</p>
                 </div>
                 <div className="rounded-xl border border-amber-500/30 bg-amber-500/15 p-3">
-                  <p className="text-lg font-semibold text-amber-400">{data.summary.usersNearLimit}</p>
-                  <p className="text-xs text-amber-400/80">Usuarios cerca del límite</p>
+                  <p className="text-lg font-semibold text-amber-800">{data.summary.usersNearLimit}</p>
+                  <p className="text-xs text-amber-800/90">{t("capacity.usersNearLimit")}</p>
                 </div>
-                <div className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-3">
-                  <p className="text-lg font-semibold text-slate-200">{data.summary.usersWithOverrides}</p>
-                  <p className="text-xs text-slate-400">Con overrides</p>
+                <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/15 p-3">
+                  <p className="text-lg font-semibold text-[rgb(var(--rb-text-primary))]">{data.summary.usersWithOverrides}</p>
+                  <p className="text-xs text-[rgb(var(--rb-text-muted))]">{t("capacity.withOverrides")}</p>
                 </div>
                 <div className="rounded-xl border border-red-500/30 bg-red-500/15 p-3">
-                  <p className="text-lg font-semibold text-red-400">{data.summary.projectsAtMemberLimit}</p>
-                  <p className="text-xs text-red-400/80">Proyectos al límite (miembros)</p>
+                  <p className="text-lg font-semibold text-red-600">{data.summary.projectsAtMemberLimit}</p>
+                  <p className="text-xs text-red-600/90">{t("capacity.projectsAtMemberLimit")}</p>
                 </div>
                 <div className="rounded-xl border border-amber-500/30 bg-amber-500/15 p-3">
-                  <p className="text-lg font-semibold text-amber-400">{data.summary.projectsNearMemberLimit}</p>
-                  <p className="text-xs text-amber-400/80">Cerca (miembros)</p>
+                  <p className="text-lg font-semibold text-amber-800">{data.summary.projectsNearMemberLimit}</p>
+                  <p className="text-xs text-amber-800/90">Cerca (miembros)</p>
                 </div>
                 <div className="rounded-xl border border-red-500/30 bg-red-500/15 p-3">
-                  <p className="text-lg font-semibold text-red-400">{data.summary.projectsAtInvitationLimit}</p>
-                  <p className="text-xs text-red-400/80">Al límite (invit.)</p>
+                  <p className="text-lg font-semibold text-red-600">{data.summary.projectsAtInvitationLimit}</p>
+                  <p className="text-xs text-red-600/90">{t("capacity.invitationsAtLimit")}</p>
                 </div>
                 <div className="rounded-xl border border-amber-500/30 bg-amber-500/15 p-3">
-                  <p className="text-lg font-semibold text-amber-400">{data.summary.projectsNearInvitationLimit}</p>
-                  <p className="text-xs text-amber-400/80">Cerca (invit.)</p>
+                  <p className="text-lg font-semibold text-amber-800">{data.summary.projectsNearInvitationLimit}</p>
+                  <p className="text-xs text-amber-800/90">Cerca (invit.)</p>
                 </div>
               </div>
 
               <div className="flex flex-wrap gap-2 mb-4 items-center">
-                <span className="text-xs font-medium text-slate-400 mr-1">Vistas:</span>
+                <span className="text-xs font-medium text-[rgb(var(--rb-text-muted))] mr-1">{t("capacity.views")}:</span>
                 <button
                   type="button"
                   onClick={() => setFilterStatus("at_limit")}
-                  className="rounded-lg border border-red-500/30 bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/25 transition-colors"
+                  className="rounded-lg border border-red-200/90 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100/80 transition-colors"
                 >
-                  Solo al límite
+                  {t("capacity.atLimitOnly")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setFilterStatus("near_limit")}
-                  className="rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/25 transition-colors"
+                  className="rounded-lg border border-amber-200/90 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100/80 transition-colors"
                 >
-                  Solo cerca del límite
+                  {t("capacity.nearLimitOnly")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setFilterStatus("")}
-                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800/50 transition-colors"
+                  className="rounded-lg border border-[rgb(var(--rb-surface-border))]/60 px-3 py-1.5 text-xs text-[rgb(var(--rb-text-muted))] hover:bg-[rgb(var(--rb-surface-3))]/25 transition-colors"
                 >
-                  Todos
+                  {t("capacity.all")}
                 </button>
-                <span className="w-px h-5 bg-slate-600 mx-1" />
+                <span className="w-px h-5 bg-[rgb(var(--rb-surface-border))]/70 mx-1" />
                 <select
                   value={filterRole}
                   onChange={(e) => setFilterRole(e.target.value)}
-                  className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-100"
+                  className="rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-1.5 text-sm text-[rgb(var(--rb-text-primary))]"
                 >
-                  <option value="">Todos los roles</option>
+                  <option value="">{t("capacity.allRoles")}</option>
                   <option value="admin">admin</option>
                   <option value="consultant">consultant</option>
                   <option value="viewer">viewer</option>
@@ -962,53 +958,53 @@ function CapacityDashboard() {
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-100"
+                  className="rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-1.5 text-sm text-[rgb(var(--rb-text-primary))]"
                 >
-                  <option value="">Todos los estados</option>
-                  <option value="at_limit">Al límite</option>
-                  <option value="near_limit">Cerca del límite</option>
+                  <option value="">{t("capacity.allStatuses")}</option>
+                  <option value="at_limit">{t("capacity.atLimit")}</option>
+                  <option value="near_limit">{t("capacity.nearLimit")}</option>
                   <option value="normal">Normal</option>
-                  <option value="unlimited">Sin límite</option>
+                  <option value="unlimited">{t("capacity.unlimited")}</option>
                 </select>
-                <label className="flex items-center gap-2 text-sm text-slate-400">
-                  <input type="checkbox" checked={overridesOnly} onChange={(e) => setOverridesOnly(e.target.checked)} className="rounded border-slate-600 bg-slate-900 text-indigo-600" />
-                  Solo con overrides
+                <label className="flex items-center gap-2 text-sm text-[rgb(var(--rb-text-muted))]">
+                  <input type="checkbox" checked={overridesOnly} onChange={(e) => setOverridesOnly(e.target.checked)} className="rounded border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 text-[rgb(var(--rb-brand-primary))]" />
+                  {t("capacity.overridesOnly")}
                 </label>
-                <label className="flex items-center gap-2 text-sm text-slate-400">
-                  <input type="checkbox" checked={projectsWithLimitsOnly} onChange={(e) => setProjectsWithLimitsOnly(e.target.checked)} className="rounded border-slate-600 bg-slate-900 text-indigo-600" />
-                  Solo proyectos con límite
+                <label className="flex items-center gap-2 text-sm text-[rgb(var(--rb-text-muted))]">
+                  <input type="checkbox" checked={projectsWithLimitsOnly} onChange={(e) => setProjectsWithLimitsOnly(e.target.checked)} className="rounded border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 text-[rgb(var(--rb-brand-primary))]" />
+                  {t("capacity.limitedProjectsOnly")}
                 </label>
               </div>
 
-              <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wide mt-6 mb-2">Por usuario</h3>
-              <div className="overflow-x-auto rounded-xl border border-slate-700/60 mb-6">
+              <h3 className="text-xs font-medium text-[rgb(var(--rb-text-muted))] uppercase tracking-wide mt-6 mb-2">{t("capacity.byUser")}</h3>
+              <div className="overflow-x-auto rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] shadow-sm mb-6">
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                      <th className="py-2 px-3">Usuario</th>
+                    <tr className="border-b border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/18 text-left text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">
+                      <th className="py-2 px-3">{t("capacity.table.user")}</th>
                       <th className="py-2 px-3">Email</th>
-                      <th className="py-2 px-3">Rol</th>
-                      <th className="py-2 px-3">Proyectos</th>
-                      <th className="py-2 px-3">Clientes</th>
-                      <th className="py-2 px-3">Overrides</th>
-                      <th className="py-2 px-3">Estado</th>
-                      <th className="py-2 px-3 text-right">Acciones</th>
+                      <th className="py-2 px-3">{t("capacity.table.role")}</th>
+                      <th className="py-2 px-3">{t("capacity.table.projects")}</th>
+                      <th className="py-2 px-3">{t("capacity.table.clients")}</th>
+                      <th className="py-2 px-3">{t("capacity.table.overrides")}</th>
+                      <th className="py-2 px-3">{t("capacity.table.status")}</th>
+                      <th className="py-2 px-3 text-right">{t("capacity.table.actions")}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700/40">
+                  <tbody className="divide-y divide-[rgb(var(--rb-surface-border))]/45">
                     {data.userUsage.map((u) => (
-                      <tr key={u.userId} className="hover:bg-slate-800/50 transition-colors duration-150">
-                        <td className="py-2 px-3 text-slate-200">{u.fullName ?? "—"}</td>
-                        <td className="py-2 px-3 text-slate-400">{u.email ?? "—"}</td>
-                        <td className="py-2 px-3 text-slate-300">{u.appRole}</td>
-                        <td className="py-2 px-3 text-slate-300">{u.projectsLimit != null ? `${u.projectsUsed} / ${u.projectsLimit}` : `${u.projectsUsed} (sin límite)`}</td>
-                        <td className="py-2 px-3 text-slate-300">{u.clientsLimit != null ? `${u.clientsUsed} / ${u.clientsLimit}` : `${u.clientsUsed} (sin límite)`}</td>
-                        <td className="py-2 px-3 text-slate-400">{u.hasOverrides ? "Sí" : "—"}</td>
+                      <tr key={u.userId} className="hover:bg-[rgb(var(--rb-surface-3))]/25 transition-colors duration-150">
+                        <td className="py-2 px-3 text-[rgb(var(--rb-text-primary))]">{u.fullName ?? "—"}</td>
+                        <td className="py-2 px-3 text-[rgb(var(--rb-text-muted))]">{u.email ?? "—"}</td>
+                        <td className="py-2 px-3 text-[rgb(var(--rb-text-secondary))]">{u.appRole}</td>
+                        <td className="py-2 px-3 text-[rgb(var(--rb-text-secondary))]">{u.projectsLimit != null ? `${u.projectsUsed} / ${u.projectsLimit}` : `${u.projectsUsed} (${t("capacity.unlimited")})`}</td>
+                        <td className="py-2 px-3 text-[rgb(var(--rb-text-secondary))]">{u.clientsLimit != null ? `${u.clientsUsed} / ${u.clientsLimit}` : `${u.clientsUsed} (${t("capacity.unlimited")})`}</td>
+                        <td className="py-2 px-3 text-[rgb(var(--rb-text-muted))]">{u.hasOverrides ? "Yes" : "—"}</td>
                         <td className="py-2 px-3">
                           <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${
-                            u.status === "at_limit" ? "bg-red-500/15 text-red-400 border border-red-500/30" :
-                            u.status === "near_limit" ? "bg-amber-500/15 text-amber-400 border border-amber-500/30" :
-                            u.status === "unlimited" ? "bg-slate-700/60 text-slate-400 border border-slate-600/60" : "bg-slate-700/60 text-slate-300 border border-slate-600/60"
+                            u.status === "at_limit" ? "bg-red-500/10 text-red-700 border border-red-200/80" :
+                            u.status === "near_limit" ? "border-amber-200/80 bg-amber-500/10 text-amber-900 border" :
+                            u.status === "unlimited" ? "bg-[rgb(var(--rb-surface-3))]/30 text-[rgb(var(--rb-text-muted))] border border-[rgb(var(--rb-surface-border))]/55" : "bg-[rgb(var(--rb-surface-3))]/30 text-[rgb(var(--rb-text-secondary))] border border-[rgb(var(--rb-surface-border))]/55"
                           }`}>
                             {STATUS_LABELS[u.status] ?? u.status}
                           </span>
@@ -1017,9 +1013,9 @@ function CapacityDashboard() {
                           <button
                             type="button"
                             onClick={() => setQuotaModalUserId(u.userId)}
-                            className="text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors duration-150"
+                            className="text-[rgb(var(--rb-brand-primary))] hover:text-[rgb(var(--rb-brand-primary-hover))] text-xs font-medium transition-colors duration-150"
                           >
-                            Configurar límites
+                            {t("userLimits.configure")}
                           </button>
                         </td>
                       </tr>
@@ -1028,41 +1024,41 @@ function CapacityDashboard() {
                 </table>
               </div>
 
-              <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wide mt-6 mb-2">Por proyecto</h3>
-              <div className="overflow-x-auto rounded-xl border border-slate-700/60">
+              <h3 className="text-xs font-medium text-[rgb(var(--rb-text-muted))] uppercase tracking-wide mt-6 mb-2">{t("capacity.byProject")}</h3>
+              <div className="overflow-x-auto rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] shadow-sm">
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                      <th className="py-2 px-3">Proyecto</th>
-                      <th className="py-2 px-3">Cliente</th>
-                      <th className="py-2 px-3">Miembros</th>
-                      <th className="py-2 px-3">Invit. pend.</th>
-                      <th className="py-2 px-3">Estado</th>
-                      <th className="py-2 px-3 text-right">Acciones</th>
+                    <tr className="border-b border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/18 text-left text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">
+                      <th className="py-2 px-3">{t("capacity.projectTable.project")}</th>
+                      <th className="py-2 px-3">{t("capacity.projectTable.client")}</th>
+                      <th className="py-2 px-3">{t("capacity.projectTable.members")}</th>
+                      <th className="py-2 px-3">{t("capacity.projectTable.pendingInvitations")}</th>
+                      <th className="py-2 px-3">{t("capacity.projectTable.status")}</th>
+                      <th className="py-2 px-3 text-right">{t("capacity.projectTable.actions")}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700/40">
+                  <tbody className="divide-y divide-[rgb(var(--rb-surface-border))]/45">
                     {data.projectUsage.map((p) => (
-                      <tr key={p.projectId} className="hover:bg-slate-800/50 transition-colors duration-150">
-                        <td className="py-2 px-3 text-slate-200">{p.projectName}</td>
-                        <td className="py-2 px-3 text-slate-400">{p.clientName ?? "—"}</td>
-                        <td className="py-2 px-3 text-slate-300">{p.membersLimit != null ? `${p.membersCurrent} / ${p.membersLimit}` : `${p.membersCurrent} (sin límite)`}</td>
-                        <td className="py-2 px-3 text-slate-300">{p.invitationsLimit != null ? `${p.invitationsCurrent} / ${p.invitationsLimit}` : `${p.invitationsCurrent} (sin límite)`}</td>
+                      <tr key={p.projectId} className="hover:bg-[rgb(var(--rb-surface-3))]/25 transition-colors duration-150">
+                        <td className="py-2 px-3 text-[rgb(var(--rb-text-primary))]">{p.projectName}</td>
+                        <td className="py-2 px-3 text-[rgb(var(--rb-text-muted))]">{p.clientName ?? "—"}</td>
+                        <td className="py-2 px-3 text-[rgb(var(--rb-text-secondary))]">{p.membersLimit != null ? `${p.membersCurrent} / ${p.membersLimit}` : `${p.membersCurrent} (${t("capacity.unlimited")})`}</td>
+                        <td className="py-2 px-3 text-[rgb(var(--rb-text-secondary))]">{p.invitationsLimit != null ? `${p.invitationsCurrent} / ${p.invitationsLimit}` : `${p.invitationsCurrent} (${t("capacity.unlimited")})`}</td>
                         <td className="py-2 px-3">
                           <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${
-                            p.status === "at_limit" ? "bg-red-500/15 text-red-400 border border-red-500/30" :
-                            p.status === "near_limit" ? "bg-amber-500/15 text-amber-400 border border-amber-500/30" :
-                            p.status === "unlimited" ? "bg-slate-700/60 text-slate-400 border border-slate-600/60" : "bg-slate-700/60 text-slate-300 border border-slate-600/60"
+                            p.status === "at_limit" ? "bg-red-500/10 text-red-700 border border-red-200/80" :
+                            p.status === "near_limit" ? "border-amber-200/80 bg-amber-500/10 text-amber-900 border" :
+                            p.status === "unlimited" ? "bg-[rgb(var(--rb-surface-3))]/30 text-[rgb(var(--rb-text-muted))] border border-[rgb(var(--rb-surface-border))]/55" : "bg-[rgb(var(--rb-surface-3))]/30 text-[rgb(var(--rb-text-secondary))] border border-[rgb(var(--rb-surface-border))]/55"
                           }`}>
                             {STATUS_LABELS[p.status] ?? p.status}
                           </span>
                         </td>
                         <td className="py-2 px-3 text-right">
-                          <Link href={`/projects/${p.projectId}`} className="text-indigo-400 hover:text-indigo-300 text-xs font-medium mr-2 transition-colors duration-150">
-                            Ver proyecto
+                          <Link href={`/projects/${p.projectId}`} className="text-[rgb(var(--rb-brand-primary))] hover:text-[rgb(var(--rb-brand-primary-hover))] text-xs font-medium mr-2 transition-colors duration-150">
+                            {t("capacity.projectTable.viewProject")}
                           </Link>
-                          <Link href={`/projects/${p.projectId}/members`} className="text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors duration-150">
-                            Ver equipo
+                          <Link href={`/projects/${p.projectId}/members`} className="text-[rgb(var(--rb-brand-primary))] hover:text-[rgb(var(--rb-brand-primary-hover))] text-xs font-medium transition-colors duration-150">
+                            {t("capacity.projectTable.viewTeam")}
                           </Link>
                         </td>
                       </tr>
@@ -1072,14 +1068,13 @@ function CapacityDashboard() {
               </div>
             </>
           ) : (
-            <p className="text-sm text-slate-500">No se pudieron cargar los datos.</p>
+            <p className="text-sm text-[rgb(var(--rb-text-muted))]">{t("errors.loadData")}</p>
           )}
         </div>
       </div>
 
       {quotaModalUserId && (
         <CapacityQuotaModal
-          userId={quotaModalUserId}
           userLabel={data?.userUsage.find((u) => u.userId === quotaModalUserId)?.fullName ?? data?.userUsage.find((u) => u.userId === quotaModalUserId)?.email ?? quotaModalUserId}
           quotaData={quotaModalData}
           loading={quotaModalLoading}
@@ -1094,7 +1089,6 @@ function CapacityDashboard() {
 }
 
 function CapacityQuotaModal({
-  userId,
   userLabel,
   quotaData,
   loading,
@@ -1103,7 +1097,6 @@ function CapacityQuotaModal({
   onClose,
   onSave,
 }: {
-  userId: string;
   userLabel: string;
   quotaData: UserQuotaConfig | null;
   loading: boolean;
@@ -1112,6 +1105,7 @@ function CapacityQuotaModal({
   onClose: () => void;
   onSave: (overrides: Record<string, number>) => Promise<void>;
 }) {
+  const t = useTranslations("admin.page");
   const [overrides, setOverrides] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -1120,6 +1114,7 @@ function CapacityQuotaModal({
     for (const key of Object.keys(USER_QUOTA_LABELS)) {
       o[key] = String(quotaData.userOverrides[key] ?? "");
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOverrides(o);
   }, [quotaData]);
 
@@ -1135,55 +1130,55 @@ function CapacityQuotaModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="rounded-xl border border-slate-700/60 bg-slate-800/95 shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="border-b border-slate-700/60 px-5 py-4 flex items-center justify-between">
-          <h3 className="text-sm font-medium text-slate-200">Límites: {userLabel}</h3>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-200 text-xl leading-none transition-colors">&times;</button>
+      <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-[rgb(var(--rb-surface-border))]/60 px-5 py-4 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">{t("userLimits.modalTitle")}: {userLabel}</h3>
+          <button type="button" onClick={onClose} className="text-[rgb(var(--rb-text-muted))] hover:text-[rgb(var(--rb-text-primary))] text-xl leading-none transition-colors">&times;</button>
         </div>
         <div className="p-5">
           {loading ? (
-            <p className="text-sm text-slate-500">Cargando…</p>
+            <p className="text-sm text-[rgb(var(--rb-text-muted))]">{t("loading")}</p>
           ) : quotaData ? (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <p className="text-xs text-slate-400">Rol: <strong className="text-slate-200">{quotaData.appRole ?? "—"}</strong></p>
-              <div className="rounded-lg border border-slate-700/60 p-3 bg-slate-900/50">
-                <p className="text-xs font-medium text-slate-400 mb-2">Límites por defecto del rol</p>
-                <ul className="text-xs text-slate-300 space-y-1">
+              <p className="text-xs text-[rgb(var(--rb-text-muted))]">{t("usersRoles.table.role")}: <strong className="text-[rgb(var(--rb-text-primary))]">{quotaData.appRole ?? "—"}</strong></p>
+              <div className="rounded-lg border border-[rgb(var(--rb-surface-border))]/55 p-3 bg-[rgb(var(--rb-surface-3))]/12">
+                <p className="text-xs font-medium text-[rgb(var(--rb-text-muted))] mb-2">{t("userLimits.defaultRoleLimits")}</p>
+                <ul className="text-xs text-[rgb(var(--rb-text-secondary))] space-y-1">
                   {Object.entries(USER_QUOTA_LABELS).map(([key, label]) => (
-                    <li key={key}>{label}: {quotaData.roleLimits[key] ?? "sin límite"}</li>
+                    <li key={key}>{label}: {quotaData.roleLimits[key] ?? "unlimited"}</li>
                   ))}
                 </ul>
               </div>
-              <p className="text-xs text-slate-400">Override por usuario (vacío = usar valor del rol):</p>
+              <p className="text-xs text-[rgb(var(--rb-text-muted))]">{t("userLimits.overrideHelp")}</p>
               <div className="grid grid-cols-1 gap-3">
                 {Object.entries(USER_QUOTA_LABELS).map(([key, label]) => (
                   <div key={key}>
-                    <label className="block text-xs text-slate-400 mb-0.5">{label}</label>
+                    <label className="block text-xs text-[rgb(var(--rb-text-muted))] mb-0.5">{label}</label>
                     <input
                       type="number"
                       min={1}
                       value={overrides[key] ?? ""}
                       onChange={(e) => setOverrides((o) => ({ ...o, [key]: e.target.value }))}
-                      placeholder={quotaData.roleLimits[key] != null ? String(quotaData.roleLimits[key]) : "Sin límite"}
-                      className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                      placeholder={quotaData.roleLimits[key] != null ? String(quotaData.roleLimits[key]) : "Unlimited"}
+                      className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
                       disabled={saving}
                     />
                     {quotaData.effectiveLimits[key] != null && (
-                      <p className="text-xs text-slate-500 mt-0.5">Efectivo: {quotaData.effectiveLimits[key]}</p>
+                      <p className="text-xs text-[rgb(var(--rb-text-muted))] mt-0.5">{t("userLimits.effective")}: {quotaData.effectiveLimits[key]}</p>
                     )}
                   </div>
                 ))}
               </div>
-              {message && <p className="text-sm text-emerald-400">{message}</p>}
+              {message && <p className="text-sm text-emerald-800">{message}</p>}
               <div className="flex gap-2">
-                <button type="submit" disabled={saving} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150">
-                  {saving ? "Guardando…" : "Guardar"}
+                <button type="submit" disabled={saving} className="rounded-xl bg-[rgb(var(--rb-brand-primary))] px-4 py-2 text-sm font-medium text-white hover:bg-[rgb(var(--rb-brand-primary-hover))] disabled:opacity-50 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35">
+                  {saving ? "Saving…" : "Save"}
                 </button>
-                <button type="button" onClick={onClose} className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 transition-colors duration-150">Cerrar</button>
+                <button type="button" onClick={onClose} className="rounded-xl border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-4 py-2 text-sm font-medium text-[rgb(var(--rb-text-primary))] hover:bg-[rgb(var(--rb-surface-3))]/35 transition-colors duration-150">{t("close")}</button>
               </div>
             </form>
           ) : (
-            <p className="text-sm text-slate-500">No se pudo cargar la configuración.</p>
+            <p className="text-sm text-[rgb(var(--rb-text-muted))]">{t("errors.loadConfig")}</p>
           )}
         </div>
       </div>
@@ -1192,6 +1187,7 @@ function CapacityQuotaModal({
 }
 
 function ActivationsPanel() {
+  const t = useTranslations("admin.page");
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -1212,41 +1208,41 @@ function ActivationsPanel() {
     }
     fetchUsers();
     return () => { cancelled = true; };
-  }, []);
+  }, [t]);
 
   const pending = users.filter((u) => !u.is_active);
   const active = users.filter((u) => u.is_active);
 
   return (
-    <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden shadow-sm ring-1 ring-slate-700/50">
-      <div className="border-b border-slate-700/60 px-5 py-4 bg-slate-800/50">
-        <h2 className="text-sm font-medium text-slate-200">Activación de usuarios</h2>
-        <p className="text-xs text-slate-500 mt-1">
-          Los usuarios que se registran por la página pública quedan pendientes hasta que un administrador los active.
+    <section className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] overflow-hidden shadow-sm ring-1 ring-[rgb(var(--rb-surface-border))]/35">
+      <div className="border-b border-[rgb(var(--rb-surface-border))]/60 px-5 py-4 bg-[rgb(var(--rb-surface-3))]/20">
+        <h2 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">{t("activations.title")}</h2>
+        <p className="text-xs text-[rgb(var(--rb-text-muted))] mt-1">
+          {t("activations.subtitle")}
         </p>
       </div>
       <div className="p-5">
         {loading ? (
-          <p className="text-sm text-slate-500">Cargando…</p>
+          <p className="text-sm text-[rgb(var(--rb-text-muted))]">{t("loading")}</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/15 p-4">
-              <p className="text-2xl font-semibold text-amber-400">{pending.length}</p>
-              <p className="text-sm font-medium text-amber-400">Pendientes</p>
-              <p className="text-xs text-amber-400/80 mt-0.5">Sin acceso a la plataforma</p>
+            <div className="rounded-xl border border-amber-200/80 bg-amber-50/80 p-4 shadow-sm">
+              <p className="text-2xl font-semibold tabular-nums text-amber-900">{pending.length}</p>
+              <p className="text-sm font-medium text-amber-900">{t("activations.pending")}</p>
+              <p className="text-xs text-amber-800/90 mt-0.5">No platform access yet</p>
             </div>
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/15 p-4">
-              <p className="text-2xl font-semibold text-emerald-400">{active.length}</p>
-              <p className="text-sm font-medium text-emerald-400">Activos</p>
-              <p className="text-xs text-emerald-400/80 mt-0.5">Pueden iniciar sesión</p>
+            <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/80 p-4 shadow-sm">
+              <p className="text-2xl font-semibold tabular-nums text-emerald-900">{active.length}</p>
+              <p className="text-sm font-medium text-emerald-900">{t("activations.active")}</p>
+              <p className="text-xs text-emerald-800/90 mt-0.5">{t("activations.canSignIn")}</p>
             </div>
           </div>
         )}
         <a
           href="/admin/users"
-          className="mt-4 inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+          className="mt-4 inline-flex items-center rounded-lg bg-[rgb(var(--rb-brand-primary))] px-4 py-2 text-sm font-medium text-white hover:bg-[rgb(var(--rb-brand-primary-hover))] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35"
         >
-          Gestionar usuarios y activaciones
+          {t("activations.manage")}
         </a>
       </div>
     </section>
@@ -1270,6 +1266,7 @@ type AppRoleOption = {
 };
 
 function UsersRolesPanel() {
+  const t = useTranslations("admin.page");
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [appRoles, setAppRoles] = useState<AppRoleOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1290,7 +1287,7 @@ function UsersRolesPanel() {
         const res = await fetch("/api/admin/users", { headers });
         if (cancelled) return;
         if (!res.ok) {
-          setError("No se pudieron cargar los usuarios.");
+          setError(t("errors.loadUsers"));
           setUsers([]);
           setLoading(false);
           return;
@@ -1300,7 +1297,7 @@ function UsersRolesPanel() {
         setUsers(data.users ?? []);
       } catch {
         if (!cancelled) {
-          setError("No se pudieron cargar los usuarios.");
+          setError(t("errors.loadUsers"));
           setUsers([]);
         }
       } finally {
@@ -1325,7 +1322,7 @@ function UsersRolesPanel() {
         if (cancelled) return;
         if (!res.ok) {
           const data = (await res.json().catch(() => ({}))) as { error?: string };
-          setRolesError(data.error ?? "No se pudieron cargar los roles de aplicación.");
+          setRolesError(data.error ?? "Could not load app roles.");
           setAppRoles([]);
           return;
         }
@@ -1334,7 +1331,7 @@ function UsersRolesPanel() {
         setAppRoles(data.roles ?? []);
       } catch {
         if (!cancelled) {
-          setRolesError("No se pudieron cargar los roles de aplicación.");
+          setRolesError("Could not load app roles.");
           setAppRoles([]);
         }
       }
@@ -1376,7 +1373,7 @@ function UsersRolesPanel() {
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setSaveMessage({ type: "error", text: data.error ?? "No se pudo actualizar el rol." });
+        setSaveMessage({ type: "error", text: data.error ?? "Could not update role." });
         return;
       }
       setUsers((prev) =>
@@ -1387,43 +1384,44 @@ function UsersRolesPanel() {
         delete next[userId];
         return next;
       });
-      setSaveMessage({ type: "success", text: "Rol actualizado correctamente." });
+      setSaveMessage({ type: "success", text: t("usersRoles.roleUpdated") });
     } finally {
       setSavingUserId(null);
     }
   };
 
   return (
-    <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5 space-y-6 shadow-sm ring-1 ring-slate-700/50">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-medium text-slate-200">
-            Users & Roles
+    <section className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] shadow-sm">
+      <div className="flex flex-col gap-4 border-b border-[rgb(var(--rb-surface-border))]/55 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-base font-semibold tracking-tight text-[rgb(var(--rb-text-primary))]">
+            Users &amp; Roles
           </h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm leading-relaxed text-[rgb(var(--rb-text-muted))] max-w-xl">
             Manage global platform access for each user.
           </p>
         </div>
         <a
           href="/admin/users"
-          className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
+          className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-transparent bg-[rgb(var(--rb-brand-primary))] px-4 text-sm font-medium text-white shadow-sm hover:bg-[rgb(var(--rb-brand-primary-hover))] disabled:opacity-60 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-0"
         >
           Manage users
         </a>
       </div>
+      <div className="space-y-5 p-5 sm:p-6 sm:pt-5">
 
       {rolesError && (
-        <div className="rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-2 text-sm text-amber-200">
+        <div className="rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           {rolesError}
         </div>
       )}
 
       {saveMessage && (
         <div
-          className={`rounded-xl border px-4 py-2 text-sm ${
+          className={`rounded-xl border px-4 py-3 text-sm ${
             saveMessage.type === "success"
-              ? "border-emerald-800/50 bg-emerald-950/30 text-emerald-200"
-              : "border-red-800/50 bg-red-950/30 text-red-200"
+              ? "border-emerald-200/90 bg-emerald-50 text-emerald-900"
+              : "border-red-200/90 bg-red-50 text-red-800"
           }`}
         >
           {saveMessage.text}
@@ -1431,44 +1429,56 @@ function UsersRolesPanel() {
       )}
 
       {loading ? (
-        <p className="text-sm text-slate-500">Cargando usuarios...</p>
+        <p className="text-sm text-[rgb(var(--rb-text-muted))]">{t("usersRoles.loadingUsers")}</p>
       ) : error ? (
-        <p className="text-sm text-red-400">{error}</p>
+        <p className="text-sm text-red-700">{error}</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-700/60">
+        <div className="overflow-x-auto rounded-2xl border border-[rgb(var(--rb-surface-border))]/55 bg-[rgb(var(--rb-surface))] shadow-sm">
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-xs uppercase tracking-wide text-slate-400">
-                <th className="py-3 px-4">Usuario</th>
-                <th className="py-3 px-4">Rol</th>
-                <th className="py-3 px-4">Activación</th>
-                <th className="py-3 px-4 text-right">Acciones</th>
+              <tr className="border-b border-[rgb(var(--rb-surface-border))]/50 bg-[rgb(var(--rb-surface-3))]/14 text-left text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">
+                <th className="py-4 px-4 first:pl-5">{t("usersRoles.table.user")}</th>
+                <th className="py-4 px-4">{t("usersRoles.table.role")}</th>
+                <th className="py-4 px-4">{t("usersRoles.table.activation")}</th>
+                <th className="py-4 px-4 pr-5 text-right">{t("usersRoles.table.actions")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/40">
+            <tbody>
               {users.map((user) => {
                 const displayName =
-                  user.full_name || user.email || "Sin nombre";
+                  user.full_name || user.email || t("usersRoles.untitled");
+                const secondaryLine =
+                  user.full_name && user.email ? user.email : null;
                 const currentRole =
                   pendingRoles[user.id] ?? user.app_role;
                 const roleOptions = appRoles.length > 0
                   ? appRoles
                   : [
-                      { id: "consultant", key: "consultant", name: "Consultor" },
+                      { id: "consultant", key: "consultant", name: t("usersRoles.consultant") },
                       { id: "superadmin", key: "superadmin", name: "Superadmin" },
                     ];
                 return (
-                  <tr key={user.id} className="hover:bg-slate-800/50 transition-colors duration-150">
-                    <td className="py-3 px-4 text-slate-200">
-                      {displayName}
+                  <tr
+                    key={user.id}
+                    className="border-b border-[rgb(var(--rb-surface-border))]/30 transition-colors duration-150 last:border-b-0 hover:bg-[rgb(var(--rb-brand-primary))]/[0.045]"
+                  >
+                    <td className="py-4 px-4 pl-5 align-middle">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[15px] font-semibold leading-snug tracking-tight text-[rgb(var(--rb-text-primary))]">
+                          {displayName}
+                        </span>
+                        {secondaryLine && (
+                          <span className="text-xs text-[rgb(var(--rb-text-muted))] tabular-nums">{secondaryLine}</span>
+                        )}
+                      </div>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-4 px-4 align-middle">
                       <select
                         value={currentRole}
                         onChange={(e) =>
                           handleRoleChange(user.id, e.target.value)
                         }
-                        className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
+                        className="h-10 min-w-[10rem] rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/12 px-2.5 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30 disabled:opacity-60"
                         disabled={savingUserId === user.id}
                       >
                         {roleOptions.map((role) => (
@@ -1483,26 +1493,26 @@ function UsersRolesPanel() {
                         )}
                       </select>
                     </td>
-                    <td className="py-3 px-4">
-                      <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${user.is_active ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "bg-amber-500/15 text-amber-400 border border-amber-500/30"}`}>
-                        {user.is_active ? "Activo" : "Pendiente"}
+                    <td className="py-4 px-4 align-middle">
+                      <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${user.is_active ? "border-emerald-200/80 bg-emerald-500/10 text-emerald-800" : "border-amber-200/80 bg-amber-500/10 text-amber-900"}`}>
+                        {user.is_active ? t("activations.active") : t("activations.pending")}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="py-4 px-4 pr-5 text-right align-middle">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => handleSaveRole(user.id)}
                           disabled={savingUserId === user.id}
-                          className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150"
+                          className="inline-flex h-8 items-center justify-center rounded-lg bg-[rgb(var(--rb-brand-primary))] px-3 text-xs font-medium text-white shadow-sm hover:bg-[rgb(var(--rb-brand-primary-hover))] disabled:opacity-50 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35"
                         >
-                          {savingUserId === user.id ? "Guardando..." : "Guardar"}
+                          {savingUserId === user.id ? "Saving..." : "Save"}
                         </button>
                         <a
                           href="/admin/users"
-                          className="inline-flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700 transition-colors duration-150"
+                          className="inline-flex h-8 items-center justify-center rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/15 px-3 text-xs font-medium text-[rgb(var(--rb-text-primary))] hover:bg-[rgb(var(--rb-surface-3))]/30 transition-colors duration-150"
                         >
-                          Gestionar
+                          {t("usersRoles.manage")}
                         </a>
                       </div>
                     </td>
@@ -1513,6 +1523,7 @@ function UsersRolesPanel() {
           </table>
         </div>
       )}
+      </div>
     </section>
   );
 }
@@ -1527,12 +1538,13 @@ type ProjectMember = {
 };
 
 const ROLE_LABELS: Record<"owner" | "editor" | "viewer", string> = {
-  owner: "Propietario",
-  editor: "Editor",
-  viewer: "Lector",
+  owner: "owner",
+  editor: "editor",
+  viewer: "viewer",
 };
 
 function ProjectAccessPanel() {
+  const t = useTranslations("admin.page");
   const [projects, setProjects] = useState<
     { id: string; name: string; status?: string | null }[]
   >([]);
@@ -1565,7 +1577,7 @@ function ProjectAccessPanel() {
         if (cancelled) return;
 
         if (!usersRes.ok) {
-          setError("Se produjo un error al cargar los datos.");
+          setError(t("projectAccess.errors.loadData"));
           setUsers([]);
         } else {
           const usersData = (await usersRes.json()) as { users?: AdminUser[] };
@@ -1573,13 +1585,13 @@ function ProjectAccessPanel() {
         }
 
         if (projResult.error) {
-          setError("Se produjo un error al cargar los datos.");
+          setError(t("projectAccess.errors.loadData"));
           setProjects([]);
         } else {
           setProjects((projResult.data ?? []) as { id: string; name: string; status?: string | null }[]);
         }
       } catch {
-        if (!cancelled) setError("Se produjo un error al cargar los datos.");
+        if (!cancelled) setError(t("projectAccess.errors.loadData"));
       } finally {
         if (!cancelled) setLoadingProjects(false);
       }
@@ -1598,14 +1610,14 @@ function ProjectAccessPanel() {
       const headers = await getAdminAuthHeaders();
       const res = await fetch(`/api/admin/projects/${projectId}/members`, { headers });
       if (!res.ok) {
-        setError("No se pudieron cargar los miembros del proyecto.");
+        setError(t("projectAccess.errors.loadMembers"));
         setMembers([]);
         return;
       }
       const data = (await res.json()) as { members?: ProjectMember[] };
       setMembers(data.members ?? []);
     } catch {
-      setError("No se pudieron cargar los miembros del proyecto.");
+      setError(t("projectAccess.errors.loadMembers"));
       setMembers([]);
     } finally {
       setLoadingMembers(false);
@@ -1637,7 +1649,7 @@ function ProjectAccessPanel() {
         }
       );
       if (!res.ok) {
-        setError("No se pudo añadir el miembro.");
+        setError("Could not add member.");
         return;
       }
       const data = (await res.json()) as { member?: ProjectMember };
@@ -1645,7 +1657,7 @@ function ProjectAccessPanel() {
       setAddUserId("");
       setAddRole("");
     } catch {
-      setError("No se pudo añadir el miembro.");
+      setError("Could not add member.");
     } finally {
       setSavingMemberId(null);
     }
@@ -1667,26 +1679,26 @@ function ProjectAccessPanel() {
         }
       );
       if (!res.ok) {
-        setError("No se pudo quitar el acceso.");
+        setError("Could not remove access.");
         return;
       }
       setMembers((prev) => prev.filter((m) => m.id !== memberId));
     } catch {
-      setError("No se pudo quitar el acceso.");
+      setError("Could not remove access.");
     } finally {
       setSavingMemberId(null);
     }
   };
 
   return (
-    <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5 space-y-6 shadow-sm ring-1 ring-slate-700/50">
+    <section className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-5 sm:p-6 space-y-6 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-medium text-slate-200">
-            Acceso a proyectos
+          <h2 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">
+            {t("projectAccess.title")}
           </h2>
-          <p className="text-xs text-slate-500">
-            Define qué usuarios pueden ver y editar cada proyecto.
+          <p className="text-xs text-[rgb(var(--rb-text-muted))]">
+            {t("projectAccess.subtitle")}
           </p>
         </div>
       </div>
@@ -1698,11 +1710,11 @@ function ProjectAccessPanel() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Left: projects list */}
         <div className="md:col-span-1">
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Proyectos</p>
+          <p className="text-xs font-medium text-[rgb(var(--rb-text-muted))] uppercase tracking-wide mb-2">{t("projectAccess.projects")}</p>
           {loadingProjects ? (
-            <p className="text-sm text-slate-500">Cargando proyectos...</p>
+            <p className="text-sm text-[rgb(var(--rb-text-muted))]">{t("projectAccess.loadingProjects")}</p>
           ) : (
-            <div className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-2 max-h-80 overflow-y-auto space-y-1">
+            <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/15 p-2 max-h-80 overflow-y-auto space-y-1">
               {projects.map((project) => (
                 <button
                   key={project.id}
@@ -1710,14 +1722,14 @@ function ProjectAccessPanel() {
                   onClick={() => handleSelectProject(project.id)}
                   className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${
                     selectedProjectId === project.id
-                      ? "bg-indigo-600 text-white"
-                      : "text-slate-200 hover:bg-slate-800/50"
+                      ? "bg-[rgb(var(--rb-brand-primary))] text-white shadow-sm"
+                      : "text-[rgb(var(--rb-text-primary))] hover:bg-[rgb(var(--rb-surface-3))]/30"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate">{project.name}</span>
                     {project.status && (
-                      <span className="text-[11px] rounded-md border border-slate-600 px-2 py-0.5 text-slate-400">
+                      <span className="text-[11px] rounded-md border border-[rgb(var(--rb-surface-border))]/55 bg-[rgb(var(--rb-surface-3))]/15 px-2 py-0.5 text-[rgb(var(--rb-text-muted))]">
                         {project.status}
                       </span>
                     )}
@@ -1731,41 +1743,41 @@ function ProjectAccessPanel() {
         {/* Right: members + add form */}
         <div className="md:col-span-2 space-y-4">
           {!selectedProjectId ? (
-            <p className="text-sm text-slate-500">
-              Selecciona un proyecto para gestionar sus miembros.
+            <p className="text-sm text-[rgb(var(--rb-text-muted))]">
+              {t("projectAccess.selectProject")}
             </p>
           ) : (
             <>
               <div>
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">
-                  Miembros del proyecto
+                <p className="text-xs font-medium text-[rgb(var(--rb-text-muted))] uppercase tracking-wide mb-2">
+                  {t("projectAccess.membersTitle")}
                 </p>
                 {loadingMembers ? (
-                  <p className="text-sm text-slate-500">
-                    Cargando miembros...
+                  <p className="text-sm text-[rgb(var(--rb-text-muted))]">
+                    {t("projectAccess.loadingMembers")}
                   </p>
                 ) : (
-                  <div className="overflow-x-auto rounded-xl border border-slate-700/60">
+                  <div className="overflow-x-auto rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] shadow-sm">
                     <table className="min-w-full text-sm">
                       <thead>
-                        <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-xs uppercase tracking-wide text-slate-400">
-                          <th className="py-3 px-4">Usuario</th>
-                          <th className="py-3 px-4">Rol</th>
-                          <th className="py-3 px-4 text-right">Acción</th>
+                        <tr className="border-b border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/18 text-left text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">
+                          <th className="py-3 px-4">{t("projectAccess.table.user")}</th>
+                          <th className="py-3 px-4">{t("projectAccess.table.role")}</th>
+                          <th className="py-3 px-4 text-right">{t("projectAccess.table.action")}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-700/40">
+                      <tbody className="divide-y divide-[rgb(var(--rb-surface-border))]/45">
                         {members.map((member) => {
                           const displayName =
-                            member.user_full_name || "Usuario sin nombre";
+                            member.user_full_name || t("projectAccess.unnamedUser");
                           return (
-                            <tr key={member.id} className="hover:bg-slate-800/50 transition-colors duration-150">
-                              <td className="py-3 px-4 text-slate-200">
+                            <tr key={member.id} className="hover:bg-[rgb(var(--rb-surface-3))]/25 transition-colors duration-150">
+                              <td className="py-3 px-4 text-[rgb(var(--rb-text-primary))]">
                                 {displayName}
                               </td>
                               <td className="py-3 px-4">
-                                <span className="inline-flex rounded-md bg-indigo-500/15 px-2 py-0.5 text-xs font-medium text-indigo-400 border border-indigo-500/30">
-                                  {ROLE_LABELS[member.role]}
+                                <span className="inline-flex rounded-md bg-[rgb(var(--rb-brand-primary))]/10 px-2 py-0.5 text-xs font-medium text-[rgb(var(--rb-brand-primary))] border border-[rgb(var(--rb-brand-primary))]/25">
+                                  {t(`projectAccess.roles.${ROLE_LABELS[member.role]}`)}
                                 </span>
                               </td>
                               <td className="py-3 px-4 text-right">
@@ -1776,8 +1788,8 @@ function ProjectAccessPanel() {
                                   className="text-xs font-medium text-rose-400 hover:text-rose-300 disabled:opacity-50 transition-colors duration-150"
                                 >
                                   {savingMemberId === member.id
-                                    ? "Eliminando..."
-                                    : "Quitar acceso"}
+                                    ? t("projectAccess.removing")
+                                    : t("projectAccess.removeAccess")}
                                 </button>
                               </td>
                             </tr>
@@ -1791,23 +1803,23 @@ function ProjectAccessPanel() {
 
               <form
                 onSubmit={handleAddMember}
-                className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-4 space-y-3"
+                className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/15 p-4 space-y-3"
               >
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">
-                  Añadir miembro
+                <p className="text-xs font-medium text-[rgb(var(--rb-text-muted))] uppercase tracking-wide">
+                  {t("projectAccess.addMember")}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">
-                      Usuario
+                    <label className="block text-xs text-[rgb(var(--rb-text-muted))] mb-1">
+                      {t("projectAccess.table.user")}
                     </label>
                     <select
                       value={addUserId}
                       onChange={(e) => setAddUserId(e.target.value)}
-                      className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                      className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
                       disabled={savingMemberId !== null}
                     >
-                      <option value="">Seleccionar usuario</option>
+                      <option value="">{t("projectAccess.selectUser")}</option>
                       {users
                         .filter(
                           (u) =>
@@ -1815,14 +1827,14 @@ function ProjectAccessPanel() {
                         )
                         .map((u) => (
                           <option key={u.id} value={u.id}>
-                            {u.full_name || u.email || "Sin nombre"}
+                            {u.full_name || u.email || t("usersRoles.untitled")}
                           </option>
                         ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">
-                      Rol
+                    <label className="block text-xs text-[rgb(var(--rb-text-muted))] mb-1">
+                      {t("projectAccess.table.role")}
                     </label>
                     <select
                       value={addRole}
@@ -1831,13 +1843,13 @@ function ProjectAccessPanel() {
                           e.target.value as "owner" | "editor" | "viewer" | ""
                         )
                       }
-                      className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                      className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
                       disabled={savingMemberId !== null}
                     >
-                      <option value="">Seleccionar rol</option>
-                      <option value="owner">Propietario</option>
-                      <option value="editor">Editor</option>
-                      <option value="viewer">Lector</option>
+                      <option value="">{t("projectAccess.selectRole")}</option>
+                      <option value="owner">{t("projectAccess.roles.owner")}</option>
+                      <option value="editor">{t("projectAccess.roles.editor")}</option>
+                      <option value="viewer">{t("projectAccess.roles.viewer")}</option>
                     </select>
                   </div>
                 </div>
@@ -1848,9 +1860,9 @@ function ProjectAccessPanel() {
                     !addRole ||
                     savingMemberId !== null
                   }
-                  className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150"
+                  className="rounded-xl bg-[rgb(var(--rb-brand-primary))] px-3 py-2 text-sm font-medium text-white hover:bg-[rgb(var(--rb-brand-primary-hover))] disabled:opacity-50 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35"
                 >
-                  {savingMemberId === "new" ? "Añadiendo..." : "Añadir"}
+                  {savingMemberId === "new" ? t("projectAccess.adding") : t("projectAccess.add")}
                 </button>
               </form>
             </>
@@ -1889,16 +1901,16 @@ type IntegrationOption = {
 };
 
 const GLOBAL_SOURCE_TYPE_LABELS: Record<string, string> = {
-  google_drive_folder: "Carpeta Google Drive",
-  google_drive_file: "Archivo Google Drive",
+  google_drive_folder: "Google Drive folder",
+  google_drive_file: "Google Drive file",
   sap_help: "SAP Help Portal",
   sap_official: "SAP Official",
   official_web: "Official SAP web",
-  sharepoint_library: "Biblioteca SharePoint",
-  confluence_space: "Espacio Confluence",
-  jira_project: "Proyecto Jira",
-  web_url: "URL web",
-  manual_upload: "Carga manual",
+  sharepoint_library: "SharePoint library",
+  confluence_space: "Confluence space",
+  jira_project: "Jira project",
+  web_url: "Web URL",
+  manual_upload: "Manual upload",
 };
 
 type SyncStatusKey = "never" | "synced" | "syncing" | "error";
@@ -1960,6 +1972,7 @@ function isCuratedSapSource(s: GlobalKnowledgeSourceRow): boolean {
 }
 
 function GlobalKnowledgeSourcesPanel() {
+  const t = useTranslations("admin.page");
   const [sources, setSources] = useState<GlobalKnowledgeSourceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1991,16 +2004,16 @@ function GlobalKnowledgeSourcesPanel() {
       const res = await fetch("/api/integrations/google/connect?return_url=/admin", { headers });
       const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
       if (!res.ok) {
-        setError(data.error ?? "Error al iniciar la conexión con Google.");
+        setError(data.error ?? t("knowledge.errors.startGoogle"));
         return;
       }
       if (data.url) {
         window.location.href = data.url;
         return;
       }
-      setError("Respuesta inesperada del servidor.");
+      setError(t("knowledge.errors.unexpectedResponse"));
     } catch {
-      setError("Error de conexión.");
+      setError("Connection error.");
     } finally {
       setGoogleConnectPending(false);
     }
@@ -2041,7 +2054,7 @@ function GlobalKnowledgeSourcesPanel() {
         status?: string;
       };
       if (!res.ok) {
-        setSyncMessage(data.error ?? "No se pudo sincronizar la fuente.");
+        setSyncMessage(data.error ?? "Could not sync source.");
         void loadSources();
         return;
       }
@@ -2049,16 +2062,16 @@ function GlobalKnowledgeSourcesPanel() {
       const chunks = data.chunksCreated ?? 0;
       if (data.ok) {
         setSyncMessage(
-          data.message ?? `Sincronización completada. ${docs} documentos, ${chunks} fragmentos.`
+          data.message ?? t("knowledge.syncCompleted", { docs, chunks })
         );
       } else {
         setSyncMessage(
-          data.message ?? data.error ?? `Sincronización con errores. ${docs} documentos, ${chunks} fragmentos.`
+          data.message ?? data.error ?? t("knowledge.syncWithErrors", { docs, chunks })
         );
       }
       void loadSources();
     } catch {
-      setSyncMessage("Error de conexión.");
+      setSyncMessage("Connection error.");
     } finally {
       setSyncingSourceId(null);
     }
@@ -2072,14 +2085,14 @@ function GlobalKnowledgeSourcesPanel() {
       const res = await fetch(`/api/admin/knowledge-sources?scope=${scopeFilter}`, { headers });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(data.error ?? "Error al cargar las fuentes.");
+        setError(data.error ?? t("knowledge.errors.loadSources"));
         setSources([]);
         return;
       }
       const data = (await res.json()) as { sources?: GlobalKnowledgeSourceRow[] };
       setSources(data.sources ?? []);
     } catch {
-      setError("Error de conexión.");
+      setError("Connection error.");
       setSources([]);
     } finally {
       setLoading(false);
@@ -2144,7 +2157,7 @@ function GlobalKnowledgeSourcesPanel() {
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; source?: GlobalKnowledgeSourceRow };
       if (!res.ok) {
-        setCreateError(data.error ?? "Error al crear la fuente.");
+        setCreateError(data.error ?? t("knowledge.errors.createSource"));
         return;
       }
       setNewSourceName("");
@@ -2153,7 +2166,7 @@ function GlobalKnowledgeSourcesPanel() {
       setNewIntegrationId("");
       if (data.source) setSources((prev) => [data.source!, ...prev]);
     } catch {
-      setCreateError("Error de conexión.");
+      setCreateError("Connection error.");
     } finally {
       setSaving(false);
     }
@@ -2170,12 +2183,12 @@ function GlobalKnowledgeSourcesPanel() {
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setError(data.error ?? "Error al eliminar la fuente.");
+        setError(data.error ?? t("knowledge.errors.deleteSource"));
         return;
       }
       setSources((prev) => prev.filter((s) => s.id !== id));
     } catch {
-      setError("Error de conexión.");
+      setError("Connection error.");
     } finally {
       setDeletingId(null);
     }
@@ -2195,10 +2208,10 @@ function GlobalKnowledgeSourcesPanel() {
   const hasGoogleIntegration = integrations.length > 0;
 
   return (
-    <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5 space-y-6">
+    <section className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-5 shadow-sm sm:p-6 space-y-8">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="relative h-10 w-10 rounded-xl overflow-hidden bg-slate-700 shrink-0">
+          <div className="relative h-10 w-10 rounded-xl overflow-hidden bg-[rgb(var(--rb-surface-3))]/40 shrink-0">
             <Image
               src={getSapitoGeneral().avatarImage}
               alt=""
@@ -2208,10 +2221,10 @@ function GlobalKnowledgeSourcesPanel() {
             />
           </div>
           <div>
-            <h2 className="text-sm font-medium text-slate-200">
+            <h2 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">
               Knowledge Sources
             </h2>
-            <p className="text-xs text-slate-500 max-w-xl">
+            <p className="text-xs text-[rgb(var(--rb-text-muted))] max-w-xl">
               Global and project knowledge used by Sapito to answer with broader context. Managed from Admin.
             </p>
           </div>
@@ -2219,27 +2232,27 @@ function GlobalKnowledgeSourcesPanel() {
       </div>
 
       {/* Platform integrations: Google Drive — primary entry point */}
-      <div className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-4 space-y-3">
-        <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">
+      <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/15 p-4 space-y-3">
+        <p className="text-xs font-medium text-[rgb(var(--rb-text-muted))] uppercase tracking-wide">
           Platform integrations
         </p>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="font-medium text-slate-200">Google Drive</p>
+            <p className="font-medium text-[rgb(var(--rb-text-primary))]">Google Drive</p>
             {integrationsLoading ? (
-              <p className="mt-1 text-xs text-slate-500">Cargando…</p>
+              <p className="mt-1 text-xs text-[rgb(var(--rb-text-muted))]">{t("loading")}</p>
             ) : hasGoogleIntegration ? (
               <>
-                <p className="mt-1 text-xs text-slate-400">
-                  Conectado: {integrations[0]?.account_email ?? integrations[0]?.display_name ?? "—"}
+                <p className="mt-1 text-xs text-[rgb(var(--rb-text-muted))]">
+                  {t("knowledge.connected")}: {integrations[0]?.account_email ?? integrations[0]?.display_name ?? "—"}
                 </p>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Usado para fuentes globales y de proyecto. Conecta aquí para gestionar desde Admin.
+                <p className="mt-0.5 text-xs text-[rgb(var(--rb-text-muted))]">
+                  {t("knowledge.integrationHelp")}
                 </p>
               </>
             ) : (
-              <p className="mt-1 text-xs text-slate-500">
-                Conecta una cuenta de Google Drive para crear fuentes de conocimiento global o por proyecto.
+              <p className="mt-1 text-xs text-[rgb(var(--rb-text-muted))]">
+                {t("knowledge.connectHelp")}
               </p>
             )}
           </div>
@@ -2247,50 +2260,54 @@ function GlobalKnowledgeSourcesPanel() {
             type="button"
             onClick={handleConnectGoogleDrive}
             disabled={googleConnectPending || !canManageKnowledgeSources}
-            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60 transition-colors duration-150 shrink-0"
+            className="rounded-xl bg-[rgb(var(--rb-brand-primary))] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[rgb(var(--rb-brand-primary-hover))] disabled:opacity-60 transition-colors duration-150 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35"
           >
-            {googleConnectPending ? "Redirigiendo…" : hasGoogleIntegration ? "Reconectar Google Drive" : "Connect Google Drive"}
+            {googleConnectPending ? t("knowledge.redirecting") : hasGoogleIntegration ? t("knowledge.reconnectDrive") : t("knowledge.connectDrive")}
           </button>
         </div>
       </div>
 
       {error && (
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm text-red-400">{error}</p>
+          <p className="text-sm text-red-700">{error}</p>
           <button
             type="button"
             onClick={() => void loadSources()}
-            className="rounded-xl border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700 transition-colors duration-150"
+            className="rounded-xl border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-1.5 text-xs font-medium text-[rgb(var(--rb-text-primary))] hover:bg-[rgb(var(--rb-surface-3))]/35 transition-colors duration-150"
           >
-            Reintentar
+            {t("knowledge.retry")}
           </button>
         </div>
       )}
       {syncMessage && (
         <div
           className={`rounded-xl border px-4 py-3 text-sm ${
-            syncMessage.includes("completada") && !syncMessage.includes("errores")
-              ? "border-emerald-800/50 bg-emerald-950/30 text-emerald-200"
-              : syncMessage.includes("Error") || syncMessage.includes("errores")
-                ? "border-red-800/50 bg-red-950/30 text-red-200"
-                : "border-amber-800/50 bg-amber-950/30 text-amber-200"
+            syncMessage.includes("completed") && !syncMessage.includes("errors")
+              ? "border-emerald-200/90 bg-emerald-50 text-emerald-900"
+              : syncMessage.includes("Error") || syncMessage.includes("errors")
+                ? "border-red-200/90 bg-red-50 text-red-800"
+                : "border-amber-200/90 bg-amber-50 text-amber-900"
           }`}
         >
           {syncMessage}
         </div>
       )}
 
-      <form onSubmit={handleCreate} className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-4 space-y-3">
-        <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">
-          Crear fuente global
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/50 bg-[rgb(var(--rb-surface-3))]/10 p-5 shadow-sm sm:p-6">
+        <div className="mb-6 space-y-1 border-b border-[rgb(var(--rb-surface-border))]/45 pb-5">
+          <h3 className="text-sm font-semibold tracking-tight text-[rgb(var(--rb-text-primary))]">
+            {t("knowledge.createGlobalSource")}
+          </h3>
+          <p className="text-sm leading-relaxed text-[rgb(var(--rb-text-muted))]">{t("knowledge.createSectionHint")}</p>
+        </div>
+        <form onSubmit={handleCreate} className="space-y-6">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Tipo</label>
+            <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--rb-text-secondary))]">{t("knowledge.type")}</label>
             <select
               value={newSourceType}
               onChange={(e) => setNewSourceType(e.target.value)}
-              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              className="h-10 w-full rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
               disabled={saving}
             >
               {Object.entries(GLOBAL_SOURCE_TYPE_LABELS).map(([value, label]) => (
@@ -2299,51 +2316,51 @@ function GlobalKnowledgeSourcesPanel() {
             </select>
             {(newSourceType === "sap_help" || newSourceType === "official_web" || newSourceType === "sap_official") && (
               <div className="mt-1 space-y-1">
-                <p className="text-xs text-slate-500">
-                  Añade la URL de la página (una por fuente). Al sincronizar se indexará solo esa página.
+                <p className="text-xs text-[rgb(var(--rb-text-muted))]">
+                  {t("knowledge.curatedUrlHelp")}
                 </p>
-                <p className="text-xs text-amber-200 bg-amber-500/15 rounded px-2 py-1.5 border border-amber-500/30">
-                  <strong>Guía:</strong> Las páginas SAP Help solo se indexan cuando el contenido legible está en el HTML inicial. Las que cargan todo por JavaScript no se pueden indexar con este flujo. Si una URL falla, prueba otra página curada o usa un documento/PDF como alternativa.
+                <p className="text-xs rounded-lg border border-amber-200/80 bg-amber-50/90 px-2.5 py-1.5 text-amber-900">
+                  <strong>{t("knowledge.guide")}:</strong> {t("knowledge.guideBody")}
                 </p>
                 {newSourceType === "sap_help" && (
-                  <p className="text-xs text-amber-200 bg-amber-500/15 rounded px-2 py-1 border border-amber-500/30">
-                    <strong>SAP Help Portal:</strong> solo URLs de help.sap.com. No uses community.sap.com (esas páginas usan JavaScript y no se pueden indexar aquí).
+                  <p className="text-xs rounded-lg border border-amber-200/80 bg-amber-50/90 px-2.5 py-1 text-amber-900">
+                    <strong>{t("knowledge.sapHelpTitle")}:</strong> {t("knowledge.sapHelpBody")}
                   </p>
                 )}
                 {newSourceType === "sap_official" && (
-                  <p className="text-xs text-slate-400">
-                    <strong>SAP Official:</strong> documentación oficial SAP aprobada (p. ej. help.sap.com u otras fuentes oficiales).
+                  <p className="text-xs text-[rgb(var(--rb-text-muted))]">
+                    <strong>{t("knowledge.sapOfficialTitle")}:</strong> {t("knowledge.sapOfficialBody")}
                   </p>
                 )}
                 {newSourceType === "official_web" && (
-                  <p className="text-xs text-slate-400">
-                    <strong>Official Web:</strong> páginas públicas curadas (p. ej. community.sap.com u otros dominios). Si la página requiere JavaScript o verificación anti-bot, la sincronización fallará con un mensaje claro.
+                  <p className="text-xs text-[rgb(var(--rb-text-muted))]">
+                    <strong>{t("knowledge.officialWebTitle")}:</strong> {t("knowledge.officialWebBody")}
                   </p>
                 )}
               </div>
             )}
           </div>
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Nombre *</label>
+            <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--rb-text-secondary))]">{t("knowledge.nameRequired")}</label>
             <input
               type="text"
               value={newSourceName}
               onChange={(e) => setNewSourceName(e.target.value)}
-              placeholder="Nombre de la fuente"
-              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              placeholder={t("knowledge.sourceNamePlaceholder")}
+              className="h-10 w-full rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
               disabled={saving}
             />
           </div>
           {(newSourceType === "google_drive_folder" || newSourceType === "google_drive_file") && (
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Cuenta Google Drive</label>
+              <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--rb-text-secondary))]">{t("knowledge.driveAccount")}</label>
               <select
                 value={newIntegrationId}
                 onChange={(e) => setNewIntegrationId(e.target.value)}
-                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                className="h-10 w-full rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
                 disabled={saving}
               >
-                <option value="">Seleccionar cuenta</option>
+                <option value="">{t("knowledge.selectAccount")}</option>
                 {integrations.map((int) => (
                   <option key={int.id} value={int.id}>
                     {int.account_email || int.display_name || int.id}
@@ -2351,104 +2368,113 @@ function GlobalKnowledgeSourcesPanel() {
                 ))}
               </select>
               {!hasGoogleIntegration && (
-                <p className="mt-1 text-xs text-slate-500">Conecta Google Drive arriba.</p>
+                <p className="mt-1 text-xs text-[rgb(var(--rb-text-muted))]">{t("knowledge.connectDriveAbove")}</p>
               )}
             </div>
           )}
           <div>
-            <label className="block text-xs text-slate-400 mb-1">URL</label>
+            <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--rb-text-secondary))]">{t("knowledge.url")}</label>
             <input
               type="text"
               value={newSourceUrl}
               onChange={(e) => setNewSourceUrl(e.target.value)}
               placeholder="https://..."
-              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              className="h-10 w-full rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
               disabled={saving}
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Ref externa (ej. ID carpeta)</label>
+            <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--rb-text-secondary))]">{t("knowledge.externalRef")}</label>
             <input
               type="text"
               value={newExternalRef}
               onChange={(e) => setNewExternalRef(e.target.value)}
-              placeholder="Opcional"
-              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              placeholder={t("knowledge.optional")}
+              className="h-10 w-full rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
               disabled={saving}
             />
           </div>
         </div>
-        <button
-          type="submit"
-          disabled={!newSourceName.trim() || saving}
-          className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150"
-        >
-          {saving ? "Creando…" : "Crear fuente global"}
-        </button>
-        {createError && (
-          <p className="text-sm text-red-400">{createError}</p>
-        )}
+        <div className="flex flex-col gap-3 border-t border-[rgb(var(--rb-surface-border))]/40 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <button
+            type="submit"
+            disabled={!newSourceName.trim() || saving}
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-[rgb(var(--rb-brand-primary))] px-4 text-sm font-medium text-white shadow-sm hover:bg-[rgb(var(--rb-brand-primary-hover))] disabled:opacity-50 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35"
+          >
+            {saving ? t("knowledge.creating") : t("knowledge.createGlobalSource")}
+          </button>
+          {createError && <p className="text-sm text-red-700">{createError}</p>}
+        </div>
       </form>
+      </div>
 
-      <div>
-        <div className="flex flex-wrap items-center gap-2 mb-2">
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">
-            Listado
-          </p>
-          <div className="inline-flex rounded-lg border border-slate-700/60 bg-slate-900 p-0.5 text-xs">
+      <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/55 bg-[rgb(var(--rb-surface))] p-5 shadow-sm sm:p-6">
+        <div className="mb-5 flex flex-col gap-4 border-b border-[rgb(var(--rb-surface-border))]/45 pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 space-y-1">
+            <h3 className="text-sm font-semibold tracking-tight text-[rgb(var(--rb-text-primary))]">
+              {t("knowledge.sourcesRegistryTitle")}
+            </h3>
+            <p className="text-sm text-[rgb(var(--rb-text-muted))]">{t("knowledge.sourcesRegistryHint")}</p>
+          </div>
+          <div className="inline-flex shrink-0 gap-0.5 rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/18 p-1 text-xs shadow-inner">
             {(["global", "project", "all"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => setScopeFilter(s)}
-                className={`px-2 py-1 rounded-md font-medium transition-colors duration-150 ${
-                  scopeFilter === s ? "bg-slate-800 text-slate-100" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                className={`rounded-lg px-3 py-1.5 font-semibold transition-all duration-150 ${
+                  scopeFilter === s
+                    ? "bg-[rgb(var(--rb-surface))] text-[rgb(var(--rb-text-primary))] shadow-sm ring-2 ring-[rgb(var(--rb-brand-primary))]/25"
+                    : "text-[rgb(var(--rb-text-muted))] hover:bg-[rgb(var(--rb-surface))]/90 hover:text-[rgb(var(--rb-text-primary))]"
                 }`}
               >
-                {s === "global" ? "Global" : s === "project" ? "Project" : "All"}
+                {s === "global" ? t("knowledge.scope.global") : s === "project" ? t("knowledge.scope.project") : t("knowledge.scope.all")}
               </button>
             ))}
           </div>
         </div>
         {loading ? (
-          <p className="text-sm text-slate-500">Cargando fuentes…</p>
+          <p className="text-sm text-[rgb(var(--rb-text-muted))]">{t("knowledge.loadingSources")}</p>
         ) : sources.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            {scopeFilter === "global" && "No hay fuentes globales. Crea una para que Sapito use conocimiento reutilizable (por ejemplo SAP Help o Google Drive)."}
-            {scopeFilter === "project" && "No hay fuentes de proyecto listadas aquí."}
-            {scopeFilter === "all" && "No hay fuentes de conocimiento. Añade una fuente global o de proyecto para empezar."}
+          <p className="text-sm text-[rgb(var(--rb-text-muted))]">
+            {scopeFilter === "global" && t("knowledge.emptyGlobal")}
+            {scopeFilter === "project" && "No project sources listed here."}
+            {scopeFilter === "all" && "No knowledge sources. Add a global or project source to get started."}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-700/60">
+          <div className="overflow-x-auto rounded-xl border border-[rgb(var(--rb-surface-border))]/55 bg-[rgb(var(--rb-surface-3))]/8 shadow-sm">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-xs uppercase tracking-wide text-slate-400">
-                  <th className="py-3 px-4">Nombre</th>
-                  <th className="py-3 px-4">Tipo</th>
-                  <th className="py-3 px-4">Scope</th>
-                  <th className="py-3 px-4">Proyecto</th>
-                  <th className="py-3 px-4">Sync status</th>
-                  <th className="py-3 px-4">Última sync</th>
-                  <th className="py-3 px-4 text-right">Acciones</th>
+                <tr className="border-b border-[rgb(var(--rb-surface-border))]/50 bg-[rgb(var(--rb-surface-3))]/14 text-left text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">
+                  <th className="py-3.5 px-4">{t("knowledge.table.name")}</th>
+                  <th className="py-3.5 px-4">{t("knowledge.table.type")}</th>
+                  <th className="py-3.5 px-4">Scope</th>
+                  <th className="py-3.5 px-4">{t("knowledge.table.project")}</th>
+                  <th className="py-3.5 px-4">Sync status</th>
+                  <th className="py-3.5 px-4">{t("knowledge.table.lastSync")}</th>
+                  <th className="py-3.5 px-4 text-right">{t("knowledge.table.actions")}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/40">
+              <tbody>
                 {sources.map((s) => {
                   const syncStatus = getSyncStatus(s, syncingSourceId);
                   return (
-                  <tr key={s.id} className="hover:bg-slate-800/50 transition-colors duration-150">
-                    <td className="py-3 px-4 text-slate-200 font-medium">{s.source_name}</td>
+                  <tr
+                    key={s.id}
+                    className="border-b border-[rgb(var(--rb-surface-border))]/30 transition-colors duration-150 last:border-b-0 hover:bg-[rgb(var(--rb-brand-primary))]/[0.045]"
+                  >
+                    <td className="py-3.5 px-4 text-[rgb(var(--rb-text-primary))] font-medium">{s.source_name}</td>
                     <td className="py-3 px-4">
-                      <span className="inline-flex rounded-md bg-slate-700/60 px-2 py-0.5 text-xs text-slate-300 border border-slate-600/60">
+                      <span className="inline-flex rounded-md bg-[rgb(var(--rb-surface-3))]/30 px-2 py-0.5 text-xs text-[rgb(var(--rb-text-secondary))] border border-[rgb(var(--rb-surface-border))]/55">
                         {GLOBAL_SOURCE_TYPE_LABELS[s.source_type] ?? s.source_type}
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="inline-flex rounded-md bg-indigo-500/15 px-2 py-0.5 text-xs text-indigo-400 border border-indigo-500/30">
-                        {s.scope_type === "global" ? "Global" : "Project"}
+                      <span className="inline-flex rounded-md bg-[rgb(var(--rb-brand-primary))]/10 px-2 py-0.5 text-xs text-[rgb(var(--rb-brand-primary))] border border-[rgb(var(--rb-brand-primary))]/25">
+                        {s.scope_type === "global" ? t("knowledge.scope.global") : t("knowledge.scope.project")}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-slate-400">
+                    <td className="py-3 px-4 text-[rgb(var(--rb-text-muted))]">
                       {s.scope_type === "project" && (s.project_name ?? s.project_id ?? "—")}
                       {s.scope_type === "global" && "—"}
                     </td>
@@ -2457,24 +2483,24 @@ function GlobalKnowledgeSourcesPanel() {
                         <span
                           className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium w-fit ${
                             syncStatus === "syncing"
-                              ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                              ? "border border-amber-200/80 bg-amber-500/10 text-amber-900"
                               : syncStatus === "error"
-                                ? "bg-red-500/15 text-red-400 border border-red-500/30"
+                                ? "border border-red-200/80 bg-red-500/10 text-red-800"
                                 : syncStatus === "synced"
-                                  ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                                  : "bg-slate-700/60 text-slate-400 border border-slate-600/60"
+                                  ? "bg-emerald-500/10 text-emerald-800 border border-emerald-200/80"
+                                  : "bg-[rgb(var(--rb-surface-3))]/30 text-[rgb(var(--rb-text-muted))] border border-[rgb(var(--rb-surface-border))]/55"
                           }`}
                         >
                           {SYNC_STATUS_LABELS[syncStatus]}
                         </span>
                         {isCuratedSapSource(s) && getSyncDetailLine(s) && (
-                          <span className="text-xs text-slate-500 max-w-[220px] truncate" title={s.last_sync_error ?? undefined}>
+                          <span className="text-xs text-[rgb(var(--rb-text-muted))] max-w-[220px] truncate" title={s.last_sync_error ?? undefined}>
                             {getSyncDetailLine(s)}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-slate-400 text-xs">
+                    <td className="py-3 px-4 text-[rgb(var(--rb-text-muted))] text-xs">
                       {s.last_synced_at ? formatSyncDate(s.last_synced_at) : "—"}
                     </td>
                     <td className="py-3 px-4 text-right">
@@ -2484,13 +2510,13 @@ function GlobalKnowledgeSourcesPanel() {
                             type="button"
                             onClick={() => handleSync(s.id)}
                             disabled={syncingSourceId !== null || !canSyncSource(s) || !canManageKnowledgeSources}
-                            title={!canSyncSource(s) ? (isCuratedSapSource(s) ? "Añade la URL de la página SAP en la fuente" : "Configura cuenta de Google Drive y Ref externa (ID carpeta) en la fuente") : "Sincronizar ahora"}
-                            className="text-xs font-medium text-indigo-400 hover:text-indigo-300 disabled:opacity-50 transition-colors duration-150"
+                            title={!canSyncSource(s) ? (isCuratedSapSource(s) ? t("knowledge.syncHintSap") : t("knowledge.syncHintDrive")) : t("knowledge.syncNow")}
+                            className="text-xs font-medium text-[rgb(var(--rb-brand-primary))] hover:text-[rgb(var(--rb-brand-primary-hover))] disabled:opacity-50 transition-colors duration-150"
                           >
-                            {syncingSourceId === s.id ? "Syncing…" : "Sync now"}
+                            {syncingSourceId === s.id ? t("knowledge.syncing") : t("knowledge.syncNow")}
                           </button>
                         ) : (
-                          <span className="text-xs text-slate-500" title="Sync solo disponible para Google Drive o SAP oficial (sap_help, sap_official, official_web)">
+                          <span className="text-xs text-[rgb(var(--rb-text-muted))]" title={t("knowledge.syncOnlyHint")}>
                             —
                           </span>
                         )}
@@ -2499,9 +2525,9 @@ function GlobalKnowledgeSourcesPanel() {
                             type="button"
                             onClick={() => handleDelete(s.id)}
                             disabled={deletingId !== null}
-                            className="text-xs font-medium text-rose-400 hover:text-rose-300 disabled:opacity-50 transition-colors duration-150"
+                            className="text-xs font-medium text-rose-700 hover:text-rose-800 disabled:opacity-50 transition-colors duration-150"
                           >
-                            {deletingId === s.id ? "Eliminando…" : "Eliminar"}
+                            {deletingId === s.id ? t("knowledge.deleting") : t("knowledge.delete")}
                           </button>
                         )}
                       </div>
@@ -2603,7 +2629,7 @@ function ClientsPanel() {
       const data = (await res.json()) as { clients?: ClientRow[] };
       setClients(data.clients ?? []);
     } catch {
-      setError("Error de conexión.");
+      setError("Connection error.");
       setClients([]);
     } finally {
       setLoading(false);
@@ -2744,7 +2770,7 @@ function ClientsPanel() {
         setForm(EMPTY_CLIENT_FORM as Record<string, string | boolean>);
       }
     } catch {
-      setFormError("Error de conexión.");
+      setFormError("Connection error.");
     } finally {
       setSaving(false);
     }
@@ -2752,39 +2778,39 @@ function ClientsPanel() {
 
   const field = (key: string, label: string, placeholder = "") => (
     <div key={key} className="space-y-1">
-      <label className="block text-xs text-slate-400">{label}</label>
+      <label className="block text-xs text-[rgb(var(--rb-text-muted))]">{label}</label>
       <input
         type="text"
         value={(form[key] as string) ?? ""}
         onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
         placeholder={placeholder}
-        className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+        className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
         disabled={saving}
       />
     </div>
   );
 
   return (
-    <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5 space-y-6 shadow-sm ring-1 ring-slate-700/50">
+    <section className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-5 sm:p-6 space-y-6 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-medium text-slate-200">Clientes</h2>
-          <p className="text-xs text-slate-500">Crear y editar clientes para proyectos, reporting y contexto SAP.</p>
+          <h2 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">Clientes</h2>
+          <p className="text-xs text-[rgb(var(--rb-text-muted))]">Crear y editar clientes para proyectos, reporting y contexto SAP.</p>
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-700">{error}</p>}
 
-      <form onSubmit={handleSubmit} className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-4 space-y-4">
+      <form onSubmit={handleSubmit} className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/15 p-4 space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">
+          <span className="text-xs font-medium text-[rgb(var(--rb-text-muted))] uppercase tracking-wide">
             {editingId ? "Editar cliente" : "Nuevo cliente"}
           </span>
           {editingId && (
             <button
               type="button"
               onClick={() => { setEditingId(null); setForm(EMPTY_CLIENT_FORM as Record<string, string | boolean>); }}
-              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+              className="text-xs text-[rgb(var(--rb-brand-primary))] hover:text-[rgb(var(--rb-brand-primary-hover))] transition-colors"
             >
               Cancelar
             </button>
@@ -2793,38 +2819,38 @@ function ClientsPanel() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-3">
-            <p className="text-xs font-medium text-slate-400">Identidad</p>
-            {field("name", "Nombre (obligatorio)", "Nombre o razón social")}
+            <p className="text-xs font-medium text-[rgb(var(--rb-text-muted))]">Identidad</p>
+            {field("name", "Name (required)", "Name or company name")}
             {field("display_name", "Nombre para mostrar", "Ej. Acme")}
-            {field("legal_name", "Razón social / legal")}
+            {field("legal_name", "Legal name")}
             {field("tax_id", "CIF / NIF")}
             {field("website", "Web")}
             {field("linkedin_url", "LinkedIn")}
           </div>
           <div className="space-y-3">
-            <p className="text-xs font-medium text-slate-400">Segmentación</p>
+            <p className="text-xs font-medium text-[rgb(var(--rb-text-muted))]">Segmentación</p>
             <div className="space-y-1">
-              <label className="block text-xs text-slate-400">Industria</label>
-              <select value={(form.industry as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, industry: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40" disabled={saving}>
+              <label className="block text-xs text-[rgb(var(--rb-text-muted))]">Industria</label>
+              <select value={(form.industry as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, industry: e.target.value }))} className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30" disabled={saving}>
                 {INDUSTRY_OPTIONS.map((o) => <option key={o.value || "_"} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             {field("subindustry", "Subindustria")}
             <div className="space-y-1">
-              <label className="block text-xs text-slate-400">Tamaño empresa</label>
-              <select value={(form.company_size_bucket as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, company_size_bucket: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40" disabled={saving}>
+              <label className="block text-xs text-[rgb(var(--rb-text-muted))]">Tamaño empresa</label>
+              <select value={(form.company_size_bucket as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, company_size_bucket: e.target.value }))} className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30" disabled={saving}>
                 {COMPANY_SIZE_OPTIONS.map((o) => <option key={o.value || "_"} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             {field("employee_range", "Rango empleados")}
-            {field("annual_revenue_range", "Facturación (rango)")}
-            <p className="text-xs font-medium text-slate-400 mt-3">Estructura</p>
+            {field("annual_revenue_range", "Revenue range")}
+            <p className="text-xs font-medium text-[rgb(var(--rb-text-muted))] mt-3">Estructura</p>
             <div className="space-y-1">
-              <label className="block text-xs text-slate-400">Cliente padre</label>
+              <label className="block text-xs text-[rgb(var(--rb-text-muted))]">Cliente padre</label>
               <select
                 value={(form.parent_client_id as string) ?? ""}
                 onChange={(e) => setForm((f) => ({ ...f, parent_client_id: e.target.value }))}
-                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
                 disabled={saving}
               >
                 <option value="">Ninguno</option>
@@ -2834,11 +2860,11 @@ function ClientsPanel() {
               </select>
             </div>
             <div className="space-y-1">
-              <label className="block text-xs text-slate-400">País</label>
+              <label className="block text-xs text-[rgb(var(--rb-text-muted))]">País</label>
               <select
                 value={resolveCountryOptionValue(form.country as string)}
                 onChange={(e) => { const v = e.target.value; setForm((f) => ({ ...f, country: v, region: "" })); }}
-                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
                 disabled={saving}
               >
                 <option value="">—</option>
@@ -2851,11 +2877,11 @@ function ClientsPanel() {
               </select>
             </div>
             <div className="space-y-1">
-              <label className="block text-xs text-slate-400">Región / Estado</label>
+              <label className="block text-xs text-[rgb(var(--rb-text-muted))]">Región / Estado</label>
               <select
                 value={resolveStateOptionValue(form.country as string, form.region as string)}
                 onChange={(e) => setForm((f) => ({ ...f, region: e.target.value }))}
-                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
                 disabled={saving}
               >
                 <option value="">—</option>
@@ -2869,20 +2895,20 @@ function ClientsPanel() {
             </div>
             {field("account_group", "Grupo de cuenta")}
             <div className="space-y-1">
-              <label className="block text-xs text-slate-400">Tier</label>
-              <select value={(form.account_tier as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, account_tier: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40" disabled={saving}>
+              <label className="block text-xs text-[rgb(var(--rb-text-muted))]">Tier</label>
+              <select value={(form.account_tier as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, account_tier: e.target.value }))} className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30" disabled={saving}>
                 {ACCOUNT_TIER_OPTIONS.map((o) => <option key={o.value || "_"} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="block text-xs text-slate-400">Tipo propiedad</label>
-              <select value={(form.ownership_type as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, ownership_type: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40" disabled={saving}>
+              <label className="block text-xs text-[rgb(var(--rb-text-muted))]">Tipo propiedad</label>
+              <select value={(form.ownership_type as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, ownership_type: e.target.value }))} className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30" disabled={saving}>
                 {OWNERSHIP_TYPE_OPTIONS.map((o) => <option key={o.value || "_"} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="block text-xs text-slate-400">Modelo negocio</label>
-              <select value={(form.business_model as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, business_model: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40" disabled={saving}>
+              <label className="block text-xs text-[rgb(var(--rb-text-muted))]">Modelo negocio</label>
+              <select value={(form.business_model as string) ?? ""} onChange={(e) => setForm((f) => ({ ...f, business_model: e.target.value }))} className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30" disabled={saving}>
                 {BUSINESS_MODEL_OPTIONS.map((o) => <option key={o.value || "_"} value={o.value}>{o.label}</option>)}
               </select>
             </div>
@@ -2892,87 +2918,87 @@ function ClientsPanel() {
         </div>
 
         <div className="space-y-3">
-          <p className="text-xs font-medium text-slate-400">Contexto SAP</p>
+          <p className="text-xs font-medium text-[rgb(var(--rb-text-muted))]">Contexto SAP</p>
           <textarea
             value={(form.sap_relevance_summary as string) ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, sap_relevance_summary: e.target.value }))}
             placeholder="Resumen de relevancia SAP, sistemas, roadmap…"
             rows={2}
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
             disabled={saving}
           />
         </div>
 
         <div className="space-y-3">
-          <p className="text-xs font-medium text-slate-400">Notas estratégicas</p>
+          <p className="text-xs font-medium text-[rgb(var(--rb-text-muted))]">Notas estratégicas</p>
           <textarea
             value={(form.known_pain_points as string) ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, known_pain_points: e.target.value }))}
             placeholder="Pain points conocidos"
             rows={1}
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
             disabled={saving}
           />
           <textarea
             value={(form.strategic_notes as string) ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, strategic_notes: e.target.value }))}
-            placeholder="Notas internas estratégicas"
+            placeholder="Internal strategic notes"
             rows={2}
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            className="w-full rounded-md border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30"
             disabled={saving}
           />
         </div>
 
         <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-slate-300">
+          <label className="flex items-center gap-2 text-sm text-[rgb(var(--rb-text-secondary))]">
             <input
               type="checkbox"
               checked={form.is_active === true}
               onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
               disabled={saving}
-              className="rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500/40"
+              className="rounded border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface-3))]/20 text-[rgb(var(--rb-brand-primary))] focus:ring-[rgb(var(--rb-brand-primary))]/30"
             />
             Activo
           </label>
           <button
             type="submit"
             disabled={saving}
-            className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors duration-150"
+            className="rounded-xl bg-[rgb(var(--rb-brand-primary))] px-3 py-2 text-sm font-medium text-white hover:bg-[rgb(var(--rb-brand-primary-hover))] disabled:opacity-50 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35"
           >
-            {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Crear cliente"}
+            {saving ? "Saving…" : editingId ? "Save changes" : "Create client"}
           </button>
         </div>
-        {formError && <p className="text-sm text-red-400">{formError}</p>}
+        {formError && <p className="text-sm text-red-700">{formError}</p>}
       </form>
 
       <div>
-        <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Listado de clientes</p>
+        <p className="text-xs font-medium text-[rgb(var(--rb-text-muted))] uppercase tracking-wide mb-2">Listado de clientes</p>
         {loading ? (
-          <p className="text-sm text-slate-500">Cargando clientes…</p>
+          <p className="text-sm text-[rgb(var(--rb-text-muted))]">Cargando clientes…</p>
         ) : clients.length === 0 ? (
-          <p className="text-sm text-slate-500">Aún no hay clientes. Crea uno arriba.</p>
+          <p className="text-sm text-[rgb(var(--rb-text-muted))]">Aún no hay clientes. Crea uno arriba.</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-700/60">
+          <div className="overflow-x-auto rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] shadow-sm">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-700/60 bg-slate-800/50 text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr className="border-b border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/18 text-left text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">
                   <th className="py-3 px-4">Nombre</th>
                   <th className="py-3 px-4">País</th>
                   <th className="py-3 px-4">Industria</th>
                   <th className="py-3 px-4">Tier</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/40">
+              <tbody className="divide-y divide-[rgb(var(--rb-surface-border))]/45">
                 {clients.map((c) => (
                   <tr
                     key={c.id}
                     onClick={() => setEditingId(c.id)}
-                    className="hover:bg-slate-800/50 transition-colors duration-150 cursor-pointer"
+                    className="hover:bg-[rgb(var(--rb-surface-3))]/25 transition-colors duration-150 cursor-pointer"
                   >
-                    <td className="py-3 px-4 text-slate-200 font-medium">{c.display_name || c.name}</td>
-                    <td className="py-3 px-4 text-slate-400">{getCountryDisplayName(c.country) || "—"}</td>
-                    <td className="py-3 px-4 text-slate-400">{c.industry ?? "—"}</td>
-                    <td className="py-3 px-4 text-slate-400">{c.account_tier ?? "—"}</td>
+                    <td className="py-3 px-4 text-[rgb(var(--rb-text-primary))] font-medium">{c.display_name || c.name}</td>
+                    <td className="py-3 px-4 text-[rgb(var(--rb-text-muted))]">{getCountryDisplayName(c.country) || "—"}</td>
+                    <td className="py-3 px-4 text-[rgb(var(--rb-text-muted))]">{c.industry ?? "—"}</td>
+                    <td className="py-3 px-4 text-[rgb(var(--rb-text-muted))]">{c.account_tier ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -2983,7 +3009,7 @@ function ClientsPanel() {
           <button
             type="button"
             onClick={() => { setEditingId(null); setForm(EMPTY_CLIENT_FORM as Record<string, string | boolean>); }}
-            className="mt-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors duration-150"
+            className="mt-2 text-sm text-[rgb(var(--rb-brand-primary))] hover:text-[rgb(var(--rb-brand-primary-hover))] transition-colors duration-150"
           >
             + Nuevo cliente
           </button>

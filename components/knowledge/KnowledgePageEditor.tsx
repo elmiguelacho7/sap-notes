@@ -16,6 +16,7 @@ import { common as lowlightCommon, createLowlight } from "lowlight";
 import { Node, mergeAttributes } from "@tiptap/core";
 import { Extension } from "@tiptap/core";
 import { Plugin } from "prosemirror-state";
+import { NodeSelection } from "prosemirror-state";
 import type { BlockNoteBlock } from "@/lib/knowledge/blockNoteToText";
 import {
   blockNoteBlocksToTiptapDoc,
@@ -23,8 +24,10 @@ import {
 } from "@/lib/knowledge/blockNoteTiptapAdapter";
 import { blockNoteDocumentToText } from "@/lib/knowledge/blockNoteToText";
 import { getKnowledgeTemplateBlocks, type KnowledgeTemplateId } from "@/lib/knowledge/knowledgeTemplates";
+import { searchKnowledge } from "@/lib/knowledgeService";
 import { supabase } from "@/lib/supabaseClient";
 import { uploadKnowledgeImage } from "@/lib/knowledge/uploadKnowledgeImage";
+import type { KnowledgeSearchResult } from "@/lib/types/knowledge";
 import {
   Save,
   Network,
@@ -66,6 +69,20 @@ function extractTiptapContentText(blocks: BlockNoteBlock[]) {
   return blockNoteDocumentToText(blocks);
 }
 
+function collectTiptapImageUrls(node: unknown): string[] {
+  const out: string[] = [];
+  const walk = (n: unknown) => {
+    if (!n || typeof n !== "object") return;
+    const obj = n as { type?: unknown; attrs?: { src?: unknown }; content?: unknown[] };
+    if (obj.type === "image" && typeof obj.attrs?.src === "string" && obj.attrs.src.length > 0) {
+      out.push(obj.attrs.src);
+    }
+    if (Array.isArray(obj.content)) obj.content.forEach(walk);
+  };
+  walk(node);
+  return out;
+}
+
 type SapCalloutVariant =
   | "procedure"
   | "tip"
@@ -73,7 +90,8 @@ type SapCalloutVariant =
   | "configuration"
   | "reference"
   | "expected"
-  | "quote";
+  | "quote"
+  | "knowledge_reference";
 
 const SAP_CALLOUT_LABELS: Record<SapCalloutVariant, string> = {
   procedure: "Procedure Step",
@@ -83,6 +101,7 @@ const SAP_CALLOUT_LABELS: Record<SapCalloutVariant, string> = {
   reference: "Transaction / App Reference",
   expected: "Expected Result",
   quote: "Note",
+  knowledge_reference: "Linked Page",
 };
 
 const SAP_CALLOUT_ICONS: Record<SapCalloutVariant, string> = {
@@ -93,6 +112,7 @@ const SAP_CALLOUT_ICONS: Record<SapCalloutVariant, string> = {
   reference: "🧭",
   expected: "✅",
   quote: "📝",
+  knowledge_reference: "🔗",
 };
 
 const SAP_CALLOUT_STYLES: Record<
@@ -106,6 +126,7 @@ const SAP_CALLOUT_STYLES: Record<
   reference: { bg: "bg-sky-500/8", label: "text-sky-200", sideBorder: "border-sky-500/55", iconBg: "bg-sky-500/12" },
   expected: { bg: "bg-fuchsia-500/8", label: "text-fuchsia-200", sideBorder: "border-fuchsia-500/55", iconBg: "bg-fuchsia-500/12" },
   quote: { bg: "bg-slate-900/20", label: "text-slate-300", sideBorder: "border-slate-400/45", iconBg: "bg-slate-900/25" },
+  knowledge_reference: { bg: "bg-indigo-500/7", label: "text-indigo-200", sideBorder: "border-indigo-500/55", iconBg: "bg-indigo-500/12" },
 };
 
 const SapCallout = Node.create({
@@ -125,6 +146,10 @@ const SapCallout = Node.create({
       label: {
         default: null,
         parseHTML: (element) => element.getAttribute("data-label"),
+      },
+      pageId: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-page-id"),
       },
     };
   },
@@ -154,6 +179,7 @@ const SapCallout = Node.create({
         "data-sap-callout": "",
         "data-variant": variant,
         "data-label": label,
+        "data-page-id": HTMLAttributes.pageId ?? undefined,
         class:
           `sap-callout relative rounded-2xl border border-slate-800/70 ${styles.bg} ` +
           "border-l-4 " +
@@ -251,13 +277,57 @@ export function KnowledgePageEditor({
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const imageUploadErrorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Internal Knowledge page reference picker (Phase 1).
+  const [linkPickerOpen, setLinkPickerOpen] = useState(false);
+  const [linkPickerQuery, setLinkPickerQuery] = useState("");
+  const [linkPickerLoading, setLinkPickerLoading] = useState(false);
+  const [linkPickerError, setLinkPickerError] = useState<string | null>(null);
+  const [linkPickerResults, setLinkPickerResults] = useState<KnowledgeSearchResult[]>([]);
+  const linkPickerInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedImagePos, setSelectedImagePos] = useState<number | null>(null);
+  const [selectedImageOverlay, setSelectedImageOverlay] = useState<{ top: number; left: number } | null>(null);
+
   const [saveFeedback, setSaveFeedback] = useState<"idle" | "saving" | "saved">("idle");
   const saveFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveVersionRef = useRef(0);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!linkPickerOpen) return;
+    setLinkPickerError(null);
+    // Focus search immediately for a smooth slash-command workflow.
+    setTimeout(() => linkPickerInputRef.current?.focus(), 0);
+  }, [linkPickerOpen]);
+
+  useEffect(() => {
+    if (!linkPickerOpen) return;
+    const q = linkPickerQuery.trim();
+    if (!q) {
+      setLinkPickerResults([]);
+      setLinkPickerLoading(false);
+      return;
+    }
+
+    const handle = setTimeout(async () => {
+      setLinkPickerLoading(true);
+      try {
+        const results = await searchKnowledge(supabase, q);
+        setLinkPickerResults(results);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Error al buscar páginas.";
+        setLinkPickerError(msg);
+        setLinkPickerResults([]);
+      } finally {
+        setLinkPickerLoading(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(handle);
+  }, [linkPickerOpen, linkPickerQuery]);
 
   const showImageUploadError = useCallback((message: string) => {
     setImageUploadError(message);
@@ -266,6 +336,31 @@ export function KnowledgePageEditor({
       setImageUploadError(null);
     }, 5000);
   }, []);
+
+  const flushSaveNow = useCallback(
+    (activeEditor: ReturnType<typeof useEditor> | null, nextTitle?: string) => {
+      if (!activeEditor || !onSave) return;
+      // Read the live ProseMirror doc at call time (manual save must not rely on stale snapshots).
+      const docJSON = activeEditor.state.doc.toJSON();
+      const blocks = tiptapDocToBlockNoteBlocks(docJSON);
+      const content_text = extractTiptapContentText(blocks);
+      if (process.env.NODE_ENV !== "production") {
+        const tiptapImageUrls = collectTiptapImageUrls(docJSON);
+        const imageBlocks = blocks.filter((b) => b.type === "image");
+        console.debug("[Knowledge save outgoing payload]", {
+          title: nextTitle ?? title,
+          tiptapImageCount: tiptapImageUrls.length,
+          tiptapImages: tiptapImageUrls,
+          imageCount: imageBlocks.length,
+          images: imageBlocks.map((b) => (b.props?.src as string) ?? (b.props?.url as string) ?? null),
+          content_json: blocks,
+          content_text,
+        });
+      }
+      onSave({ title: nextTitle ?? title, content_json: blocks, content_text });
+    },
+    [onSave, title]
+  );
 
   const editor = useEditor({
     editable,
@@ -333,6 +428,13 @@ export function KnowledgePageEditor({
                 schema.nodes.image.create({ src: url, alt: file.name })
               )
             );
+            // Persist immediately after async image insertion to avoid race on quick reload/navigation.
+            if (saveTimeoutRef.current) {
+              clearTimeout(saveTimeoutRef.current);
+              saveTimeoutRef.current = null;
+            }
+            saveVersionRef.current += 1;
+            setTimeout(() => flushSaveNow(editor), 0);
           })
           .catch((e) => {
             const msg = e instanceof Error ? e.message : "Error al subir la imagen.";
@@ -343,6 +445,14 @@ export function KnowledgePageEditor({
       },
       handleKeyDown: (view, event) => {
         if (!editable) return false;
+
+        const selNode = (view.state.selection as { node?: { type?: { name?: string } } }).node;
+        const isImageSelected = selNode?.type?.name === "image";
+        if (isImageSelected && (event.key === "Backspace" || event.key === "Delete")) {
+          event.preventDefault();
+          view.dispatch(view.state.tr.deleteSelection());
+          return true;
+        }
 
         if (slashOpenRef.current) {
           const items = slashItemsRef.current;
@@ -417,17 +527,24 @@ export function KnowledgePageEditor({
         setSlashOpen(true);
         return true;
       },
+      handleClickOn: (view, pos, node, nodePos) => {
+        if (!editable) return false;
+        if (node.type.name !== "image") return false;
+        const tr = view.state.tr.setSelection(NodeSelection.create(view.state.doc, nodePos));
+        view.dispatch(tr);
+        view.focus();
+        return true;
+      },
     },
-    onUpdate: () => {
+    onUpdate: ({ editor: activeEditor }) => {
       if (!onSave) return;
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      const nextVersion = saveVersionRef.current + 1;
+      saveVersionRef.current = nextVersion;
       saveTimeoutRef.current = setTimeout(() => {
         saveTimeoutRef.current = null;
-        if (!editor) return;
-        const docJSON = editor.getJSON();
-        const blocks = tiptapDocToBlockNoteBlocks(docJSON);
-        const content_text = extractTiptapContentText(blocks);
-        onSave({ title, content_json: blocks, content_text });
+        if (saveVersionRef.current !== nextVersion) return;
+        flushSaveNow(activeEditor);
       }, debounceMs);
     },
   });
@@ -446,6 +563,58 @@ export function KnowledgePageEditor({
   }, [slashOpen]);
 
   useEffect(() => {
+    if (!editor || !isMounted) return;
+
+    const updateImageSelectionOverlay = () => {
+      const sel = editor.state.selection as { from: number; node?: { type?: { name?: string } } };
+      const isImageSelected = sel?.node?.type?.name === "image";
+      if (!isImageSelected) {
+        setSelectedImagePos(null);
+        setSelectedImageOverlay(null);
+        return;
+      }
+
+      const pos = sel.from;
+      setSelectedImagePos(pos);
+
+      const hostRect = editorHostRef.current?.getBoundingClientRect();
+      if (!hostRect) {
+        setSelectedImageOverlay(null);
+        return;
+      }
+
+      const domAtPos = editor.view.nodeDOM(pos) as HTMLElement | null;
+      const imageRect = domAtPos?.getBoundingClientRect?.();
+      if (!imageRect) {
+        setSelectedImageOverlay(null);
+        return;
+      }
+
+      setSelectedImageOverlay({
+        top: imageRect.top - hostRect.top + (editorHostRef.current?.scrollTop ?? 0) + 8,
+        left: imageRect.right - hostRect.left - 130,
+      });
+    };
+
+    updateImageSelectionOverlay();
+    editor.on("selectionUpdate", updateImageSelectionOverlay);
+    editor.on("update", updateImageSelectionOverlay);
+    return () => {
+      editor.off("selectionUpdate", updateImageSelectionOverlay);
+      editor.off("update", updateImageSelectionOverlay);
+    };
+  }, [editor, isMounted]);
+
+  const removeSelectedImage = useCallback(() => {
+    if (!editor || selectedImagePos == null) return;
+    const tr = editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, selectedImagePos)).deleteSelection();
+    editor.view.dispatch(tr);
+    editor.commands.focus();
+    setSelectedImagePos(null);
+    setSelectedImageOverlay(null);
+  }, [editor, selectedImagePos]);
+
+  useEffect(() => {
     slashActiveIndexRef.current = slashActiveIndex;
   }, [slashActiveIndex]);
 
@@ -460,15 +629,17 @@ export function KnowledgePageEditor({
     if (!editor || !onSave) return;
     setSaveFeedback("saving");
     if (saveFeedbackTimeoutRef.current) clearTimeout(saveFeedbackTimeoutRef.current);
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    saveVersionRef.current += 1;
 
-    const docJSON = editor.getJSON();
-    const blocks = tiptapDocToBlockNoteBlocks(docJSON);
-    const content_text = extractTiptapContentText(blocks);
-    onSave({ title, content_json: blocks, content_text });
+    flushSaveNow(editor);
 
     saveFeedbackTimeoutRef.current = setTimeout(() => setSaveFeedback("saved"), 500);
     saveFeedbackTimeoutRef.current = setTimeout(() => setSaveFeedback("idle"), 1800);
-  }, [editor, onSave, title]);
+  }, [editor, flushSaveNow, onSave]);
 
   const handleTitleChange = useCallback(
     (v: string) => {
@@ -478,13 +649,10 @@ export function KnowledgePageEditor({
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
         saveTimeoutRef.current = null;
-        const docJSON = editor.getJSON();
-        const blocks = tiptapDocToBlockNoteBlocks(docJSON);
-        const content_text = extractTiptapContentText(blocks);
-        onSave({ title: v, content_json: blocks, content_text });
+        flushSaveNow(editor, v);
       }, 600);
     },
-    [editor, onSave, onTitleChange]
+    [editor, flushSaveNow, onSave, onTitleChange]
   );
 
   const insertTemplate = useCallback(
@@ -521,6 +689,30 @@ export function KnowledgePageEditor({
     [editor]
   );
 
+  const insertKnowledgeReference = useCallback(
+    (target: KnowledgeSearchResult) => {
+      if (!editor) return;
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "sapCallout",
+          attrs: { variant: "knowledge_reference", pageId: target.page_id },
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: target.title }],
+            },
+          ],
+        })
+        .run();
+
+      setLinkPickerOpen(false);
+      setLinkPickerQuery("");
+    },
+    [editor]
+  );
+
   const uploadAndInsertImageFile = useCallback(
     async (file: File | null | undefined) => {
       if (!file || !editor) return;
@@ -528,12 +720,19 @@ export function KnowledgePageEditor({
         setImageUploadError(null);
         const url = await uploadKnowledgeImage({ supabase, file, pageId, projectId });
         editor.chain().focus().setImage({ src: url, alt: file.name }).run();
+        // Persist immediately after async image insertion to avoid race on quick reload/navigation.
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+          saveTimeoutRef.current = null;
+        }
+        saveVersionRef.current += 1;
+        setTimeout(() => flushSaveNow(editor), 0);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Error al subir la imagen.";
         showImageUploadError(msg);
       }
     },
-    [editor, pageId, projectId, showImageUploadError]
+    [editor, flushSaveNow, pageId, projectId, showImageUploadError]
   );
 
   const openImagePicker = useCallback(() => {
@@ -803,6 +1002,18 @@ export function KnowledgePageEditor({
         }
       ),
       mk(
+        "knowledge_reference",
+        "SAP Documentation",
+        "Linked page",
+        <Network className="h-4 w-4 text-slate-400" />,
+        () => {
+          setSlashOpen(false);
+          setSlashQuery("");
+          setLinkPickerOpen(true);
+          setLinkPickerQuery("");
+        }
+      ),
+      mk(
         "result",
         "SAP Documentation",
         "Result",
@@ -875,7 +1086,7 @@ export function KnowledgePageEditor({
           void uploadAndInsertImageFile(file);
         }}
       />
-      <div className="max-w-[780px] mx-auto space-y-9">
+      <div className="max-w-6xl mx-auto space-y-9">
         {/* Title + action bar */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
@@ -948,6 +1159,10 @@ export function KnowledgePageEditor({
             [&_.ProseMirror]:focus-visible:ring-2
             [&_.ProseMirror]:focus-visible:ring-indigo-500/30
             [&_.ProseMirror]:focus-visible:ring-offset-0
+            [&_.ProseMirror-selectednode]:ring-2
+            [&_.ProseMirror-selectednode]:ring-indigo-500/45
+            [&_.ProseMirror-selectednode]:ring-offset-0
+            [&_.ProseMirror-selectednode]:rounded-xl
             [&_.ProseMirror_p]:my-4
             [&_.ProseMirror_p]:leading-7
             [&_.ProseMirror_h1]:text-4xl [&_.ProseMirror_h1]:font-semibold [&_.ProseMirror_h1]:mt-8 [&_.ProseMirror_h1]:mb-4
@@ -1025,6 +1240,89 @@ export function KnowledgePageEditor({
                     {filteredSlashActions.length === 0 && (
                       <div className="px-3 py-4 text-sm text-slate-500">Sin resultados</div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {selectedImageOverlay && (
+                <button
+                  type="button"
+                  onClick={removeSelectedImage}
+                  className="absolute z-20 rounded-lg border border-slate-700/70 bg-slate-900/90 px-2.5 py-1.5 text-xs text-slate-100 hover:bg-slate-800/95"
+                  style={{
+                    top: Math.max(4, selectedImageOverlay.top),
+                    left: Math.max(4, selectedImageOverlay.left),
+                  }}
+                >
+                  Remove image
+                </button>
+              )}
+
+              {linkPickerOpen && (
+                <div className="absolute inset-0 z-30 bg-slate-950/60 backdrop-blur-sm flex items-start justify-center p-4">
+                  <div className="w-full max-w-xl rounded-2xl border border-slate-800/80 bg-slate-950/95 px-4 py-4 shadow-2xl shadow-black/30">
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={linkPickerInputRef}
+                        value={linkPickerQuery}
+                        onChange={(e) => setLinkPickerQuery(e.target.value)}
+                        placeholder="Buscar página de conocimiento…"
+                        className="w-full rounded-xl border border-slate-800/80 bg-slate-900/40 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30"
+                        aria-label="Buscar páginas"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLinkPickerOpen(false);
+                          setLinkPickerQuery("");
+                          setLinkPickerError(null);
+                        }}
+                        className="rounded-xl border border-slate-800/80 bg-slate-900/20 px-3 py-2 text-sm text-slate-200 hover:bg-slate-900/40"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+
+                    <div className="mt-3">
+                      {linkPickerError && (
+                        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+                          {linkPickerError}
+                        </div>
+                      )}
+
+                      {!linkPickerError && (
+                        <>
+                          <div className="px-1 text-[11px] uppercase tracking-wide text-slate-500 mb-2">
+                            Resultados
+                          </div>
+                          {linkPickerLoading ? (
+                            <div className="text-sm text-slate-400 py-2">Buscando…</div>
+                          ) : linkPickerResults.length === 0 ? (
+                            <div className="text-sm text-slate-500 py-2">
+                              Escribe para buscar. (Se muestran solo páginas a las que tienes acceso.)
+                            </div>
+                          ) : (
+                            <div className="max-h-72 overflow-auto pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(71,85,105,0.35)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-slate-700/60 [&::-webkit-scrollbar-track]:bg-transparent">
+                              <div className="space-y-2">
+                                {linkPickerResults.slice(0, 10).map((r) => (
+                                  <button
+                                    key={r.page_id}
+                                    type="button"
+                                    onClick={() => insertKnowledgeReference(r)}
+                                    className="w-full text-left rounded-xl border border-slate-800/60 bg-slate-900/20 px-3 py-2.5 hover:bg-slate-900/40 transition-colors"
+                                  >
+                                    <div className="text-sm font-medium text-slate-100">{r.title}</div>
+                                    {r.summary ? (
+                                      <div className="text-xs text-slate-500 mt-0.5 line-clamp-2">{r.summary}</div>
+                                    ) : null}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

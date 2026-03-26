@@ -1,10 +1,10 @@
-import { PageShell } from "@/components/layout/PageShell";
+import { AppPageShell } from "@/components/ui/layout/AppPageShell";
 import { ContentSkeleton } from "@/components/skeletons/ContentSkeleton";
 
 export default function KnowledgeLoading() {
   return (
-    <PageShell>
+    <AppPageShell>
       <ContentSkeleton title lines={4} cards={3} />
-    </PageShell>
+    </AppPageShell>
   );
 }

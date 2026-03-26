@@ -133,27 +133,27 @@ export default function NoteDetailPage() {
   const hasExtraInfo = note?.extra_info != null && note.extra_info.trim() !== "";
 
   return (
-    <div className="min-h-screen w-full min-w-0 bg-slate-950 px-6 py-7 xl:px-8 2xl:px-10">
+    <div className="min-h-screen w-full min-w-0 rb-workspace-bg px-6 py-7 xl:px-8 2xl:px-10">
       <Link
         href={backHref}
-        className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200 transition-colors mb-6"
+        className="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 transition-colors mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
         Volver a notas
       </Link>
 
       {errorMsg && (
-        <div className="mb-6 rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {errorMsg}
         </div>
       )}
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <div className="h-8 w-8 rounded-full border-2 border-slate-600 border-t-indigo-400 animate-spin" />
+          <div className="h-8 w-8 rounded-full border-2 border-slate-300 border-t-[rgb(var(--rb-brand-primary-active))] animate-spin" />
         </div>
       ) : !note ? (
-        <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 px-6 py-12 text-center text-sm text-slate-400">
+        <div className="rounded-2xl border border-slate-200/90 bg-white px-6 py-12 text-center text-sm text-slate-600 shadow-sm ring-1 ring-slate-100">
           No se encontró la nota.
         </div>
       ) : (

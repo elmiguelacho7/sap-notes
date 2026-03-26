@@ -1,0 +1,30 @@
+{
+  "title": "Account",
+  "subtitle": "Your account information, security, and preferences.",
+  "loading": "Loading…",
+  "loadingSubtext": "One moment.",
+  "securityHelp": "Enter your current password and new password. After updating, you will need to sign in again.",
+  "currentPassword": "Current password",
+  "currentPasswordPlaceholder": "Your current password",
+  "newPassword": "New password",
+  "newPasswordPlaceholder": "Minimum {min} characters",
+  "confirmPassword": "Confirm new password",
+  "confirmPasswordPlaceholder": "Type the new password again",
+  "updatePassword": "Update password",
+  "saving": "Saving...",
+  "forgotPassword": "Forgot your password?",
+  "resetPassword": "Reset password",
+  "success": {
+    "updated": "Password updated successfully."
+  },
+  "errors": {
+    "currentRequired": "Current password is required.",
+    "newRequired": "New password is required.",
+    "minLength": "Password must be at least {min} characters.",
+    "confirmRequired": "Confirm the new password.",
+    "passwordMismatch": "Passwords do not match.",
+    "noEmail": "Could not get your email. Sign out and sign in again.",
+    "currentIncorrect": "Current password is incorrect.",
+    "updateFailed": "Could not update password. Try again."
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "eyebrow": "Espacio de proyecto",
+  "title": "Buscar",
+  "subtitle": "Busca en tareas, tickets, actividades, notas y conocimiento de este proyecto.",
+  "results": {
+    "tasks": "Tareas",
+    "tickets": "Tickets",
+    "activities": "Actividades",
+    "notes": "Notas",
+    "knowledge": "Conocimiento"
+  },
+  "states": {
+    "emptyQueryTitle": "Buscar dentro de este proyecto",
+    "emptyQueryBody": "Escribe una palabra clave para buscar en tareas, tickets, notas y conocimiento del proyecto.",
+    "noResultsTitle": "Sin resultados",
+    "noResultsBody": "Prueba otra palabra clave o una búsqueda más corta."
+  }
+}
+

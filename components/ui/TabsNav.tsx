@@ -23,8 +23,8 @@ export function TabsNav({
 
   const wrapperClass =
     variant === "dark"
-      ? "flex items-center gap-0.5 rounded-lg bg-slate-800/50 border border-slate-700/50 p-1 overflow-x-auto overflow-y-hidden min-w-0"
-      : "flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1 overflow-x-auto overflow-y-hidden min-w-0";
+      ? "flex items-center gap-0.5 rounded-lg bg-[rgb(var(--rb-surface-2))]/85 border border-[rgb(var(--rb-surface-border))]/85 p-1 overflow-x-auto overflow-y-hidden min-w-0"
+      : "flex items-center gap-1 rounded-2xl border border-[rgb(var(--rb-surface-border))]/90 bg-[rgb(var(--rb-surface))]/98 p-1 overflow-x-auto overflow-y-hidden min-w-0";
 
   return (
     <div className={`${wrapperClass} ${className}`.trim()}>
@@ -36,25 +36,25 @@ export function TabsNav({
         const linkClass =
           variant === "dark"
             ? active
-              ? "bg-slate-700 text-slate-100 shadow-sm"
-              : "text-slate-400 hover:bg-slate-700/60 hover:text-slate-200"
+              ? "bg-[rgb(var(--rb-brand-primary))]/12 text-[rgb(var(--rb-brand-primary-hover))] shadow-sm"
+              : "text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-brand-primary))]/10 hover:text-[rgb(var(--rb-text-primary))]"
             : active
-              ? "bg-indigo-50 text-indigo-700"
-              : "text-slate-700 hover:bg-slate-100/70";
+              ? "bg-[rgb(var(--rb-brand-primary))]/12 text-[rgb(var(--rb-brand-primary-hover))]"
+              : "text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/70";
 
         const iconClass =
           variant === "dark"
             ? active
-              ? "text-slate-200"
-              : "text-slate-500"
-            : "text-slate-400";
+              ? "text-[rgb(var(--rb-brand-primary-hover))]"
+              : "text-[rgb(var(--rb-text-muted))]"
+            : "text-[rgb(var(--rb-text-muted))]";
 
         const sizeClass = variant === "dark" ? "gap-1.5 rounded-md px-2.5 py-1.5 text-xs" : "gap-2 rounded-lg px-3 py-2 text-sm";
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={`relative inline-flex items-center font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0 ${sizeClass} ${linkClass}`}
+            className={`relative inline-flex items-center font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-0 ${sizeClass} ${linkClass}`}
           >
             {item.icon ? <span className={iconClass}>{item.icon}</span> : null}
             <span className="truncate">{item.label}</span>

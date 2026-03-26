@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabaseClient";
 import { SapitoAvatar } from "./SapitoAvatar";
 import { AssistantSuggestionChips } from "./AssistantSuggestionChips";
@@ -11,21 +12,14 @@ type ChatMessage = { role: "user" | "assistant"; content: string; grounded?: boo
 
 const AGENT_URL = "/api/project-agent";
 
-const PROJECT_SUGGESTIONS = [
+const PROJECT_SUGGESTIONS_PAYLOAD = [
   "¿Qué tareas están vencidas?",
   "¿Qué tickets siguen abiertos?",
   "¿Qué conocimiento tenemos sobre este tema?",
-];
-
-const QUICK_ACTIONS = [
-  { label: "Ver tareas vencidas", href: (id: string) => `/projects/${id}/tasks` },
-  { label: "Ver tickets abiertos", href: (id: string) => `/projects/${id}/tickets` },
-  { label: "Ir a Tasks", href: (id: string) => `/projects/${id}/tasks` },
 ] as const;
 
 type ProjectAssistantChatProps = {
   projectId: string;
-  projectName?: string;
   /** When set, open from another page (e.g. Brain): send this message once and clear */
   initialMessage?: string;
   onClearInitialMessage?: () => void;
@@ -33,24 +27,36 @@ type ProjectAssistantChatProps = {
 
 export function ProjectAssistantChat({
   projectId,
-  projectName,
   initialMessage,
   onClearInitialMessage,
 }: ProjectAssistantChatProps) {
+  const t = useTranslations("sapito.chat");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const initialMessageSentRef = useRef(false);
 
+  const projectSuggestions = [
+    { label: t("suggestions.overdueTasks"), payload: PROJECT_SUGGESTIONS_PAYLOAD[0] },
+    { label: t("suggestions.openTickets"), payload: PROJECT_SUGGESTIONS_PAYLOAD[1] },
+    { label: t("suggestions.knowledgeTopic"), payload: PROJECT_SUGGESTIONS_PAYLOAD[2] },
+  ] as const;
+
+  const quickActions = [
+    { label: t("quickActions.viewOverdueTasks"), href: (id: string) => `/projects/${id}/tasks` },
+    { label: t("quickActions.viewOpenTickets"), href: (id: string) => `/projects/${id}/tickets` },
+    { label: t("quickActions.goToTasks"), href: (id: string) => `/projects/${id}/tasks` },
+  ] as const;
+
   const sendMessage = useCallback(async (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed || loading || !projectId) return;
+    if (!trimmed || isSending || !projectId) return;
 
     setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
     setInput("");
     setError(null);
-    setLoading(true);
+    setIsSending(true);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -69,15 +75,15 @@ export function ProjectAssistantChat({
 
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(data?.error ?? "No se pudo obtener respuesta.");
-        setLoading(false);
+        setError(data?.error ?? t("errors.noResponse"));
+        setIsSending(false);
         return;
       }
 
       const data = (await res.json()) as { reply?: string; grounded?: boolean; groundingLabel?: string };
       const reply = typeof data?.reply === "string"
         ? data.reply
-        : "No he podido obtener una respuesta de Sapito ahora mismo.";
+        : t("errors.noReplyNow");
       setMessages((prev) => [...prev, {
         role: "assistant",
         content: reply,
@@ -86,11 +92,11 @@ export function ProjectAssistantChat({
       }]);
     } catch (err) {
       console.error("Project agent request failed", err);
-      setError("No se pudo obtener respuesta de la IA. Inténtalo de nuevo.");
+      setError(t("errors.aiRequestFailed"));
     } finally {
-      setLoading(false);
+      setIsSending(false);
     }
-  }, [loading, projectId]);
+  }, [isSending, projectId, t]);
 
   // When opened with a prefilled message (e.g. from Brain quick action), send it once
   useEffect(() => {
@@ -111,48 +117,48 @@ export function ProjectAssistantChat({
     await sendMessage(input);
   };
 
+  const isEmpty = messages.length === 0;
+
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="rounded-2xl border border-slate-700 bg-slate-900/40 p-4 sm:p-5 space-y-6 text-sm">
-          {messages.length === 0 && !loading ? (
-            <div className="rounded-xl border border-slate-700 bg-slate-900 p-4 space-y-4">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 space-y-6 text-sm shadow-sm ring-1 ring-slate-100">
+          {isEmpty ? (
+            <div className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-4 space-y-4">
               <div className="flex items-center gap-3">
                 <SapitoAvatar size="lg" styledContainer showOnlineIndicator />
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-100">Sapito AI</h3>
-                  <p className="text-xs text-slate-500">Copiloto del proyecto</p>
+                  <h3 className="text-sm font-semibold text-slate-900">{t("header.title")}</h3>
+                  <p className="text-xs text-slate-600">{t("header.subtitle")}</p>
                 </div>
               </div>
               <div className="space-y-2">
-                <p className="text-slate-300 text-sm leading-relaxed font-medium">
-                  Qué puedo hacer por ti
+                <p className="text-slate-800 text-sm leading-relaxed font-medium">
+                  {t("intro.whatICanDoTitle")}
                 </p>
-                <p className="text-slate-400 text-sm leading-relaxed">
-                  Soy tu asistente de proyecto con contexto de tareas, tickets y conocimiento. Puedo ayudarte a:
+                <p className="text-slate-600 text-sm leading-relaxed">
+                  {t("intro.whatICanDoBody")}
                 </p>
-                <ul className="list-disc list-outside pl-4 space-y-1 text-slate-300 text-sm">
-                  <li>Resumir el estado del proyecto y tareas vencidas</li>
-                  <li>Revisar tickets abiertos y prioridades</li>
-                  <li>Buscar en la base de conocimiento del proyecto</li>
-                  <li>Sugerir siguientes pasos y riesgos</li>
+                <ul className="list-disc list-outside pl-4 space-y-1 text-slate-700 text-sm">
+                  <li>{t("intro.bullets.projectStatus")}</li>
+                  <li>{t("intro.bullets.tickets")}</li>
+                  <li>{t("intro.bullets.knowledge")}</li>
+                  <li>{t("intro.bullets.nextSteps")}</li>
                 </ul>
               </div>
               <div className="pt-1">
-                <p className="text-slate-500 text-xs mb-2">Prueba preguntando:</p>
+                <p className="text-slate-500 text-xs mb-2">{t("intro.tryAsking")}</p>
                 <AssistantSuggestionChips
-                  suggestions={PROJECT_SUGGESTIONS}
-                  onSelect={sendMessage}
-                  disabled={loading}
+                  suggestions={projectSuggestions.map((s) => s.label)}
+                  onSelect={(label) => {
+                    const selected = projectSuggestions.find((s) => s.label === label);
+                    if (selected) sendMessage(selected.payload);
+                  }}
+                  disabled={false}
                   className="justify-start"
-                  variant="dark"
+                  variant="light"
                 />
               </div>
-            </div>
-          ) : messages.length === 0 && loading ? (
-            <div className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-6 text-center">
-              <SapitoAvatar size="lg" className="mx-auto mb-2 inline-block" thinking styledContainer />
-              <p className="text-sm font-medium text-slate-300">Sapito está pensando…</p>
             </div>
           ) : (
             <>
@@ -167,27 +173,27 @@ export function ProjectAssistantChat({
                     </div>
                   )}
                   {msg.role === "user" ? (
-                    <div className="max-w-[88%] min-w-0 rounded-2xl px-4 py-3.5 bg-indigo-600 text-white shadow-sm">
+                    <div className="max-w-[88%] min-w-0 rounded-2xl px-4 py-3.5 bg-[rgb(var(--rb-brand-primary))] text-white shadow-sm">
                       <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
                     </div>
                   ) : (
-                    <div className="max-w-[88%] min-w-0 rounded-xl border border-slate-700 bg-slate-900 p-4 space-y-3">
+                    <div className="max-w-[88%] min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-slate-100">Sapito AI</span>
-                        <span className="text-[11px] text-slate-500">Project Copilot</span>
+                        <span className="text-xs font-semibold text-slate-900">{t("header.title")}</span>
+                        <span className="text-[11px] text-slate-500">{t("header.subtitle")}</span>
                       </div>
                       {(msg.groundingLabel || msg.grounded !== undefined) && (
-                        <p className="text-[11px] text-slate-500 pb-2 border-b border-slate-700 font-medium">
-                          {msg.groundingLabel ?? (msg.grounded === true ? "Según la documentación sincronizada" : "Respuesta general (sin documentación indexada)")}
+                        <p className="text-[11px] text-slate-500 pb-2 border-b border-slate-200 font-medium">
+                          {msg.groundingLabel ?? (msg.grounded === true ? t("grounding.syncedDocs") : t("grounding.general"))}
                         </p>
                       )}
-                      <AssistantMessageContent content={msg.content} variant="dark" />
-                      <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-700">
-                        {QUICK_ACTIONS.map((action) => (
+                      <AssistantMessageContent content={msg.content} variant="light" />
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
+                        {quickActions.map((action) => (
                           <Link
                             key={action.label}
                             href={action.href(projectId)}
-                            className="rounded-lg border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 transition-colors"
+                            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                           >
                             {action.label}
                           </Link>
@@ -197,13 +203,13 @@ export function ProjectAssistantChat({
                   )}
                 </div>
               ))}
-              {loading && (
+              {isSending && (
                 <div className="flex gap-3 justify-start">
                   <div className="mt-1 shrink-0">
                     <SapitoAvatar size="sm" thinking styledContainer />
                   </div>
-                  <div className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3.5 text-slate-400 text-sm">
-                    Sapito está pensando…
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-600 text-sm">
+                    {t("states.thinking")}
                   </div>
                 </div>
               )}
@@ -213,7 +219,7 @@ export function ProjectAssistantChat({
       </div>
 
       {error && (
-        <p className="mt-2 px-1 text-xs text-red-400">{error}</p>
+        <p className="mt-2 px-1 text-xs text-red-700">{error}</p>
       )}
 
       <form onSubmit={handleSubmit} className="mt-4 flex items-center gap-2.5 shrink-0 p-1">
@@ -221,17 +227,17 @@ export function ProjectAssistantChat({
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Mensaje, error SAP o consulta sobre este proyecto…"
-          disabled={loading}
-          className="flex-1 rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:opacity-60"
-          aria-label="Mensaje para Sapito del proyecto"
+          disabled={isSending}
+          className="flex-1 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/30 focus:border-[rgb(var(--rb-brand-primary))]/35 disabled:opacity-70"
+          placeholder={t("input.placeholder")}
+          aria-label={t("input.aria")}
         />
         <button
           type="submit"
-          disabled={loading || !input.trim()}
-          className="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-medium px-4 py-2.5 text-sm disabled:opacity-60 shrink-0 transition-colors"
+          disabled={isSending || !input.trim()}
+          className="rounded-xl rb-btn-primary font-medium px-4 py-2.5 text-sm disabled:opacity-60 shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2"
         >
-          {loading ? "Enviando…" : "Enviar"}
+          {isSending ? t("input.sending") : t("input.send")}
         </button>
       </form>
     </div>

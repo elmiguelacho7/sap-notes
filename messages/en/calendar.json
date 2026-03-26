@@ -1,0 +1,54 @@
+{
+  "emDash": "—",
+  "page": {
+    "title": "Planning calendar",
+    "subtitle": "Timeline view of project phases and activities."
+  },
+  "actions": {
+    "backToProject": "Back to project",
+    "goToProjectPhases": "Go to project phases"
+  },
+  "sections": {
+    "calendar": "Calendar",
+    "riskByPhase": "Risk by phase",
+    "phaseDurationDays": "Duration by phase (days)",
+    "projectTimeline": "Project timeline",
+    "activitiesByPhase": "Activities by phase",
+    "unassignedPhase": "No assigned phase"
+  },
+  "states": {
+    "loading": "Loading calendar...",
+    "noPhases": "No phases have been defined for this project yet.",
+    "noActivities": "There are no activities registered for this project yet."
+  },
+  "labels": {
+    "status": "Status",
+    "toArrow": "->"
+  },
+  "dates": {
+    "noDate": "No date"
+  },
+  "risk": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "highShort": "High: {count}",
+    "mediumShort": "Med: {count}",
+    "lowShort": "Low: {count}"
+  },
+  "errors": {
+    "loadFailed": "Could not load planning calendar.",
+    "missingProjectId": "Project identifier was not found."
+  },
+  "gantt": {
+    "defaultTitle": "Timeline",
+    "timelineEyebrow": "Timeline",
+    "visualPlan": "Visual plan",
+    "legend": {
+      "phase": "Phase",
+      "activity": "Activity"
+    },
+    "empty": "No dates or phases to display.",
+    "today": "Today"
+  }
+}

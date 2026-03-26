@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 export default function RegisterSuccessPage() {
+  const t = useTranslations("auth.registerSuccess");
+
   return (
     <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md text-center">
@@ -12,18 +15,13 @@ export default function RegisterSuccessPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="text-lg font-semibold text-slate-900 mb-2">
-            Cuenta creada
-          </h1>
-          <p className="text-sm text-slate-600 mb-6">
-            Tu cuenta ha sido creada y está pendiente de activación por un administrador.
-            Recibirás acceso cuando tu cuenta sea activada.
-          </p>
+          <h1 className="text-lg font-semibold text-slate-900 mb-2">{t("title")}</h1>
+          <p className="text-sm text-slate-600 mb-6">{t("body")}</p>
           <Link
             href="/"
-            className="inline-block rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition"
+            className="inline-block rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-semibold text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/40 focus-visible:ring-offset-2"
           >
-            Volver a iniciar sesión
+            {t("backToLogin")}
           </Link>
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabaseClient";
 import type { BoardTask } from "@/app/components/TasksBoard";
 import { AppPageShell } from "@/components/ui/layout/AppPageShell";
@@ -13,19 +14,8 @@ import { useAssignableUsers } from "@/components/hooks/useAssignableUsers";
 
 type TaskStatusRow = { id: string; code: string; name: string };
 
-const SCOPE_OPTIONS = [
-  { value: "global", label: "Tareas globales" },
-  { value: "my", label: "Asignado a mí" },
-];
-
-const PRIORITY_OPTIONS = [
-  { value: "", label: "Todas las prioridades" },
-  { value: "high", label: "Alta" },
-  { value: "medium", label: "Media" },
-  { value: "low", label: "Baja" },
-];
-
 export default function GlobalTasksPage() {
+  const t = useTranslations("tasks");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<TaskStatusRow[]>([]);
   const [scope, setScope] = useState<"global" | "my">("global");
@@ -42,10 +32,28 @@ export default function GlobalTasksPage() {
   const { users: assignableUsers } = useAssignableUsers({ contextType: "global" });
   const assigneeFilterOptions = useMemo(
     () => [
-      { value: "", label: "Todos los responsables" },
+      { value: "", label: t("filters.allAssignees") },
       ...assignableUsers.map((u) => ({ value: u.id, label: u.label })),
     ],
-    [assignableUsers]
+    [assignableUsers, t]
+  );
+
+  const scopeOptions = useMemo(
+    () => [
+      { value: "global", label: t("filters.tasksGlobal") },
+      { value: "my", label: t("filters.assignedToMeFilter") },
+    ],
+    [t]
+  );
+
+  const priorityOptions = useMemo(
+    () => [
+      { value: "", label: t("filters.allPriorities") },
+      { value: "high", label: t("priority.high") },
+      { value: "medium", label: t("priority.medium") },
+      { value: "low", label: t("priority.low") },
+    ],
+    [t]
   );
 
   useEffect(() => {
@@ -69,10 +77,10 @@ export default function GlobalTasksPage() {
     loadStatuses();
   }, [loadStatuses]);
 
-  const statusOptions = [
-    { value: "", label: "Todos los estados" },
-    ...statuses.map((s) => ({ value: s.id, label: s.name })),
-  ];
+  const statusOptions = useMemo(
+    () => [{ value: "", label: t("filters.allStatuses") }, ...statuses.map((s) => ({ value: s.id, label: s.name }))],
+    [statuses, t]
+  );
 
   const handleSaveDetailGlobal = useCallback(async (taskId: string, payload: TaskDetailPayload) => {
     setDetailSaving(true);
@@ -100,26 +108,26 @@ export default function GlobalTasksPage() {
   }, []);
 
   return (
-    <div className="bg-slate-950 min-h-full">
+    <div className="rb-workspace-bg min-h-full">
       <AppPageShell>
       <div className="space-y-6">
       <TaskWorkspaceHeader
-        title="Tareas"
-        subtitle="Gestiona tareas globales y tareas asignadas a ti."
+        title={t("globalPage.title")}
+        subtitle={t("globalPage.subtitle")}
         actions={<ViewModeToggle value={viewMode} onChange={setViewMode} />}
       />
 
       <TaskFilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder="Buscar tareas..."
-        scopeOptions={SCOPE_OPTIONS}
+        searchPlaceholder={t("filters.searchGlobal")}
+        scopeOptions={scopeOptions}
         scopeValue={scope}
         onScopeChange={(v) => setScope(v as "global" | "my")}
         statusOptions={statusOptions}
         statusValue={statusFilter}
         onStatusChange={setStatusFilter}
-        priorityOptions={PRIORITY_OPTIONS}
+        priorityOptions={priorityOptions}
         priorityValue={priorityFilter}
         onPriorityChange={setPriorityFilter}
         assigneeOptions={assigneeFilterOptions}
@@ -130,8 +138,8 @@ export default function GlobalTasksPage() {
       <section>
         <TasksBoard
           projectId={null}
-          title="Board"
-          subtitle="Tareas globales (sin proyecto). Crea y mueve tarjetas por estado."
+          title={t("globalPage.boardTitle")}
+          subtitle={t("globalPage.boardSubtitle")}
           filterByUserId={scope === "my" ? currentUserId : null}
           assigneeFilterId={assigneeFilter ? assigneeFilter : null}
           searchQuery={searchQuery}
@@ -158,11 +166,6 @@ export default function GlobalTasksPage() {
         onSave={handleSaveDetailGlobal}
         context="global"
         statusOptions={statuses.map((s) => ({ value: s.id, label: s.name }))}
-        priorityOptions={[
-          { value: "high", label: "Alta" },
-          { value: "medium", label: "Media" },
-          { value: "low", label: "Baja" },
-        ]}
         saving={detailSaving}
       />
       </div>

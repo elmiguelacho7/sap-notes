@@ -3,9 +3,13 @@
 import { Suspense, useState, type FormEvent, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { AuthBrandHero } from "@/components/auth/AuthBrandHero";
 import { supabase } from "../lib/supabaseClient";
 
 function LoginPageContent() {
+  const t = useTranslations("auth.login");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextUrl = searchParams.get("next");
@@ -84,90 +88,69 @@ function LoginPageContent() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 flex">
-      {/* Panel izquierdo tipo “branding” */}
-      <section className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-500 text-white p-10 flex-col justify-between">
-        <header className="flex items-center gap-2">
-          <div className="h-9 w-9 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center text-sm font-bold">
-            PH
-          </div>
-          <span className="text-sm font-medium tracking-wide">
-            Project Hub
-          </span>
-        </header>
-
-        <div className="space-y-4">
-          <h1 className="text-3xl font-semibold leading-snug">
-            Centraliza la documentación
-            <br />
-            técnica de tus proyectos.
-          </h1>
-          <p className="text-sm text-blue-100 max-w-md">
-            Un entorno privado para registrar decisiones, notas funcionales
-            y detalles clave de tus implementaciones, siempre a tu alcance.
-          </p>
-        </div>
-
-        <p className="text-[11px] text-blue-100/80">
-          Acceso restringido · Información interna
-        </p>
-      </section>
+    <main className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-[rgb(var(--rb-brand-surface))]/60 text-slate-900 lg:grid lg:grid-cols-[1.08fr_1fr]">
+      <AuthBrandHero />
 
       {/* Panel derecho: formulario */}
-      <section className="flex-1 flex items-center justify-center p-6">
+      <section className="flex items-center justify-center p-6 sm:p-8 lg:p-10 xl:p-14">
         <div className="w-full max-w-md">
           <div className="mb-8 lg:hidden">
-            <h1 className="text-2xl font-semibold text-slate-900">
-              Project Hub
-            </h1>
-            <p className="text-sm text-slate-500">
-              Acceso seguro a la gestión de proyectos.
-            </p>
+            <div className="mb-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center" aria-hidden>
+                  <img
+                    src="/branding/ribbit_eyes_light.svg"
+                    alt=""
+                    className="h-full w-full object-contain"
+                  />
+                </span>
+                <span className="text-lg leading-none tracking-tight">
+                  <span className="text-slate-900 font-bold">ri</span>
+                  <span className="text-black font-extrabold">bb</span>
+                  <span className="text-slate-900 font-bold">it</span>
+                </span>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600">{t("mobileTagline")}</p>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-7">
-            <h2 className="text-lg font-semibold text-slate-900 mb-1">
-              Iniciar sesión
-            </h2>
-            <p className="text-xs text-slate-500 mb-6">
-              Introduce tus credenciales para acceder al espacio interno.
-            </p>
+          <div className="rounded-2xl border border-slate-200/70 bg-white p-7 sm:p-9 shadow-[0_24px_65px_-36px_rgba(15,23,42,0.35)]">
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-900 mb-1.5">{t("title")}</h2>
+            <p className="text-sm text-slate-500 mb-7 leading-relaxed">{t("subtitle")}</p>
 
             {resetSuccess && (
               <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                Contraseña restablecida correctamente. Inicia sesión con tu nueva contraseña.
+                {t("resetSuccess")}
               </div>
             )}
 
             {isInviteContext && (
               <p className="mb-4 text-sm text-slate-600 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                Si no tienes cuenta todavía, crea una para definir tu contraseña y acceder al proyecto invitado.
+                {t("inviteHint")}
               </p>
             )}
 
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-700">
-                  Correo electrónico
-                </label>
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold tracking-[0.02em] text-slate-700">{t("emailLabel")}</label>
                 <input
                   type="email"
-                  placeholder="correo@ejemplo.com"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder={t("emailPlaceholder")}
+                  className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:outline-none focus:bg-white focus:border-[rgb(var(--rb-brand-primary))] focus:ring-4 focus:ring-[rgb(var(--rb-brand-ring))]/12"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-700">
-                  Contraseña
+              <div className="space-y-2">
+                <label className="text-xs font-semibold tracking-[0.02em] text-slate-700">
+                  {t("passwordLabel")}
                 </label>
                 <input
                   type="password"
                   placeholder="••••••••"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:outline-none focus:bg-white focus:border-[rgb(var(--rb-brand-primary))] focus:ring-4 focus:ring-[rgb(var(--rb-brand-ring))]/12"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
@@ -175,9 +158,9 @@ function LoginPageContent() {
                 <p className="text-right">
                   <Link
                     href="/forgot-password"
-                    className="text-xs text-blue-600 hover:text-blue-700"
+                    className="text-xs font-medium text-slate-500 hover:text-[rgb(var(--rb-brand-primary))] transition-colors"
                   >
-                    ¿Olvidaste tu contraseña?
+                    {t("forgotPassword")}
                   </Link>
                 </p>
               </div>
@@ -189,32 +172,39 @@ function LoginPageContent() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full mt-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg py-2.5 text-sm font-medium transition"
+                className="rb-btn-primary w-full mt-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:translate-y-[1px] focus:outline-none focus:ring-4 focus:ring-[rgb(var(--rb-brand-ring))]/25 disabled:opacity-60"
               >
-                {loading ? "Validando..." : "Acceder"}
+                {loading ? t("submitLoading") : t("submit")}
               </button>
 
-              <p className="text-center text-xs text-slate-500 pt-1">
-                ¿No tienes cuenta?{" "}
-                <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
-                  Crear cuenta
+              <p className="text-center text-xs text-slate-500 pt-2">
+                {t("noAccount")}{" "}
+                <Link href="/register" className="font-semibold text-[rgb(var(--rb-brand-primary))] hover:text-[rgb(var(--rb-brand-primary-hover))]">
+                  {t("createAccount")}
                 </Link>
               </p>
             </form>
           </div>
 
-          <p className="mt-6 text-[11px] text-slate-400 text-center">
-            Uso interno · No compartas tus credenciales.
-          </p>
+          <p className="mt-6 text-[11px] text-slate-400/90 text-center">{tCommon("footerInternalUse")}</p>
         </div>
       </section>
     </main>
   );
 }
 
+function LoginSuspenseFallback() {
+  const t = useTranslations("common");
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-[rgb(var(--rb-brand-surface))]/60 flex items-center justify-center">
+      <p className="text-sm text-slate-500">{t("loading")}</p>
+    </main>
+  );
+}
+
 export default function LoginPage() {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-slate-50 flex items-center justify-center"><p className="text-sm text-slate-500">Cargando…</p></main>}>
+    <Suspense fallback={<LoginSuspenseFallback />}>
       <LoginPageContent />
     </Suspense>
   );

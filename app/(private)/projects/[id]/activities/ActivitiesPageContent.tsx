@@ -1,13 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import { getProjectPhases, type ProjectPhase } from "@/lib/services/projectPhaseService";
-import { Plus, Pencil, Save, Trash2, ListTodo, User, Search } from "lucide-react";
+import { Plus, Pencil, Save, Trash2, ListTodo, Search, MoreHorizontal } from "lucide-react";
 import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
 import { AssigneeCell } from "@/components/AssigneeCell";
+import { ModuleKpiCard, ModuleKpiRow } from "@/components/layout/module";
+import {
+  PROJECT_WORKSPACE_PAGE,
+  PROJECT_WORKSPACE_HERO,
+  PROJECT_WORKSPACE_TOOLBAR,
+  PROJECT_WORKSPACE_SEARCH_INPUT,
+  PROJECT_WORKSPACE_FILTER_PILL,
+  PROJECT_WORKSPACE_FILTER_PILL_ACTIVE,
+  PROJECT_WORKSPACE_EMPTY,
+  PROJECT_WORKSPACE_PANEL_HEADER,
+  PROJECT_WORKSPACE_TABLE_HEAD_ROW,
+  PROJECT_WORKSPACE_TABLE_BODY,
+  PROJECT_WORKSPACE_TABLE_ROW,
+  PROJECT_WORKSPACE_CARD_FRAME,
+} from "@/lib/projectWorkspaceUi";
 
 type StatusFilterKind = "all" | "planned" | "in_progress" | "blocked" | "done" | "overdue" | "assigned_to_me";
 
@@ -37,19 +54,6 @@ type ProjectActivity = {
   updated_at: string | null;
 };
 
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: "planned", label: "Pendiente" },
-  { value: "in_progress", label: "En progreso" },
-  { value: "blocked", label: "Bloqueada" },
-  { value: "done", label: "Finalizada" },
-];
-
-const PRIORITY_OPTIONS: { value: string; label: string }[] = [
-  { value: "low", label: "Baja" },
-  { value: "medium", label: "Media" },
-  { value: "high", label: "Alta" },
-];
-
 type Profile = {
   id: string;
   full_name: string | null;
@@ -57,36 +61,67 @@ type Profile = {
 };
 
 function ActivityStatusBadge({ status, isOverdue }: { status: string | null; isOverdue?: boolean }) {
+  const t = useTranslations("activities");
   const s = (status ?? "planned").toLowerCase();
   if (isOverdue && s !== "done") {
     return (
-      <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium bg-amber-500/20 text-amber-300">
-        Overdue
+      <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900 ring-1 ring-inset ring-amber-200/80">
+        {t("status.overdue")}
       </span>
     );
   }
   const styles: Record<string, string> = {
-    planned: "bg-slate-700 text-slate-300",
-    in_progress: "bg-indigo-500/20 text-indigo-300",
-    blocked: "bg-rose-500/20 text-rose-300",
-    done: "bg-emerald-500/20 text-emerald-300",
+    planned: "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200/90",
+    in_progress:
+      "bg-[rgb(var(--rb-brand-surface))] text-[rgb(var(--rb-brand-primary-active))] ring-1 ring-inset ring-[rgb(var(--rb-brand-primary))]/18",
+    blocked: "bg-rose-50 text-rose-800 ring-1 ring-inset ring-rose-200/80",
+    done: "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200/80",
   };
   const labels: Record<string, string> = {
-    planned: "Planned",
-    in_progress: "In Progress",
-    blocked: "Blocked",
-    done: "Completed",
+    planned: t("status.planned"),
+    in_progress: t("status.in_progress"),
+    blocked: t("status.blocked"),
+    done: t("status.done"),
   };
-  const style = styles[s] ?? "bg-slate-700/60 text-slate-400";
-  const label = labels[s] ?? (status ?? "—");
+  const style = styles[s] ?? "border-slate-200/90 bg-slate-100 text-slate-600";
+  const label = labels[s] ?? (status ?? t("emDash"));
   return (
-    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${style}`}>
+    <span
+      className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${style}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function ActivityPriorityBadge({ priority }: { priority: string | null }) {
+  const t = useTranslations("activities");
+  const p = (priority ?? "medium").toLowerCase();
+  const tone =
+    p === "high"
+      ? "bg-rose-50 text-rose-800 ring-1 ring-inset ring-rose-200/80"
+      : p === "low"
+        ? "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200/90"
+        : "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200/80";
+  const labels: Record<string, string> = {
+    low: t("priority.low"),
+    medium: t("priority.medium"),
+    high: t("priority.high"),
+  };
+  const label = labels[p] ?? t("priority.medium");
+  return (
+    <span
+      className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${tone}`}
+    >
       {label}
     </span>
   );
 }
 
 export default function ProjectActivitiesPageContent() {
+  const t = useTranslations("activities");
+  const locale = useLocale();
+  const localeTag = locale === "es" ? "es-ES" : "en-US";
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -110,7 +145,7 @@ export default function ProjectActivitiesPageContent() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [profilesLoading, setProfilesLoading] = useState(false);
+  const [, setProfilesLoading] = useState(false);
 
   /** activity_id -> risk_level (LOW | MEDIUM | HIGH) from activity_risk_metrics view */
   const [riskByActivity, setRiskByActivity] = useState<Record<string, string>>({});
@@ -245,12 +280,12 @@ export default function ProjectActivitiesPageContent() {
       if (session?.user?.id) setCurrentUserProfileId(session.user.id);
       else setCurrentUserProfileId(null);
     } catch {
-      setErrorMsg("No se pudieron cargar los datos.");
+      setErrorMsg(t("errors.loadData"));
     } finally {
       setLoading(false);
       setProfilesLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, t]);
 
   useEffect(() => {
     loadData();
@@ -287,12 +322,20 @@ export default function ProjectActivitiesPageContent() {
       list = list.filter((a) => {
         const name = (a.name ?? "").toLowerCase();
         const desc = (a.description ?? "").toLowerCase();
-        const ownerName = a.owner_profile_id ? (getProfileName(a.owner_profile_id) ?? "").toLowerCase() : "";
+        const prof = a.owner_profile_id ? profilesMap.get(a.owner_profile_id) : null;
+        const ownerName = (prof?.full_name || prof?.email || "").toLowerCase();
         return name.includes(q) || desc.includes(q) || ownerName.includes(q);
       });
     }
     return list;
-  }, [activities, selectedPhaseId, statusFilter, searchQuery, currentUserProfileId, profiles]);
+  }, [
+    activities,
+    selectedPhaseId,
+    statusFilter,
+    searchQuery,
+    currentUserProfileId,
+    profilesMap,
+  ]);
 
   const summary = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -310,13 +353,17 @@ export default function ProjectActivitiesPageContent() {
     return { open, inProgress, blocked, overdue };
   }, [activities]);
 
-  const getPhaseName = (phaseId: string) => phases.find((p) => p.id === phaseId)?.name ?? "—";
+  const getPhaseName = (phaseId: string) => phases.find((p) => p.id === phaseId)?.name ?? t("emDash");
 
-  const getProfileName = (id: string | null) => {
-    if (!id) return "Sin asignar";
-    const p = profiles.find((prof) => prof.id === id);
-    return p?.full_name || p?.email || "Sin asignar";
-  };
+  const formatListDate = useCallback(
+    (iso: string) =>
+      new Date(iso).toLocaleDateString(localeTag, {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+    [localeTag]
+  );
 
   const updateActivity = async (activityId: string, payload: Partial<ProjectActivity>) => {
     setSavingId(activityId);
@@ -355,160 +402,198 @@ export default function ProjectActivitiesPageContent() {
 
   if (!projectId) {
     return (
-      <div className="w-full min-w-0 bg-slate-950">
-        <p className="text-sm text-slate-400">No se ha encontrado el identificador del proyecto.</p>
+      <div className={PROJECT_WORKSPACE_PAGE}>
+        <p className="text-sm text-slate-500">{t("errors.missingProjectId")}</p>
       </div>
     );
   }
 
-  return (
-    <div className="w-full min-w-0 space-y-6 bg-slate-950">
-        {showCreandoBanner && (
-          <div className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-400 transition-opacity duration-300">
-            Creando...
-          </div>
-        )}
-        {errorMsg && (
-          <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-5 py-3 text-sm text-red-200">
-            {errorMsg}
-          </div>
-        )}
+  const selectedPhaseSummary =
+    selectedPhaseId !== "all" ? phases.find((p) => p.id === selectedPhaseId)?.name ?? null : null;
 
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold text-slate-100 sm:text-2xl">Actividades</h1>
-            <p className="mt-0.5 text-sm text-slate-500">Plan de trabajo estructurado por fases SAP Activate.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 shrink-0 pt-2 sm:pt-0">
+  return (
+    <div className={PROJECT_WORKSPACE_PAGE}>
+      {showCreandoBanner && (
+        <div className="rounded-xl border border-slate-200/90 bg-slate-50/90 px-3 py-2 text-xs font-medium text-slate-600 transition-opacity duration-300">
+          {t("banner.creating")}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-800">
+          {errorMsg}
+        </div>
+      )}
+
+      <div className={`${PROJECT_WORKSPACE_HERO} space-y-4`}>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{t("page.eyebrow")}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-[1.65rem]">{t("page.title")}</h1>
+          <p className="mt-1 text-sm text-slate-600 leading-relaxed">
+            {t("page.subtitle")}
+          </p>
+          {project?.name ? (
+            <p className="mt-2 text-xs font-medium text-slate-500">{t("page.projectMeta", { name: project.name })}</p>
+          ) : null}
+        </div>
+        <div className="flex flex-col gap-4 border-t border-slate-200/80 pt-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+          <div className="flex min-w-0 flex-col gap-2 sm:max-w-md">
+            <label htmlFor="activities-phase-filter" className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              {t("phaseFilter.label")}
+            </label>
             <select
+              id="activities-phase-filter"
               value={selectedPhaseId}
               onChange={(e) => setSelectedPhaseId(e.target.value as string | "all")}
-              className="rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+              className="w-full rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/25 focus:border-[rgb(var(--rb-brand-primary))]/30"
             >
-              <option value="all">Todas las fases</option>
+              <option value="all">{t("phaseFilter.all")}</option>
               {phases.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              onClick={() => setIsCreating(true)}
-              disabled={phases.length === 0}
-              className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Plus className="h-4 w-4 shrink-0" />
-              Nueva actividad
-            </button>
+            {selectedPhaseSummary ? (
+              <p className="text-xs text-slate-600">
+                {t("phaseFilter.showing")}{" "}
+                <span className="font-medium text-slate-800">{selectedPhaseSummary}</span>
+              </p>
+            ) : (
+              <p className="text-xs text-slate-600">{t("phaseFilter.contextAll")}</p>
+            )}
           </div>
-        </header>
+          <button
+            type="button"
+            onClick={() => setIsCreating(true)}
+            disabled={phases.length === 0}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4 shrink-0" aria-hidden />
+            {t("page.createCta")}
+          </button>
+        </div>
+      </div>
 
-        {!loading && activities.length > 0 && (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase tracking-wider text-slate-400">Open</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.open}</p>
-            </div>
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase tracking-wider text-slate-400">In Progress</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.inProgress}</p>
-            </div>
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase tracking-wider text-slate-400">Blocked</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.blocked}</p>
-            </div>
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase tracking-wider text-slate-400">Overdue</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.overdue}</p>
-            </div>
-          </div>
-        )}
+      {!loading && activities.length > 0 && (
+        <ModuleKpiRow>
+          <ModuleKpiCard tone="light" label={t("kpi.open")} value={summary.open} />
+          <ModuleKpiCard tone="light" label={t("kpi.inProgress")} value={summary.inProgress} />
+          <ModuleKpiCard
+            tone="light"
+            label={t("kpi.blocked")}
+            value={summary.blocked}
+            className={summary.blocked > 0 ? "border-amber-200/90 bg-amber-50/50 ring-1 ring-amber-100" : ""}
+            valueClassName={summary.blocked > 0 ? "!text-amber-900" : ""}
+          />
+          <ModuleKpiCard
+            tone="light"
+            label={t("kpi.overdue")}
+            value={summary.overdue}
+            className={summary.overdue > 0 ? "border-rose-200/90 bg-rose-50/50 ring-rose-100" : ""}
+            valueClassName={summary.overdue > 0 ? "!text-rose-900" : ""}
+          />
+        </ModuleKpiRow>
+      )}
 
-        {!loading && activities.length > 0 && (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
+      {!loading && activities.length > 0 && (
+        <div className={PROJECT_WORKSPACE_TOOLBAR}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               {(
                 [
-                  { key: "all" as StatusFilterKind, label: "All" },
-                  { key: "planned" as StatusFilterKind, label: "Planned" },
-                  { key: "in_progress" as StatusFilterKind, label: "In Progress" },
-                  { key: "blocked" as StatusFilterKind, label: "Blocked" },
-                  { key: "done" as StatusFilterKind, label: "Completed" },
-                  { key: "overdue" as StatusFilterKind, label: "Overdue" },
-                  { key: "assigned_to_me" as StatusFilterKind, label: "Asignado a mí" },
+                  { key: "all" as StatusFilterKind, label: t("filters.all") },
+                  { key: "planned" as StatusFilterKind, label: t("filters.planned") },
+                  { key: "in_progress" as StatusFilterKind, label: t("filters.inProgress") },
+                  { key: "blocked" as StatusFilterKind, label: t("filters.blocked") },
+                  { key: "done" as StatusFilterKind, label: t("filters.done") },
+                  { key: "overdue" as StatusFilterKind, label: t("filters.overdue") },
+                  { key: "assigned_to_me" as StatusFilterKind, label: t("filters.assignedToMe") },
                 ] as const
               ).map(({ key, label }) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setStatusFilter(key)}
-                  className={`rounded-full border px-3 py-1.5 text-xs transition-colors duration-150 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0 ${
-                    statusFilter === key
-                      ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-300"
-                      : "border-slate-700 bg-slate-800/40 text-slate-300 hover:bg-slate-800"
-                  }`}
+                  className={
+                    statusFilter === key ? PROJECT_WORKSPACE_FILTER_PILL_ACTIVE : PROJECT_WORKSPACE_FILTER_PILL
+                  }
                 >
                   {label}
                 </button>
               ))}
             </div>
-            <div className="w-full sm:w-auto sm:min-w-[200px]">
+            <div className="w-full min-w-0 sm:w-64 sm:shrink-0">
               <label className="relative block">
-                <span className="sr-only">Search activities</span>
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
+                <span className="sr-only">{t("filters.searchAria")}</span>
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="search"
-                  placeholder="Search activities..."
+                  placeholder={t("filters.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:border-indigo-500/50 min-w-0"
+                  className={PROJECT_WORKSPACE_SEARCH_INPUT}
                 />
               </label>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        <section className="w-full min-w-0 rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
-          <div className="border-b border-slate-700/60 px-6 py-4 bg-slate-800/50">
-            <h2 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Listado de actividades</h2>
-            <p className="mt-0.5 text-sm text-slate-400">Actividades por fase. Edita y enlaza con tareas.</p>
-          </div>
-          <div className="p-5 min-w-0">
-            {loading ? (
-              <TableSkeleton rows={6} colCount={7} />
-            ) : activities.length === 0 ? (
-              <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-16 px-6 flex flex-col items-center justify-center min-h-[200px] text-center">
-                <p className="text-base font-medium text-slate-200">No hay actividades en este proyecto</p>
-                <p className="mt-1.5 text-sm text-slate-500 max-w-sm">Puedes crear actividades para organizar el trabajo y vincular tareas del proyecto.</p>
-                <button
-                  type="button"
-                  onClick={() => phases.length > 0 && setIsCreating(true)}
-                  disabled={phases.length === 0}
-                  className="mt-5 inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
-                >
-                  <Plus className="h-4 w-4 shrink-0" />
-                  Crear primera actividad
-                </button>
-              </div>
-            ) : filteredActivities.length === 0 ? (
-              <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-12 px-6 flex flex-col items-center justify-center min-h-[160px] text-center">
-                {selectedPhaseId !== "all" ? (
-                  <>
-                    <p className="text-sm font-medium text-slate-300">No hay actividades en esta fase.</p>
-                    <p className="mt-1 text-xs text-slate-500">Cambia de fase o crea una nueva actividad.</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm font-medium text-slate-300">No hay actividades que coincidan con los filtros</p>
-                    <p className="mt-1 text-xs text-slate-500">Prueba otro filtro o búsqueda.</p>
-                  </>
-                )}
-              </div>
-            ) : (
+      <section className={`w-full min-w-0 overflow-hidden ${PROJECT_WORKSPACE_CARD_FRAME}`}>
+        <div className={PROJECT_WORKSPACE_PANEL_HEADER}>
+          <h2 className="text-sm font-semibold text-slate-900">{t("section.title")}</h2>
+          <p className="mt-1 text-xs leading-relaxed text-slate-600">
+            {t("section.description")}
+          </p>
+        </div>
+        <div className="min-w-0 p-4 sm:p-5">
+          {loading ? (
+            <TableSkeleton rows={6} colCount={9} />
+          ) : activities.length === 0 ? (
+            <div className={`${PROJECT_WORKSPACE_EMPTY} min-h-[200px]`}>
+              <p className="text-base font-semibold tracking-tight text-slate-900">
+                {t("empty.none.title")}
+              </p>
+              <p className="mt-2 max-w-md text-sm text-slate-600 leading-relaxed">
+                {t("empty.none.description")}
+              </p>
+              <button
+                type="button"
+                onClick={() => phases.length > 0 && setIsCreating(true)}
+                disabled={phases.length === 0}
+                className="mt-6 inline-flex items-center gap-2 rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35"
+              >
+                <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                {t("empty.none.createFirst")}
+              </button>
+              {phases.length === 0 ? (
+                <p className="mt-3 text-xs text-slate-500">
+                  {t("empty.none.noPhasesHint")}
+                </p>
+              ) : null}
+            </div>
+          ) : filteredActivities.length === 0 ? (
+            <div className={`${PROJECT_WORKSPACE_EMPTY} min-h-[160px] py-10`}>
+              {selectedPhaseId !== "all" ? (
+                <>
+                  <p className="text-sm font-semibold tracking-tight text-slate-800">{t("empty.byPhase.title")}</p>
+                  <p className="mt-2 max-w-md text-sm text-slate-600 leading-relaxed">
+                    {t("empty.byPhase.description")}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold tracking-tight text-slate-800">{t("empty.filtered.title")}</p>
+                  <p className="mt-2 max-w-md text-sm text-slate-600 leading-relaxed">
+                    {t("empty.filtered.description")}
+                  </p>
+                </>
+              )}
+            </div>
+          ) : (
               <>
                 {/* Mobile: stacked cards */}
-                <div className="md:hidden divide-y divide-slate-700/40">
+                <div className="md:hidden divide-y divide-slate-100">
                   {filteredActivities.map((activity) => {
                     const today = new Date().toISOString().slice(0, 10);
                     const isOverdue = !!(activity.due_date && activity.due_date < today && (activity.status ?? "planned") !== "done");
@@ -517,58 +602,80 @@ export default function ProjectActivitiesPageContent() {
                     return (
                       <div
                         key={activity.id}
-                        className="px-4 py-4 hover:bg-slate-800/50 transition-colors"
+                        className="rounded-lg px-3 py-4 transition-colors hover:bg-slate-50/90"
                       >
-                        <p className="text-xs text-slate-500 uppercase tracking-wider">{getPhaseName(activity.phase_id)}</p>
-                        <p className="font-medium text-slate-100 mt-0.5 line-clamp-2">{activity.name}</p>
-                        {activity.description && (
-                          <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{activity.description}</p>
-                        )}
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <AssigneeCell profileId={activity.owner_profile_id} profilesMap={profilesMap} />
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <span className="inline-flex max-w-full rounded-md border border-slate-200/90 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                              {getPhaseName(activity.phase_id)}
+                            </span>
+                            <p className="mt-2 font-semibold leading-snug text-slate-900 line-clamp-2">
+                              {activity.name}
+                            </p>
+                            {activity.description ? (
+                              <p className="mt-1 text-xs text-slate-600 line-clamp-2">{activity.description}</p>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
                           <ActivityStatusBadge status={activity.status} isOverdue={isOverdue} />
-                          <span className="text-slate-400 text-xs tabular-nums">{displayProgress}%</span>
-                          {riskLevel != null && riskLevel !== "" && (
+                          <ActivityPriorityBadge priority={activity.priority} />
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                          <div className="text-slate-400">
+                            <AssigneeCell profileId={activity.owner_profile_id} profilesMap={profilesMap} />
+                          </div>
+                          <span className="tabular-nums text-slate-400">{t("mobile.progress", { value: displayProgress })}</span>
+                          {riskLevel != null && riskLevel !== "" ? (
                             <span
                               className={
                                 riskLevel === "HIGH"
-                                  ? "inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium bg-red-500/20 text-red-400"
+                                  ? "inline-flex rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-900 ring-1 ring-inset ring-rose-200/80"
                                   : riskLevel === "MEDIUM"
-                                  ? "inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium bg-amber-500/20 text-amber-400"
-                                  : "inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium bg-emerald-500/20 text-emerald-400"
+                                    ? "inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900 ring-1 ring-inset ring-amber-200/80"
+                                    : "inline-flex rounded-md bg-[rgb(var(--rb-brand-surface))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--rb-brand-primary-active))] ring-1 ring-inset ring-[rgb(var(--rb-brand-primary))]/18"
                               }
                             >
-                              {riskLevel === "HIGH" ? "Alto" : riskLevel === "MEDIUM" ? "Medio" : "Bajo"}
+                              {riskLevel === "HIGH" ? t("risk.high") : riskLevel === "MEDIUM" ? t("risk.medium") : t("risk.low")}
                             </span>
-                          )}
+                          ) : null}
                         </div>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {activity.start_date ? `Inicio ${activity.start_date}` : ""}
-                          {activity.start_date && activity.due_date ? " · " : ""}
-                          {activity.due_date ? `Fin ${activity.due_date}` : ""}
+                        <p className="mt-2 text-[11px] text-slate-500">
+                          {activity.start_date || activity.due_date ? (
+                            <>
+                              {activity.start_date ? `${t("dates.start")} ${formatListDate(activity.start_date)}` : null}
+                              {activity.start_date && activity.due_date ? " · " : null}
+                              {activity.due_date ? `${t("dates.end")} ${formatListDate(activity.due_date)}` : null}
+                            </>
+                          ) : (
+                            t("dates.none")
+                          )}
                         </p>
-                        <div className="mt-3 flex items-center gap-2">
+                        <div className="mt-3 flex items-center gap-1.5 border-t border-slate-100 pt-3">
                           <button
                             type="button"
                             onClick={() => setEditingActivity(activity)}
-                            className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-600 bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
-                            aria-label="Editar"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200/90 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/25 focus-visible:ring-offset-0"
+                            aria-label={t("actions.editActivity")}
+                            title={t("actions.editActivity")}
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button
                             type="button"
                             onClick={() => handleViewTasks(activity.id)}
-                            className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-600 bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
-                            aria-label="Ver tareas"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200/90 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/25 focus-visible:ring-offset-0"
+                            aria-label={t("actions.viewProjectTasks")}
+                            title={t("actions.viewTasks")}
                           >
                             <ListTodo className="h-4 w-4" />
                           </button>
                           <button
                             type="button"
                             onClick={() => setDeleteConfirmId(activity.id)}
-                            className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-600 bg-slate-800/60 text-red-400 hover:bg-red-500/20 hover:text-red-300"
-                            aria-label="Eliminar"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200/90 bg-white text-red-600 shadow-sm hover:border-red-200 hover:bg-red-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200 focus-visible:ring-offset-0"
+                            aria-label={t("actions.deleteActivity")}
+                            title={t("actions.deleteActivity")}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -578,28 +685,48 @@ export default function ProjectActivitiesPageContent() {
                   })}
                 </div>
                 {/* Desktop: table */}
-                <div className="hidden md:block w-full min-w-0 overflow-x-auto rounded-lg [scrollbar-width:thin] [scrollbar-color:#334155_#1e293b] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-800/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/70 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500">
-                  <table className="w-full text-left text-sm min-w-[640px] md:table">
-                    <thead className="sticky top-0 z-10 bg-slate-800/95 backdrop-blur border-b border-slate-700/60">
+                <div className="hidden md:block w-full min-w-0 overflow-x-auto rounded-xl [scrollbar-width:thin] [scrollbar-color:#cbd5e1_#f1f5f9] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/90 [&::-webkit-scrollbar-thumb:hover]:bg-slate-400">
+                  <table className="w-full min-w-[900px] text-left text-sm md:table">
+                    <thead className={`sticky top-0 z-10 ${PROJECT_WORKSPACE_TABLE_HEAD_ROW} backdrop-blur-sm bg-slate-50/95`}>
                       <tr>
-                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[100px] min-w-[100px] align-middle whitespace-nowrap">Fase</th>
-                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[180px] min-w-[180px] align-middle">Actividad</th>
-                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[140px] min-w-[140px] align-middle">Responsable</th>
-                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[110px] min-w-[110px] align-middle">Estado</th>
-                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[100px] min-w-[100px] align-middle whitespace-nowrap">Inicio</th>
-                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[100px] min-w-[100px] align-middle whitespace-nowrap">Fin</th>
-                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[44px] min-w-[44px] align-middle">%</th>
-                        <th className="px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[72px] min-w-[72px] align-middle">Riesgo</th>
-                        <th className="px-3 py-3.5 pl-3 pr-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-[180px] min-w-[180px] max-w-[180px] align-middle text-right whitespace-nowrap">Acciones</th>
+                        <th className="w-[112px] min-w-[112px] whitespace-nowrap px-3 py-3.5 align-middle text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          {t("table.phase")}
+                        </th>
+                        <th className="min-w-[168px] px-3 py-3.5 align-middle text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          {t("table.activity")}
+                        </th>
+                        <th className="w-[132px] min-w-[132px] px-3 py-3.5 align-middle text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          {t("table.owner")}
+                        </th>
+                        <th className="w-[118px] min-w-[118px] px-3 py-3.5 align-middle text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          {t("table.status")}
+                        </th>
+                        <th className="w-[76px] min-w-[76px] px-3 py-3.5 align-middle text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          {t("table.priority")}
+                        </th>
+                        <th className="w-[104px] min-w-[104px] whitespace-nowrap px-3 py-3.5 align-middle text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          {t("table.start")}
+                        </th>
+                        <th className="w-[104px] min-w-[104px] whitespace-nowrap px-3 py-3.5 align-middle text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          {t("table.end")}
+                        </th>
+                        <th className="w-[48px] min-w-[48px] px-3 py-3.5 align-middle text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          %
+                        </th>
+                        <th className="w-[76px] min-w-[76px] px-3 py-3.5 align-middle text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          {t("table.risk")}
+                        </th>
+                        <th className="w-[120px] min-w-[120px] whitespace-nowrap px-3 py-3.5 pr-4 text-right align-middle text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          {t("table.actions")}
+                        </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-700/40">
+                    <tbody className={PROJECT_WORKSPACE_TABLE_BODY}>
                       {filteredActivities.map((activity) => (
                         <ActivityRow
-                          key={activity.id}
+                          key={`${activity.id}-${activity.start_date ?? ""}-${activity.due_date ?? ""}`}
                           activity={activity}
                           phaseName={getPhaseName(activity.phase_id)}
-                          profiles={profiles}
                           profilesMap={profilesMap}
                           riskLevel={riskByActivity[activity.id]}
                           onUpdate={updateActivity}
@@ -607,6 +734,7 @@ export default function ProjectActivitiesPageContent() {
                           onEdit={() => setEditingActivity(activity)}
                           onDelete={() => setDeleteConfirmId(activity.id)}
                           onViewTasks={handleViewTasks}
+                          t={t}
                         />
                       ))}
                     </tbody>
@@ -638,28 +766,30 @@ export default function ProjectActivitiesPageContent() {
 
       {deleteConfirmId && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
           onClick={() => !deletingId && setDeleteConfirmId(null)}
           role="dialog"
           aria-modal="true"
           aria-labelledby="activity-delete-title"
         >
           <div
-            className="w-full max-w-sm rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-xl ring-1 ring-slate-700/50"
+            className="w-full max-w-sm rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xl ring-1 ring-slate-100"
             onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => { if (e.key === "Escape") !deletingId && setDeleteConfirmId(null); }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && !deletingId) setDeleteConfirmId(null);
+            }}
           >
-            <p id="activity-delete-title" className="text-sm text-slate-300">
-              ¿Seguro que deseas eliminar esta actividad? Las tareas asociadas seguirán existiendo pero quedarán sin vínculo.
+            <p id="activity-delete-title" className="text-sm text-slate-700">
+              {t("delete.confirmBody")}
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setDeleteConfirmId(null)}
                 disabled={!!deletingId}
-                className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
+                className="rounded-xl border border-slate-200/90 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/25"
               >
-                Cancelar
+                {t("delete.cancel")}
               </button>
               <button
                 type="button"
@@ -668,9 +798,9 @@ export default function ProjectActivitiesPageContent() {
                   if (id) deleteActivity(id);
                 }}
                 disabled={!!deletingId}
-                className="rounded-xl bg-red-600/90 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
+                className="rounded-xl bg-red-600/90 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/25 focus-visible:ring-offset-2"
               >
-                {deletingId ? "Eliminando…" : "Sí, eliminar"}
+                {deletingId ? t("delete.deleting") : t("delete.confirm")}
               </button>
             </div>
           </div>
@@ -683,7 +813,6 @@ export default function ProjectActivitiesPageContent() {
 type ActivityRowProps = {
   activity: ProjectActivity;
   phaseName: string;
-  profiles: Profile[];
   profilesMap: Map<string, Profile>;
   riskLevel?: string | null;
   onUpdate: (id: string, payload: Partial<ProjectActivity>) => Promise<void>;
@@ -691,7 +820,10 @@ type ActivityRowProps = {
   onEdit: () => void;
   onDelete: () => void;
   onViewTasks: (activityId: string) => void;
+  t: (key: string, values?: Record<string, string | number>) => string;
 };
+
+const ACTIVITY_ROW_MENU_WIDTH_PX = 176;
 
 function ActivityRow({
   activity,
@@ -703,18 +835,53 @@ function ActivityRow({
   onEdit,
   onDelete,
   onViewTasks,
+  t,
 }: ActivityRowProps) {
   const [startDate, setStartDate] = useState(activity.start_date ?? "");
   const [dueDate, setDueDate] = useState(activity.due_date ?? "");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
 
   const displayProgress = activity.derived_progress_pct ?? activity.progress_pct ?? 0;
   const today = new Date().toISOString().slice(0, 10);
   const isOverdue = !!(activity.due_date && activity.due_date < today && (activity.status ?? "planned") !== "done");
 
+  const updateMenuPosition = useCallback(() => {
+    const el = menuTriggerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const pad = 8;
+    let left = r.right - ACTIVITY_ROW_MENU_WIDTH_PX;
+    left = Math.max(pad, Math.min(left, window.innerWidth - ACTIVITY_ROW_MENU_WIDTH_PX - pad));
+    setMenuPosition({ top: r.bottom + 4, left });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!menuOpen) return;
+    updateMenuPosition();
+  }, [menuOpen, updateMenuPosition]);
+
   useEffect(() => {
-    setStartDate(activity.start_date ?? "");
-    setDueDate(activity.due_date ?? "");
-  }, [activity.id, activity.start_date, activity.due_date]);
+    if (!menuOpen) return;
+    const onPointerDown = (e: MouseEvent | PointerEvent) => {
+      const targetNode = e.target as Node;
+      if (menuTriggerRef.current?.contains(targetNode)) return;
+      if (menuPanelRef.current?.contains(targetNode)) return;
+      setMenuOpen(false);
+    };
+    const onScroll = () => setMenuOpen(false);
+    const onResize = () => updateMenuPosition();
+    document.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [menuOpen, updateMenuPosition]);
 
   const handleSave = () => {
     onUpdate(activity.id, {
@@ -723,94 +890,154 @@ function ActivityRow({
     });
   };
 
+  const closeMenu = () => setMenuOpen(false);
+
+  const menuItemClass =
+    "block w-full px-3 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none";
+
   const dateInputClass =
-    "w-full max-w-[100px] min-w-0 rounded-lg border border-slate-600/80 bg-slate-800/80 px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 transition-colors";
-  const actionBtnClass =
-    "inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-600 bg-slate-800/60 text-slate-400 hover:bg-slate-700/60 hover:text-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0";
+    "w-full max-w-[104px] min-w-0 rounded-lg border border-slate-200/90 bg-white px-2 py-1.5 text-xs text-slate-800 shadow-sm focus:border-[rgb(var(--rb-brand-primary))]/35 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/20 transition-colors";
+
+  const menuPortal =
+    menuOpen && menuPosition && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={menuPanelRef}
+            className="fixed z-[200] rounded-xl border border-slate-200/90 bg-white py-1 shadow-lg ring-1 ring-slate-100"
+            style={{
+              top: menuPosition.top,
+              left: menuPosition.left,
+              width: ACTIVITY_ROW_MENU_WIDTH_PX,
+            }}
+            role="menu"
+            aria-label={t("row.menu.actionsLabel")}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              className={menuItemClass}
+              onClick={() => {
+                onEdit();
+                closeMenu();
+              }}
+            >
+              {t("row.menu.edit")}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className={menuItemClass}
+              onClick={() => {
+                onViewTasks(activity.id);
+                closeMenu();
+              }}
+            >
+              {t("row.menu.viewTasks")}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className={`${menuItemClass} text-red-600 hover:bg-red-50 focus-visible:bg-red-50`}
+              onClick={() => {
+                onDelete();
+                closeMenu();
+              }}
+            >
+              {t("row.menu.delete")}
+            </button>
+          </div>,
+          document.body
+        )
+      : null;
 
   return (
-    <tr className="hover:bg-slate-800/50 transition-colors duration-150">
-      <td className="px-3 py-3.5 text-slate-300 align-middle whitespace-nowrap">{phaseName}</td>
-      <td className="px-3 py-3.5 align-middle min-w-0 max-w-[180px]">
-        <div className="flex flex-col gap-0.5">
-          <span className="font-medium text-slate-100 truncate" title={activity.name}>{activity.name}</span>
-          {activity.description && (
-            <span className="text-xs text-slate-400 line-clamp-1">{activity.description}</span>
-          )}
+    <tr className={PROJECT_WORKSPACE_TABLE_ROW}>
+      <td className="whitespace-nowrap px-3 py-4 align-middle">
+        <span className="inline-flex max-w-[7.5rem] truncate rounded-md border border-slate-200/90 bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+          {phaseName}
+        </span>
+      </td>
+      <td className="max-w-[200px] min-w-0 px-3 py-4 align-middle">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate font-medium text-slate-900" title={activity.name}>
+            {activity.name}
+          </span>
+          {activity.description ? (
+            <span className="line-clamp-1 text-xs text-slate-600">{activity.description}</span>
+          ) : null}
         </div>
       </td>
-      <td className="px-3 py-3.5 align-middle">
-        <AssigneeCell profileId={activity.owner_profile_id} profilesMap={profilesMap} />
+      <td className="px-3 py-4 align-middle">
+        <AssigneeCell profileId={activity.owner_profile_id} profilesMap={profilesMap} tone="light" />
       </td>
-      <td className="px-3 py-3.5 align-middle">
+      <td className="px-3 py-4 align-middle">
         <ActivityStatusBadge status={activity.status} isOverdue={isOverdue} />
       </td>
-      <td className="px-3 py-3.5 align-middle">
+      <td className="px-3 py-4 align-middle">
+        <ActivityPriorityBadge priority={activity.priority} />
+      </td>
+      <td className="px-3 py-4 align-middle">
         <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={dateInputClass} />
       </td>
-      <td className="px-3 py-3.5 align-middle">
+      <td className="px-3 py-4 align-middle">
         <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={dateInputClass} />
       </td>
-      <td className="px-3 py-3.5 align-middle">
-        <span className="text-slate-300 tabular-nums whitespace-nowrap" title="Progreso derivado de tareas (hechas / total)">
+      <td className="px-3 py-4 align-middle">
+        <span
+          className="whitespace-nowrap tabular-nums text-sm text-slate-600"
+          title={t("row.progressTitle")}
+        >
           {displayProgress}%
         </span>
       </td>
-      <td className="px-3 py-3.5 align-middle">
+      <td className="px-3 py-4 align-middle">
         {riskLevel == null || riskLevel === "" ? (
-          <span className="text-slate-500 text-[11px]">—</span>
+          <span className="text-[11px] text-slate-500">{t("emDash")}</span>
         ) : (
           <span
             className={
               riskLevel === "HIGH"
-                ? "inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium bg-red-500/20 text-red-400"
+                ? "inline-flex rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-900 ring-1 ring-inset ring-rose-200/80"
                 : riskLevel === "MEDIUM"
-                  ? "inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium bg-amber-500/20 text-amber-400"
-                  : "inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium bg-emerald-500/20 text-emerald-400"
+                  ? "inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900 ring-1 ring-inset ring-amber-200/80"
+                  : "inline-flex rounded-md bg-[rgb(var(--rb-brand-surface))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--rb-brand-primary-active))] ring-1 ring-inset ring-[rgb(var(--rb-brand-primary))]/18"
             }
           >
-            {riskLevel === "HIGH" ? "Alto" : riskLevel === "MEDIUM" ? "Medio" : "Bajo"}
+            {riskLevel === "HIGH" ? t("risk.high") : riskLevel === "MEDIUM" ? t("risk.medium") : t("risk.low")}
           </span>
         )}
       </td>
-      <td className="px-3 py-3.5 align-middle text-right w-[180px] min-w-[180px] max-w-[180px]">
-        <div className="flex items-center gap-1.5 justify-end whitespace-nowrap">
+      <td className="px-3 py-4 align-middle text-right">
+        <div className="flex items-center justify-end gap-2 whitespace-nowrap">
           <button
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className={`${actionBtnClass} ${saving ? "text-indigo-400/70" : "text-indigo-300 hover:text-indigo-200 hover:border-indigo-500/50 hover:bg-indigo-500/10"}`}
-            title="Save changes"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--rb-brand-primary))]/30 bg-[rgb(var(--rb-brand-primary))] text-white shadow-sm ring-1 ring-[rgb(var(--rb-brand-primary))]/20 transition-colors hover:bg-[rgb(var(--rb-brand-primary-hover))] disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label={t("row.saveDates")}
+            title={t("row.saveDates")}
           >
             <Save className="h-4 w-4" />
           </button>
           <button
+            ref={menuTriggerRef}
             type="button"
-            onClick={onEdit}
-            className={actionBtnClass}
-            aria-label="Edit activity"
-            title="Edit activity"
+            onClick={() => setMenuOpen((o) => !o)}
+            className={
+              "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/25 focus-visible:ring-offset-0 " +
+              (menuOpen
+                ? "border-slate-300 bg-slate-100 text-slate-800"
+                : "border-slate-200/90 bg-white")
+            }
+            aria-label={t("row.moreActions")}
+            title={t("row.moreActions")}
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
           >
-            <Pencil className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onViewTasks(activity.id)}
-            className={actionBtnClass}
-            title="Manage tasks"
-          >
-            <ListTodo className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onDelete}
-            className={`${actionBtnClass} text-red-400 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/40`}
-            aria-label="Delete activity"
-            title="Delete activity"
-          >
-            <Trash2 className="h-4 w-4" />
+            <MoreHorizontal className="h-4 w-4" aria-hidden />
           </button>
         </div>
+        {menuPortal}
       </td>
     </tr>
   );
@@ -835,7 +1062,25 @@ function ActivityFormModal({
   onClose,
   onSaved,
 }: ActivityFormModalProps) {
+  const t = useTranslations("activities");
   const isEdit = !!activity;
+  const statusOptions = useMemo(
+    () => [
+      { value: "planned", label: t("status.planned") },
+      { value: "in_progress", label: t("status.in_progress") },
+      { value: "blocked", label: t("status.blocked") },
+      { value: "done", label: t("status.done") },
+    ],
+    [t]
+  );
+  const priorityOptions = useMemo(
+    () => [
+      { value: "low", label: t("priority.low") },
+      { value: "medium", label: t("priority.medium") },
+      { value: "high", label: t("priority.high") },
+    ],
+    [t]
+  );
   const formContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -844,8 +1089,8 @@ function ActivityFormModal({
       "input, select, textarea"
     );
     if (el) {
-      const t = setTimeout(() => el.focus(), 50);
-      return () => clearTimeout(t);
+      const focusTimeout = setTimeout(() => el.focus(), 50);
+      return () => clearTimeout(focusTimeout);
     }
   }, [isEdit]);
   const [phaseId, setPhaseId] = useState(activity?.phase_id ?? initialPhaseId ?? "");
@@ -865,22 +1110,22 @@ function ActivityFormModal({
   useEffect(() => {
     if (!isEdit && selectedPhase?.start_date) setStartDate(selectedPhase.start_date);
     if (!isEdit && selectedPhase?.end_date) setEndDate(selectedPhase.end_date);
-  }, [selectedPhase?.id, isEdit]);
+  }, [selectedPhase?.id, selectedPhase?.start_date, selectedPhase?.end_date, isEdit]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (!projectId) {
-      setError("No se pudo identificar el proyecto.");
+      setError(t("modal.errors.missingProject"));
       return;
     }
     if (!phaseId || !String(phaseId).trim()) {
-      setError("Selecciona una fase para la actividad.");
+      setError(t("modal.errors.phaseRequired"));
       return;
     }
     if (!title || !title.trim()) {
-      setError("La actividad necesita un título.");
+      setError(t("modal.errors.titleRequired"));
       return;
     }
 
@@ -906,7 +1151,7 @@ function ActivityFormModal({
           .eq("id", activity.id);
         if (err) {
           console.error("Error updating activity (Supabase)", err);
-          setError(err.message || "No se pudo actualizar la actividad.");
+          setError(err.message || t("modal.errors.updateFailed"));
           return;
         }
         onSaved();
@@ -935,47 +1180,47 @@ function ActivityFormModal({
 
       if (insertError) {
         console.error("Error creating activity (Supabase)", insertError);
-        setError(insertError.message || "No se pudo crear la actividad.");
+        setError(insertError.message || t("modal.errors.createFailed"));
         return;
       }
       onSaved();
     } catch (err) {
       console.error("Error creating activity (JS)", err);
-      setError("Ocurrió un error inesperado al crear la actividad.");
+      setError(t("modal.errors.unexpected"));
     } finally {
       setSaving(false);
     }
   };
 
   const fieldClass =
-    "mt-1 w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50";
+    "mt-1 w-full rounded-xl border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/25 focus:border-[rgb(var(--rb-brand-primary))]/30";
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
       onClick={onClose}
     >
       <div
         ref={formContainerRef}
-        className="w-full max-w-lg rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-xl ring-1 ring-slate-700/50"
+        className="w-full max-w-lg rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xl ring-1 ring-slate-100"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold text-slate-100">
-          {isEdit ? "Editar actividad" : "Nueva actividad"}
+        <h2 className="text-lg font-semibold text-slate-900">
+          {isEdit ? t("modal.titleEdit") : t("modal.titleCreate")}
         </h2>
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           {error && (
-            <p className="mt-2 rounded-lg bg-red-950/50 border border-red-800/50 px-3 py-2 text-sm text-red-200">{error}</p>
+            <p className="mt-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800">{error}</p>
           )}
           <div>
-            <label className="block text-xs font-medium text-slate-500">Fase *</label>
+            <label className="block text-xs font-medium text-slate-600">{t("modal.fields.phaseRequired")}</label>
             <select
               value={phaseId}
               onChange={(e) => setPhaseId(e.target.value)}
               required
               className={fieldClass}
             >
-              <option value="">Selecciona una fase</option>
+              <option value="">{t("modal.fields.selectPhase")}</option>
               {phases.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -984,7 +1229,7 @@ function ActivityFormModal({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500">Título *</label>
+            <label className="block text-xs font-medium text-slate-600">{t("modal.fields.titleRequired")}</label>
             <input
               type="text"
               value={title}
@@ -994,7 +1239,7 @@ function ActivityFormModal({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500">Descripción</label>
+            <label className="block text-xs font-medium text-slate-600">{t("modal.fields.description")}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -1003,13 +1248,13 @@ function ActivityFormModal({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500">Responsable</label>
+            <label className="block text-xs font-medium text-slate-600">{t("modal.fields.owner")}</label>
             <select
               className={fieldClass}
               value={ownerProfileId ?? ""}
               onChange={(e) => setOwnerProfileId(e.target.value || null)}
             >
-              <option value="">Sin asignar</option>
+              <option value="">{t("modal.fields.unassigned")}</option>
               {profiles.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.full_name || p.email || p.id}
@@ -1019,9 +1264,9 @@ function ActivityFormModal({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-500">Estado</label>
+              <label className="block text-xs font-medium text-slate-600">{t("modal.fields.status")}</label>
               <select value={status} onChange={(e) => setStatus(e.target.value)} className={fieldClass}>
-                {STATUS_OPTIONS.map((o) => (
+                {statusOptions.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>
@@ -1029,9 +1274,9 @@ function ActivityFormModal({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500">Prioridad</label>
+              <label className="block text-xs font-medium text-slate-600">{t("modal.fields.priority")}</label>
               <select value={priority} onChange={(e) => setPriority(e.target.value)} className={fieldClass}>
-                {PRIORITY_OPTIONS.map((o) => (
+                {priorityOptions.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>
@@ -1041,7 +1286,7 @@ function ActivityFormModal({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-500">Inicio</label>
+              <label className="block text-xs font-medium text-slate-600">{t("modal.fields.start")}</label>
               <input
                 type="date"
                 value={startDate}
@@ -1050,7 +1295,7 @@ function ActivityFormModal({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500">Fin</label>
+              <label className="block text-xs font-medium text-slate-500">{t("modal.fields.end")}</label>
               <input
                 type="date"
                 value={endDate}
@@ -1060,7 +1305,7 @@ function ActivityFormModal({
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500">Progreso (%)</label>
+            <label className="block text-xs font-medium text-slate-600">{t("modal.fields.progress")}</label>
             <input
               type="number"
               min={0}
@@ -1074,16 +1319,16 @@ function ActivityFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700"
+              className="rounded-xl border border-slate-200/90 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
-              Cancelar
+              {t("modal.cancel")}
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50"
+              className="rounded-xl rb-btn-primary px-4 py-2 text-sm font-medium disabled:opacity-50 shadow-sm"
             >
-              {saving ? (isEdit ? "Guardando…" : "Creando…") : isEdit ? "Guardar cambios" : "Crear actividad"}
+              {saving ? (isEdit ? t("modal.savingEdit") : t("modal.savingCreate")) : isEdit ? t("modal.saveChanges") : t("modal.create")}
             </button>
           </div>
         </form>

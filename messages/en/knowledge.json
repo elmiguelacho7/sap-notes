@@ -1,0 +1,112 @@
+{
+  "page": {
+    "eyebrow": "Knowledge workspace",
+    "title": "Knowledge",
+    "subtitle": "Project wiki: reusable spaces and pages to document SAP, procedures, and team decisions.",
+    "newPage": "New page",
+    "newSpace": "New space",
+    "searchKnowledge": "Search knowledge"
+  },
+  "stats": {
+    "spaces": "{count, plural, one {# space} other {# spaces}}",
+    "pages": "{count, plural, one {# page} other {# pages}}",
+    "lastUpdated": "Last update"
+  },
+  "panels": {
+    "spaces": {
+      "title": "Spaces",
+      "subtitle": "Organize project documentation"
+    },
+    "pages": {
+      "title": "Pages",
+      "selectSpaceHint": "Select a space to view its pages"
+    }
+  },
+  "empty": {
+    "noSpaces": {
+      "title": "No spaces yet",
+      "description": "Create a space with \"New space\" to start the project wiki."
+    },
+    "selectSpace": {
+      "title": "Choose a space",
+      "description": "Select a space in the left panel to view its pages."
+    },
+    "spaceEmpty": {
+      "title": "This space is empty",
+      "description": "Add the first page with \"New page\"."
+    }
+  },
+  "delete": {
+    "title": "Delete page",
+    "confirmBody": "Delete \"{title}\"? It can be undone later.",
+    "confirm": "Delete",
+    "deleting": "Deleting…"
+  },
+  "modals": {
+    "newSpace": {
+      "title": "New space",
+      "nameLabel": "Name *",
+      "namePlaceholder": "Ex: SAP configuration",
+      "descriptionLabel": "Description (optional)",
+      "descriptionPlaceholder": "Short description"
+    },
+    "newPage": {
+      "title": "New page",
+      "titleLabel": "Title *",
+      "titlePlaceholder": "Ex: How to configure valuation variant",
+      "templateLabel": "Template (optional)"
+    }
+  },
+  "templates": {
+    "blank": "Blank",
+    "sapProcedure": "SAP Procedure",
+    "sapConfiguration": "SAP Configuration",
+    "troubleshootingGuide": "Troubleshooting Guide"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "create": "Create",
+    "creating": "Creating…"
+  },
+  "errors": {
+    "invalidProjectId": "Invalid project identifier.",
+    "loadSpaces": "Error loading spaces.",
+    "createSpace": "Error creating space.",
+    "createPage": "Error creating page."
+  },
+  "row": {
+    "open": "Open",
+    "fullEditor": "Full editor",
+    "editDetails": "Edit details",
+    "delete": "Delete",
+    "pageActions": "Page actions",
+    "comingSoon": "Coming soon",
+    "move": "Move",
+    "createSubpage": "Create subpage"
+  },
+  "drawer": {
+    "emDash": "—",
+    "title": "Page details",
+    "close": "Close",
+    "context": {
+      "global": "Global",
+      "project": "Project"
+    },
+    "fields": {
+      "title": "Title *",
+      "titlePlaceholder": "Page title",
+      "summary": "Summary / content",
+      "summaryPlaceholder": "Summary or main content",
+      "space": "Space",
+      "project": "Project"
+    },
+    "timestamps": {
+      "updated": "Updated",
+      "created": "Created"
+    },
+    "openFullEditor": "Open full editor",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…"
+  }
+}

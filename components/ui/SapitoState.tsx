@@ -1,18 +1,13 @@
 "use client";
 
 import Image from "next/image";
-
-const VARIANT_IMAGE: Record<
-  "empty" | "loading" | "error" | "success" | "thinking" | "alert",
-  string
-> = {
-  empty: "sapito_sleeping",
-  loading: "sapito_thinking",
-  error: "sapito_error",
-  success: "sapito_happy",
-  thinking: "sapito_thinking",
-  alert: "sapito_alert",
-};
+import {
+  getSapitoAlert,
+  getSapitoDefault,
+  getSapitoError,
+  getSapitoHappy,
+  getSapitoThinking,
+} from "@/lib/ui/sapito";
 
 const SIZE_PX = { sm: 64, md: 128, lg: 256 } as const;
 
@@ -48,10 +43,21 @@ export function SapitoState({
   imageQuery,
   tone = "dark",
 }: SapitoStateProps) {
-  const base = VARIANT_IMAGE[variant];
   const px = SIZE_PX[size];
-  const filename = `${base}_${px}x${px}.svg`;
-  const src = `/agents/sapito/${filename}${imageQuery ? `?${imageQuery}` : ""}`;
+  const srcBase =
+    variant === "empty"
+      ? getSapitoDefault(px)
+      : variant === "loading" || variant === "thinking"
+        ? getSapitoThinking(px)
+        : variant === "error"
+          ? getSapitoError(px)
+          : variant === "success"
+            ? getSapitoHappy(px)
+            : variant === "alert"
+              ? getSapitoAlert(px)
+              : getSapitoDefault(px);
+
+  const src = `${srcBase}${imageQuery ? `?${imageQuery}` : ""}`;
   const text = TONE_CLASS[tone];
 
   return (

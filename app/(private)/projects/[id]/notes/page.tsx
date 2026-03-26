@@ -3,10 +3,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { FileText, Link2, AlertCircle, Calendar, Search, Eye, MoreVertical, Pencil, BookMarked, Trash2 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import { FileText, Link2, Search, Eye, MoreVertical, Pencil, BookMarked, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
+import { ModuleKpiCard, ModuleKpiRow, ModuleContentCard } from "@/components/layout/module";
 import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
+import {
+  PROJECT_WORKSPACE_PAGE,
+  PROJECT_WORKSPACE_HERO,
+  PROJECT_WORKSPACE_TOOLBAR,
+  PROJECT_WORKSPACE_SEARCH_INPUT,
+  PROJECT_WORKSPACE_FIELD,
+  PROJECT_WORKSPACE_EMPTY,
+} from "@/lib/projectWorkspaceUi";
 
 type ProjectNoteSummary = {
   id: string;
@@ -22,11 +32,7 @@ type ProjectNoteSummary = {
   is_knowledge_base?: boolean;
 };
 
-const SORT_OPTIONS = [
-  { value: "recent", label: "Más recientes" },
-  { value: "oldest", label: "Más antiguas" },
-  { value: "title", label: "Título A-Z" },
-] as const;
+const SORT_OPTIONS = [{ value: "recent" }, { value: "oldest" }, { value: "title" }] as const;
 type SortValue = (typeof SORT_OPTIONS)[number]["value"];
 
 /** Safe row actions: Ver (primary) + overflow menu (Editar, KB, Eliminar). */
@@ -51,6 +57,7 @@ function NoteRowActions({
   onToggleKnowledge: (e: React.MouseEvent) => void;
   togglingId: string | null;
 }) {
+  const t = useTranslations("projects.notes");
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -79,13 +86,13 @@ function NoteRowActions({
       const res = await fetch(deleteEndpoint, { method: "DELETE", headers });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setDeleteError(data?.error ?? "No se pudo completar la acción.");
+        setDeleteError(data?.error ?? t("errors.actionFailed"));
         return;
       }
       setDeleteOpen(false);
       onDeleted?.();
     } catch {
-      setDeleteError("Error de conexión. Inténtalo de nuevo.");
+      setDeleteError(t("errors.connection"));
     } finally {
       setDeleteLoading(false);
     }
@@ -98,61 +105,61 @@ function NoteRowActions({
     <div className="flex items-center gap-2 shrink-0" ref={menuRef}>
       <Link
         href={viewHref}
-        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-600/80 bg-slate-800/60 px-3 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:border-slate-500 hover:text-slate-100 transition-colors"
+        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200/90 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-colors"
       >
         <Eye className="h-3.5 w-3.5" />
-        Ver
+        {t("actions.view")}
       </Link>
       <div className="relative">
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-600/80 bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
-          aria-label="Más opciones"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200/90 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+          aria-label={t("actions.more")}
         >
           <MoreVertical className="h-4 w-4" />
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-full z-20 mt-1 min-w-[160px] rounded-xl border border-slate-600/80 bg-slate-800 shadow-lg ring-1 ring-slate-700/50 py-1">
+          <div className="absolute right-0 top-full z-20 mt-1 min-w-[160px] rounded-xl border border-slate-200/90 bg-white py-1 shadow-lg ring-1 ring-slate-100">
             {showEdit && (
               <button
                 type="button"
                 onClick={() => { setMenuOpen(false); router.push(editHref!); }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-200 hover:bg-slate-700"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
-                <Pencil className="h-3.5 w-3.5" /> Editar
+                <Pencil className="h-3.5 w-3.5" /> {t("actions.edit")}
               </button>
             )}
             <button
               type="button"
               onClick={(e) => { setMenuOpen(false); onToggleKnowledge(e); }}
               disabled={!!togglingId}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               <BookMarked className="h-3.5 w-3.5" />
-              {togglingId === note.id ? "…" : note.is_knowledge_base ? "Quitar de KB" : "Añadir a KB"}
+              {togglingId === note.id ? "…" : note.is_knowledge_base ? t("actions.removeKb") : t("actions.addKb")}
             </button>
             {showDelete && (
               <button
                 type="button"
                 onClick={() => { setMenuOpen(false); setDeleteOpen(true); }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-rose-300 hover:bg-slate-700 hover:bg-rose-500/10"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-red-600 hover:bg-red-50"
               >
-                <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                <Trash2 className="h-3.5 w-3.5" /> {t("actions.delete")}
               </button>
             )}
           </div>
         )}
       </div>
       {deleteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !deleteLoading && setDeleteOpen(false)}>
-          <div className="rounded-2xl border border-slate-700/80 bg-slate-800 p-6 shadow-xl ring-1 ring-slate-700/50 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-slate-100">Eliminar nota</h3>
-            <p className="mt-2 text-sm text-slate-400">¿Seguro que quieres eliminar esta nota? Esta acción no se puede deshacer.</p>
-            {deleteError && <p className="mt-3 text-sm text-rose-400 bg-rose-950/30 rounded-lg px-3 py-2">{deleteError}</p>}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40" onClick={() => !deleteLoading && setDeleteOpen(false)}>
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xl ring-1 ring-slate-100 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-slate-900">{t("delete.title")}</h3>
+            <p className="mt-2 text-sm text-slate-600">{t("delete.body")}</p>
+            {deleteError && <p className="mt-3 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{deleteError}</p>}
             <div className="mt-6 flex justify-end gap-2">
-              <button type="button" onClick={() => !deleteLoading && setDeleteOpen(false)} disabled={deleteLoading} className="rounded-xl border border-slate-600 bg-slate-700 px-3 h-9 text-sm font-medium text-slate-200 hover:bg-slate-600 disabled:opacity-60">Cancelar</button>
-              <button type="button" onClick={handleDeleteConfirm} disabled={deleteLoading} className="rounded-xl bg-rose-600 px-3 h-9 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-60">{deleteLoading ? "Eliminando…" : "Eliminar"}</button>
+              <button type="button" onClick={() => !deleteLoading && setDeleteOpen(false)} disabled={deleteLoading} className="rounded-xl border border-slate-200/90 bg-white px-3 h-9 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">{t("delete.cancel")}</button>
+              <button type="button" onClick={handleDeleteConfirm} disabled={deleteLoading} className="rounded-xl bg-red-600 px-3 h-9 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">{deleteLoading ? t("delete.deleting") : t("delete.confirm")}</button>
             </div>
           </div>
         </div>
@@ -162,6 +169,9 @@ function NoteRowActions({
 }
 
 export default function ProjectNotesPage() {
+  const t = useTranslations("projects.notes");
+  const locale = useLocale();
+  const localeTag = locale === "es" ? "es-ES" : "en-US";
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -200,7 +210,7 @@ export default function ProjectNotesPage() {
     }
     loadPermissions();
     return () => { cancelled = true; };
-  }, [projectId]);
+  }, [projectId, t]);
 
   const loadNotes = useCallback(async () => {
     if (!projectId) return;
@@ -210,19 +220,19 @@ export default function ProjectNotesPage() {
       const res = await fetch(`/api/projects/${projectId}/notes?limit=50`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setErrorMsg((data as { error?: string }).error ?? "Error al cargar las notas.");
+        setErrorMsg((data as { error?: string }).error ?? t("errors.load"));
         setNotes([]);
         return;
       }
       const list = (data as { notes?: ProjectNoteSummary[] }).notes ?? [];
       setNotes(list);
     } catch {
-      setErrorMsg("Error de conexión.");
+      setErrorMsg(t("errors.connection"));
       setNotes([]);
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, t]);
 
   useEffect(() => {
     void loadNotes();
@@ -255,14 +265,14 @@ export default function ProjectNotesPage() {
         const title = (n.title ?? "").toLowerCase();
         const body = (n.body ?? "").toLowerCase();
         const extra = (n.extra_info ?? "").toLowerCase();
-        const module = (n.module ?? "").toLowerCase();
+        const moduleName = (n.module ?? "").toLowerCase();
         const scope = (n.scope_item ?? "").toLowerCase();
         const err = (n.error_code ?? "").toLowerCase();
         return (
           title.includes(q) ||
           body.includes(q) ||
           extra.includes(q) ||
-          module.includes(q) ||
+          moduleName.includes(q) ||
           scope.includes(q) ||
           err.includes(q)
         );
@@ -313,122 +323,110 @@ export default function ProjectNotesPage() {
 
   if (!projectId) {
     return (
-      <div className="space-y-6">
-        <p className="text-sm text-slate-400">Identificador de proyecto no válido.</p>
+      <div className={PROJECT_WORKSPACE_PAGE}>
+        <p className="text-sm text-slate-500">{t("invalidProjectId")}</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full min-w-0 space-y-8">
-      <header className="space-y-1">
+    <div className={PROJECT_WORKSPACE_PAGE}>
+      <div className={PROJECT_WORKSPACE_HERO}>
         <ProjectPageHeader
-          variant="section"
-          dark
-          title="Notas del proyecto"
-          subtitle="Notas operativas y memoria funcional de este proyecto. No son conocimiento global; solo visibles para miembros del proyecto."
-          primaryActionLabel="Nueva nota"
+          variant="page"
+          eyebrow={t("eyebrow")}
+          title={t("title")}
+          subtitle={t("subtitle")}
+          primaryActionLabel={t("newNote")}
           primaryActionHref={`/notes/new?projectId=${projectId}`}
         />
-      </header>
+      </div>
 
       {errorMsg && (
-        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {errorMsg}
         </div>
       )}
 
       {loading ? (
-        <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
+        <ModuleContentCard tone="light">
           <div className="px-6 py-6">
             <TableSkeleton rows={6} colCount={5} />
           </div>
-        </section>
+        </ModuleContentCard>
       ) : (
         <>
-          {/* Summary strip */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase text-slate-400">Total</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.total}</p>
-            </div>
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase text-slate-400">Con código error</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.withErrorCode}</p>
-            </div>
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase text-slate-400">Con enlaces</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.withLinks}</p>
-            </div>
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase text-slate-400">Recientes (7 d)</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{summary.recentlyAdded}</p>
-            </div>
-          </div>
+          <ModuleKpiRow>
+            <ModuleKpiCard tone="light" label={t("summary.total")} value={summary.total} />
+            <ModuleKpiCard tone="light" label={t("summary.withErrorCode")} value={summary.withErrorCode} />
+            <ModuleKpiCard tone="light" label={t("summary.withLinks")} value={summary.withLinks} />
+            <ModuleKpiCard tone="light" label={t("summary.recent7d")} value={summary.recentlyAdded} />
+          </ModuleKpiRow>
 
-          {/* Filter / search bar */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar en notas..."
-                className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
-              />
-            </div>
-            {uniqueModules.length > 0 && (
+          <div className={PROJECT_WORKSPACE_TOOLBAR}>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-[200px] max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t("searchPlaceholder")}
+                  className={PROJECT_WORKSPACE_SEARCH_INPUT}
+                />
+              </div>
+              {uniqueModules.length > 0 && (
+                <select
+                  value={moduleFilter}
+                  onChange={(e) => setModuleFilter(e.target.value)}
+                  className={PROJECT_WORKSPACE_FIELD}
+                >
+                  <option value="">{t("allModules")}</option>
+                  {uniqueModules.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              )}
               <select
-                value={moduleFilter}
-                onChange={(e) => setModuleFilter(e.target.value)}
-                className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortValue)}
+                className={PROJECT_WORKSPACE_FIELD}
               >
-                <option value="">Todos los módulos</option>
-                {uniqueModules.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {t(`sort.${opt.value}`)}
                   </option>
                 ))}
               </select>
-            )}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortValue)}
-              className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+            </div>
           </div>
 
-          <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
+          <ModuleContentCard tone="light">
             {notes.length === 0 ? (
-              <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-16 px-6 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 text-slate-500">
+              <div className={`${PROJECT_WORKSPACE_EMPTY} py-16`}>
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-slate-200/90 bg-white text-slate-400 shadow-sm ring-1 ring-slate-100">
                   <FileText className="h-7 w-7" />
                 </div>
-                <p className="mt-4 text-base font-medium text-slate-200">Aún no hay notas en este proyecto</p>
-                <p className="mt-1.5 max-w-md mx-auto text-sm text-slate-500">
-                  Captura incidencias, soluciones, decisiones y contexto operativo. Crea la primera para empezar.
+                <p className="mt-4 text-base font-semibold text-slate-900">{t("empty.title")}</p>
+                <p className="mt-1.5 max-w-md text-sm text-slate-600 leading-relaxed">
+                  {t("empty.description")}
                 </p>
                 <Link
                   href={`/notes/new?projectId=${projectId}`}
-                  className="mt-5 inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors"
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-medium transition-colors"
                 >
-                  Crear primera nota
+                  {t("empty.createFirst")}
                 </Link>
               </div>
             ) : filteredAndSortedNotes.length === 0 ? (
-              <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-12 px-6 text-center">
-                <p className="text-sm font-medium text-slate-300">Ninguna nota coincide con los filtros</p>
-                <p className="mt-1 text-xs text-slate-500">Prueba a cambiar la búsqueda o el módulo.</p>
+              <div className={`${PROJECT_WORKSPACE_EMPTY} py-12`}>
+                <p className="text-sm font-semibold text-slate-800">{t("filteredEmpty.title")}</p>
+                <p className="mt-1 text-xs text-slate-600">{t("filteredEmpty.description")}</p>
               </div>
             ) : (
-              <ul className="divide-y divide-slate-700/40">
+              <ul className="divide-y divide-slate-100">
                 {filteredAndSortedNotes.map((note) => {
                   const excerpt =
                     (note.body && note.body.trim() !== ""
@@ -451,18 +449,18 @@ export default function ProjectNotesPage() {
                           router.push(`/notes/${note.id}`);
                         }
                       }}
-                      className="flex items-start justify-between gap-3 px-6 py-4 cursor-pointer hover:bg-slate-800/50 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-inset"
+                      className="flex items-start justify-between gap-3 px-6 py-4 cursor-pointer hover:bg-slate-50/90 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/20 focus-visible:ring-inset"
                     >
                       <div
                         className="min-w-0 flex-1 cursor-pointer"
                         onClick={(e) => { e.stopPropagation(); router.push(`/notes/${note.id}`); }}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="font-medium text-slate-100">
-                            {note.title ?? "Sin título"}
+                          <p className="font-medium text-slate-900">
+                            {note.title ?? t("untitled")}
                           </p>
                           <span className="text-xs text-slate-500 shrink-0">
-                            {new Date(note.created_at).toLocaleString("es-ES", {
+                            {new Date(note.created_at).toLocaleString(localeTag, {
                               day: "2-digit",
                               month: "short",
                               year: "numeric",
@@ -472,29 +470,29 @@ export default function ProjectNotesPage() {
                           </span>
                         </div>
                         {excerpt && (
-                          <p className="mt-1.5 line-clamp-2 text-xs text-slate-400">
+                          <p className="mt-1.5 line-clamp-2 text-xs text-slate-600">
                             {excerpt}
                           </p>
                         )}
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           {note.module && (
-                            <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2 py-0.5 text-[10px] text-slate-300">
+                            <span className="inline-flex items-center rounded-lg bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700 ring-1 ring-slate-200/80">
                               {note.module}
                             </span>
                           )}
                           {note.scope_item && (
-                            <span className="inline-flex items-center rounded-lg bg-indigo-500/20 px-2 py-0.5 text-[10px] text-indigo-300">
+                            <span className="inline-flex items-center rounded-lg bg-[rgb(var(--rb-brand-surface))] px-2 py-0.5 text-[10px] font-medium text-[rgb(var(--rb-brand-primary-active))] ring-1 ring-[rgb(var(--rb-brand-primary))]/18">
                               {note.scope_item}
                             </span>
                           )}
                           {note.error_code && (
-                            <span className="inline-flex items-center rounded-lg bg-red-500/20 px-2 py-0.5 text-[10px] text-red-400">
-                              Error {note.error_code}
+                            <span className="inline-flex items-center rounded-lg bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-800 ring-1 ring-red-200/70">
+                              {t("error")} {note.error_code}
                             </span>
                           )}
                           {hasLinks && (
-                            <span className="inline-flex items-center gap-0.5 rounded-lg bg-slate-600/50 px-2 py-0.5 text-[10px] text-slate-400">
-                              <Link2 className="h-3 w-3" /> Enlaces
+                            <span className="inline-flex items-center gap-0.5 rounded-lg bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600 ring-1 ring-slate-200/80">
+                              <Link2 className="h-3 w-3" /> {t("links")}
                             </span>
                           )}
                         </div>
@@ -516,7 +514,7 @@ export default function ProjectNotesPage() {
                 })}
               </ul>
             )}
-          </section>
+          </ModuleContentCard>
         </>
       )}
     </div>

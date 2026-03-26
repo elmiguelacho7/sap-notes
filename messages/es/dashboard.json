@@ -1,0 +1,128 @@
+{
+  "errors": {
+    "loadFailed": "No se pudieron cargar los datos del dashboard."
+  },
+  "greeting": {
+    "morning": "Buenos días",
+    "afternoon": "Buenas tardes",
+    "evening": "Buenas noches"
+  },
+  "subtitle": "Resumen del workspace — proyectos, tareas y conocimiento en un solo lugar.",
+  "heroEyebrow": "Centro de control",
+  "metricsIntro": "Señales clave de tu workspace.",
+  "appsHint": "Accede a los módulos principales al instante.",
+  "insightsLead": "Distribución de tickets, clientes y tendencia de actividad en los últimos 30 días.",
+  "create": "Crear",
+  "createMenu": {
+    "project": "Crear proyecto",
+    "ticket": "Crear ticket",
+    "task": "Crear tarea",
+    "note": "Crear nota"
+  },
+  "search": "Buscar",
+  "askSapito": "Preguntar a Sapito",
+  "metricsSr": "Métricas del workspace",
+  "kpi": {
+    "activeProjects": "Proyectos activos",
+    "activeProjectsTrend": "En curso",
+    "openTickets": "Tickets abiertos",
+    "openTicketsTrend": "Pendientes",
+    "tasksDueToday": "Tareas vencen hoy",
+    "tasksDueTodayTrend": "Fecha hoy",
+    "clients": "Clientes",
+    "clientsTrend": "Registrados",
+    "knowledgeSpaces": "Espacios knowledge",
+    "knowledgeTrend": "Knowledge"
+  },
+  "yourWork": "Tu trabajo",
+  "loading": "Cargando…",
+  "tiles": {
+    "overdueTasks": "{count, plural, one {# tarea vencida} other {# tareas vencidas}}",
+    "openTickets": "{count, plural, one {# ticket abierto} other {# tickets abiertos}}",
+    "staleProjects": "{count, plural, one {# proyecto sin actividad reciente} other {# proyectos sin actividad reciente}}"
+  },
+  "allCaughtUp": "Todo al día.",
+  "applications": "Aplicaciones",
+  "app": {
+    "projects": "Proyectos",
+    "tickets": "Tickets",
+    "tasks": "Tareas",
+    "knowledge": "Knowledge",
+    "notes": "Notas",
+    "clients": "Clientes",
+    "search": "Buscar"
+  },
+  "insights": "Insights",
+  "insightsSub": "Métricas y gráficos.",
+  "workload": {
+    "title": "Carga por responsable",
+    "subtitle": "Tareas activas por responsable.",
+    "emptyTitle": "Aún no hay datos de carga de trabajo",
+    "emptySub": "Los datos aparecerán cuando existan tareas asignadas a varios responsables en tus proyectos.",
+    "chart": {
+      "tooltipUser": "Usuario",
+      "tooltipTasks": "Tareas activas",
+      "unnamedUser": "Sin nombre"
+    }
+  },
+  "systemHealth": {
+    "title": "Estado del sistema",
+    "subtitle": "Resumen operativo de la plataforma.",
+    "activeProjects": "Proyectos activos",
+    "overdueTasks": "Tareas vencidas",
+    "openTickets": "Tickets abiertos",
+    "staleProjects": "Proyectos sin actividad reciente",
+    "healthy": "Activo",
+    "noProjects": "Sin proyectos",
+    "attention": "Atención",
+    "onTrack": "Al día",
+    "manyPending": "Varios pendientes",
+    "normal": "Normal",
+    "review": "Revisar",
+    "ok": "Ok"
+  },
+  "activity": {
+    "title": "Actividad reciente",
+    "subtitle": "Últimos eventos (proyectos, tareas, tickets, notas).",
+    "empty": "Aún no hay actividad reciente.",
+    "eventTypes": {
+      "project_created": "Proyecto creado",
+      "task_created": "Tarea creada",
+      "ticket_closed": "Ticket cerrado",
+      "note_created": "Nota añadida",
+      "user_invited": "Usuario invitado"
+    }
+  },
+  "recentProjects": {
+    "title": "Proyectos recientes",
+    "subtitle": "Acceso rápido a proyectos.",
+    "empty": "Sin proyectos",
+    "viewAll": "Ver todos los proyectos"
+  },
+  "charts": {
+    "ticketsByStatus": "Tickets por estado",
+    "ticketsByStatusSub": "Distribución actual",
+    "ticketsByClient": "Tickets por cliente",
+    "ticketsByClientSub": "Top clientes",
+    "activity30d": "Actividad últimos 30 días",
+    "activity30dSub": "Eventos por día",
+    "emptyTitle": "Aún no hay datos",
+    "emptySub": "Los datos aparecerán aquí conforme se registre actividad.",
+    "donutCenter": "Tickets\n{count}",
+    "tooltip": {
+      "status": "Estado",
+      "count": "Cantidad",
+      "pctOfTotal": "% del total",
+      "client": "Cliente",
+      "ticketCount": "Tickets",
+      "fullDate": "Fecha",
+      "eventCount": "Eventos"
+    }
+  },
+  "relative": {
+    "now": "ahora",
+    "minutes": "hace {n} min",
+    "hours": "hace {n} h",
+    "days": "hace {n} d"
+  }
+}

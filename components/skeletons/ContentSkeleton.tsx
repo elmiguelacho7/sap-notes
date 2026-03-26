@@ -33,7 +33,7 @@ export function ContentSkeleton({ title = true, lines = 3, cards = 0, className 
       {cards > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: cards }).map((_, i) => (
-            <div key={i} className="rounded-xl border border-slate-700/80 bg-slate-900/60 p-4">
+            <div key={i} className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm ring-1 ring-slate-100">
               <Skeleton className="mb-3 h-5 w-2/3 rounded-xl" />
               <Skeleton className="mb-2 h-4 w-full rounded-xl" />
               <Skeleton className="h-4 w-4/5 rounded-xl" />

@@ -14,6 +14,8 @@ export type AssigneeSelectProps = {
   placeholder?: string;
   variant?: "assigned" | "unassigned";
   className?: string;
+  /** Ribbit light form styling (ticket/note create flows). */
+  appearance?: "default" | "light";
 };
 
 /**
@@ -31,6 +33,7 @@ export function AssigneeSelect({
   placeholder = "Sin asignar",
   variant,
   className = "",
+  appearance = "default",
 }: AssigneeSelectProps) {
   const { users, loading } = useAssignableUsers({
     contextType,
@@ -49,6 +52,7 @@ export function AssigneeSelect({
       placeholder={placeholder}
       variant={effectiveVariant}
       className={className}
+      appearance={appearance}
     />
   );
 }

@@ -1,9 +1,18 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, type FormEvent } from "react";
+import { ChevronDown } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 export type ClientOption = { id: string; name: string };
+
+const triggerClass =
+  "w-full cursor-pointer rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2.5 pr-10 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:border-[rgb(var(--rb-brand-primary))]/35 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 disabled:cursor-not-allowed disabled:opacity-60 read-only:bg-[rgb(var(--rb-surface))]/95";
+
+const innerInputClass =
+  "w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:border-[rgb(var(--rb-brand-primary))]/35 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35";
+
+const labelClass = "mb-1.5 block text-xs font-medium text-[rgb(var(--rb-text-secondary))]";
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
@@ -17,7 +26,7 @@ export function ClientSelector({
   value,
   onChange,
   disabled,
-  placeholder = "Buscar cliente…",
+  placeholder = "Search client…",
 }: {
   value: string;
   onChange: (clientId: string | null, clientName: string | null) => void;
@@ -73,11 +82,11 @@ export function ClientSelector({
   const selectedClient = value ? clients.find((c) => c.id === value) : null;
   const displayValue = selectedClient ? selectedClient.name : "";
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
     const nameTrim = createName.trim();
     if (!nameTrim) {
-      setCreateError("El nombre es obligatorio.");
+      setCreateError("Name is required.");
       return;
     }
     setCreating(true);
@@ -95,7 +104,7 @@ export function ClientSelector({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setCreateError((data as { error?: string }).error ?? "No se pudo crear el cliente.");
+        setCreateError((data as { error?: string }).error ?? "Could not create client.");
         return;
       }
       const newClient = (data as { client?: ClientOption }).client;
@@ -108,7 +117,7 @@ export function ClientSelector({
       setCreateCompany("");
       setOpen(false);
     } catch {
-      setCreateError("Error de conexión.");
+      setCreateError("Connection error.");
     } finally {
       setCreating(false);
     }
@@ -125,45 +134,53 @@ export function ClientSelector({
           disabled={disabled}
           onFocus={() => !disabled && setOpen(true)}
           onClick={() => !disabled && setOpen(true)}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0 bg-white disabled:opacity-60 disabled:cursor-not-allowed"
+          className={triggerClass}
+          aria-expanded={open}
+          aria-haspopup="listbox"
         />
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">▼</span>
+        <ChevronDown
+          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--rb-text-muted))]"
+          aria-hidden
+        />
       </div>
       {open && !disabled && (
-        <div className="absolute z-10 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg max-h-60 overflow-hidden flex flex-col">
-          <div className="p-2 border-b border-slate-100">
+        <div
+          className="absolute z-50 mt-1.5 flex max-h-60 w-full flex-col overflow-hidden rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] shadow-lg"
+          role="listbox"
+        >
+          <div className="border-b border-[rgb(var(--rb-surface-border))]/60 p-2">
             <input
               type="text"
-              placeholder="Buscar por nombre…"
+              placeholder="Search by name…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded border border-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-slate-400"
+              className={innerInputClass}
               autoFocus
             />
           </div>
-          <div className="overflow-y-auto flex-1">
+          <div className="flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgb(var(--rb-surface-border))_transparent]">
             {loading ? (
-              <div className="p-3 text-sm text-slate-500">Cargando…</div>
+              <div className="p-3 text-sm text-[rgb(var(--rb-text-muted))]">Loading…</div>
             ) : (
               <>
                 {value && (
                   <button
                     type="button"
-                    className="w-full text-left px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 border-b border-slate-100"
+                    className="w-full border-b border-[rgb(var(--rb-surface-border))]/60 px-3 py-2.5 text-left text-sm text-[rgb(var(--rb-text-muted))] transition-colors hover:bg-[rgb(var(--rb-surface))]/80 hover:text-[rgb(var(--rb-text-primary))]"
                     onClick={() => {
                       onChange(null, null);
                       setOpen(false);
                       setSearch("");
                     }}
                   >
-                    Ninguno
+                    None
                   </button>
                 )}
                 {filtered.map((c) => (
                   <button
                     key={c.id}
                     type="button"
-                    className="w-full text-left px-3 py-2 text-sm text-slate-900 hover:bg-slate-50"
+                    className="w-full px-3 py-2.5 text-left text-sm text-[rgb(var(--rb-text-primary))] transition-colors hover:bg-[rgb(var(--rb-surface))]/80"
                     onClick={() => {
                       onChange(c.id, c.name);
                       setOpen(false);
@@ -175,13 +192,13 @@ export function ClientSelector({
                 ))}
                 <button
                   type="button"
-                  className="w-full text-left px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 border-t border-slate-100"
+                  className="w-full border-t border-[rgb(var(--rb-surface-border))]/60 px-3 py-2.5 text-left text-sm font-medium text-[rgb(var(--rb-brand-primary))] transition-colors hover:bg-[rgb(var(--rb-brand-primary))]/8"
                   onClick={() => {
                     setSearch("");
                     setCreateModalOpen(true);
                   }}
                 >
-                  + Crear nuevo cliente
+                  + Create new client
                 </button>
               </>
             )}
@@ -190,35 +207,40 @@ export function ClientSelector({
       )}
 
       {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-slate-900">Crear cliente</h3>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+          <div
+            className="w-full max-w-md rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-6 shadow-lg"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="client-modal-title"
+          >
+            <h3 id="client-modal-title" className="text-lg font-semibold text-[rgb(var(--rb-text-primary))]">
+              Create client
+            </h3>
             <form onSubmit={handleCreate} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Nombre *</label>
+                <label className={labelClass}>Name *</label>
                 <input
                   type="text"
                   value={createName}
                   onChange={(e) => setCreateName(e.target.value)}
-                  placeholder="Nombre del cliente"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400"
+                  placeholder="Client name"
+                  className={innerInputClass}
                   required
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Empresa (opcional)</label>
+                <label className={labelClass}>Company (optional)</label>
                 <input
                   type="text"
                   value={createCompany}
                   onChange={(e) => setCreateCompany(e.target.value)}
-                  placeholder="Empresa"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400"
+                  placeholder="Company"
+                  className={innerInputClass}
                 />
               </div>
-              {createError && (
-                <p className="text-sm text-red-600">{createError}</p>
-              )}
-              <div className="flex gap-2 justify-end pt-2">
+              {createError && <p className="text-sm text-red-600">{createError}</p>}
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -227,16 +249,16 @@ export function ClientSelector({
                     setCreateCompany("");
                     setCreateError(null);
                   }}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                  className="rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-primary))] transition-colors hover:bg-[rgb(var(--rb-surface))]/80"
                 >
-                  Cancelar
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creating}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                  className="rounded-xl border border-transparent bg-[rgb(var(--rb-brand-primary))] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[rgb(var(--rb-brand-primary-hover))] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {creating ? "Creando…" : "Crear"}
+                  {creating ? "Creating…" : "Create"}
                 </button>
               </div>
             </form>

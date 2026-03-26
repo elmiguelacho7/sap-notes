@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import { FileText, Link2, Search, Eye, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
-import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
 import { TableSkeleton } from "@/components/skeletons/TableSkeleton";
+import { AppPageShell } from "@/components/ui/layout/AppPageShell";
 
 type Note = {
   id: string;
@@ -30,29 +31,24 @@ type Note = {
   created_at: string;
 };
 
-const SORT_OPTIONS = [
-  { value: "recent", label: "Más recientes" },
-  { value: "oldest", label: "Más antiguas" },
-  { value: "title", label: "Título A-Z" },
-] as const;
+const SORT_OPTIONS = [{ value: "recent" }, { value: "oldest" }, { value: "title" }] as const;
 type SortValue = (typeof SORT_OPTIONS)[number]["value"];
 
 /** Row actions for global notes: Ver (primary) + overflow menu (Editar, Eliminar). */
 function GlobalNoteRowActions({
-  viewHref,
   editHref,
   canEdit,
   canDelete,
   deleteEndpoint,
   onDeleted,
 }: {
-  viewHref: string;
   editHref?: string;
   canEdit: boolean;
   canDelete: boolean;
   deleteEndpoint?: string;
   onDeleted?: () => void;
 }) {
+  const t = useTranslations("notes");
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -81,13 +77,13 @@ function GlobalNoteRowActions({
       const res = await fetch(deleteEndpoint, { method: "DELETE", headers });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setDeleteError(data?.error ?? "No se pudo completar la acción.");
+        setDeleteError(data?.error ?? t("errors.actionFailed"));
         return;
       }
       setDeleteOpen(false);
       onDeleted?.();
     } catch {
-      setDeleteError("Error de conexión. Inténtalo de nuevo.");
+      setDeleteError(t("errors.connection"));
     } finally {
       setDeleteLoading(false);
     }
@@ -97,55 +93,62 @@ function GlobalNoteRowActions({
   const showDelete = canDelete && deleteEndpoint;
 
   return (
-    <div className="flex items-center gap-2 shrink-0" ref={menuRef}>
-      <Link
-        href={viewHref}
-        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-600/80 bg-slate-800/60 px-3 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:border-slate-500 hover:text-slate-100 transition-colors"
-      >
-        <Eye className="h-3.5 w-3.5" />
-        Ver
-      </Link>
+    <div className="flex items-center shrink-0" ref={menuRef}>
       <div className="relative">
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-600/80 bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
-          aria-label="Más opciones"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgb(var(--rb-surface-border))]/50 bg-[rgb(var(--rb-surface-3))]/20 text-[rgb(var(--rb-text-muted))] hover:bg-[rgb(var(--rb-surface-3))]/35 hover:text-[rgb(var(--rb-text-secondary))] transition-colors"
+          aria-label={t("actions.more")}
         >
           <MoreVertical className="h-4 w-4" />
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-full z-20 mt-1 min-w-[160px] rounded-xl border border-slate-600/80 bg-slate-800 shadow-lg ring-1 ring-slate-700/50 py-1">
+          <div className="absolute right-0 top-full z-20 mt-1 min-w-[160px] rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] shadow-lg ring-1 ring-[rgb(var(--rb-surface-border))]/40 py-1">
             {showEdit && (
               <button
                 type="button"
                 onClick={() => { setMenuOpen(false); router.push(editHref!); }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-200 hover:bg-slate-700"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/35"
               >
-                <Pencil className="h-3.5 w-3.5" /> Editar
+                <Pencil className="h-3.5 w-3.5" /> {t("actions.edit")}
               </button>
             )}
             {showDelete && (
               <button
                 type="button"
                 onClick={() => { setMenuOpen(false); setDeleteOpen(true); }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-rose-300 hover:bg-slate-700 hover:bg-rose-500/10"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-rose-700 hover:bg-rose-500/10"
               >
-                <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                <Trash2 className="h-3.5 w-3.5" /> {t("actions.delete")}
               </button>
             )}
           </div>
         )}
       </div>
       {deleteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !deleteLoading && setDeleteOpen(false)}>
-          <div className="rounded-2xl border border-slate-700/80 bg-slate-800 p-6 shadow-xl ring-1 ring-slate-700/50 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-slate-100">Eliminar nota</h3>
-            <p className="mt-2 text-sm text-slate-400">¿Seguro que quieres eliminar esta nota? Esta acción no se puede deshacer.</p>
-            {deleteError && <p className="mt-3 text-sm text-rose-400 bg-rose-950/30 rounded-lg px-3 py-2">{deleteError}</p>}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => !deleteLoading && setDeleteOpen(false)}>
+          <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-6 shadow-xl ring-1 ring-[rgb(var(--rb-surface-border))]/40 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-[rgb(var(--rb-text-primary))]">{t("delete.title")}</h3>
+            <p className="mt-2 text-sm text-[rgb(var(--rb-text-muted))]">{t("delete.body")}</p>
+            {deleteError && <p className="mt-3 text-sm text-rose-800 bg-rose-50 rounded-lg px-3 py-2 border border-rose-200/80">{deleteError}</p>}
             <div className="mt-6 flex justify-end gap-2">
-              <button type="button" onClick={() => !deleteLoading && setDeleteOpen(false)} disabled={deleteLoading} className="rounded-xl border border-slate-600 bg-slate-700 px-3 h-9 text-sm font-medium text-slate-200 hover:bg-slate-600 disabled:opacity-60">Cancelar</button>
-              <button type="button" onClick={handleDeleteConfirm} disabled={deleteLoading} className="rounded-xl bg-rose-600 px-3 h-9 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-60">{deleteLoading ? "Eliminando…" : "Eliminar"}</button>
+              <button
+                type="button"
+                onClick={() => !deleteLoading && setDeleteOpen(false)}
+                disabled={deleteLoading}
+                className="rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-3 h-9 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/25 disabled:opacity-60"
+              >
+                {t("delete.cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteConfirm}
+                disabled={deleteLoading}
+                className="rounded-xl bg-rose-600 px-3 h-9 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-60"
+              >
+                {deleteLoading ? t("delete.deleting") : t("delete.confirm")}
+              </button>
             </div>
           </div>
         </div>
@@ -154,7 +157,29 @@ function GlobalNoteRowActions({
   );
 }
 
+function getScopeBadge(note: Note): { label: string; className: string } {
+  const isProject = Boolean(note.project_id);
+  return isProject
+    ? { label: "Project note", className: "bg-blue-100 text-blue-600" }
+    : { label: "Global note", className: "bg-purple-100 text-purple-600" };
+}
+
+function getTypeBadge(note: Note): { label: string; className: string } | null {
+  const raw = `${note.note_type ?? ""} ${note.scope_item ?? ""}`.toLowerCase();
+  const hasError = Boolean(note.error_code && note.error_code.trim() !== "");
+  if (hasError || raw.includes("incident") || raw.includes("error")) {
+    return { label: "Incident / error", className: "bg-rose-100 text-rose-600" };
+  }
+  if (raw.includes("config") || raw.includes("configuration") || raw.includes("process") || raw.includes("sap") || raw.includes("note")) {
+    return { label: "Configuration / process", className: "bg-amber-100 text-amber-700" };
+  }
+  return null;
+}
+
 export default function NotesPage() {
+  const t = useTranslations("notes");
+  const locale = useLocale();
+  const localeTag = locale === "es" ? "es-ES" : "en-US";
   const router = useRouter();
 
   const [notes, setNotes] = useState<Note[]>([]);
@@ -173,7 +198,7 @@ export default function NotesPage() {
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
     if (!token) {
-      setErrorMsg("Debes iniciar sesión para ver las notas.");
+      setErrorMsg(t("errors.loginRequired"));
       setLoadingNotes(false);
       return;
     }
@@ -184,9 +209,9 @@ export default function NotesPage() {
       });
       if (!res.ok) {
         if (res.status === 401) {
-          setErrorMsg("Sesión expirada. Inicia sesión de nuevo.");
+          setErrorMsg(t("errors.sessionExpired"));
         } else {
-          setErrorMsg("No se pudieron cargar las notas.");
+          setErrorMsg(t("errors.load"));
         }
         setLoadingNotes(false);
         return;
@@ -195,12 +220,12 @@ export default function NotesPage() {
       setNotes(Array.isArray(data) ? data : []);
     } catch {
       handleSupabaseError("notes", new Error("Network error"));
-      setErrorMsg("No se pudieron cargar las notas.");
+      setErrorMsg(t("errors.load"));
       setNotes([]);
     } finally {
       setLoadingNotes(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchNotes();
@@ -245,7 +270,7 @@ export default function NotesPage() {
         const title = (n.title ?? "").toLowerCase();
         const body = (n.body ?? "").toLowerCase();
         const extra = (n.extra_info ?? "").toLowerCase();
-        const module = (n.module ?? "").toLowerCase();
+        const moduleName = (n.module ?? "").toLowerCase();
         const scope = (n.scope_item ?? "").toLowerCase();
         const err = (n.error_code ?? "").toLowerCase();
         const noteType = (n.note_type ?? "").toLowerCase();
@@ -253,7 +278,7 @@ export default function NotesPage() {
           title.includes(q) ||
           body.includes(q) ||
           extra.includes(q) ||
-          module.includes(q) ||
+          moduleName.includes(q) ||
           scope.includes(q) ||
           err.includes(q) ||
           noteType.includes(q)
@@ -278,28 +303,35 @@ export default function NotesPage() {
   }, [notes, searchQuery, moduleFilter, sortBy]);
 
   return (
-    <div className="w-full px-6 lg:px-8 py-8">
-      <div className="w-full min-w-0 space-y-8">
-      <header className="space-y-1">
-        <ProjectPageHeader
-          variant="section"
-          dark
-          title="Global Knowledge Notes"
-          subtitle="Reusable SAP patterns, incidents, configuration standards, and cross-project decisions. Only users with global notes permission can view and create them."
-          primaryActionLabel={manageGlobalNotes ? "New global note" : undefined}
-          primaryActionHref={manageGlobalNotes ? "/notes/new" : undefined}
-          primaryActionClassName="shadow-sm shadow-indigo-500/20 bg-indigo-500/20 hover:bg-indigo-500/30"
-        />
-      </header>
+    <AppPageShell>
+      <div className="space-y-6">
+        <header className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight text-[rgb(var(--rb-text-primary))]">
+              Global Knowledge Notes
+            </h1>
+            <p className="mt-1 text-sm text-[rgb(var(--rb-text-muted))] max-w-3xl">
+              Reusable SAP patterns, incidents, configuration standards, and cross-project decisions.
+            </p>
+          </div>
+          {manageGlobalNotes && (
+            <Link
+              href="/notes/new"
+              className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-transparent bg-[rgb(var(--rb-brand-primary))] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[rgb(var(--rb-brand-primary-hover))] active:bg-[rgb(var(--rb-brand-primary-active))] mt-0.5"
+            >
+              New note
+            </Link>
+          )}
+        </header>
 
       {errorMsg && (
-        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200/90 bg-red-50 px-4 py-3 text-sm text-red-800">
           {errorMsg}
         </div>
       )}
 
       {loadingNotes ? (
-        <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
+        <section className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] overflow-hidden shadow-sm">
           <div className="px-6 py-6">
             <TableSkeleton rows={6} colCount={5} />
           </div>
@@ -307,44 +339,44 @@ export default function NotesPage() {
       ) : (
         <>
           {/* Metrics cards — subdued so notes dominate */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-slate-700/40 bg-slate-800/30 p-3 sm:p-4">
-              <p className="text-[11px] uppercase tracking-wide text-slate-500">Total notes</p>
-              <p className="mt-0.5 text-base font-semibold text-slate-300">{summary.total}</p>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4 pt-2">
+            <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-4 shadow-sm">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">Total notes</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[rgb(var(--rb-text-primary))]">{summary.total}</p>
             </div>
-            <div className="rounded-xl border border-slate-700/40 bg-slate-800/30 p-3 sm:p-4">
-              <p className="text-[11px] uppercase tracking-wide text-slate-500">SAP modules covered</p>
-              <p className="mt-0.5 text-base font-semibold text-slate-300">{summary.modulesCovered}</p>
+            <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-4 shadow-sm">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">SAP modules covered</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[rgb(var(--rb-text-primary))]">{summary.modulesCovered}</p>
             </div>
-            <div className="rounded-xl border border-slate-700/40 bg-slate-800/30 p-3 sm:p-4">
-              <p className="text-[11px] uppercase tracking-wide text-slate-500">Recent notes (7d)</p>
-              <p className="mt-0.5 text-base font-semibold text-slate-300">{summary.recentlyAdded}</p>
+            <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-4 shadow-sm">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">Recent notes (7d)</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[rgb(var(--rb-text-primary))]">{summary.recentlyAdded}</p>
             </div>
-            <div className="rounded-xl border border-slate-700/40 bg-slate-800/30 p-3 sm:p-4">
-              <p className="text-[11px] uppercase tracking-wide text-slate-500">Recurring incidents</p>
-              <p className="mt-0.5 text-base font-semibold text-slate-300">{summary.recurringIncidents}</p>
+            <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-4 shadow-sm">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">Recurring incidents</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[rgb(var(--rb-text-primary))]">{summary.recurringIncidents}</p>
             </div>
           </div>
 
           {/* Filter / search bar — aligned with notes width */}
-          <div className="flex flex-wrap items-center gap-3 w-full">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+          <div className="flex flex-wrap gap-3 rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] shadow-sm p-3">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[rgb(var(--rb-text-muted))]" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar en notas..."
-                className="h-10 w-full rounded-xl border border-slate-600 bg-slate-800/80 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                placeholder={t("searchPlaceholder")}
+                className="h-10 w-full rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 pl-9 pr-3 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30 focus:border-[rgb(var(--rb-brand-primary))]/30"
               />
             </div>
             {uniqueModules.length > 0 && (
               <select
                 value={moduleFilter}
                 onChange={(e) => setModuleFilter(e.target.value)}
-                className="h-10 rounded-xl border border-slate-600 bg-slate-800/80 px-3 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                className="h-10 rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30 focus:border-[rgb(var(--rb-brand-primary))]/30"
               >
-                <option value="">Todos los módulos</option>
+                <option value="">{t("allModules")}</option>
                 {uniqueModules.map((m) => (
                   <option key={m} value={m}>
                     {m}
@@ -355,24 +387,25 @@ export default function NotesPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortValue)}
-              className="h-10 rounded-xl border border-slate-600 bg-slate-800/80 px-3 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+              className="h-10 rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30 focus:border-[rgb(var(--rb-brand-primary))]/30"
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
-                  {opt.label}
+                  {t(`sort.${opt.value}`)}
                 </option>
               ))}
             </select>
           </div>
 
-          <section className="w-full rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden pb-1 min-h-[200px]">
+          {/* Grid of note cards */}
+          <section className="w-full min-h-[200px]">
             {notes.length === 0 ? (
-              <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-16 px-6 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 text-slate-500">
+              <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] py-16 px-6 text-center shadow-sm">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 text-[rgb(var(--rb-text-muted))]">
                   <FileText className="h-7 w-7" />
                 </div>
-                <p className="mt-4 text-base font-medium text-slate-200">No global notes yet</p>
-                <p className="mt-1.5 max-w-md mx-auto text-sm text-slate-500">
+                <p className="mt-4 text-base font-medium text-[rgb(var(--rb-text-primary))]">No global notes yet</p>
+                <p className="mt-1.5 max-w-md mx-auto text-sm text-[rgb(var(--rb-text-muted))]">
                   {manageGlobalNotes
                     ? "Create your first global note to document SAP patterns, recurring incidents, configuration standards, or cross-project decisions."
                     : "Global notes are only visible to users with permission. Create or view notes within a project from the project Notes tab."}
@@ -380,108 +413,146 @@ export default function NotesPage() {
                 {manageGlobalNotes && (
                   <Link
                     href="/notes/new"
-                    className="mt-5 inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors"
+                    className="mt-5 inline-flex items-center gap-2 rounded-xl border border-transparent bg-[rgb(var(--rb-brand-primary))] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[rgb(var(--rb-brand-primary-hover))] active:bg-[rgb(var(--rb-brand-primary-active))]"
                   >
                     Create first note
                   </Link>
                 )}
               </div>
             ) : filteredAndSortedNotes.length === 0 ? (
-              <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-12 px-6 text-center">
-                <p className="text-sm font-medium text-slate-300">No notes match the filters</p>
-                <p className="mt-1 text-xs text-slate-500">Try changing the search or module.</p>
+              <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] py-12 px-6 text-center shadow-sm">
+                <p className="text-sm font-medium text-[rgb(var(--rb-text-primary))]">No notes match the filters</p>
+                <p className="mt-1 text-xs text-[rgb(var(--rb-text-muted))]">Try changing the search or module.</p>
               </div>
             ) : (
-              <ul className="w-full space-y-5 p-4 pb-6">
-                {filteredAndSortedNotes.map((note) => {
-                  const excerpt =
-                    (note.body && note.body.trim() !== ""
-                      ? note.body
-                      : note.extra_info && note.extra_info.trim() !== ""
-                        ? note.extra_info
-                        : null) ?? "";
-                  const hasLinks =
-                    (note.web_link_1 && note.web_link_1.trim() !== "") ||
-                    (note.web_link_2 && note.web_link_2.trim() !== "");
-                  return (
-                    <li
-                      key={note.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => router.push(`/notes/${note.id}`)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          router.push(`/notes/${note.id}`);
-                        }
-                      }}
-                      className="flex items-start justify-between gap-3 rounded-xl border border-slate-700/60 bg-slate-800/40 px-5 py-5 cursor-pointer transition-all duration-150 hover:bg-slate-800/60 hover:border-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-inset"
-                    >
+              <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] shadow-sm p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+                  {filteredAndSortedNotes.map((note) => {
+                    const excerpt =
+                      (note.body && note.body.trim() !== ""
+                        ? note.body
+                        : note.extra_info && note.extra_info.trim() !== ""
+                          ? note.extra_info
+                          : null) ?? "";
+                    const hasLinks =
+                      (note.web_link_1 && note.web_link_1.trim() !== "") ||
+                      (note.web_link_2 && note.web_link_2.trim() !== "");
+                    const scopeBadge = getScopeBadge(note);
+                    const typeBadge = getTypeBadge(note);
+                    const sapitoHref = `/knowledge/search?context=${encodeURIComponent(`note:${note.id}`)}`;
+                    return (
                       <div
-                        className="min-w-0 flex-1 cursor-pointer"
-                        onClick={(e) => { e.stopPropagation(); router.push(`/notes/${note.id}`); }}
+                        key={note.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => router.push(`/notes/${note.id}`)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            router.push(`/notes/${note.id}`);
+                          }
+                        }}
+                        className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-white shadow-sm p-4 space-y-3.5 cursor-pointer hover:shadow-md hover:-translate-y-[2px] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-primary))]/30"
                       >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="font-medium text-slate-100">
-                            {note.title ?? "Sin título"}
-                          </p>
-                          <span className="text-xs text-slate-500 shrink-0">
-                            {new Date(note.created_at).toLocaleString("es-ES", {
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                            {typeBadge ? (
+                              <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-medium tracking-wide ${typeBadge.className}`}>
+                                {typeBadge.label}
+                              </span>
+                            ) : (
+                              <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-medium tracking-wide ${scopeBadge.className}`}>
+                                {scopeBadge.label}
+                              </span>
+                            )}
+                            {typeBadge ? (
+                              <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-medium tracking-wide ${scopeBadge.className}`}>
+                                {scopeBadge.label}
+                              </span>
+                            ) : null}
+                          </div>
+                          {note.module ? (
+                            <span className="shrink-0 inline-flex items-center rounded-md border border-[rgb(var(--rb-surface-border))]/40 bg-[rgb(var(--rb-surface-3))]/20 px-2 py-0.5 text-[10px] text-[rgb(var(--rb-text-muted))]">
+                              {note.module}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <h3 className="text-[16px] font-semibold tracking-tight text-[rgb(var(--rb-text-primary))] line-clamp-2">
+                            {note.title ?? t("untitled")}
+                          </h3>
+                          {excerpt ? (
+                            <p className="text-sm leading-relaxed text-[rgb(var(--rb-text-muted))] line-clamp-3">
+                              {excerpt.length > 220 ? excerpt.slice(0, 220).trimEnd() + "…" : excerpt}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5">
+                          {note.note_type ? (
+                            <span className="inline-flex items-center rounded-md bg-[rgb(var(--rb-surface-3))]/30 px-2 py-0.5 text-xs text-[rgb(var(--rb-text-secondary))]">
+                              {note.note_type}
+                            </span>
+                          ) : null}
+                          {note.scope_item ? (
+                            <span className="inline-flex items-center rounded-md bg-[rgb(var(--rb-surface-3))]/30 px-2 py-0.5 text-xs text-[rgb(var(--rb-text-secondary))]">
+                              {note.scope_item}
+                            </span>
+                          ) : null}
+                          {note.error_code ? (
+                            <span className="inline-flex items-center rounded-md bg-rose-100 px-2 py-0.5 text-xs text-rose-600">
+                              Error {note.error_code}
+                            </span>
+                          ) : null}
+                          {hasLinks ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-[rgb(var(--rb-surface-3))]/30 px-2 py-0.5 text-xs text-[rgb(var(--rb-text-secondary))]">
+                              <Link2 className="h-3 w-3" /> {t("links")}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 pt-0.5">
+                          <span className="text-xs tabular-nums text-[rgb(var(--rb-text-muted))]">
+                            {new Date(note.created_at).toLocaleString(localeTag, {
                               day: "2-digit",
                               month: "short",
                               year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
                             })}
                           </span>
                         </div>
-                        {excerpt && (
-                          <p className="mt-1.5 line-clamp-2 text-xs text-slate-400">
-                            {excerpt.length > 160 ? excerpt.slice(0, 160).trimEnd() + "…" : excerpt}
-                          </p>
-                        )}
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {note.module && (
-                            <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2 py-0.5 text-[10px] text-slate-300">
-                              {note.module}
-                            </span>
-                          )}
-                          {note.note_type && (
-                            <span className="inline-flex items-center rounded-lg bg-indigo-500/20 px-2 py-0.5 text-[10px] text-indigo-300">
-                              {note.note_type}
-                            </span>
-                          )}
-                          {note.scope_item && (
-                            <span className="inline-flex items-center rounded-lg bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-300">
-                              {note.scope_item}
-                            </span>
-                          )}
-                          {note.error_code && (
-                            <span className="inline-flex items-center rounded-lg bg-red-500/20 px-2 py-0.5 text-[10px] text-red-400">
-                              Error {note.error_code}
-                            </span>
-                          )}
-                          {hasLinks && (
-                            <span className="inline-flex items-center gap-0.5 rounded-lg bg-slate-600/50 px-2 py-0.5 text-[10px] text-slate-400">
-                              <Link2 className="h-3 w-3" /> Enlaces
-                            </span>
-                          )}
+
+                        <div className="flex items-center justify-between gap-2 pt-3 border-t border-[rgb(var(--rb-surface-border))]/50 mt-0.5">
+                          <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <Link
+                              href={`/notes/${note.id}`}
+                              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 px-3 text-xs font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/35 transition-colors"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              {t("actions.view")}
+                            </Link>
+                            <Link
+                              href={sapitoHref}
+                              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 px-3 text-xs font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/35 transition-colors"
+                            >
+                              Ask Sapito
+                            </Link>
+                          </div>
+                          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <GlobalNoteRowActions
+                              editHref={manageGlobalNotes ? `/notes/${note.id}` : undefined}
+                              canEdit={manageGlobalNotes}
+                              canDelete={manageGlobalNotes}
+                              deleteEndpoint={manageGlobalNotes ? `/api/notes/${note.id}` : undefined}
+                              onDeleted={fetchNotes}
+                            />
+                          </div>
                         </div>
                       </div>
-                      <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <GlobalNoteRowActions
-                          viewHref={`/notes/${note.id}`}
-                          editHref={manageGlobalNotes ? `/notes/${note.id}` : undefined}
-                          canEdit={manageGlobalNotes}
-                          canDelete={manageGlobalNotes}
-                          deleteEndpoint={manageGlobalNotes ? `/api/notes/${note.id}` : undefined}
-                          onDeleted={fetchNotes}
-                        />
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </section>
 
@@ -489,6 +560,6 @@ export default function NotesPage() {
         </>
       )}
       </div>
-    </div>
+    </AppPageShell>
   );
 }

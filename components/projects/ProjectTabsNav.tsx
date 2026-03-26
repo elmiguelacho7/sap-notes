@@ -1,5 +1,6 @@
 import { TabsNav } from "@/components/ui/TabsNav";
 import { LayoutDashboard, CalendarDays, ListTodo, CheckSquare, FileText, Link as LinkIcon, BookOpen, Ticket, Brain, Users } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export function ProjectTabsNav({
   projectId,
@@ -10,6 +11,7 @@ export function ProjectTabsNav({
   className?: string;
   variant?: "light" | "dark";
 }) {
+  const t = useTranslations("projects.tabs");
   const base = `/projects/${projectId}`;
   const iconClass = "h-[18px] w-[18px] shrink-0";
 
@@ -18,16 +20,16 @@ export function ProjectTabsNav({
       variant={variant}
       className={className}
       items={[
-        { label: "Overview", href: base, exact: true, icon: <LayoutDashboard className={iconClass} /> },
-        { label: "Planning", href: `${base}/planning`, icon: <CalendarDays className={iconClass} /> },
-        { label: "Activities", href: `${base}/planning/activities`, icon: <ListTodo className={iconClass} /> },
-        { label: "Tasks", href: `${base}/tasks`, icon: <CheckSquare className={iconClass} /> },
-        { label: "Notes", href: `${base}/notes`, icon: <FileText className={iconClass} /> },
-        { label: "Brain", href: `${base}/brain`, icon: <Brain className={iconClass} /> },
-        { label: "Links", href: `${base}/links`, icon: <LinkIcon className={iconClass} /> },
-        { label: "Knowledge", href: `${base}/knowledge`, icon: <BookOpen className={iconClass} /> },
-        { label: "Tickets", href: `${base}/tickets`, icon: <Ticket className={iconClass} /> },
-        { label: "Equipo", href: `${base}/members`, icon: <Users className={iconClass} /> },
+        { label: t("overview"), href: base, exact: true, icon: <LayoutDashboard className={iconClass} /> },
+        { label: t("planning"), href: `${base}/planning`, icon: <CalendarDays className={iconClass} /> },
+        { label: t("activities"), href: `${base}/planning/activities`, icon: <ListTodo className={iconClass} /> },
+        { label: t("tasks"), href: `${base}/tasks`, icon: <CheckSquare className={iconClass} /> },
+        { label: t("notes"), href: `${base}/notes`, icon: <FileText className={iconClass} /> },
+        { label: t("brain"), href: `${base}/brain`, icon: <Brain className={iconClass} /> },
+        { label: t("links"), href: `${base}/links`, icon: <LinkIcon className={iconClass} /> },
+        { label: t("knowledge"), href: `${base}/knowledge`, icon: <BookOpen className={iconClass} /> },
+        { label: t("tickets"), href: `${base}/tickets`, icon: <Ticket className={iconClass} /> },
+        { label: t("team"), href: `${base}/members`, icon: <Users className={iconClass} /> },
       ]}
     />
   );

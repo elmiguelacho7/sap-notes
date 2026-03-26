@@ -1,0 +1,85 @@
+{
+  "emDash": "—",
+  "page": {
+    "eyebrow": "Hoja de ruta de implantación",
+    "title": "Planificación del proyecto",
+    "subtitle": "Estructura por fases SAP Activate: orden, fechas y timeline alineados con el proyecto."
+  },
+  "status": {
+    "configured": "Plan configurado",
+    "pending": "Plan pendiente"
+  },
+  "kpi": {
+    "currentPhase": "Fase actual",
+    "plannedStart": "Inicio previsto",
+    "plannedEnd": "Fin previsto",
+    "duration": "Duración",
+    "days": "{count} días",
+    "phases": "Fases"
+  },
+  "empty": {
+    "title": "Aún no hay fases de planificación",
+    "description": "Crea las fases SAP Activate o genera el plan completo (fases, actividades y tareas) cuando el proyecto tenga fechas de inicio y fin definidas."
+  },
+  "actions": {
+    "generating": "Generando…",
+    "generateFromTemplate": "Generar plan desde plantilla",
+    "generatePhasesOnly": "Generar solo fases",
+    "backToProject": "Volver al proyecto"
+  },
+  "editor": {
+    "title": "Editor de fases",
+    "subtitle": "Edita nombres y fechas; el timeline se actualiza con los cambios guardados.",
+    "saveAllLabel": "Guardar planificación",
+    "saveAllHelp": "persiste todas las fases y actualiza las fechas del proyecto.",
+    "rowSaveLabel": "Guardar",
+    "rowSaveHelpPrefix": "en cada fila",
+    "rowSaveHelpSuffix": "solo esa fase."
+  },
+  "save": {
+    "saveAll": "Guardar planificación",
+    "saving": "Guardando…",
+    "success": "Planificación guardada correctamente.",
+    "successWithProjectDates": "Planificación guardada y fechas del proyecto actualizadas.",
+    "error": "Error al guardar la planificación. Inténtalo de nuevo."
+  },
+  "table": {
+    "order": "Orden",
+    "phase": "Fase",
+    "start": "Inicio",
+    "end": "Fin",
+    "actions": "Acciones"
+  },
+  "row": {
+    "moveUp": "Mover arriba",
+    "moveDown": "Mover abajo",
+    "phaseNamePlaceholder": "Nombre de fase",
+    "save": "Guardar"
+  },
+  "gantt": {
+    "eyebrow": "Timeline del proyecto",
+    "title": "Fases SAP Activate",
+    "subtitle": "Vista ejecutiva de fases y duraciones, alineada con el editor de fechas.",
+    "empty": "Indica fechas de inicio y fin en el editor de fases para ver el timeline."
+  },
+  "timeline": {
+    "empty": "Indica fechas de inicio y fin en el editor de fases para ver el timeline.",
+    "today": "Hoy",
+    "current": "Actual",
+    "durationUnitShort": "d",
+    "durationUnitShortCompact": "d",
+    "tooltip": {
+      "start": "Inicio",
+      "end": "Fin",
+      "duration": "Duración"
+    }
+  },
+  "errors": {
+    "loadData": "No se pudieron cargar los datos.",
+    "createPhases": "No se pudieron crear las fases. Comprueba que tienes permiso o inténtalo más tarde.",
+    "generatePhases": "Se produjo un error al generar las fases. Inténtalo de nuevo.",
+    "missingDates": "Indica fechas de inicio y fin en el proyecto.",
+    "generatePlan": "No se pudo generar el plan.",
+    "missingProjectId": "No se ha encontrado el identificador del proyecto."
+  }
+}

@@ -2,6 +2,7 @@
 
 import { User } from "lucide-react";
 import React from "react";
+import { useTranslations } from "next-intl";
 
 export type AssigneeProfile = {
   id: string;
@@ -22,10 +23,11 @@ export type AssigneeCellProps = {
  * Standardized assignee pill for tables and lists.
  * - Shows avatar/initial
  * - Uses best-available display name
- * - Fallback: "Sin asignar"
+ * - Fallback: tickets.project.assigneeUnassigned
  */
 export function AssigneeCell({ profileId, profilesMap, tone = "dark" }: AssigneeCellProps) {
   const isLight = tone === "light";
+  const t = useTranslations("tickets");
 
   if (!profileId) {
     return (
@@ -37,7 +39,7 @@ export function AssigneeCell({ profileId, profilesMap, tone = "dark" }: Assignee
         >
           <User className="h-3.5 w-3.5" />
         </span>
-        Sin asignar
+        {t("project.assigneeUnassigned")}
       </span>
     );
   }

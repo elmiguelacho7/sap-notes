@@ -1,9 +1,9 @@
-import { PageShell } from "@/components/layout/PageShell";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { AppPageShell } from "@/components/ui/layout/AppPageShell";
 
 export default function DashboardLoading() {
   return (
-    <PageShell className="bg-slate-950">
+    <AppPageShell>
       <div className="space-y-8">
         <div className="flex flex-wrap gap-3">
           {[1, 2, 3, 4].map((i) => (
@@ -21,6 +21,6 @@ export default function DashboardLoading() {
           ))}
         </div>
       </div>
-    </PageShell>
+    </AppPageShell>
   );
 }

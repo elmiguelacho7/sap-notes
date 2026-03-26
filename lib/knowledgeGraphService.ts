@@ -64,3 +64,55 @@ export async function getPageGraph(
 
   return { nodes, edges: links };
 }
+
+/**
+ * Synchronize internal knowledge references for a page.
+ * Creates/removes rows in `knowledge_page_links` so backlinks stay consistent.
+ */
+export async function syncKnowledgePageLinks(
+  supabase: SupabaseClient,
+  fromPageId: string,
+  toPageIds: string[],
+  linkType: string = "references"
+): Promise<void> {
+  const uniqueToIds = Array.from(new Set(toPageIds.filter(Boolean)));
+
+  const { data: existing, error: existingError } = await supabase
+    .from("knowledge_page_links")
+    .select("to_page_id")
+    .eq("from_page_id", fromPageId)
+    .eq("link_type", linkType);
+
+  if (existingError) {
+    throw new Error(existingError.message ?? "Error al leer knowledge_page_links.");
+  }
+
+  const existingToIds = new Set((existing ?? []).map((r) => r.to_page_id as string));
+
+  const toInsert = uniqueToIds.filter((id) => !existingToIds.has(id));
+  const toDelete = Array.from(existingToIds).filter((id) => !uniqueToIds.includes(id));
+
+  if (toInsert.length > 0) {
+    const rows = toInsert.map((to_page_id) => ({
+      from_page_id: fromPageId,
+      to_page_id,
+      link_type: linkType,
+    }));
+    const { error: insertError } = await supabase.from("knowledge_page_links").insert(rows);
+    if (insertError) {
+      throw new Error(insertError.message ?? "Error al crear knowledge_page_links.");
+    }
+  }
+
+  if (toDelete.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("knowledge_page_links")
+      .delete()
+      .eq("from_page_id", fromPageId)
+      .eq("link_type", linkType)
+      .in("to_page_id", toDelete);
+    if (deleteError) {
+      throw new Error(deleteError.message ?? "Error al eliminar knowledge_page_links.");
+    }
+  }
+}

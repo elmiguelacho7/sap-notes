@@ -1,0 +1,149 @@
+{
+  "emDash": "—",
+  "page": {
+    "eyebrow": "Ejecución",
+    "title": "Actividades",
+    "subtitle": "Gestión de actividades SAP Activate por fase: responsables, fechas, riesgo y vínculo con tareas del proyecto.",
+    "projectMeta": "Proyecto · {name}",
+    "createCta": "Nueva actividad"
+  },
+  "banner": {
+    "creating": "Creando…"
+  },
+  "kpi": {
+    "open": "Abiertas",
+    "inProgress": "En progreso",
+    "blocked": "Bloqueadas",
+    "overdue": "Vencidas"
+  },
+  "phaseFilter": {
+    "label": "Fase",
+    "all": "Todas las fases",
+    "showing": "Mostrando actividades de:",
+    "contextAll": "Contexto: todas las fases del proyecto"
+  },
+  "filters": {
+    "all": "Todas",
+    "planned": "Planificadas",
+    "inProgress": "En progreso",
+    "blocked": "Bloqueadas",
+    "done": "Completadas",
+    "overdue": "Vencidas",
+    "assignedToMe": "Asignadas a mí",
+    "searchAria": "Buscar actividades",
+    "searchPlaceholder": "Buscar actividades…"
+  },
+  "section": {
+    "title": "Listado de actividades",
+    "description": "Vista por fase; edita fechas en línea o abre el detalle para el resto de campos. Enlaza con tareas desde el icono de lista."
+  },
+  "empty": {
+    "none": {
+      "title": "Sin actividades en este proyecto",
+      "description": "Crea actividades para organizar el trabajo y vincularlas con las tareas del proyecto.",
+      "createFirst": "Crear la primera actividad",
+      "noPhasesHint": "Necesitas fases en la planificación antes de crear actividades."
+    },
+    "byPhase": {
+      "title": "Sin actividades en esta fase",
+      "description": "Cambia el filtro de fase o crea una actividad nueva."
+    },
+    "filtered": {
+      "title": "Sin resultados con los filtros actuales",
+      "description": "Prueba otro estado o ajusta la búsqueda."
+    }
+  },
+  "status": {
+    "planned": "Planificada",
+    "in_progress": "En progreso",
+    "blocked": "Bloqueada",
+    "done": "Completada",
+    "overdue": "Vencida"
+  },
+  "priority": {
+    "low": "Baja",
+    "medium": "Media",
+    "high": "Alta"
+  },
+  "risk": {
+    "high": "Riesgo alto",
+    "medium": "Riesgo medio",
+    "low": "Riesgo bajo"
+  },
+  "dates": {
+    "start": "Inicio",
+    "end": "Fin",
+    "none": "Sin fechas"
+  },
+  "mobile": {
+    "progress": "Progreso {value}%"
+  },
+  "table": {
+    "phase": "Fase",
+    "activity": "Actividad",
+    "owner": "Responsable",
+    "status": "Estado",
+    "priority": "Prioridad",
+    "start": "Inicio",
+    "end": "Fin",
+    "risk": "Riesgo",
+    "actions": "Acciones"
+  },
+  "actions": {
+    "editActivity": "Editar actividad",
+    "viewProjectTasks": "Ver tareas del proyecto",
+    "viewTasks": "Ver tareas",
+    "deleteActivity": "Eliminar actividad"
+  },
+  "row": {
+    "saveDates": "Guardar fechas",
+    "moreActions": "Más acciones",
+    "progressTitle": "Progreso derivado de tareas (hechas / total)",
+    "menu": {
+      "actionsLabel": "Acciones de la actividad",
+      "edit": "Editar actividad",
+      "viewTasks": "Ver tareas",
+      "delete": "Eliminar actividad"
+    }
+  },
+  "delete": {
+    "confirmBody": "¿Seguro que deseas eliminar esta actividad? Las tareas asociadas seguirán existiendo pero quedarán sin vínculo.",
+    "cancel": "Cancelar",
+    "deleting": "Eliminando…",
+    "confirm": "Sí, eliminar"
+  },
+  "modal": {
+    "titleCreate": "Nueva actividad",
+    "titleEdit": "Editar actividad",
+    "fields": {
+      "phaseRequired": "Fase *",
+      "selectPhase": "Selecciona una fase",
+      "titleRequired": "Título *",
+      "description": "Descripción",
+      "owner": "Responsable",
+      "unassigned": "Sin asignar",
+      "status": "Estado",
+      "priority": "Prioridad",
+      "start": "Inicio",
+      "end": "Fin",
+      "progress": "Progreso (%)"
+    },
+    "cancel": "Cancelar",
+    "saveChanges": "Guardar cambios",
+    "create": "Crear actividad",
+    "savingEdit": "Guardando…",
+    "savingCreate": "Creando…",
+    "errors": {
+      "missingProject": "No se pudo identificar el proyecto.",
+      "phaseRequired": "Selecciona una fase para la actividad.",
+      "titleRequired": "La actividad necesita un título.",
+      "updateFailed": "No se pudo actualizar la actividad.",
+      "createFailed": "No se pudo crear la actividad.",
+      "unexpected": "Ocurrió un error inesperado al crear la actividad."
+    }
+  },
+  "errors": {
+    "loadData": "No se pudieron cargar los datos.",
+    "missingProjectId": "No se ha encontrado el identificador del proyecto."
+  }
+}

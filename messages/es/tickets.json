@@ -1,0 +1,173 @@
+{
+  "emDash": "—",
+  "project": {
+    "invalidProjectId": "Identificador de proyecto no válido.",
+    "eyebrow": "Control de incidencias",
+    "title": "Tickets del proyecto",
+    "subtitle": "Incidencias y seguimiento operativo vinculados a este proyecto. Abre una fila para ver el detalle.",
+    "createTicket": "Crear ticket",
+    "createFirstTicket": "Crear primer ticket",
+    "searchAria": "Buscar tickets",
+    "searchPlaceholder": "Buscar tickets…",
+    "loadError": "No se pudieron cargar los tickets. Inténtalo de nuevo más tarde.",
+    "kpi": {
+      "open": "Abiertos",
+      "inProgress": "En progreso",
+      "overdue": "Vencidos",
+      "unassigned": "Sin asignar"
+    },
+    "empty": {
+      "title": "Aún no hay tickets",
+      "description": "Registra incidencias o trabajo técnico para este proyecto. Los tickets aparecerán en esta lista."
+    },
+    "filteredEmpty": {
+      "title": "Ningún ticket coincide",
+      "description": "Prueba otro filtro o limpia la búsqueda para ver más resultados."
+    },
+    "table": {
+      "title": "Título",
+      "assignee": "Asignado a",
+      "priority": "Prioridad",
+      "status": "Estado",
+      "dueDate": "Fecha límite",
+      "created": "Alta",
+      "actions": "Acciones"
+    },
+    "noDueDate": "Sin fecha límite",
+    "createdMeta": "Alta",
+    "assigneeUnassigned": "Sin asignar"
+  },
+  "filters": {
+    "all": "Todos",
+    "open": "Abierto",
+    "in_progress": "En progreso",
+    "closed": "Cerrado",
+    "overdue": "Vencidos",
+    "unassigned": "Sin asignar",
+    "my_tickets": "Asignado a mí"
+  },
+  "priority": {
+    "low": "Baja",
+    "medium": "Media",
+    "high": "Alta",
+    "urgent": "Urgente"
+  },
+  "status": {
+    "open": "Abierto",
+    "in_progress": "En progreso",
+    "pending": "Pendiente",
+    "resolved": "Resuelto",
+    "closed": "Cerrado",
+    "cancelled": "Cancelado"
+  },
+  "due": {
+    "overdue": "Vencida",
+    "dueToday": "Vence hoy",
+    "dueTomorrow": "Vence mañana",
+    "inDays": "En {n} días",
+    "limit": "Límite"
+  },
+  "rowActions": {
+    "moreTitle": "Más acciones",
+    "moreAria": "Más acciones",
+    "view": "Ver",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "deleteTitle": "Eliminar ticket",
+    "deleteBody": "¿Seguro que quieres eliminar este ticket? Esta acción no se puede deshacer.",
+    "cancel": "Cancelar",
+    "deleteConfirm": "Eliminar",
+    "deleting": "Eliminando…",
+    "actionFailed": "No se pudo completar la acción.",
+    "connectionError": "Error de conexión. Inténtalo de nuevo."
+  },
+  "new": {
+    "invalidProjectId": "Identificador de proyecto no válido.",
+    "backToProjects": "Volver a proyectos",
+    "creatingBanner": "Creando…",
+    "title": "Nuevo ticket del proyecto",
+    "subtitle": "Crea un ticket vinculado a este proyecto. Quedará visible en la sección Tickets del proyecto.",
+    "sectionMain": "Información principal",
+    "sectionManagement": "Asignación y estado",
+    "fieldTitle": "Título *",
+    "titlePlaceholder": "Resumen del ticket",
+    "fieldDescription": "Descripción (opcional)",
+    "descriptionPlaceholder": "Detalles del ticket",
+    "fieldAssignee": "Responsable",
+    "assigneePlaceholder": "Sin asignar",
+    "fieldPriority": "Prioridad",
+    "fieldStatus": "Estado",
+    "fieldDueDate": "Fecha límite (opcional)",
+    "cancel": "Cancelar",
+    "submit": "Crear ticket",
+    "submitting": "Creando…",
+    "errors": {
+      "titleRequired": "El título es obligatorio.",
+      "missingProject": "Falta el identificador del proyecto.",
+      "userUnknown": "No se pudo identificar al usuario actual.",
+      "clientProjectConflict": "El ticket no puede estar asociado a un proyecto y a un cliente al mismo tiempo.",
+      "createFailed": "No se pudo crear el ticket. Inténtalo de nuevo más tarde.",
+      "redirectFailed": "El ticket se creó pero no se pudo redirigir. Ve a la lista de tickets."
+    }
+  },
+  "comments": {
+    "empty": "Aún no hay comentarios.",
+    "userFallback": "Usuario",
+    "placeholder": "Escribe un comentario...",
+    "sending": "Enviando...",
+    "add": "Añadir comentario",
+    "errors": {
+      "loginRequired": "Debes iniciar sesión para comentar.",
+      "addFailed": "No se pudo añadir el comentario."
+    }
+  },
+  "detail": {
+    "untitled": "Sin título",
+    "missingId": "No se ha encontrado el identificador del ticket.",
+    "loading": "Cargando ticket...",
+    "backToTickets": "← Volver a tickets",
+    "notFound": "No se encontró el ticket.",
+    "linkedProject": "Proyecto vinculado",
+    "created": "Creado",
+    "due": "Vence",
+    "updated": "Actualizado",
+    "closing": "Cerrando...",
+    "closeTicket": "Cerrar ticket",
+    "overviewSubtitle": "Detalles principales del ticket.",
+    "description": "Descripción",
+    "noDescription": "Sin descripción.",
+    "commentsSubtitle": "Discusión y seguimiento del ticket.",
+    "assignmentSubtitle": "Responsable actual y reasignación.",
+    "unassigned": "Sin asignar",
+    "saving": "Guardando...",
+    "saveAssignee": "Guardar responsable",
+    "rootCausePlaceholder": "Breve causa raíz",
+    "resolutionTypePlaceholder": "workaround, fix, configuración...",
+    "resolutionSummaryPlaceholder": "Describe la resolución...",
+    "saveResolution": "Guardar resolución",
+    "referencesSubtitle": "Enlaces y documentos relacionados.",
+    "knowledgeSubtitle": "Convierte la solución en conocimiento reutilizable para el equipo.",
+    "knowledgeAlreadyLinked": "Ya existe una página de conocimiento vinculada a este ticket.",
+    "knowledgePublishHint": "Publica este aprendizaje en Knowledge cuando la resolución esté lista.",
+    "converting": "Convirtiendo...",
+    "convertToKnowledge": "Convert to Knowledge Page",
+    "knowledgeNeedsProject": "Vincula un proyecto para convertir este ticket en una página de conocimiento.",
+    "errors": {
+      "loadTicket": "No se pudo cargar el ticket. Inténtalo de nuevo más tarde.",
+      "closeFailed": "No se pudo cerrar el ticket.",
+      "updateAssigneeFailed": "No se pudo actualizar el responsable.",
+      "saveFailed": "No se pudo guardar.",
+      "saveSolutionFailed": "No se pudo guardar la solución.",
+      "convertFailed": "No se pudo convertir.",
+      "convertKnowledgeFailed": "No se pudo convertir en página de conocimiento."
+    },
+    "references": {
+      "empty": "Sin referencias todavía.",
+      "remove": "Quitar",
+      "document": "Documento",
+      "value": "Valor",
+      "adding": "Agregando...",
+      "add": "Agregar"
+    }
+  }
+}

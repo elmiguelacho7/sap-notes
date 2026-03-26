@@ -86,7 +86,8 @@ export function KnowledgeBlockEditor({
         className="w-full mb-4 text-2xl font-semibold bg-transparent border-none text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-0"
         aria-label="Page title"
       />
-      <div className="[&_.bn-editor]:min-h-[200px] [&_.bn-editor]:rounded-xl [&_.bn-editor]:border [&_.bn-editor]:border-slate-700/60 [&_.bn-editor]:bg-slate-800/40 [&_.bn-editor]:px-4 [&_.bn-editor]:py-3">
+      {/* Single outer chrome only — do not use [&_.bn-editor] (BlockNote nests multiple .bn-editor nodes). */}
+      <div className="knowledge-bn-editor-root min-h-[200px] rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-3">
         <BlockNoteView editor={editor} theme="dark" className="bn-editor-dark" />
       </div>
     </div>

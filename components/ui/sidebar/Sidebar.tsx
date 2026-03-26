@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import {
   LayoutDashboard,
+  CalendarDays,
   FolderKanban,
   CheckSquare,
   Ticket,
@@ -12,59 +13,170 @@ import {
   FileText,
   FolderOpen,
   Search,
+  ListTodo,
+  Brain,
+  Link as LinkIcon,
   ShieldCheck,
   Settings,
   ChevronLeft,
-  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
   LogOut,
   Briefcase,
   Building2,
   Cloud,
   ArrowLeft,
+  BarChart3,
 } from "lucide-react";
 
 const ICON_WRAPPER = "flex items-center justify-center w-5 h-5 shrink-0";
 
-type NavItem = { label: string; href: string; icon: React.ComponentType<{ className?: string }>; roles?: string[] };
+type NavItem = {
+  navKey: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles?: string[];
+};
 
-const SIDEBAR_SECTIONS: { label: string; items: NavItem[] }[] = [
+type SidebarSectionDef = { sectionKey: string; items: NavItem[] };
+
+const SIDEBAR_SECTIONS: SidebarSectionDef[] = [
   {
-    label: "WORKSPACE",
+    sectionKey: "workspace",
     items: [
-      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { label: "Projects", href: "/projects", icon: FolderKanban },
-      { label: "Tasks", href: "/tasks", icon: CheckSquare },
-      { label: "Tickets", href: "/tickets", icon: Ticket },
-      { label: "My Work", href: "/my-work", icon: Briefcase },
+      { navKey: "dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { navKey: "projects", href: "/projects", icon: FolderKanban },
+      { navKey: "tasks", href: "/tasks", icon: CheckSquare },
+      { navKey: "tickets", href: "/tickets", icon: Ticket },
+      { navKey: "reports", href: "/reports", icon: BarChart3 },
+      { navKey: "myWork", href: "/my-work", icon: Briefcase },
     ],
   },
   {
-    label: "KNOWLEDGE",
+    sectionKey: "knowledge",
     items: [
-      { label: "Knowledge", href: "/knowledge", icon: BookOpen },
-      { label: "Notes", href: "/notes", icon: FileText },
-      { label: "Spaces", href: "/knowledge/documents", icon: FolderOpen },
-      { label: "Sapito", href: "/knowledge/search", icon: Search },
+      { navKey: "knowledge", href: "/knowledge", icon: BookOpen },
+      { navKey: "notes", href: "/notes", icon: FileText },
+      { navKey: "spaces", href: "/knowledge/documents", icon: FolderOpen },
+      { navKey: "sapito", href: "/knowledge/search", icon: Search },
     ],
   },
   {
-    label: "BUSINESS",
-    items: [{ label: "Clients", href: "/clients", icon: Building2, roles: ["superadmin", "admin"] }],
+    sectionKey: "business",
+    items: [{ navKey: "clients", href: "/clients", icon: Building2, roles: ["superadmin", "admin"] }],
   },
   {
-    label: "SYSTEM",
+    sectionKey: "system",
     items: [
-      { label: "Admin", href: "/admin", icon: ShieldCheck, roles: ["superadmin"] },
-      { label: "Knowledge Sources", href: "/admin/knowledge-sources", icon: Cloud, roles: ["superadmin"] },
-      { label: "Settings", href: "/account", icon: Settings },
+      { navKey: "admin", href: "/admin", icon: ShieldCheck, roles: ["superadmin"] },
+      { navKey: "knowledgeSources", href: "/admin/knowledge-sources", icon: Cloud, roles: ["superadmin"] },
+      { navKey: "settings", href: "/account", icon: Settings },
     ],
   },
 ];
+
+function buildProjectContextNavItems(projectId: string): NavItem[] {
+  const base = `/projects/${projectId}`;
+  return [
+    { navKey: "overview", href: base, icon: LayoutDashboard },
+    { navKey: "planning", href: `${base}/planning`, icon: CalendarDays },
+    { navKey: "activities", href: `${base}/planning/activities`, icon: ListTodo },
+    { navKey: "tasks", href: `${base}/tasks`, icon: CheckSquare },
+    { navKey: "tickets", href: `${base}/tickets`, icon: Ticket },
+    { navKey: "notes", href: `${base}/notes`, icon: FileText },
+    { navKey: "brain", href: `${base}/brain`, icon: Brain },
+    { navKey: "links", href: `${base}/links`, icon: LinkIcon },
+    { navKey: "knowledge", href: `${base}/knowledge`, icon: BookOpen },
+    { navKey: "timeline", href: `${base}/planning/calendar`, icon: CalendarDays },
+    { navKey: "search", href: `${base}/search`, icon: Search },
+  ];
+}
+
+function projectStatusChipClass(status: string | null | undefined): string {
+  const s = String(status ?? "").toLowerCase().trim();
+  if (s === "in_progress") return "rb-badge-success";
+  if (s === "blocked" || s === "paused") return "rb-badge-warning";
+  if (s === "archived") return "rb-badge-neutral";
+  if (s === "completed") return "border-sky-500/30 bg-sky-500/12 text-sky-700";
+  return "rb-badge-neutral";
+}
+
+function formatSidebarShortDate(iso: string | null | undefined): string | null {
+  if (!iso?.trim()) return null;
+  const d = new Date(iso.includes("T") ? iso : `${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+type SidebarExecutionHealth = { labelKey: string; tone: "good" | "watch" | "risk" };
+
+/** Display-only hint from plan dates + status (same fields already loaded for sidebar). */
+function sidebarExecutionHealth(
+  status: string | null | undefined,
+  plannedEndIso: string | null | undefined
+): SidebarExecutionHealth | null {
+  const s = (status ?? "").toLowerCase().trim();
+  if (!plannedEndIso?.trim() && !s) return null;
+  if (s === "completed" || s === "archived") {
+    return { labelKey: "executionHealth.stable", tone: "good" };
+  }
+  if (plannedEndIso?.trim()) {
+    const end = new Date(plannedEndIso.includes("T") ? plannedEndIso : `${plannedEndIso}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    if (!Number.isNaN(end.getTime()) && end.getTime() < today.getTime()) {
+      return { labelKey: "executionHealth.behindSchedule", tone: "risk" };
+    }
+    const days = Math.round((end.getTime() - today.getTime()) / 86400000);
+    if (days <= 7 && days >= 0) {
+      return { labelKey: "executionHealth.deadlineNear", tone: "watch" };
+    }
+  }
+  if (s === "blocked" || s === "paused") {
+    return { labelKey: "executionHealth.blocked", tone: "risk" };
+  }
+  if (s === "in_progress") {
+    return { labelKey: "executionHealth.onTrack", tone: "good" };
+  }
+  return { labelKey: "executionHealth.planned", tone: "good" };
+}
+
+function executionHealthChipSurface(tone: SidebarExecutionHealth["tone"]): string {
+  if (tone === "risk") return "border-rose-200/95 bg-rose-50/95 text-rose-900";
+  if (tone === "watch") return "border-amber-200/95 bg-amber-50/95 text-amber-950";
+  return "border-emerald-200/95 bg-emerald-50/90 text-emerald-900";
+}
 
 function getProjectIdFromPath(path: string): string | null {
   const match = path.match(/^\/projects\/([^/]+)/);
   if (!match?.[1] || match[1] === "new") return null;
   return match[1];
+}
+
+/** Treat as project workspace only when id looks like a real project UUID (avoids empty/broken contextual nav). */
+function isLikelyUuid(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}
+
+/** Set to true to log sidebar mode (search: SIDEBAR_NAV_DEBUG). */
+const SIDEBAR_NAV_DEBUG = false;
+
+function filterNavItemsForRole(items: NavItem[], appRole: string | null): NavItem[] {
+  return items.filter((item) => {
+    if (!item.roles?.length) return true;
+    return Boolean(appRole && item.roles.includes(appRole));
+  });
+}
+
+function buildSectionsForRole(sections: SidebarSectionDef[], appRole: string | null) {
+  return sections
+    .map((s) => ({ sectionKey: s.sectionKey, items: filterNavItemsForRole(s.items, appRole) }))
+    .filter((s) => s.items.length > 0);
+}
+
+function countNavItems(sections: { sectionKey: string; items: NavItem[] }[]): number {
+  return sections.reduce((acc, s) => acc + s.items.length, 0);
 }
 
 function SidebarNavItem({
@@ -89,26 +201,28 @@ function SidebarNavItem({
   onNavigate: (href: string) => void;
   appRole: string | null;
 }) {
+  const t = useTranslations("sidebar");
+  const label = (t as (key: string) => string)(`nav.${item.navKey}`);
   const Icon = item.icon;
   if (item.roles?.length && (!appRole || !item.roles.includes(appRole))) return null;
 
-  const baseButtonClass = `relative flex items-center h-10 rounded-xl text-sm font-medium border-l-2 transition-all duration-150 ${
+  const baseButtonClass = `relative flex items-center min-h-10 rounded-xl text-sm font-medium border transition-all duration-200 ${
     isActive
-      ? "bg-slate-800/80 border-l-indigo-400 text-white"
+      ? "border-[rgb(var(--rb-brand-primary))]/25 bg-[rgb(var(--rb-brand-primary))]/14 text-[rgb(var(--rb-text-primary))] shadow-[0_1px_3px_rgba(15,23,42,0.06)] ring-1 ring-[rgb(var(--rb-brand-primary))]/28 font-semibold"
       : isExpanded
-        ? "text-slate-200 bg-slate-800/40 border-l-transparent hover:bg-slate-800/60 hover:translate-x-0.5"
-        : "text-slate-400 border-l-transparent hover:bg-slate-800/60 hover:text-slate-100 hover:translate-x-0.5"
+        ? "border-transparent text-[rgb(var(--rb-text-primary))] bg-slate-100/85 hover:bg-[rgb(var(--rb-brand-primary))]/10 hover:border-[rgb(var(--rb-brand-primary))]/15"
+        : "border-transparent text-[rgb(var(--rb-text-secondary))] hover:bg-slate-100/80 hover:text-[rgb(var(--rb-text-primary))]"
   }`;
   const labelTransitionClass = "transition-all duration-200 ease-out";
   const labelVisibleClass = labelVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1";
 
   if (collapsed) {
-    const collapsedButtonClass = `h-[34px] w-[34px] rounded-[11px] flex items-center justify-center transition-all duration-150 ${
+    const collapsedButtonClass = `h-[38px] w-[38px] rounded-xl flex items-center justify-center transition-all duration-200 border ${
       isActive
-        ? "bg-slate-800/65 text-slate-100 ring-1 ring-indigo-400/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+        ? "bg-[rgb(var(--rb-brand-primary))]/14 text-[rgb(var(--rb-text-primary))] ring-1 ring-[rgb(var(--rb-brand-primary))]/35 border-[rgb(var(--rb-brand-primary))]/25 shadow-sm"
         : isExpanded
-          ? "text-slate-200 hover:bg-slate-800/50"
-          : "text-slate-400 hover:bg-slate-800/45 hover:text-slate-100"
+          ? "text-[rgb(var(--rb-text-primary))] border-transparent bg-slate-100/90 hover:bg-[rgb(var(--rb-brand-primary))]/10"
+          : "text-[rgb(var(--rb-text-secondary))] border-transparent hover:bg-slate-100/85 hover:text-[rgb(var(--rb-text-primary))]"
     }`;
 
     return (
@@ -118,16 +232,16 @@ function SidebarNavItem({
           onClick={() => onNavigate(item.href)}
           className={collapsedButtonClass}
         >
-          <span className={`${ICON_WRAPPER} ${isActive ? "text-slate-100" : "text-current"}`}>
+          <span className={`${ICON_WRAPPER} ${isActive ? "text-[rgb(var(--rb-brand-primary-active))]" : "text-current"}`}>
             <Icon className="h-5 w-5 shrink-0" aria-hidden />
           </span>
         </button>
         {showTooltip && (
           <span
-            className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 z-50 ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ease-out whitespace-nowrap rounded-md bg-slate-900 border border-slate-700 text-slate-200 text-xs px-2 py-1 shadow-lg"
+            className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 z-50 ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ease-out whitespace-nowrap rounded-md bg-[rgb(var(--rb-surface))] border border-[rgb(var(--rb-surface-border))] text-[rgb(var(--rb-text-primary))] text-xs px-2.5 py-1.5 shadow-lg"
             role="tooltip"
           >
-            {item.label}
+            {label}
           </span>
         )}
       </div>
@@ -140,10 +254,10 @@ function SidebarNavItem({
       onClick={() => onNavigate(item.href)}
       className={`relative flex w-full items-center rounded-xl px-3 gap-3 justify-start ${baseButtonClass}`}
     >
-      <span className={`${ICON_WRAPPER} ${isActive ? "text-slate-100" : "text-current"}`}>
+      <span className={`${ICON_WRAPPER} ${isActive ? "text-[rgb(var(--rb-brand-primary-active))]" : "text-current"}`}>
         <Icon className="h-5 w-5 shrink-0" aria-hidden />
       </span>
-      <span className={`min-w-0 truncate ${labelTransitionClass} ${labelVisibleClass}`}>{item.label}</span>
+      <span className={`min-w-0 truncate ${labelTransitionClass} ${labelVisibleClass}`}>{label}</span>
     </button>
   );
 }
@@ -161,13 +275,16 @@ export function Sidebar({
   userEmail,
   projectName,
   projectSubtitle,
+  projectClientName,
+  projectStartDate,
+  projectPlannedEndDate,
   mobileOpen,
   onClose,
 }: {
   collapsed: boolean;
-  /** When true, sidebar is temporarily expanded by hover (desktop collapsed only). */
+  /** Legacy: layout may still pass; ignored (width is toggle-only). */
   hoverExpanded?: boolean;
-  /** Called when mouse enters (true) or leaves (false) sidebar; used for hover-expand width. */
+  /** Legacy: layout may still pass; ignored. */
   onHoverExpandChange?: (expanded: boolean) => void;
   onToggle: () => void;
   appRole: string | null;
@@ -178,92 +295,74 @@ export function Sidebar({
   userEmail?: string | null;
   projectName?: string | null;
   projectSubtitle?: string | null;
+  projectClientName?: string | null;
+  projectStartDate?: string | null;
+  projectPlannedEndDate?: string | null;
   mobileOpen?: boolean;
   onClose?: () => void;
 }) {
+  /** Layout still passes these for API compatibility; sidebar width is toggle-only. */
+  void hoverExpanded;
+  void onHoverExpandChange;
+
+  const t = useTranslations("sidebar");
+  const tCommon = useTranslations("common");
+  const tProjectStatus = useTranslations("projects.status");
+
+  const executionHealth = useMemo(
+    () => sidebarExecutionHealth(projectSubtitle ?? null, projectPlannedEndDate ?? null),
+    [projectSubtitle, projectPlannedEndDate]
+  );
+  const planStartLabel = formatSidebarShortDate(projectStartDate ?? null);
+  const planEndLabel = formatSidebarShortDate(projectPlannedEndDate ?? null);
+
   const isMobileOverlay = Boolean(mobileOpen && onClose);
   const isCollapsedDesktop = collapsed && !isMobileOverlay;
-  const showLabels = !collapsed || (hoverExpanded && isCollapsedDesktop);
-  const showTooltipWhenCollapsed = isCollapsedDesktop && !hoverExpanded;
-  const currentProjectId = getProjectIdFromPath(pathname);
+  /** Width/labels follow persisted toggle only (no hover-expand). */
+  const showLabels = !collapsed || isMobileOverlay;
+  const showTooltipWhenCollapsed = isCollapsedDesktop;
+  const rawProjectId = getProjectIdFromPath(pathname);
+  const currentProjectId = rawProjectId && isLikelyUuid(rawProjectId) ? rawProjectId : null;
   const isProjectMode = Boolean(currentProjectId);
 
-  const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [labelsVisible, setLabelsVisible] = useState(true);
-
-  const clearOpenTimer = useCallback(() => {
-    if (openTimerRef.current != null) {
-      clearTimeout(openTimerRef.current);
-      openTimerRef.current = null;
-    }
-  }, []);
-  const clearCloseTimer = useCallback(() => {
-    if (closeTimerRef.current != null) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!collapsed) {
-      setLabelsVisible(true);
-      return;
-    }
-    if (hoverExpanded) {
-      const t = setTimeout(() => setLabelsVisible(true), 60);
-      return () => clearTimeout(t);
-    }
-    setLabelsVisible(false);
-  }, [collapsed, hoverExpanded]);
-
-  useEffect(() => {
-    return () => {
-      clearOpenTimer();
-      clearCloseTimer();
-    };
-  }, [clearOpenTimer, clearCloseTimer]);
-
-  const handleMouseEnter = useCallback(() => {
-    if (!isCollapsedDesktop || !onHoverExpandChange) return;
-    clearCloseTimer();
-    openTimerRef.current = setTimeout(() => {
-      openTimerRef.current = null;
-      onHoverExpandChange(true);
-    }, 140);
-  }, [isCollapsedDesktop, onHoverExpandChange, clearCloseTimer]);
-
-  const handleMouseLeave = useCallback(() => {
-    if (!onHoverExpandChange) return;
-    clearOpenTimer();
-    setLabelsVisible(false);
-    closeTimerRef.current = setTimeout(() => {
-      closeTimerRef.current = null;
-      onHoverExpandChange(false);
-    }, 180);
-  }, [onHoverExpandChange, clearOpenTimer]);
-
-  const projectSections = useMemo<{ label: string; items: NavItem[] }[]>(
-    () =>
-      currentProjectId
-        ? [
-            {
-              label: "PROJECT",
-              items: [
-                { label: "Overview", href: `/projects/${currentProjectId}`, icon: LayoutDashboard },
-                { label: "Tasks", href: `/projects/${currentProjectId}/tasks`, icon: CheckSquare },
-                { label: "Tickets", href: `/projects/${currentProjectId}/tickets`, icon: Ticket },
-                { label: "Knowledge", href: `/projects/${currentProjectId}/knowledge`, icon: BookOpen },
-                { label: "Phases", href: `/projects/${currentProjectId}/planning`, icon: FolderKanban },
-                { label: "Documents", href: `/projects/${currentProjectId}/notes`, icon: FileText },
-              ],
-            },
-          ]
-        : [],
-    [currentProjectId]
+  const globalSectionsForRole = useMemo(
+    () => buildSectionsForRole(SIDEBAR_SECTIONS, appRole),
+    [appRole]
   );
 
-  const visibleSections = isProjectMode ? projectSections : SIDEBAR_SECTIONS;
+  /**
+   * Inside a project workspace, render a single project-context navigation
+   * so the workspace does not compete with a horizontal project nav row.
+   */
+  const visibleSections = useMemo(() => {
+    if (isProjectMode && currentProjectId) {
+      const projectSection: SidebarSectionDef = {
+        sectionKey: "project",
+        items: buildProjectContextNavItems(currentProjectId),
+      };
+
+      // Keep only non-overlapping global destinations.
+      const preserved = globalSectionsForRole.filter((s) => s.sectionKey === "business" || s.sectionKey === "system");
+      return [projectSection, ...preserved];
+    }
+
+    const globalCount = countNavItems(globalSectionsForRole);
+    if (globalCount > 0) return globalSectionsForRole;
+    return buildSectionsForRole(SIDEBAR_SECTIONS, null);
+  }, [appRole, currentProjectId, globalSectionsForRole, isProjectMode]);
+
+  const sidebarMode: "global" | "project-context" = "global";
+
+  useEffect(() => {
+    if (!SIDEBAR_NAV_DEBUG) return;
+    console.debug("[sidebar]", {
+      pathname,
+      sidebarMode,
+      collapsed,
+      navItemCount: countNavItems(visibleSections),
+      sectionCount: visibleSections.length,
+    });
+  }, [pathname, sidebarMode, collapsed, visibleSections]);
 
   /** True if any sidebar item is a child of this path (same section, href starts with path + "/"). */
   const hasSidebarChild = useCallback(
@@ -297,14 +396,20 @@ export function Sidebar({
     [pathname]
   );
 
-  const widthClass = isMobileOverlay ? "w-[240px]" : (collapsed && !hoverExpanded) ? "w-[72px]" : "w-[240px]";
-  const showCollapse = !isMobileOverlay && !collapsed;
-  const showExpand = !isMobileOverlay && collapsed;
-  const displayName = (userName && userName.trim()) || "Usuario";
-  const displaySubtext = (userEmail && userEmail.trim()) || "Sesion activa";
+  /**
+   * Desktop: outer AppShell already sets w-[72px] / w-[240px]. Aside must fill that hit box exactly
+   * (w-full) — a second width transition on aside can desync hit-testing from the visible rail.
+   * Mobile overlay: fixed drawer width on aside.
+   */
+  const asideWidthClass = isMobileOverlay ? "w-[240px]" : "w-full min-w-0";
+  const asideBorderClass = isMobileOverlay ? "border-r border-[rgb(var(--rb-surface-border))]/90" : "";
+  const toggleBtnClass =
+    "shrink-0 flex h-8 w-8 items-center justify-center rounded-md text-[rgb(var(--rb-text-muted))] transition-all duration-200 hover:bg-[rgb(var(--rb-surface-3))]/70 hover:text-[rgb(var(--rb-text-primary))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent";
+  const displayName = (userName && userName.trim()) || tCommon("userFallback");
+  const displaySubtext = (userEmail && userEmail.trim()) || tCommon("sessionActive");
   const initials = displayName
     .split(" ")
-    .map((part) => part[0])
+    .map((part: string) => part[0])
     .filter(Boolean)
     .slice(0, 2)
     .join("")
@@ -312,89 +417,114 @@ export function Sidebar({
 
   return (
     <aside
-      className={`flex flex-col h-full min-h-0 shrink-0 bg-slate-950 border-r border-slate-800 transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] overflow-hidden ${widthClass}`}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      className={`flex flex-col h-full min-h-0 shrink-0 bg-transparent overflow-hidden ${asideBorderClass} ${asideWidthClass}`}
     >
-      {/* Top branding: logo + product name when expanded; centered logo when collapsed */}
-      <div
-        className={`flex h-12 shrink-0 items-center border-b border-slate-800 px-4 ${
-          !showLabels ? "justify-center" : "justify-between gap-2"
-        }`}
-      >
-        <Link
-          href="/dashboard"
-          onClick={isMobileOverlay ? onClose : undefined}
-          className={`flex items-center gap-3 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 min-w-0 transition-colors duration-150 hover:bg-slate-800/50 ${
-            !showLabels ? "justify-center p-1.5" : ""
+      {/* Brand header: wordmark + toggle read as one shell bar (not a floating control) */}
+      <div className="shrink-0 px-3.5 pt-3.5 pb-3">
+        <div
+          className={`group/header flex w-full rounded-[10px] border border-[rgb(var(--rb-surface-border))]/45 bg-[rgb(var(--rb-surface))]/72 transition-[border-color,background-color] duration-200 ${
+            showLabels
+              ? "min-h-[3rem] flex-row items-center gap-0 pl-3.5 pr-2 py-2"
+              : "flex-col items-center gap-1.5 py-3 px-2"
           }`}
         >
-          <div className="h-8 w-8 shrink-0 rounded-xl bg-indigo-600 flex items-center justify-center text-[10px] font-bold">
-            PH
-          </div>
-          {showLabels && (
-            <span className={`truncate text-sm font-semibold transition-all duration-200 ease-out ${labelsVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1"}`}>
-              SAP Notes Hub
-            </span>
+          {showLabels ? (
+            <>
+              <Link
+                href="/dashboard"
+                onClick={isMobileOverlay ? onClose : undefined}
+                className="flex min-w-0 flex-1 items-center rounded-md py-0.5 pl-0 pr-1 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--rb-shell-bg-strong))]"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center" aria-hidden>
+                    <img
+                      src="/branding/ribbit_eyes_brand.svg"
+                      alt=""
+                      className="h-full w-full object-contain"
+                    />
+                  </span>
+                  <span className="flex min-w-0 items-center gap-0 truncate text-lg leading-none tracking-tight">
+                    <span className="shrink-0 font-bold text-[rgb(var(--rb-brand-primary))]">ri</span>
+                    <span className="shrink-0 font-extrabold text-slate-900">bb</span>
+                    <span className="shrink-0 font-bold text-[rgb(var(--rb-brand-primary))]">it</span>
+                  </span>
+                </div>
+              </Link>
+              <span className="shrink-0 h-5 w-px bg-[rgb(var(--rb-surface-border))]/90 mx-0.5" aria-hidden />
+              {isMobileOverlay ? (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className={toggleBtnClass}
+                  aria-label={t("aria.closeMenu")}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onToggle}
+                  className={toggleBtnClass}
+                  aria-label={t("aria.collapseSidebar")}
+                  title={t("aria.collapseSidebar")}
+                >
+                  <PanelLeftClose className="h-4 w-4" aria-hidden />
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <Link
+                href="/dashboard"
+                className="flex items-center justify-center rounded-md py-0.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--rb-shell-bg-strong))]"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center" aria-hidden>
+                  <img
+                    src="/branding/ribbit_eyes_brand.svg"
+                    alt=""
+                    className="h-full w-full object-contain"
+                  />
+                </span>
+              </Link>
+              <button
+                type="button"
+                onClick={onToggle}
+                className={toggleBtnClass}
+                aria-label={t("aria.expandSidebar")}
+                title={t("aria.expandSidebar")}
+              >
+                <PanelLeftOpen className="h-4 w-4" aria-hidden />
+              </button>
+            </>
           )}
-        </Link>
-        {isMobileOverlay && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 transition-colors duration-150"
-            aria-label="Cerrar menú"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-        )}
-        {showCollapse && (
-          <button
-            type="button"
-            onClick={onToggle}
-            className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 transition-colors duration-150"
-            aria-label="Collapse sidebar"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-        )}
-        {showExpand && (
-          <button
-            type="button"
-            onClick={onToggle}
-            className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-800/70 hover:text-slate-100 transition-colors duration-150"
-            aria-label="Expand sidebar"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        )}
+        </div>
       </div>
 
       {/* Navigation: icons-only when collapsed and not hover-expanded; full sections when expanded or hover-expanded */}
       <nav
-        className={`flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden [scrollbar-width:thin] [scrollbar-color:rgba(71,85,105,0.24)_transparent] [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-700/35 [&::-webkit-scrollbar-thumb:hover]:bg-slate-600/45 [&::-webkit-scrollbar-track]:bg-slate-900/20 ${
+        className={`flex-1 min-h-0 w-full min-w-0 flex flex-col overflow-y-auto overflow-x-hidden [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.6)_transparent] [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/55 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500/65 [&::-webkit-scrollbar-track]:bg-slate-200/35 ${
           !showLabels ? "pr-1.5 pl-0.5" : ""
         }`}
       >
         {!showLabels ? (
           <>
-            <div className="flex flex-col items-center gap-2.5 py-4 px-2">
+            <div className="flex w-full min-w-0 flex-col items-center gap-2.5 py-4 px-2">
               {isProjectMode && currentProjectId ? (
                 <div className="relative group shrink-0 w-10 h-10">
                   <button
                     type="button"
                     onClick={() => onNavigate("/projects")}
-                    className="w-full h-full rounded-xl flex items-center justify-center text-slate-300 border-l-2 border-l-transparent hover:bg-slate-800/60 transition-all duration-150"
-                    aria-label="All projects"
+                    className="w-full h-full rounded-xl flex items-center justify-center text-[rgb(var(--rb-text-secondary))] border-l-2 border-l-transparent hover:bg-[rgb(var(--rb-brand-primary))]/10 transition-all duration-150"
+                    aria-label={t("allProjects")}
                   >
                     <ArrowLeft className="h-5 w-5" aria-hidden />
                   </button>
                   {showTooltipWhenCollapsed && (
                     <span
-                      className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 z-50 ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ease-out whitespace-nowrap rounded-md bg-slate-900 border border-slate-700 text-slate-200 text-xs px-2 py-1 shadow-lg"
+                      className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 z-50 ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ease-out whitespace-nowrap rounded-md bg-[rgb(var(--rb-surface))] border border-[rgb(var(--rb-surface-border))] text-[rgb(var(--rb-text-primary))] text-xs px-2.5 py-1.5 shadow-lg"
                       role="tooltip"
                     >
-                      All projects
+                      {t("allProjects")}
                     </span>
                   )}
                 </div>
@@ -402,7 +532,7 @@ export function Sidebar({
               {visibleSections.map((section) =>
                 section.items.map((item) => (
                   <SidebarNavItem
-                    key={item.href + item.label}
+                    key={item.href + item.navKey}
                     item={item}
                     isActive={isActive(item.href)}
                     isExpanded={isExpanded(item.href)}
@@ -414,49 +544,108 @@ export function Sidebar({
                 ))
               )}
             </div>
-            <div className="flex-grow min-h-0 shrink-0" aria-hidden />
+            {/* Full rail width below icons so hover hit area matches visible column (not just icon stacks). */}
+            <div className="w-full min-w-0 flex-1 min-h-[1px] shrink-0" aria-hidden />
           </>
         ) : (
-          <div className="py-4">
+          <div className="py-4 pb-5">
             {isProjectMode && currentProjectId ? (
-              <div className="px-3.5 mb-3 space-y-2">
+              <div className="px-3.5 mb-5 space-y-3">
                 <button
                   type="button"
                   onClick={() => onNavigate("/projects")}
-                  className={`inline-flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200 transition-all duration-150 ${
-                    labelsVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1"
+                  className={`inline-flex items-center gap-2 rounded-lg px-1 -mx-1 py-1 text-xs font-medium text-[rgb(var(--rb-text-muted))] hover:text-[rgb(var(--rb-text-primary))] hover:bg-slate-100/80 transition-all duration-150 ${
+                    showLabels ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1"
                   }`}
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
-                  <span>All projects</span>
+                  <span>{t("allProjects")}</span>
                 </button>
                 <div
-                  className={`rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2 transition-all duration-200 ease-out ${
-                    labelsVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1"
+                  className={`rounded-2xl border border-[rgb(var(--rb-surface-border))]/90 bg-gradient-to-br from-white via-[rgb(var(--rb-surface))]/95 to-[rgb(var(--rb-surface-2))]/60 px-3.5 py-3.5 shadow-[0_10px_28px_-18px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/50 transition-all duration-200 ease-out ${
+                    showLabels ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1"
                   }`}
                 >
-                  <p className="text-sm font-semibold text-slate-100 truncate">{projectName?.trim() || "Project"}</p>
-                  {projectSubtitle ? (
-                    <p className="mt-0.5 text-[11px] text-slate-500 truncate">{projectSubtitle}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[rgb(var(--rb-text-muted))]">
+                    {t("projectContextLabel")}
+                  </p>
+                  <p className="mt-1.5 text-[15px] font-semibold leading-snug tracking-tight text-[rgb(var(--rb-text-primary))]">
+                    {projectName?.trim() || t("projectFallback")}
+                  </p>
+                  {projectClientName?.trim() ? (
+                    <p className="mt-1 text-xs font-medium text-[rgb(var(--rb-text-secondary))] truncate">
+                      {projectClientName.trim()}
+                    </p>
                   ) : null}
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {projectSubtitle ? (
+                      <span className={`rb-badge ${projectStatusChipClass(projectSubtitle)} text-[10px] font-semibold`}>
+                        {(tProjectStatus as (key: string) => string)(projectSubtitle) || projectSubtitle}
+                      </span>
+                    ) : null}
+                    {executionHealth ? (
+                      <span
+                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none ${executionHealthChipSurface(executionHealth.tone)}`}
+                      >
+                        {(t as (key: string) => string)(executionHealth.labelKey)}
+                      </span>
+                    ) : null}
+                  </div>
+                  {(planStartLabel || planEndLabel) && (
+                    <p className="mt-2.5 text-[11px] tabular-nums text-[rgb(var(--rb-text-muted))] leading-relaxed">
+                      {planStartLabel && planEndLabel
+                        ? t("projectDateRange", { start: planStartLabel, end: planEndLabel })
+                        : planStartLabel
+                          ? t("projectDateStartOnly", { start: planStartLabel })
+                          : t("projectDateEndOnly", { end: planEndLabel! })}
+                    </p>
+                  )}
                 </div>
               </div>
             ) : null}
-            {visibleSections.map((section) => (
-              <div key={section.label} className="mt-6 first:mt-0">
-                <p className={`px-3.5 mt-4 mb-2 text-xs font-medium uppercase tracking-[0.14em] text-slate-500 transition-all duration-200 ease-out ${labelsVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1"}`}>
-                  {section.label}
-                </p>
-                <div className="space-y-0.5">
+            {visibleSections.map((section, sectionIdx) => (
+              <div
+                key={section.sectionKey}
+                className={
+                  section.sectionKey === "project"
+                    ? "mt-0.5"
+                    : sectionIdx === 1
+                      ? "mt-2 border-t border-slate-200/90 pt-6"
+                      : "mt-5"
+                }
+              >
+                {section.sectionKey === "project" ? (
+                  <p
+                    className={`px-3.5 mb-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[rgb(var(--rb-brand-primary-active))] transition-all duration-200 ease-out ${showLabels ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1"}`}
+                  >
+                    {t("sections.projectRail")}
+                  </p>
+                ) : (
+                  <>
+                    {sectionIdx === 1 ? (
+                      <p
+                        className={`px-3.5 mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[rgb(var(--rb-text-muted))] transition-all duration-200 ease-out ${showLabels ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1"}`}
+                      >
+                        {t("sections.platform")}
+                      </p>
+                    ) : null}
+                    <p
+                      className={`px-3.5 mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--rb-text-muted))] transition-all duration-200 ease-out ${showLabels ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1"}`}
+                    >
+                      {(t as (key: string) => string)(`sections.${section.sectionKey}`)}
+                    </p>
+                  </>
+                )}
+                <div className={section.sectionKey === "project" ? "space-y-1 px-0.5" : "space-y-0.5"}>
                   {section.items.map((item) => (
                     <SidebarNavItem
-                      key={item.href + item.label}
+                      key={item.href + item.navKey}
                       item={item}
                       isActive={isActive(item.href)}
                       isExpanded={isExpanded(item.href)}
                       collapsed={false}
                       showTooltip={false}
-                      labelVisible={labelsVisible}
+                      labelVisible={showLabels}
                       onNavigate={onNavigate}
                       appRole={appRole}
                     />
@@ -468,41 +657,41 @@ export function Sidebar({
         )}
       </nav>
 
-      {/* Footer: icon-only when collapsed; profile card when expanded */}
+      {/* Footer: quiet profile strip; logout de-emphasized */}
       <div
-        className={`mt-auto shrink-0 border-t border-slate-800 flex min-w-0 ${
+        className={`mt-auto w-full min-w-0 shrink-0 border-t border-[rgb(var(--rb-surface-border))]/85 flex ${
           !showLabels
-            ? "flex-col items-center gap-1 px-0 pt-2.5 pb-2.5"
-            : "flex-row items-center justify-between gap-2 px-3.5 pt-3 pb-3"
+            ? "flex-col items-center gap-1.5 px-0 pt-2.5 pb-3"
+            : "flex-row items-center justify-between gap-3 px-3 pt-3 pb-3"
         }`}
       >
         {showLabels && (
           <div
-            className={`min-w-0 flex-1 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-2 flex items-center gap-2 transition-all duration-200 ease-out ${
-              labelsVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1"
+            className={`min-w-0 flex-1 flex items-center gap-2.5 min-h-[2rem] transition-all duration-200 ease-out ${
+              showLabels ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1"
             }`}
           >
-            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-800 text-[11px] font-semibold text-slate-200">
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[rgb(var(--rb-surface-border))]/85 bg-[rgb(var(--rb-surface-2))]/90 text-[10px] font-medium text-[rgb(var(--rb-text-secondary))]">
               {initials || "U"}
             </span>
-            <span className="min-w-0 flex flex-col">
-              <span className="truncate text-xs font-medium text-slate-100">{displayName}</span>
-              <span className="truncate text-[11px] text-slate-500">{displaySubtext}</span>
+            <span className="min-w-0 flex flex-col gap-0.5">
+              <span className="truncate text-xs font-medium text-[rgb(var(--rb-text-secondary))]">
+                {displayName}
+              </span>
+              <span className="truncate text-[10px] leading-tight text-[rgb(var(--rb-text-muted))]">
+                {displaySubtext}
+              </span>
             </span>
           </div>
         )}
         <button
           type="button"
           onClick={onLogout}
-          className={`shrink-0 flex items-center justify-center text-slate-400 hover:text-slate-100 transition-colors duration-150 ${
-            !showLabels
-              ? "h-[34px] w-[34px] rounded-[10px] border border-slate-800/80 bg-slate-900/45 hover:bg-slate-800/65"
-              : "h-10 w-10 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700"
-          }`}
-          title="Cerrar sesión"
-          aria-label="Cerrar sesión"
+          className="shrink-0 flex h-8 w-8 items-center justify-center rounded-md text-[rgb(var(--rb-text-muted))] transition-colors duration-150 hover:text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+          title={t("logoutTitle")}
+          aria-label={t("aria.logout")}
         >
-          <LogOut className="h-4 w-4" />
+          <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
         </button>
       </div>
     </aside>

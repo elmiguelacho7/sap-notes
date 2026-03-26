@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import { X, ExternalLink } from "lucide-react";
 import type { KnowledgePage } from "@/lib/types/knowledge";
 
@@ -35,10 +36,10 @@ const inputClass =
   "w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50";
 const labelClass = "block text-xs font-medium text-slate-500 mb-1";
 
-function formatDate(iso: string | undefined): string {
-  if (!iso) return "—";
+function formatDate(iso: string | undefined, localeTag: string, emDash: string): string {
+  if (!iso) return emDash;
   try {
-    return new Date(iso).toLocaleDateString("es-ES", {
+    return new Date(iso).toLocaleDateString(localeTag, {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -46,7 +47,7 @@ function formatDate(iso: string | undefined): string {
       minute: "2-digit",
     });
   } catch {
-    return "—";
+    return emDash;
   }
 }
 
@@ -63,15 +64,21 @@ export function PageDetailDrawer({
   fullEditorPath = "/knowledge",
   fullEditorQuery,
 }: PageDetailDrawerProps) {
+  const t = useTranslations("knowledge.drawer");
+  const locale = useLocale();
+  const localeTag = locale === "es" ? "es-ES" : "en-US";
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [spaceId, setSpaceId] = useState("");
 
   useEffect(() => {
     if (page && open) {
+      /* Sincronizar formulario al abrir; patrón controlado por props del drawer */
+      /* eslint-disable react-hooks/set-state-in-effect */
       setTitle(page.title ?? "");
       setSummary(page.summary ?? "");
       setSpaceId(page.space_id ?? "");
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [page, open]);
 
@@ -90,7 +97,7 @@ export function PageDetailDrawer({
 
   if (!open) return null;
 
-  const contextLabel = context === "global" ? "Global" : "Project";
+  const contextLabel = context === "global" ? t("context.global") : t("context.project");
 
   return (
     <>
@@ -107,13 +114,13 @@ export function PageDetailDrawer({
       >
         <div className="flex items-center justify-between shrink-0 border-b border-slate-700/60 px-4 py-3">
           <h2 id="page-detail-title" className="text-lg font-semibold text-slate-100">
-            Detalle de página
+            {t("title")}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-            aria-label="Cerrar"
+            aria-label={t("close")}
           >
             <X className="h-5 w-5" />
           </button>
@@ -132,30 +139,30 @@ export function PageDetailDrawer({
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           <div>
-            <label className={labelClass}>Título *</label>
+            <label className={labelClass}>{t("fields.title")}</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className={inputClass}
-              placeholder="Título de la página"
+              placeholder={t("fields.titlePlaceholder")}
               required
             />
           </div>
 
           <div>
-            <label className={labelClass}>Resumen / contenido</label>
+            <label className={labelClass}>{t("fields.summary")}</label>
             <textarea
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               rows={4}
               className={inputClass}
-              placeholder="Resumen o contenido principal"
+              placeholder={t("fields.summaryPlaceholder")}
             />
           </div>
 
           <div>
-            <label className={labelClass}>Espacio</label>
+            <label className={labelClass}>{t("fields.space")}</label>
             <select
               value={spaceId}
               onChange={(e) => setSpaceId(e.target.value)}
@@ -171,17 +178,17 @@ export function PageDetailDrawer({
 
           {context === "project" && projectName != null && (
             <div>
-              <label className={labelClass}>Proyecto</label>
+              <label className={labelClass}>{t("fields.project")}</label>
               <p className="text-sm text-slate-400">{projectName}</p>
             </div>
           )}
 
           {page && (
             <div className="space-y-1 pt-2 border-t border-slate-700/40">
-              <p className="text-xs text-slate-500">Actualizado</p>
-              <p className="text-sm text-slate-400">{formatDate(page.updated_at)}</p>
-              <p className="text-xs text-slate-500 mt-2">Creado</p>
-              <p className="text-sm text-slate-400">{formatDate(page.created_at)}</p>
+              <p className="text-xs text-slate-500">{t("timestamps.updated")}</p>
+              <p className="text-sm text-slate-400">{formatDate(page.updated_at, localeTag, t("emDash"))}</p>
+              <p className="text-xs text-slate-500 mt-2">{t("timestamps.created")}</p>
+              <p className="text-sm text-slate-400">{formatDate(page.created_at, localeTag, t("emDash"))}</p>
             </div>
           )}
 
@@ -192,7 +199,7 @@ export function PageDetailDrawer({
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors"
               >
                 <ExternalLink className="h-4 w-4" />
-                Abrir editor completo
+                {t("openFullEditor")}
               </Link>
             )}
             <div className="flex gap-2">
@@ -201,14 +208,14 @@ export function PageDetailDrawer({
                 onClick={onClose}
                 className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors"
               >
-                Cancelar
+                {t("cancel")}
               </button>
               <button
                 type="submit"
                 disabled={saving || !title.trim()}
                 className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50 transition-colors"
               >
-                {saving ? "Guardando…" : "Guardar"}
+                {saving ? t("saving") : t("save")}
               </button>
             </div>
           </div>

@@ -1,0 +1,85 @@
+{
+  "emDash": "—",
+  "page": {
+    "eyebrow": "Implementation roadmap",
+    "title": "Project planning",
+    "subtitle": "SAP Activate phase structure: order, dates, and timeline aligned with the project."
+  },
+  "status": {
+    "configured": "Plan configured",
+    "pending": "Plan pending"
+  },
+  "kpi": {
+    "currentPhase": "Current phase",
+    "plannedStart": "Planned start",
+    "plannedEnd": "Planned end",
+    "duration": "Duration",
+    "days": "{count} days",
+    "phases": "Phases"
+  },
+  "empty": {
+    "title": "No planning phases yet",
+    "description": "Create SAP Activate phases or generate the complete plan (phases, activities, and tasks) once the project has start and end dates defined."
+  },
+  "actions": {
+    "generating": "Generating…",
+    "generateFromTemplate": "Generate plan from template",
+    "generatePhasesOnly": "Generate phases only",
+    "backToProject": "Back to project"
+  },
+  "editor": {
+    "title": "Phase editor",
+    "subtitle": "Edit names and dates; the timeline updates with saved changes.",
+    "saveAllLabel": "Save planning",
+    "saveAllHelp": "persists all phases and updates project dates.",
+    "rowSaveLabel": "Save",
+    "rowSaveHelpPrefix": "on each row",
+    "rowSaveHelpSuffix": "only that phase."
+  },
+  "save": {
+    "saveAll": "Save planning",
+    "saving": "Saving…",
+    "success": "Planning saved successfully.",
+    "successWithProjectDates": "Planning saved and project dates updated.",
+    "error": "Error saving planning. Please try again."
+  },
+  "table": {
+    "order": "Order",
+    "phase": "Phase",
+    "start": "Start",
+    "end": "End",
+    "actions": "Actions"
+  },
+  "row": {
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "phaseNamePlaceholder": "Phase name",
+    "save": "Save"
+  },
+  "gantt": {
+    "eyebrow": "Project timeline",
+    "title": "SAP Activate phases",
+    "subtitle": "Executive view of phases and durations, aligned with the date editor.",
+    "empty": "Set start and end dates in the phase editor to view the timeline."
+  },
+  "timeline": {
+    "empty": "Set start and end dates in the phase editor to view the timeline.",
+    "today": "Today",
+    "current": "Current",
+    "durationUnitShort": "d",
+    "durationUnitShortCompact": "d",
+    "tooltip": {
+      "start": "Start",
+      "end": "End",
+      "duration": "Duration"
+    }
+  },
+  "errors": {
+    "loadData": "Could not load data.",
+    "createPhases": "Could not create phases. Verify your permissions or try again later.",
+    "generatePhases": "An error occurred while generating phases. Please try again.",
+    "missingDates": "Set start and end dates on the project.",
+    "generatePlan": "Could not generate the plan.",
+    "missingProjectId": "Project identifier was not found."
+  }
+}

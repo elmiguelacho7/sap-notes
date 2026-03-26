@@ -3,11 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Search, MessageCircle, FolderOpen, ExternalLinkIcon } from "lucide-react";
+import { Search, MessageCircle, FolderOpen, ExternalLinkIcon } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { AppPageShell } from "@/components/ui/layout/AppPageShell";
 import { SapitoState } from "@/components/ui/SapitoState";
-import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
 import type { KnowledgeExploreItem, KnowledgeExploreMetrics, KnowledgeItemType, KnowledgeScope } from "@/app/api/knowledge/explore/route";
 
 const TYPE_LABELS: Record<KnowledgeItemType, string> = {
@@ -19,13 +18,13 @@ const TYPE_LABELS: Record<KnowledgeItemType, string> = {
 
 /** Context badge: GLOBAL NOTE | PROJECT NOTE | DOCUMENT | SAP SOURCE */
 function getContextBadge(item: KnowledgeExploreItem): { label: string; className: string } {
-  if (item.type === "sap_source") return { label: "SAP SOURCE", className: "bg-amber-500/20 text-amber-400 border border-amber-500/30" };
+  if (item.type === "sap_source") return { label: "SAP source", className: "bg-amber-100 text-amber-700" };
   if (item.type === "note") {
-    if (item.scope === "project") return { label: "PROJECT NOTE", className: "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" };
-    return { label: "GLOBAL NOTE", className: "bg-slate-600/50 text-slate-400 border border-slate-500/40" };
+    if (item.scope === "project") return { label: "Project note", className: "bg-blue-100 text-blue-600" };
+    return { label: "Global note", className: "bg-purple-100 text-purple-600" };
   }
-  if (item.type === "document" || item.type === "governance") return { label: "DOCUMENT", className: "bg-violet-500/20 text-violet-300 border border-violet-500/30" };
-  return { label: "DOCUMENT", className: "bg-violet-500/20 text-violet-300 border border-violet-500/30" };
+  if (item.type === "document" || item.type === "governance") return { label: "Document", className: "bg-slate-100 text-slate-600" };
+  return { label: "Document", className: "bg-slate-100 text-slate-600" };
 }
 
 const SCOPE_OPTIONS: { value: KnowledgeScope | ""; label: string }[] = [
@@ -143,42 +142,42 @@ export default function KnowledgeExplorerPage() {
 
   return (
     <AppPageShell>
-      <div className="space-y-8">
-      <header className="space-y-1">
-        <ProjectPageHeader
-          variant="section"
-          dark
-          title="Knowledge Explorer"
-          subtitle="Explore platform knowledge across notes, governance, architecture, and SAP documentation."
-          secondaryActionSlot={
-            <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href="/knowledge/search"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-600/80 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 hover:border-slate-500 transition-colors"
-              >
-                <MessageCircle className="h-4 w-4" />
-                Ask Sapito
-              </Link>
-              <Link
-                href="/knowledge/documents"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-600/80 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 hover:border-slate-500 transition-colors"
-              >
-                <FolderOpen className="h-4 w-4" />
-                Spaces
-              </Link>
-            </div>
-          }
-        />
-      </header>
+      <div className="space-y-6">
+        <header className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight text-[rgb(var(--rb-text-primary))]">
+              Knowledge Explorer
+            </h1>
+            <p className="mt-1 text-sm text-[rgb(var(--rb-text-muted))] max-w-3xl">
+              Explore platform knowledge across notes, governance, architecture, and SAP documentation.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Link
+              href="/knowledge/search"
+              className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-transparent px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface))]/70 transition-colors"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Ask Sapito
+            </Link>
+            <Link
+              href="/knowledge/documents"
+              className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface))]/80 transition-colors"
+            >
+              <FolderOpen className="h-4 w-4" />
+              Spaces
+            </Link>
+          </div>
+        </header>
 
       {error && (
-        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200/90 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}
         </div>
       )}
 
       {loading ? (
-        <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
+        <section className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] overflow-hidden shadow-sm">
           <SapitoState
             variant="loading"
             title="Cargando conocimiento…"
@@ -188,41 +187,41 @@ export default function KnowledgeExplorerPage() {
       ) : data ? (
         <>
           {/* Metrics */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase text-slate-400">Total notes</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{data.metrics.totalNotes}</p>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4 pt-1">
+            <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-4 shadow-sm">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">Total notes</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[rgb(var(--rb-text-primary))]">{data.metrics.totalNotes}</p>
             </div>
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase text-slate-400">Total knowledge documents</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{data.metrics.totalDocuments}</p>
+            <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-4 shadow-sm">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">Total knowledge documents</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[rgb(var(--rb-text-primary))]">{data.metrics.totalDocuments}</p>
             </div>
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase text-slate-400">Governance decisions</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{data.metrics.governanceDecisions}</p>
+            <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-4 shadow-sm">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">Governance decisions</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[rgb(var(--rb-text-primary))]">{data.metrics.governanceDecisions}</p>
             </div>
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:shadow-sm transition-all duration-150">
-              <p className="text-xs uppercase text-slate-400">SAP sources</p>
-              <p className="mt-1 text-lg font-semibold text-slate-100">{data.metrics.sapSources}</p>
+            <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-4 shadow-sm">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">SAP sources</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[rgb(var(--rb-text-primary))]">{data.metrics.sapSources}</p>
             </div>
           </div>
 
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
-            <div className="relative flex-1 min-w-0 w-full sm:max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+          <div className="flex flex-wrap gap-3 rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-3 shadow-sm">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[rgb(var(--rb-text-muted))]" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Buscar en conocimiento…"
-                className="w-full rounded-xl border border-slate-600/80 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                className="w-full h-10 rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 pl-9 pr-3 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30 focus:border-[rgb(var(--rb-brand-primary))]/30"
               />
             </div>
             <select
               value={scopeFilter}
               onChange={(e) => setScopeFilter(e.target.value as KnowledgeScope | "")}
-              className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+              className="h-10 rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30 focus:border-[rgb(var(--rb-brand-primary))]/30"
             >
               {SCOPE_OPTIONS.map((opt) => (
                 <option key={opt.value || "all"} value={opt.value}>
@@ -233,7 +232,7 @@ export default function KnowledgeExplorerPage() {
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value as KnowledgeItemType | "")}
-              className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+              className="h-10 rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30 focus:border-[rgb(var(--rb-brand-primary))]/30"
             >
               {TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value || "all"} value={opt.value}>
@@ -245,7 +244,7 @@ export default function KnowledgeExplorerPage() {
               <select
                 value={moduleFilter}
                 onChange={(e) => setModuleFilter(e.target.value)}
-                className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                className="h-10 rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30 focus:border-[rgb(var(--rb-brand-primary))]/30"
               >
                 <option value="">All modules</option>
                 {uniqueModules.map((m) => (
@@ -258,7 +257,7 @@ export default function KnowledgeExplorerPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortValue)}
-              className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+              className="h-10 rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30 focus:border-[rgb(var(--rb-brand-primary))]/30"
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -269,9 +268,8 @@ export default function KnowledgeExplorerPage() {
           </div>
 
           {/* Grid of cards */}
-          <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
-            {data.items.length === 0 ? (
-              <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-8 px-6">
+          {data.items.length === 0 ? (
+            <section className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] py-8 px-6 shadow-sm">
                 <SapitoState
                   variant="empty"
                   title="Aún no hay conocimiento"
@@ -280,30 +278,29 @@ export default function KnowledgeExplorerPage() {
                 <div className="flex justify-center mt-4">
                   <Link
                     href="/knowledge/documents"
-                    className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors"
+                    className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface))]/80 transition-colors"
                   >
                     Crear espacios
                   </Link>
                 </div>
-              </div>
-            ) : filteredAndSortedItems.length === 0 ? (
-              <div className="rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/30 py-12 px-6 text-center">
-                <p className="text-sm font-medium text-slate-300">No hay resultados para los filtros</p>
-                <p className="mt-1 text-xs text-slate-500">Prueba cambiando búsqueda, ámbito, tipo o módulo.</p>
-              </div>
-            ) : (
-              <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredAndSortedItems.map((item) => (
-                  <CardLink
-                    key={`${item.type}-${item.id}`}
-                    item={item}
-                    isExternal={isExternal(item.href)}
-                    contextBadge={getContextBadge(item)}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+            </section>
+          ) : filteredAndSortedItems.length === 0 ? (
+            <section className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] py-12 px-6 text-center shadow-sm">
+              <p className="text-sm font-medium text-[rgb(var(--rb-text-primary))]">No hay resultados para los filtros</p>
+              <p className="mt-1 text-xs text-[rgb(var(--rb-text-muted))]">Prueba cambiando búsqueda, ámbito, tipo o módulo.</p>
+            </section>
+          ) : (
+            <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+              {filteredAndSortedItems.map((item) => (
+                <CardLink
+                  key={`${item.type}-${item.id}`}
+                  item={item}
+                  isExternal={isExternal(item.href)}
+                  contextBadge={getContextBadge(item)}
+                />
+              ))}
+            </section>
+          )}
         </>
       ) : null}
       </div>
@@ -324,44 +321,52 @@ function CardLink({
   const sapitoHref = `/knowledge/search?context=${encodeURIComponent(item.type + ":" + item.id)}`;
 
   const content = (
-    <>
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide border ${contextBadge.className}`}>
+        <span
+          className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-medium tracking-wide ${contextBadge.className}`}
+        >
           {contextBadge.label}
         </span>
         {item.module && (
-          <span className="inline-flex items-center rounded-lg bg-indigo-500/20 px-2 py-0.5 text-[10px] text-indigo-300">
+          <span className="inline-flex items-center rounded-md bg-[rgb(var(--rb-surface-3))]/50 px-2 py-0.5 text-[10px] text-[rgb(var(--rb-text-muted))]">
             {item.module}
           </span>
         )}
       </div>
-      <h3 className="mt-2 font-medium text-slate-100 line-clamp-2">
+      <h3 className="text-[15px] font-semibold leading-snug tracking-tight text-[rgb(var(--rb-text-primary))] line-clamp-2">
         {item.title || "Untitled"}
       </h3>
       {item.summary && (
-        <p className="mt-1.5 line-clamp-2 text-xs text-slate-400">
+        <p className="line-clamp-2 text-xs leading-relaxed text-[rgb(var(--rb-text-muted))]">
           {item.summary}
         </p>
       )}
       {item.projectName && (
-        <p className="mt-1.5 text-[11px] text-slate-500">Project: {item.projectName}</p>
+        <p className="text-[11px] text-[rgb(var(--rb-text-muted))]">Project: <span className="text-[rgb(var(--rb-text-secondary))]">{item.projectName}</span></p>
       )}
-      <p className="mt-2 text-[11px] text-slate-500">
-        {new Date(item.createdAt).toLocaleDateString("es-ES", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })}
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] text-[rgb(var(--rb-text-muted))] tabular-nums">
+          {new Date(item.createdAt).toLocaleDateString("es-ES", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })}
+        </p>
+      </div>
       {/* Quick actions */}
-      <div className="mt-3 pt-3 border-t border-slate-700/60 flex flex-wrap items-center gap-2">
+      <div className="pt-3 border-t border-[rgb(var(--rb-surface-border))]/60 flex flex-wrap items-center gap-2">
+        {/*
+          Keep actions light + consistent.
+          (No behavior change; just class consolidation via repeated strings below.)
+        */}
         {isExternal && item.href !== "#" ? (
           <a
             href={item.href}
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-600/80 bg-slate-800/60 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/30 transition-colors"
           >
             <ExternalLinkIcon className="h-3 w-3" /> Open
           </a>
@@ -369,7 +374,7 @@ function CardLink({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); item.href !== "#" && router.push(item.href); }}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-600/80 bg-slate-800/60 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/30 transition-colors"
           >
             Open
           </button>
@@ -377,17 +382,17 @@ function CardLink({
         <Link
           href={sapitoHref}
           onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-600/80 bg-slate-800/60 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/30 transition-colors"
         >
           <MessageCircle className="h-3 w-3" /> Ask Sapito
         </Link>
       </div>
-    </>
+    </div>
   );
 
   if (isExternal && item.href !== "#") {
     return (
-      <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:bg-slate-800/60 transition-all duration-150 focus-within:ring-2 focus-within:ring-indigo-500/40">
+      <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-white shadow-sm hover:shadow-md hover:-translate-y-[2px] transition-all duration-150 p-4">
         {content}
       </div>
     );
@@ -399,7 +404,7 @@ function CardLink({
       tabIndex={0}
       onClick={() => item.href !== "#" && router.push(item.href)}
       onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && item.href !== "#") router.push(item.href); }}
-      className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5 hover:border-slate-600 hover:bg-slate-800/60 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 cursor-pointer"
+      className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-white shadow-sm hover:shadow-md hover:-translate-y-[2px] transition-all duration-150 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-primary))]/30 cursor-pointer"
     >
       {content}
     </div>

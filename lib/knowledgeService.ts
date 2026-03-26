@@ -9,6 +9,33 @@ import type {
 
 export type { KnowledgeSearchResult };
 
+type SupabaseErrorLike = {
+  message?: string;
+  details?: string;
+  hint?: string;
+  code?: string;
+  status?: number;
+};
+
+function toWriteError(
+  operation: string,
+  table: string,
+  err: SupabaseErrorLike | null | undefined,
+  fallbackMessage: string
+): Error {
+  const e = new Error(err?.message ?? fallbackMessage);
+  (e as Error & { supabase?: SupabaseErrorLike; table?: string; operation?: string }).supabase = {
+    message: err?.message,
+    details: err?.details,
+    hint: err?.hint,
+    code: err?.code,
+    status: err?.status,
+  };
+  (e as Error & { supabase?: SupabaseErrorLike; table?: string; operation?: string }).table = table;
+  (e as Error & { supabase?: SupabaseErrorLike; table?: string; operation?: string }).operation = operation;
+  return e;
+}
+
 export type ListSpacesOptions = { projectId?: string | null };
 
 /**
@@ -241,7 +268,7 @@ export async function updatePage(
 
   if (error) {
     logSupabaseError("knowledgeService.updatePage", error);
-    throw new Error(error.message ?? "Error al actualizar la página.");
+    throw toWriteError("update", "knowledge_pages", error, "Error al actualizar la página.");
   }
   return data as KnowledgePage;
 }
@@ -321,7 +348,7 @@ export async function upsertBlocks(
       .eq("id", row.id);
     if (error) {
       logSupabaseError("knowledgeService.upsertBlocks update", error);
-      throw new Error(error.message ?? "Error al actualizar bloques.");
+      throw toWriteError("update", "knowledge_blocks", error, "Error al actualizar bloques.");
     }
   }
 
@@ -332,7 +359,7 @@ export async function upsertBlocks(
       .select();
     if (error) {
       logSupabaseError("knowledgeService.upsertBlocks insert", error);
-      throw new Error(error.message ?? "Error al crear bloques.");
+      throw toWriteError("insert", "knowledge_blocks", error, "Error al crear bloques.");
     }
     (inserted ?? []).forEach((r) => existingIds.add(r.id));
   }
@@ -344,14 +371,22 @@ export async function upsertBlocks(
   const currentIds = new Set(blocks.map((b) => b.id).filter(Boolean) as string[]);
   const deleteIds = (toDelete.data ?? []).map((r) => r.id).filter((id) => !currentIds.has(id));
   if (deleteIds.length > 0) {
-    await supabase.from("knowledge_blocks").delete().in("id", deleteIds);
+    const { error: deleteError } = await supabase.from("knowledge_blocks").delete().in("id", deleteIds);
+    if (deleteError) {
+      logSupabaseError("knowledgeService.upsertBlocks delete", deleteError);
+      throw toWriteError("delete", "knowledge_blocks", deleteError, "Error al eliminar bloques.");
+    }
   }
 
-  const { data: final } = await supabase
+  const { data: final, error: finalError } = await supabase
     .from("knowledge_blocks")
     .select("*")
     .eq("page_id", pageId)
     .order("sort_order", { ascending: true });
+  if (finalError) {
+    logSupabaseError("knowledgeService.upsertBlocks final-select", finalError);
+    throw toWriteError("select", "knowledge_blocks", finalError, "Error al cargar bloques finales.");
+  }
   return (final ?? []) as KnowledgeBlock[];
 }
 

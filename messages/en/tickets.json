@@ -1,0 +1,173 @@
+{
+  "emDash": "—",
+  "project": {
+    "invalidProjectId": "Invalid project identifier.",
+    "eyebrow": "Incident control",
+    "title": "Project tickets",
+    "subtitle": "Incidents and operational tracking linked to this project. Open a row to see details.",
+    "createTicket": "Create ticket",
+    "createFirstTicket": "Create first ticket",
+    "searchAria": "Search tickets",
+    "searchPlaceholder": "Search tickets…",
+    "loadError": "Could not load tickets. Please try again later.",
+    "kpi": {
+      "open": "Open",
+      "inProgress": "In progress",
+      "overdue": "Overdue",
+      "unassigned": "Unassigned"
+    },
+    "empty": {
+      "title": "No tickets yet",
+      "description": "Log incidents or technical work for this project. Tickets will appear in this list."
+    },
+    "filteredEmpty": {
+      "title": "No tickets match",
+      "description": "Try another filter or clear the search to see more results."
+    },
+    "table": {
+      "title": "Title",
+      "assignee": "Assignee",
+      "priority": "Priority",
+      "status": "Status",
+      "dueDate": "Due date",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "noDueDate": "No due date",
+    "createdMeta": "Created",
+    "assigneeUnassigned": "Unassigned"
+  },
+  "filters": {
+    "all": "All",
+    "open": "Open",
+    "in_progress": "In progress",
+    "closed": "Closed",
+    "overdue": "Overdue",
+    "unassigned": "Unassigned",
+    "my_tickets": "Assigned to me"
+  },
+  "priority": {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "urgent": "Urgent"
+  },
+  "status": {
+    "open": "Open",
+    "in_progress": "In progress",
+    "pending": "Pending",
+    "resolved": "Resolved",
+    "closed": "Closed",
+    "cancelled": "Cancelled"
+  },
+  "due": {
+    "overdue": "Overdue",
+    "dueToday": "Due today",
+    "dueTomorrow": "Due tomorrow",
+    "inDays": "In {n} days",
+    "limit": "Due"
+  },
+  "rowActions": {
+    "moreTitle": "More actions",
+    "moreAria": "More actions",
+    "view": "View",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteTitle": "Delete ticket",
+    "deleteBody": "Are you sure you want to delete this ticket? This cannot be undone.",
+    "cancel": "Cancel",
+    "deleteConfirm": "Delete",
+    "deleting": "Deleting…",
+    "actionFailed": "Could not complete the action.",
+    "connectionError": "Connection error. Please try again."
+  },
+  "new": {
+    "invalidProjectId": "Invalid project identifier.",
+    "backToProjects": "Back to projects",
+    "creatingBanner": "Creating…",
+    "title": "New project ticket",
+    "subtitle": "Create a ticket linked to this project. It will appear in the project Tickets section.",
+    "sectionMain": "Main information",
+    "sectionManagement": "Assignment and status",
+    "fieldTitle": "Title *",
+    "titlePlaceholder": "Ticket summary",
+    "fieldDescription": "Description (optional)",
+    "descriptionPlaceholder": "Ticket details",
+    "fieldAssignee": "Assignee",
+    "assigneePlaceholder": "Unassigned",
+    "fieldPriority": "Priority",
+    "fieldStatus": "Status",
+    "fieldDueDate": "Due date (optional)",
+    "cancel": "Cancel",
+    "submit": "Create ticket",
+    "submitting": "Creating…",
+    "errors": {
+      "titleRequired": "Title is required.",
+      "missingProject": "Project identifier is missing.",
+      "userUnknown": "Could not identify the current user.",
+      "clientProjectConflict": "A ticket cannot be linked to both a project and a client at the same time.",
+      "createFailed": "Could not create the ticket. Please try again later.",
+      "redirectFailed": "The ticket was created but redirect failed. Go to the ticket list."
+    }
+  },
+  "comments": {
+    "empty": "No comments yet.",
+    "userFallback": "User",
+    "placeholder": "Write a comment...",
+    "sending": "Sending...",
+    "add": "Add comment",
+    "errors": {
+      "loginRequired": "You must be signed in to comment.",
+      "addFailed": "Could not add comment."
+    }
+  },
+  "detail": {
+    "untitled": "Untitled",
+    "missingId": "Ticket identifier not found.",
+    "loading": "Loading ticket...",
+    "backToTickets": "← Back to tickets",
+    "notFound": "Ticket not found.",
+    "linkedProject": "Linked project",
+    "created": "Created",
+    "due": "Due",
+    "updated": "Updated",
+    "closing": "Closing...",
+    "closeTicket": "Close ticket",
+    "overviewSubtitle": "Main ticket details.",
+    "description": "Description",
+    "noDescription": "No description.",
+    "commentsSubtitle": "Ticket discussion and follow-up.",
+    "assignmentSubtitle": "Current assignee and reassignment.",
+    "unassigned": "Unassigned",
+    "saving": "Saving...",
+    "saveAssignee": "Save assignee",
+    "rootCausePlaceholder": "Short root cause",
+    "resolutionTypePlaceholder": "workaround, fix, configuration...",
+    "resolutionSummaryPlaceholder": "Describe the resolution...",
+    "saveResolution": "Save resolution",
+    "referencesSubtitle": "Related links and documents.",
+    "knowledgeSubtitle": "Convert this solution into reusable team knowledge.",
+    "knowledgeAlreadyLinked": "A knowledge page is already linked to this ticket.",
+    "knowledgePublishHint": "Publish this learning to Knowledge when resolution is ready.",
+    "converting": "Converting...",
+    "convertToKnowledge": "Convert to Knowledge Page",
+    "knowledgeNeedsProject": "Link a project to convert this ticket into a knowledge page.",
+    "errors": {
+      "loadTicket": "Could not load ticket. Please try again later.",
+      "closeFailed": "Could not close the ticket.",
+      "updateAssigneeFailed": "Could not update assignee.",
+      "saveFailed": "Could not save.",
+      "saveSolutionFailed": "Could not save resolution.",
+      "convertFailed": "Could not convert.",
+      "convertKnowledgeFailed": "Could not convert to knowledge page."
+    },
+    "references": {
+      "empty": "No references yet.",
+      "remove": "Remove",
+      "document": "Document",
+      "value": "Value",
+      "adding": "Adding...",
+      "add": "Add"
+    }
+  }
+}

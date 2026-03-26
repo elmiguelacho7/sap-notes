@@ -1,0 +1,128 @@
+{
+  "errors": {
+    "loadFailed": "Could not load dashboard data."
+  },
+  "greeting": {
+    "morning": "Good morning",
+    "afternoon": "Good afternoon",
+    "evening": "Good evening"
+  },
+  "subtitle": "Workspace overview — projects, tasks, and knowledge in one place.",
+  "heroEyebrow": "Command center",
+  "metricsIntro": "Key operating signals across your workspace.",
+  "appsHint": "Go to core modules in one tap.",
+  "insightsLead": "Ticket mix, client concentration, and activity trend over the last 30 days.",
+  "create": "Create",
+  "createMenu": {
+    "project": "Create project",
+    "ticket": "Create ticket",
+    "task": "Create task",
+    "note": "Create note"
+  },
+  "search": "Search",
+  "askSapito": "Ask Sapito",
+  "metricsSr": "Workspace metrics",
+  "kpi": {
+    "activeProjects": "Active projects",
+    "activeProjectsTrend": "In progress",
+    "openTickets": "Open tickets",
+    "openTicketsTrend": "Pending",
+    "tasksDueToday": "Tasks due today",
+    "tasksDueTodayTrend": "Today",
+    "clients": "Clients",
+    "clientsTrend": "Registered",
+    "knowledgeSpaces": "Knowledge spaces",
+    "knowledgeTrend": "Knowledge"
+  },
+  "yourWork": "Your work",
+  "loading": "Loading…",
+  "tiles": {
+    "overdueTasks": "{count, plural, one {# overdue task} other {# overdue tasks}}",
+    "openTickets": "{count, plural, one {# open ticket} other {# open tickets}}",
+    "staleProjects": "{count, plural, one {# project without recent activity} other {# projects without recent activity}}"
+  },
+  "allCaughtUp": "All caught up.",
+  "applications": "Applications",
+  "app": {
+    "projects": "Projects",
+    "tickets": "Tickets",
+    "tasks": "Tasks",
+    "knowledge": "Knowledge",
+    "notes": "Notes",
+    "clients": "Clients",
+    "search": "Search"
+  },
+  "insights": "Insights",
+  "insightsSub": "Metrics and charts.",
+  "workload": {
+    "title": "Workload by assignee",
+    "subtitle": "Active tasks per assignee.",
+    "emptyTitle": "No workload data yet",
+    "emptySub": "Data will appear when tasks are assigned to multiple people across your projects.",
+    "chart": {
+      "tooltipUser": "User",
+      "tooltipTasks": "Active tasks",
+      "unnamedUser": "Unnamed"
+    }
+  },
+  "systemHealth": {
+    "title": "System status",
+    "subtitle": "Operational summary of the platform.",
+    "activeProjects": "Active projects",
+    "overdueTasks": "Overdue tasks",
+    "openTickets": "Open tickets",
+    "staleProjects": "Projects without recent activity",
+    "healthy": "Active",
+    "noProjects": "No projects",
+    "attention": "Attention",
+    "onTrack": "On track",
+    "manyPending": "Several pending",
+    "normal": "Normal",
+    "review": "Review",
+    "ok": "OK"
+  },
+  "activity": {
+    "title": "Recent activity",
+    "subtitle": "Latest events (projects, tasks, tickets, notes).",
+    "empty": "No recent activity yet.",
+    "eventTypes": {
+      "project_created": "Project created",
+      "task_created": "Task created",
+      "ticket_closed": "Ticket closed",
+      "note_created": "Note added",
+      "user_invited": "User invited"
+    }
+  },
+  "recentProjects": {
+    "title": "Recent projects",
+    "subtitle": "Quick access to projects.",
+    "empty": "No projects",
+    "viewAll": "View all projects"
+  },
+  "charts": {
+    "ticketsByStatus": "Tickets by status",
+    "ticketsByStatusSub": "Current distribution",
+    "ticketsByClient": "Tickets by client",
+    "ticketsByClientSub": "Top clients",
+    "activity30d": "Activity last 30 days",
+    "activity30dSub": "Events per day",
+    "emptyTitle": "No data available yet",
+    "emptySub": "Data will appear here as activity is recorded.",
+    "donutCenter": "Tickets\n{count}",
+    "tooltip": {
+      "status": "Status",
+      "count": "Count",
+      "pctOfTotal": "% of total",
+      "client": "Client",
+      "ticketCount": "Ticket count",
+      "fullDate": "Full date",
+      "eventCount": "Event count"
+    }
+  },
+  "relative": {
+    "now": "just now",
+    "minutes": "{n} min ago",
+    "hours": "{n} h ago",
+    "days": "{n} d ago"
+  }
+}

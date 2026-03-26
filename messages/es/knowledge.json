@@ -1,0 +1,112 @@
+{
+  "page": {
+    "eyebrow": "Espacio de conocimiento",
+    "title": "Conocimiento",
+    "subtitle": "Wiki del proyecto: espacios y páginas reutilizables para documentar SAP, procedimientos y decisiones del equipo.",
+    "newPage": "Nueva página",
+    "newSpace": "Nuevo espacio",
+    "searchKnowledge": "Buscar en conocimiento"
+  },
+  "stats": {
+    "spaces": "{count, plural, one {# espacio} other {# espacios}}",
+    "pages": "{count, plural, one {# página} other {# páginas}}",
+    "lastUpdated": "Última actualización"
+  },
+  "panels": {
+    "spaces": {
+      "title": "Espacios",
+      "subtitle": "Organiza la documentación del proyecto"
+    },
+    "pages": {
+      "title": "Páginas",
+      "selectSpaceHint": "Selecciona un espacio para ver sus páginas"
+    }
+  },
+  "empty": {
+    "noSpaces": {
+      "title": "Sin espacios todavía",
+      "description": "Crea un espacio con \"Nuevo espacio\" para empezar la wiki del proyecto."
+    },
+    "selectSpace": {
+      "title": "Elige un espacio",
+      "description": "Selecciona un espacio en el panel izquierdo para ver sus páginas."
+    },
+    "spaceEmpty": {
+      "title": "Este espacio está vacío",
+      "description": "Añade la primera página con \"Nueva página\"."
+    }
+  },
+  "delete": {
+    "title": "Eliminar página",
+    "confirmBody": "¿Eliminar \"{title}\"? Se puede deshacer más tarde.",
+    "confirm": "Eliminar",
+    "deleting": "Eliminando…"
+  },
+  "modals": {
+    "newSpace": {
+      "title": "Nuevo espacio",
+      "nameLabel": "Nombre *",
+      "namePlaceholder": "Ej: Configuración SAP",
+      "descriptionLabel": "Descripción (opcional)",
+      "descriptionPlaceholder": "Breve descripción"
+    },
+    "newPage": {
+      "title": "Nueva página",
+      "titleLabel": "Título *",
+      "titlePlaceholder": "Ej: Cómo configurar variante de valoración",
+      "templateLabel": "Plantilla (opcional)"
+    }
+  },
+  "templates": {
+    "blank": "En blanco",
+    "sapProcedure": "SAP Procedure",
+    "sapConfiguration": "SAP Configuration",
+    "troubleshootingGuide": "Troubleshooting Guide"
+  },
+  "common": {
+    "cancel": "Cancelar",
+    "create": "Crear",
+    "creating": "Creando…"
+  },
+  "errors": {
+    "invalidProjectId": "Identificador de proyecto no válido.",
+    "loadSpaces": "Error al cargar espacios.",
+    "createSpace": "Error al crear espacio.",
+    "createPage": "Error al crear página."
+  },
+  "row": {
+    "open": "Abrir",
+    "fullEditor": "Editor completo",
+    "editDetails": "Editar detalles",
+    "delete": "Eliminar",
+    "pageActions": "Acciones de la página",
+    "comingSoon": "Próximamente",
+    "move": "Mover",
+    "createSubpage": "Crear subpágina"
+  },
+  "drawer": {
+    "emDash": "—",
+    "title": "Detalle de página",
+    "close": "Cerrar",
+    "context": {
+      "global": "Global",
+      "project": "Proyecto"
+    },
+    "fields": {
+      "title": "Título *",
+      "titlePlaceholder": "Título de la página",
+      "summary": "Resumen / contenido",
+      "summaryPlaceholder": "Resumen o contenido principal",
+      "space": "Espacio",
+      "project": "Proyecto"
+    },
+    "timestamps": {
+      "updated": "Actualizado",
+      "created": "Creado"
+    },
+    "openFullEditor": "Abrir editor completo",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "saving": "Guardando…"
+  }
+}

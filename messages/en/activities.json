@@ -1,0 +1,149 @@
+{
+  "emDash": "—",
+  "page": {
+    "eyebrow": "Execution",
+    "title": "Activities",
+    "subtitle": "Manage SAP Activate activities by phase: owners, dates, risk, and links to project tasks.",
+    "projectMeta": "Project · {name}",
+    "createCta": "New activity"
+  },
+  "banner": {
+    "creating": "Creating…"
+  },
+  "kpi": {
+    "open": "Open",
+    "inProgress": "In progress",
+    "blocked": "Blocked",
+    "overdue": "Overdue"
+  },
+  "phaseFilter": {
+    "label": "Phase",
+    "all": "All phases",
+    "showing": "Showing activities for:",
+    "contextAll": "Context: all project phases"
+  },
+  "filters": {
+    "all": "All",
+    "planned": "Planned",
+    "inProgress": "In progress",
+    "blocked": "Blocked",
+    "done": "Completed",
+    "overdue": "Overdue",
+    "assignedToMe": "Assigned to me",
+    "searchAria": "Search activities",
+    "searchPlaceholder": "Search activities…"
+  },
+  "section": {
+    "title": "Activities list",
+    "description": "Phase view; edit dates inline or open details for other fields. Link tasks from the list icon."
+  },
+  "empty": {
+    "none": {
+      "title": "No activities in this project",
+      "description": "Create activities to organize work and link them with project tasks.",
+      "createFirst": "Create first activity",
+      "noPhasesHint": "You need planning phases before creating activities."
+    },
+    "byPhase": {
+      "title": "No activities in this phase",
+      "description": "Change the phase filter or create a new activity."
+    },
+    "filtered": {
+      "title": "No results with current filters",
+      "description": "Try another status or adjust the search."
+    }
+  },
+  "status": {
+    "planned": "Planned",
+    "in_progress": "In progress",
+    "blocked": "Blocked",
+    "done": "Completed",
+    "overdue": "Overdue"
+  },
+  "priority": {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High"
+  },
+  "risk": {
+    "high": "High risk",
+    "medium": "Medium risk",
+    "low": "Low risk"
+  },
+  "dates": {
+    "start": "Start",
+    "end": "End",
+    "none": "No dates"
+  },
+  "mobile": {
+    "progress": "Progress {value}%"
+  },
+  "table": {
+    "phase": "Phase",
+    "activity": "Activity",
+    "owner": "Owner",
+    "status": "Status",
+    "priority": "Priority",
+    "start": "Start",
+    "end": "End",
+    "risk": "Risk",
+    "actions": "Actions"
+  },
+  "actions": {
+    "editActivity": "Edit activity",
+    "viewProjectTasks": "View project tasks",
+    "viewTasks": "View tasks",
+    "deleteActivity": "Delete activity"
+  },
+  "row": {
+    "saveDates": "Save dates",
+    "moreActions": "More actions",
+    "progressTitle": "Task-derived progress (done / total)",
+    "menu": {
+      "actionsLabel": "Activity actions",
+      "edit": "Edit activity",
+      "viewTasks": "View tasks",
+      "delete": "Delete activity"
+    }
+  },
+  "delete": {
+    "confirmBody": "Are you sure you want to delete this activity? Linked tasks will still exist but will be left unlinked.",
+    "cancel": "Cancel",
+    "deleting": "Deleting…",
+    "confirm": "Yes, delete"
+  },
+  "modal": {
+    "titleCreate": "New activity",
+    "titleEdit": "Edit activity",
+    "fields": {
+      "phaseRequired": "Phase *",
+      "selectPhase": "Select a phase",
+      "titleRequired": "Title *",
+      "description": "Description",
+      "owner": "Owner",
+      "unassigned": "Unassigned",
+      "status": "Status",
+      "priority": "Priority",
+      "start": "Start",
+      "end": "End",
+      "progress": "Progress (%)"
+    },
+    "cancel": "Cancel",
+    "saveChanges": "Save changes",
+    "create": "Create activity",
+    "savingEdit": "Saving…",
+    "savingCreate": "Creating…",
+    "errors": {
+      "missingProject": "Could not identify project.",
+      "phaseRequired": "Select a phase for the activity.",
+      "titleRequired": "The activity needs a title.",
+      "updateFailed": "Could not update the activity.",
+      "createFailed": "Could not create the activity.",
+      "unexpected": "An unexpected error occurred while creating the activity."
+    }
+  },
+  "errors": {
+    "loadData": "Could not load data.",
+    "missingProjectId": "Project identifier was not found."
+  }
+}

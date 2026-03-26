@@ -144,7 +144,7 @@ export function GlobalAssistantBubble() {
                     <div
                       className={`max-w-[88%] min-w-0 rounded-2xl px-4 py-3.5 ${
                         msg.role === "user"
-                          ? "bg-slate-900 text-white shadow-sm"
+                          ? "bg-[rgb(var(--rb-brand-primary))] text-white shadow-sm shadow-[rgb(var(--rb-brand-primary))]/15"
                           : "bg-slate-50/90 text-slate-800 border border-slate-200/80 shadow-sm"
                       }`}
                     >
@@ -184,13 +184,13 @@ export function GlobalAssistantBubble() {
               onChange={(e) => setInput(e.target.value)}
               placeholder="Error, transacción o tema…"
               disabled={loading}
-              className="flex-1 rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-60 shadow-sm"
+              className="flex-1 rounded-xl border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface))]/90 px-3.5 py-2.5 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/30 focus:border-[rgb(var(--rb-brand-primary))]/35 disabled:opacity-60 shadow-sm"
               aria-label="Mensaje para Sapito"
             />
             <button
               type="submit"
               disabled={loading || !input.trim()}
-              className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60 shrink-0 transition-colors shadow-sm"
+              className="rb-btn-primary rounded-xl border border-transparent px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60 shrink-0 transition-colors shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             >
               {loading ? "Enviando…" : "Enviar"}
             </button>
@@ -200,7 +200,7 @@ export function GlobalAssistantBubble() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-white shadow-lg hover:bg-slate-800 transition-colors"
+        className="flex h-12 w-12 items-center justify-center rounded-full bg-[rgb(var(--rb-brand-primary))] text-white shadow-lg shadow-[rgb(var(--rb-brand-primary))]/25 hover:bg-[rgb(var(--rb-brand-primary-hover))] active:bg-[rgb(var(--rb-brand-primary-active))] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--rb-workspace-bg))]"
         title="Sapito · Global SAP Copilot"
         aria-label={open ? "Cerrar Sapito" : "Abrir Sapito"}
       >

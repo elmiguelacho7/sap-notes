@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
 import type { EChartsOption } from "echarts";
 import ReactECharts from "echarts-for-react";
+import { useTranslations } from "next-intl";
 
 type TeamWorkloadUser = { id: string; name: string; taskCount: number };
 
@@ -19,42 +21,49 @@ const AXIS_LABEL = {
 };
 
 export function TeamWorkloadChart({ users }: { users: TeamWorkloadUser[] }) {
-  const option: EChartsOption = {
-    tooltip: {
-      trigger: "axis",
-      backgroundColor: "#1e293b",
-      borderColor: "#334155",
-      textStyle: { color: "#e2e8f0", fontSize: 12 },
-      formatter: (params: unknown) => {
-        const p = Array.isArray(params) ? params[0] : params;
-        const payload = p as { name?: string; value?: number };
-        return `<span style="color:#94a3b8">User</span><br/><span style="color:#f1f5f9;font-weight:600">${payload.name ?? ""}</span><br/><span style="color:#94a3b8">Active tasks</span><br/><span style="color:#e2e8f0;font-weight:600">${payload.value ?? 0}</span>`;
+  const t = useTranslations("dashboard.workload.chart");
+
+  const option: EChartsOption = useMemo(() => {
+    const tUser = t("tooltipUser");
+    const tTasks = t("tooltipTasks");
+    const unnamed = t("unnamedUser");
+    return {
+      tooltip: {
+        trigger: "axis",
+        backgroundColor: "#ffffff",
+        borderColor: "#d8e2de",
+        textStyle: { color: "#0f172a", fontSize: 12 },
+        formatter: (params: unknown) => {
+          const p = Array.isArray(params) ? params[0] : params;
+          const payload = p as { name?: string; value?: number };
+          return `<span style="color:#64748b">${tUser}</span><br/><span style="color:#0f172a;font-weight:600">${payload.name ?? ""}</span><br/><span style="color:#64748b">${tTasks}</span><br/><span style="color:#0f172a;font-weight:600">${payload.value ?? 0}</span>`;
+        },
       },
-    },
-    grid: { ...GRID, left: "20%" },
-    xAxis: {
-      type: "value",
-      axisLabel: AXIS_LABEL,
-      splitLine: { lineStyle: { color: "#334155", type: "dashed" as const } },
-      axisLine: { show: true, lineStyle: { color: "#334155" } },
-    },
-    yAxis: {
-      type: "category",
-      data: users.map((u) => u.name || "Sin nombre"),
-      axisLabel: { ...AXIS_LABEL, width: 80, overflow: "truncate" },
-      axisLine: { show: false },
-      axisTick: { show: false },
-    },
-    series: [
-      {
-        type: "bar",
-        barWidth: "60%",
-        barMaxWidth: 24,
-        data: users.map((u) => u.taskCount),
-        itemStyle: { color: "#6366f1", borderRadius: [0, 4, 4, 0] },
+      grid: { ...GRID, left: "20%" },
+      xAxis: {
+        type: "value",
+        axisLabel: AXIS_LABEL,
+        splitLine: { lineStyle: { color: "#d6e0dc", type: "dashed" as const } },
+        axisLine: { show: true, lineStyle: { color: "#d0ddd8" } },
       },
-    ],
-  };
+      yAxis: {
+        type: "category",
+        data: users.map((u) => u.name?.trim() || unnamed),
+        axisLabel: { ...AXIS_LABEL, width: 80, overflow: "truncate" },
+        axisLine: { show: false },
+        axisTick: { show: false },
+      },
+      series: [
+        {
+          type: "bar",
+          barWidth: "60%",
+          barMaxWidth: 24,
+          data: users.map((u) => u.taskCount),
+          itemStyle: { color: "#2a9d67", borderRadius: [0, 4, 4, 0] },
+        },
+      ],
+    };
+  }, [users, t]);
 
   return (
     <ReactECharts

@@ -1,0 +1,54 @@
+{
+  "emDash": "—",
+  "page": {
+    "title": "Calendario de planificación",
+    "subtitle": "Vista temporal de las fases y actividades del proyecto."
+  },
+  "actions": {
+    "backToProject": "Volver al proyecto",
+    "goToProjectPhases": "Ir a fases del proyecto"
+  },
+  "sections": {
+    "calendar": "Calendario",
+    "riskByPhase": "Riesgo por fase",
+    "phaseDurationDays": "Duración por fase (días)",
+    "projectTimeline": "Línea de tiempo del proyecto",
+    "activitiesByPhase": "Actividades por fase",
+    "unassignedPhase": "Sin fase asignada"
+  },
+  "states": {
+    "loading": "Cargando calendario...",
+    "noPhases": "Aún no hay fases definidas para este proyecto.",
+    "noActivities": "Todavía no hay actividades registradas para este proyecto."
+  },
+  "labels": {
+    "status": "Estado",
+    "toArrow": "->"
+  },
+  "dates": {
+    "noDate": "Sin fecha"
+  },
+  "risk": {
+    "high": "Alto",
+    "medium": "Medio",
+    "low": "Bajo",
+    "highShort": "Alto: {count}",
+    "mediumShort": "Med: {count}",
+    "lowShort": "Bajo: {count}"
+  },
+  "errors": {
+    "loadFailed": "No se pudo cargar el calendario de planificación.",
+    "missingProjectId": "No se ha encontrado el identificador del proyecto."
+  },
+  "gantt": {
+    "defaultTitle": "Línea de tiempo",
+    "timelineEyebrow": "Timeline",
+    "visualPlan": "Plan visual",
+    "legend": {
+      "phase": "Fase",
+      "activity": "Actividad"
+    },
+    "empty": "Sin fechas o fases para mostrar.",
+    "today": "Hoy"
+  }
+}

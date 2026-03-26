@@ -24,7 +24,7 @@ export function SectionCard({
     <Card className={className}>
       {(title || description) && (
         <CardHeader className={headerClassName}>
-          {title && <CardTitle className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{title}</CardTitle>}
+          {title && <CardTitle className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">{title}</CardTitle>}
           {description && <CardDescription className="mt-0.5 text-xs">{description}</CardDescription>}
         </CardHeader>
       )}

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { GanttChart } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 
 export type PhaseForGantt = {
   id: string;
@@ -73,14 +74,17 @@ type ProjectGanttProProps = {
 export default function ProjectGanttPro({
   phases,
   activities = [],
-  tasks = [],
   projectStart,
   projectEnd,
-  title = "Línea de tiempo",
+  title,
   showLegend = true,
   height = 320,
   dark = false,
 }: ProjectGanttProProps) {
+  const t = useTranslations("calendar.gantt");
+  const locale = useLocale();
+  const localeTag = locale === "es" ? "es-ES" : "en-US";
+  const resolvedTitle = title ?? t("defaultTitle");
   const start = toDate(projectStart);
   const end = toDate(projectEnd);
   const totalMs = end.getTime() - start.getTime();
@@ -120,20 +124,20 @@ export default function ProjectGanttPro({
               <GanttChart className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Timeline</p>
-              <p className="text-sm font-medium text-slate-200 mt-0.5">{title}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{t("timelineEyebrow")}</p>
+              <p className="text-sm font-medium text-slate-200 mt-0.5">{resolvedTitle}</p>
             </div>
           </div>
           {showLegend && (
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-600/80 bg-slate-800/60 px-2.5 py-1 text-[10px] font-medium text-slate-400">
                 <span className="h-2 w-4 rounded bg-indigo-500/80" />
-                Phase
+                {t("legend.phase")}
               </span>
               {activities.length > 0 && (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-600/80 bg-slate-800/60 px-2.5 py-1 text-[10px] font-medium text-slate-400">
                   <span className="h-1.5 w-3 rounded-sm bg-slate-500" />
-                  Activity
+                  {t("legend.activity")}
                 </span>
               )}
             </div>
@@ -146,7 +150,7 @@ export default function ProjectGanttPro({
               className="flex items-center justify-center rounded-xl border border-dashed border-slate-700/60 bg-slate-800/30 text-sm text-slate-500"
               style={{ height: `${height}px` }}
             >
-              No dates or phases to display.
+              {t("empty")}
             </div>
           ) : (
             <div className="w-full overflow-x-auto overflow-y-hidden">
@@ -161,11 +165,11 @@ export default function ProjectGanttPro({
                           key={d.getTime()}
                           className="absolute top-0 bottom-0 border-l border-slate-700/50 text-[10px] text-slate-500 pl-0.5"
                           style={{ left: `${pct}%` }}
-                          title={d.toLocaleDateString("es-ES")}
+                          title={d.toLocaleDateString(localeTag)}
                         >
                           {pct < 95 && (
                             <span className="whitespace-nowrap">
-                              {d.toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
+                              {d.toLocaleDateString(localeTag, { day: "numeric", month: "short" })}
                             </span>
                           )}
                         </div>
@@ -182,7 +186,7 @@ export default function ProjectGanttPro({
                     <div
                       className="w-0.5 h-full bg-rose-400/90"
                       style={{ marginLeft: `${todayPercent}%` }}
-                      title="Today"
+                      title={t("today")}
                     />
                   </div>
                 )}
@@ -265,21 +269,21 @@ export default function ProjectGanttPro({
           </div>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Plan visual
+              {t("visualPlan")}
             </p>
-            <p className="text-sm font-medium text-slate-800 mt-0.5">{title}</p>
+            <p className="text-sm font-medium text-slate-800 mt-0.5">{resolvedTitle}</p>
           </div>
         </div>
         {showLegend && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-medium text-slate-600">
               <span className="h-2 w-4 rounded bg-indigo-500/80" />
-              Fase
+              {t("legend.phase")}
             </span>
             {activities.length > 0 && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-medium text-slate-600">
                 <span className="h-1.5 w-3 rounded-sm bg-slate-400" />
-                Actividad
+                {t("legend.activity")}
               </span>
             )}
           </div>
@@ -292,7 +296,7 @@ export default function ProjectGanttPro({
             className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-sm text-slate-500"
             style={{ height: `${height}px` }}
           >
-            Sin fechas o fases para mostrar.
+            {t("empty")}
           </div>
         ) : (
           <div className="w-full overflow-x-auto overflow-y-hidden">
@@ -313,11 +317,11 @@ export default function ProjectGanttPro({
                         key={d.getTime()}
                         className="absolute top-0 bottom-0 border-l border-slate-200 text-[10px] text-slate-400 pl-0.5"
                         style={{ left: `${pct}%` }}
-                        title={d.toLocaleDateString("es-ES")}
+                        title={d.toLocaleDateString(localeTag)}
                       >
                         {pct < 95 && (
                           <span className="whitespace-nowrap">
-                            {d.toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
+                            {d.toLocaleDateString(localeTag, { day: "numeric", month: "short" })}
                           </span>
                         )}
                       </div>
@@ -334,7 +338,7 @@ export default function ProjectGanttPro({
                   <div
                     className="w-0.5 h-full bg-rose-400"
                     style={{ marginLeft: `${todayPercent}%` }}
-                    title="Hoy"
+                    title={t("today")}
                   />
                 </div>
               )}

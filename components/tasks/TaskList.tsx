@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ChevronRight, Pencil } from "lucide-react";
 import { AssigneeDropdown } from "@/app/components/AssigneeDropdown";
 import type { BoardTask } from "@/app/components/TasksBoard";
-import { STATUS_LABELS_ES, PRIORITY_LABELS } from "@/lib/taskWorkflow";
-import type { ProjectStatusKey, TaskPriorityKey } from "@/lib/taskWorkflow";
+import type { TaskPriorityKey } from "@/lib/taskWorkflow";
+import { FORM_SECTION_TITLE_CLASS } from "@/components/layout/formPageClasses";
 
 export type TaskListContext = "global" | "project";
 
@@ -33,16 +34,6 @@ export type TaskListProps = {
 
 const PRIORITY_ORDER: TaskPriorityKey[] = ["high", "medium", "low"];
 
-function priorityLabel(p: string): string {
-  const k = (p ?? "").toLowerCase() as TaskPriorityKey;
-  return PRIORITY_LABELS[k] ?? p ?? "—";
-}
-
-function statusLabel(key: string, options: { value: string; label: string }[]): string {
-  const opt = options.find((o) => o.value === key);
-  return opt?.label ?? (STATUS_LABELS_ES[key as ProjectStatusKey] ?? key ?? "—");
-}
-
 export function TaskList({
   tasks,
   context,
@@ -60,7 +51,20 @@ export function TaskList({
   scopeLabel,
   loading = false,
 }: TaskListProps) {
+  const t = useTranslations("tasks.list");
+  const tPriority = useTranslations("tasks.priority");
+  const tTaskCard = useTranslations("tasks.taskCard");
   const [editingDueId, setEditingDueId] = useState<string | null>(null);
+
+  const priorityLabelMap = useMemo(
+    () =>
+      ({
+        high: tPriority("high"),
+        medium: tPriority("medium"),
+        low: tPriority("low"),
+      }) as Record<TaskPriorityKey, string>,
+    [tPriority]
+  );
 
   const handleDueDateBlur = useCallback(
     (taskId: string, value: string) => {
@@ -71,12 +75,17 @@ export function TaskList({
     [onDueDateChange]
   );
 
+  function priorityLabel(p: string): string {
+    const k = (p ?? "").toLowerCase() as TaskPriorityKey;
+    return priorityLabelMap[k] ?? p ?? t("emDash");
+  }
+
   if (loading) {
     return (
-      <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
+      <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] overflow-hidden shadow-sm">
         <div className="animate-pulse p-6 space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-12 rounded-lg bg-slate-700/40" />
+            <div key={i} className="h-12 rounded-lg bg-[rgb(var(--rb-surface-3))]/50" />
           ))}
         </div>
       </div>
@@ -85,32 +94,33 @@ export function TaskList({
 
   if (tasks.length === 0) {
     return (
-      <p className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-8 text-center text-sm text-slate-500">
-        No hay tareas que coincidan con los filtros actuales.
-      </p>
+      <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-6 py-12 text-center space-y-2 shadow-sm">
+        <p className="text-sm font-medium text-[rgb(var(--rb-text-primary))]">{t("emptyTitle")}</p>
+        <p className="text-xs text-[rgb(var(--rb-text-muted))] max-w-md mx-auto leading-relaxed">{t("emptySubtitle")}</p>
+      </div>
     );
   }
 
   const baseTh =
-    "text-left text-xs font-semibold uppercase tracking-wider text-slate-400 pb-2 pr-3 whitespace-nowrap";
-  const baseTd = "py-2.5 pr-3 text-sm text-slate-200 align-middle";
+    `text-left ${FORM_SECTION_TITLE_CLASS} pb-2 pr-3 whitespace-nowrap`;
+  const baseTd = "py-2.5 pr-3 text-sm text-[rgb(var(--rb-text-primary))] align-middle";
 
   return (
-    <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
-      <div className="overflow-x-auto [scrollbar-width:thin] [scrollbar-color:#334155_#1e293b] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-slate-800/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/70 [&::-webkit-scrollbar-thumb:hover]:bg-slate-500">
+    <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] overflow-hidden shadow-sm">
+      <div className="overflow-x-auto [scrollbar-width:thin] [scrollbar-color:rgb(var(--rb-surface-border))_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgb(var(--rb-surface-border))]">
         <table className="w-full min-w-[800px] border-collapse">
           <thead>
-            <tr className="border-b border-slate-700/60">
-              <th className={baseTh}>Task</th>
-              {context === "global" && scopeLabel != null && <th className={baseTh}>Scope</th>}
-              {context === "global" && getProjectName && <th className={baseTh}>Project</th>}
-              {context === "project" && getActivityLabel && <th className={baseTh}>Activity</th>}
-              <th className={baseTh}>Status</th>
-              <th className={baseTh}>Priority</th>
-              {(assigneeOptions != null || onAssigneeChange) && <th className={baseTh}>Responsable</th>}
-              <th className={baseTh}>Due date</th>
-              <th className={baseTh}>Updated</th>
-              {onOpenDetail && <th className={`${baseTh} w-0`}>Actions</th>}
+            <tr className="border-b border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/80">
+              <th className={baseTh}>{t("colTask")}</th>
+              {context === "global" && scopeLabel != null && <th className={baseTh}>{t("colScope")}</th>}
+              {context === "global" && getProjectName && <th className={baseTh}>{t("colProject")}</th>}
+              {context === "project" && getActivityLabel && <th className={baseTh}>{t("colActivity")}</th>}
+              <th className={baseTh}>{t("colStatus")}</th>
+              <th className={baseTh}>{t("colPriority")}</th>
+              {(assigneeOptions != null || onAssigneeChange) && <th className={baseTh}>{t("colAssignee")}</th>}
+              <th className={baseTh}>{t("colDue")}</th>
+              <th className={baseTh}>{t("colUpdated")}</th>
+              {onOpenDetail && <th className={`${baseTh} w-0`}>{t("colActions")}</th>}
             </tr>
           </thead>
           <tbody>
@@ -145,14 +155,18 @@ export function TaskList({
                   {context === "global" && getProjectName && (
                     <td className={baseTd}>
                       <span className="text-slate-400">
-                        {getProjectName((task as BoardTask & { project_id?: string | null }).project_id ?? null) ?? "—"}
+                        {getProjectName((task as BoardTask & { project_id?: string | null }).project_id ?? null) ??
+                          t("emDash")}
                       </span>
                     </td>
                   )}
                   {context === "project" && getActivityLabel && (
                     <td className={baseTd}>
-                      <span className="text-slate-400 truncate max-w-[140px] block" title={getActivityLabel(task.activity_id ?? null) ?? undefined}>
-                        {getActivityLabel(task.activity_id ?? null) ?? "—"}
+                      <span
+                        className="text-slate-400 truncate max-w-[140px] block"
+                        title={getActivityLabel(task.activity_id ?? null) ?? undefined}
+                      >
+                        {getActivityLabel(task.activity_id ?? null) ?? t("emDash")}
                       </span>
                     </td>
                   )}
@@ -178,7 +192,7 @@ export function TaskList({
                       >
                         {PRIORITY_ORDER.map((p) => (
                           <option key={p} value={p}>
-                            {PRIORITY_LABELS[p]}
+                            {priorityLabelMap[p]}
                           </option>
                         ))}
                       </select>
@@ -193,11 +207,11 @@ export function TaskList({
                           options={assigneeOptions}
                           value={task.assignee_profile_id ?? null}
                           onChange={(id) => onAssigneeChange(task.id, id)}
-                          placeholder="Sin asignar"
+                          placeholder={tTaskCard("unassigned")}
                           variant={assigneeLabel ? "assigned" : "unassigned"}
                         />
                       ) : (
-                        <span className="text-slate-400">{assigneeLabel ?? "Sin asignar"}</span>
+                        <span className="text-slate-400">{assigneeLabel ?? tTaskCard("unassigned")}</span>
                       )}
                     </td>
                   )}
@@ -218,19 +232,23 @@ export function TaskList({
                           onClick={() => setEditingDueId(task.id)}
                           className="text-slate-400 hover:text-slate-200 text-xs flex items-center gap-1"
                         >
-                          {task.due_date ? new Date(task.due_date).toLocaleDateString() : "—"}
+                          {task.due_date ? new Date(task.due_date).toLocaleDateString() : t("emDash")}
                           <Pencil className="h-3 w-3 opacity-60" />
                         </button>
                       )
                     ) : (
                       <span className="text-slate-400">
-                        {task.due_date ? new Date(task.due_date).toLocaleDateString() : "—"}
+                        {task.due_date ? new Date(task.due_date).toLocaleDateString() : t("emDash")}
                       </span>
                     )}
                   </td>
                   <td className={baseTd}>
                     <span className="text-slate-500 text-xs">
-                      {task.updated_at ? new Date(String(task.updated_at)).toLocaleDateString() : task.created_at ? new Date(String(task.created_at)).toLocaleDateString() : "—"}
+                      {task.updated_at
+                        ? new Date(String(task.updated_at)).toLocaleDateString()
+                        : task.created_at
+                          ? new Date(String(task.created_at)).toLocaleDateString()
+                          : t("emDash")}
                     </span>
                   </td>
                   {onOpenDetail && (
@@ -240,7 +258,7 @@ export function TaskList({
                         onClick={() => onOpenDetail(task)}
                         className="inline-flex items-center gap-1 rounded-lg border border-slate-600/80 bg-slate-800/60 px-2 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-slate-100 transition-colors"
                       >
-                        Open
+                        {t("open")}
                         <ChevronRight className="h-3.5 w-3.5" />
                       </button>
                     </td>

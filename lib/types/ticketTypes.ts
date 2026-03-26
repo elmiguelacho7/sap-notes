@@ -3,6 +3,7 @@ export type TicketPriority = "low" | "medium" | "high" | "urgent";
 export type TicketStatus =
   | "open"
   | "in_progress"
+  | "pending"
   | "resolved"
   | "closed"
   | "cancelled";

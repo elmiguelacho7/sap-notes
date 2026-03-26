@@ -1,0 +1,165 @@
+{
+  "projectPage": {
+    "title": "Tasks",
+    "subtitle": "Operational project tracking: board and list linked to activities, with the same workflow as the global workspace.",
+    "createBanner": "Preparing new task…",
+    "scopeHint": "Scope: filtered activity.",
+    "seeAllTasks": "View all tasks",
+    "missingProjectId": "Project identifier not found.",
+    "loadError": "Could not load project tasks."
+  },
+  "globalPage": {
+    "title": "Tasks",
+    "subtitle": "Manage global tasks and tasks assigned to you.",
+    "boardTitle": "Board",
+    "boardSubtitle": "Global tasks (no project). Create and move cards by status."
+  },
+  "blockers": {
+    "noActivitiesTitle": "No activities yet",
+    "noActivitiesBody": "Project tasks are linked to activities. Create activities in Planning → Activities by phase; then you can add tasks here.",
+    "planning": "Planning",
+    "activitiesByPhase": "Activities by phase",
+    "filteredEmptyTitle": "No tasks match the filters",
+    "filteredEmptySub": "Adjust search, scope, or status, priority, and assignee filters to see results."
+  },
+  "filters": {
+    "searchProject": "Search project tasks…",
+    "searchGlobal": "Search tasks…",
+    "defaultSearch": "Search tasks…",
+    "allActivities": "All activities",
+    "allStatuses": "All statuses",
+    "allPriorities": "All priorities",
+    "allAssignees": "All assignees",
+    "tasksGlobal": "Global tasks",
+    "assignedToMeFilter": "Assigned to me"
+  },
+  "status": {
+    "pending": "To do",
+    "in_progress": "In progress",
+    "blocked": "Blocked",
+    "review": "In review",
+    "done": "Done"
+  },
+  "priority": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  },
+  "view": {
+    "kanban": "Board",
+    "list": "List"
+  },
+  "board": {
+    "defaultTitle": "Task board",
+    "subtitleProject": "Tasks linked to activities. Drag cards to change status.",
+    "subtitleWithProject": "Tasks for this project",
+    "subtitleGlobalGeneral": "General tasks (not linked to a project)",
+    "emptyColumnTitle": "No tasks in this stage",
+    "emptyColumnBody": "Tasks in this stage appear here. You can drag them from other columns.",
+    "emptyGlobalColumn": "No tasks.",
+    "newTask": "New task",
+    "createModalTitle": "New task",
+    "titleLabel": "Title",
+    "titlePlaceholder": "e.g. Create budget workflow",
+    "activityLabel": "Activity",
+    "selectActivity": "Select activity",
+    "assigneeLabel": "Assignee",
+    "priorityLabel": "Priority",
+    "dueDateLabel": "Due date",
+    "cancel": "Cancel",
+    "add": "Add",
+    "creating": "Creating…",
+    "phaseLabel": "SAP Activate phase",
+    "phases": {
+      "all": "All phases",
+      "discover": "Discover",
+      "prepare": "Prepare",
+      "explore": "Explore",
+      "realize": "Realize",
+      "deploy": "Deploy",
+      "run": "Run"
+    },
+    "dueInline": "Due:",
+    "assigneeColumn": "Assignee",
+    "refPrefix": "Ref:"
+  },
+  "errors": {
+    "loadTasks": "Could not load tasks. Please try again.",
+    "selectActivity": "Select an activity.",
+    "createFailedGeneric": "Could not create the task. Check the console for details.",
+    "createFailedPrefix": "Could not create the task:",
+    "updateStatus": "Could not update status.",
+    "updateStatusDrag": "Could not update status when moving the card."
+  },
+  "summary": {
+    "total": "Total",
+    "active": "Active",
+    "blocked": "Blocked",
+    "inReview": "In review",
+    "overdue": "Overdue",
+    "completed": "Completed",
+    "assignedToMe": "Assigned to me",
+    "risk": "Risk",
+    "riskHigh": "High",
+    "riskMedium": "Medium",
+    "riskLow": "Low"
+  },
+  "taskCard": {
+    "activity": "Activity",
+    "assigneeAbbr": "Assignee",
+    "unassigned": "Unassigned",
+    "open": "Open",
+    "openDetailTitle": "Open details",
+    "status": "Status",
+    "changeStatusTitle": "Change status",
+    "changeStatusAria": "Change task status"
+  },
+  "due": {
+    "overdue": "Overdue",
+    "dueToday": "Due today",
+    "dueTomorrow": "Due tomorrow",
+    "inDays": "In {n} days",
+    "limit": "Due"
+  },
+  "list": {
+    "emptyTitle": "No tasks in this view",
+    "emptySubtitle": "No tasks match the current filters. Adjust filters or switch to the board to see the full set.",
+    "colTask": "Task",
+    "colScope": "Scope",
+    "colProject": "Project",
+    "colActivity": "Activity",
+    "colStatus": "Status",
+    "colPriority": "Priority",
+    "colAssignee": "Assignee",
+    "colDue": "Due",
+    "colUpdated": "Updated",
+    "colActions": "Actions",
+    "open": "Open",
+    "scopeGlobal": "Global",
+    "scopeMy": "Assigned to me",
+    "emDash": "—"
+  },
+  "drawer": {
+    "title": "Task details",
+    "closeAria": "Close",
+    "titleLabel": "Title",
+    "titleRequired": "Title *",
+    "titlePlaceholder": "Task title",
+    "description": "Description",
+    "descriptionPlaceholder": "Optional description",
+    "status": "Status",
+    "priority": "Priority",
+    "assignee": "Assignee",
+    "unassigned": "Unassigned",
+    "dueDate": "Due date",
+    "activity": "Activity",
+    "project": "Project",
+    "emptySelect": "—",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…"
+  },
+  "loading": {
+    "projectTasksComment": "Project tasks module loading (same cadence as Overview / Planning)."
+  }
+}

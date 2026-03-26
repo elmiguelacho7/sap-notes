@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabaseClient";
 import type { ProjectTask } from "@/lib/types/projectTasks";
 import { PROJECT_STATUS_KEYS } from "@/lib/taskWorkflow";
@@ -10,11 +11,17 @@ import TasksBoard, {
   type BoardTask,
   type CreateTaskPayload,
 } from "@/app/components/TasksBoard";
-import { TaskWorkspaceHeader } from "@/components/tasks/TaskWorkspaceHeader";
 import { TaskFilterBar } from "@/components/tasks/TaskFilterBar";
 import { ViewModeToggle, type ViewMode } from "@/components/tasks/ViewModeToggle";
 import { TaskDetailDrawer, type TaskDetailPayload } from "@/components/tasks/TaskDetailDrawer";
 import { useAssignableUsers } from "@/components/hooks/useAssignableUsers";
+import {
+  PROJECT_WORKSPACE_PAGE,
+  PROJECT_WORKSPACE_HERO,
+  PROJECT_WORKSPACE_TOOLBAR,
+  PROJECT_WORKSPACE_EMPTY,
+  PROJECT_WORKSPACE_CARD,
+} from "@/lib/projectWorkspaceUi";
 
 function serializeUnknownError(e: unknown): Record<string, unknown> {
   if (e instanceof Error) {
@@ -35,16 +42,11 @@ function serializeUnknownError(e: unknown): Record<string, unknown> {
   return { value: e };
 }
 
-/** Unified workflow: same order as global board (TODO → … → DONE) */
-const KANBAN_COLUMNS: { id: string; label: string }[] = [
-  { id: "pending", label: "Por hacer" },
-  { id: "in_progress", label: "En progreso" },
-  { id: "blocked", label: "Bloqueado" },
-  { id: "review", label: "En revisión" },
-  { id: "done", label: "Hecho" },
-];
+/** Unified workflow column ids (labels from tasks.status.*) */
+const KANBAN_COLUMN_IDS = ["pending", "in_progress", "blocked", "review", "done"] as const;
 
 export default function ProjectTasksPage() {
+  const t = useTranslations("tasks");
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -78,6 +80,15 @@ export default function ProjectTasksPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailSaving, setDetailSaving] = useState(false);
   const [projectName, setProjectName] = useState<string | null>(null);
+
+  const kanbanColumns = useMemo(
+    () =>
+      KANBAN_COLUMN_IDS.map((id) => ({
+        id,
+        label: t(`status.${id}`),
+      })),
+    [t]
+  );
 
   const loadData = useCallback(async () => {
     if (!projectId) return;
@@ -120,11 +131,11 @@ export default function ProjectTasksPage() {
       // Assignable users (Responsable) come from useAssignableUsers hook (project members).
     } catch (err) {
       console.error("Error loading tasks", err);
-      setErrorMsg("No se pudieron cargar las tareas del proyecto.");
+      setErrorMsg(t("projectPage.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, t]);
 
   useEffect(() => {
     loadData();
@@ -201,43 +212,47 @@ export default function ProjectTasksPage() {
 
   const activityFilterOptions = useMemo(
     () => [
-      { value: "", label: "All activities" },
+      { value: "", label: t("filters.allActivities") },
       ...activities.map((a) => ({ value: a.id, label: a.name })),
     ],
-    [activities]
+    [activities, t]
+  );
+
+  const hasActiveTaskFilters = Boolean(
+    searchQuery.trim() || statusFilter || priorityFilter || assigneeFilter || activityFilter
   );
 
   const statusFilterOptions = useMemo(
     () => [
-      { value: "", label: "Todos los estados" },
-      ...KANBAN_COLUMNS.map((c) => ({ value: c.id, label: c.label })),
+      { value: "", label: t("filters.allStatuses") },
+      ...kanbanColumns.map((c) => ({ value: c.id, label: c.label })),
     ],
-    []
+    [kanbanColumns, t]
   );
 
   const priorityFilterOptions = useMemo(
     () => [
-      { value: "", label: "Todas las prioridades" },
-      { value: "high", label: "Alta" },
-      { value: "medium", label: "Media" },
-      { value: "low", label: "Baja" },
+      { value: "", label: t("filters.allPriorities") },
+      { value: "high", label: t("priority.high") },
+      { value: "medium", label: t("priority.medium") },
+      { value: "low", label: t("priority.low") },
     ],
-    []
+    [t]
   );
 
   const assigneeFilterOptions = useMemo(
     () => [
-      { value: "", label: "Todos los responsables" },
+      { value: "", label: t("filters.allAssignees") },
       ...assigneeOptions.map((o) => ({ value: o.value, label: o.label })),
     ],
-    [assigneeOptions]
+    [assigneeOptions, t]
   );
 
   const handleCreateProjectTask = useCallback(
     async (payload: CreateTaskPayload) => {
       if (!projectId) return;
       if (!payload.activity_id) {
-        throw new Error("Selecciona una actividad.");
+        throw new Error(t("errors.selectActivity"));
       }
 
       console.debug("[createTask] start");
@@ -276,7 +291,7 @@ export default function ProjectTasksPage() {
       console.debug("[createTask] success", createdRow);
       await loadData();
     },
-    [projectId, loadData]
+    [projectId, loadData, t]
   );
 
   const handleUpdateStatus = useCallback(
@@ -417,65 +432,71 @@ export default function ProjectTasksPage() {
 
   if (!projectId) {
     return (
-      <div className="-mx-4 sm:-mx-5 lg:-mx-6 xl:-mx-8 2xl:-mx-10">
-        <div className="w-full max-w-[1440px] mx-auto px-6 lg:px-8">
-          <p className="text-sm text-slate-400">No se ha encontrado el identificador del proyecto.</p>
-        </div>
+      <div className="w-full min-w-0">
+        <p className="text-sm text-slate-500">{t("projectPage.missingProjectId")}</p>
       </div>
     );
   }
 
   return (
-    <div className="-mx-4 sm:-mx-5 lg:-mx-6 xl:-mx-8 2xl:-mx-10">
-      <div className="w-full max-w-[1440px] mx-auto px-6 lg:px-8">
-        <div className="min-w-0 space-y-6">
+    <div className={PROJECT_WORKSPACE_PAGE}>
         {showCreandoBanner && (
-          <div className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-400 transition-opacity duration-300">
-            Creando...
+          <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/85 bg-[rgb(var(--rb-surface-2))]/95 px-3 py-2 text-xs text-[rgb(var(--rb-text-secondary))] transition-opacity duration-300">
+            {t("projectPage.createBanner")}
           </div>
         )}
-        <TaskWorkspaceHeader
-          title="Tasks"
-          subtitle="Organize and track project tasks. Same task system as the global workspace, scoped to this project."
-          actions={
-            <ViewModeToggle value={viewMode} onChange={setViewMode} />
-          }
-        />
 
-        <TaskFilterBar
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          searchPlaceholder="Search project tasks..."
-          scopeOptions={activityFilterOptions}
-          scopeValue={activityFilter ?? ""}
-          onScopeChange={(value) => {
-            const url = value
-              ? `/projects/${projectId}/tasks?activity=${encodeURIComponent(value)}`
-              : `/projects/${projectId}/tasks`;
-            router.push(url);
-          }}
-          statusOptions={statusFilterOptions}
-          statusValue={statusFilter}
-          onStatusChange={setStatusFilter}
-          priorityOptions={priorityFilterOptions}
-          priorityValue={priorityFilter}
-          onPriorityChange={setPriorityFilter}
-          assigneeOptions={assigneeFilterOptions}
-          assigneeValue={assigneeFilter}
-          onAssigneeChange={setAssigneeFilter}
-        />
+        {/* Módulo local: tarjeta de cabecera (no duplica el workspace del layout) */}
+        <div className={`${PROJECT_WORKSPACE_HERO} space-y-4`}>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between min-w-0">
+            <div className="min-w-0 space-y-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Execution board
+              </p>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t("projectPage.title")}</h1>
+              <p className="text-sm text-slate-600 max-w-2xl leading-relaxed">
+                {t("projectPage.subtitle")}
+              </p>
+              {activityFilter && (
+                <p className="text-xs text-slate-500 pt-1">
+                  {t("projectPage.scopeHint")}{" "}
+                  <Link
+                    href={`/projects/${projectId}/tasks`}
+                    className="font-medium text-[rgb(var(--rb-brand-primary-active))] hover:text-[rgb(var(--rb-brand-primary-hover))]"
+                  >
+                    {t("projectPage.seeAllTasks")}
+                  </Link>
+                </p>
+              )}
+            </div>
+            <ViewModeToggle value={viewMode} onChange={setViewMode} className="shrink-0" />
+          </div>
+        </div>
 
-        {activityFilter && (
-          <p className="text-sm text-slate-400">
-            Mostrando tareas de la actividad seleccionada.{" "}
-            <Link
-              href={`/projects/${projectId}/tasks`}
-              className="font-medium text-indigo-400 hover:text-indigo-300"
-            >
-              Ver todas
-            </Link>
-          </p>
-        )}
+        <div className={PROJECT_WORKSPACE_TOOLBAR}>
+          <TaskFilterBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder={t("filters.searchProject")}
+            scopeOptions={activityFilterOptions}
+            scopeValue={activityFilter ?? ""}
+            onScopeChange={(value) => {
+              const url = value
+                ? `/projects/${projectId}/tasks?activity=${encodeURIComponent(value)}`
+                : `/projects/${projectId}/tasks`;
+              router.push(url);
+            }}
+            statusOptions={statusFilterOptions}
+            statusValue={statusFilter}
+            onStatusChange={setStatusFilter}
+            priorityOptions={priorityFilterOptions}
+            priorityValue={priorityFilter}
+            onPriorityChange={setPriorityFilter}
+            assigneeOptions={assigneeFilterOptions}
+            assigneeValue={assigneeFilter}
+            onAssigneeChange={setAssigneeFilter}
+          />
+        </div>
 
         {errorMsg && (
           <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
@@ -484,18 +505,23 @@ export default function ProjectTasksPage() {
         )}
 
         {activities.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-700/60 bg-slate-800/30 px-6 py-12 text-center">
-            <p className="text-sm font-medium text-slate-300">Sin tareas aún</p>
-            <p className="mt-1 text-sm text-slate-500">
-              Crea actividades en Planificación → Actividades por fase. Luego podrás crear tareas vinculadas.
-            </p>
+          <div className={`${PROJECT_WORKSPACE_EMPTY} space-y-2 max-w-2xl`}>
+            <p className="text-base font-semibold tracking-tight text-slate-900">{t("blockers.noActivitiesTitle")}</p>
+            <p className="text-sm text-slate-600 leading-relaxed">{t("blockers.noActivitiesBody")}</p>
           </div>
         ) : (
+          <>
+            {!loading && visibleTasks.length === 0 && hasActiveTaskFilters && (
+              <div className={PROJECT_WORKSPACE_CARD}>
+                <p className="text-sm font-semibold text-slate-900">{t("blockers.filteredEmptyTitle")}</p>
+                <p className="text-xs text-slate-600 mt-1">{t("blockers.filteredEmptySub")}</p>
+              </div>
+            )}
           <TasksBoard
-            title="Board"
-            subtitle="Project tasks linked to activities. Drag to change status."
+            title={t("board.defaultTitle")}
+            subtitle={t("board.subtitleProject")}
             tasks={visibleTasks}
-            columns={KANBAN_COLUMNS}
+            columns={kanbanColumns}
             getStatusKey={getStatusKey}
             onCreateTask={handleCreateProjectTask}
             onStatusChange={handleUpdateStatus}
@@ -516,6 +542,7 @@ export default function ProjectTasksPage() {
             openCreateInitially={openCreateFromQuery}
             assignedToMeCount={assignedToMeCount}
           />
+          </>
         )}
 
       <TaskDetailDrawer
@@ -527,19 +554,12 @@ export default function ProjectTasksPage() {
         }}
         onSave={handleSaveDetail}
         context="project"
-        statusOptions={KANBAN_COLUMNS.map((c) => ({ value: c.id, label: c.label }))}
-        priorityOptions={[
-          { value: "high", label: "Alta" },
-          { value: "medium", label: "Media" },
-          { value: "low", label: "Baja" },
-        ]}
+        statusOptions={kanbanColumns.map((c) => ({ value: c.id, label: c.label }))}
         assigneeOptions={assigneeOptions}
         activityOptions={activityOptions}
         projectName={projectName}
         saving={detailSaving}
       />
-        </div>
-      </div>
     </div>
   );
 }

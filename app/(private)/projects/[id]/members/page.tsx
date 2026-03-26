@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabaseClient";
 import { Users } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { PROJECT_WORKSPACE_HERO, PROJECT_WORKSPACE_PAGE } from "@/lib/projectWorkspaceUi";
 
 type ProjectMember = {
   id: string;
@@ -13,12 +16,6 @@ type ProjectMember = {
   user_full_name: string | null;
   user_email?: string | null;
   user_app_role: string | null;
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  owner: "Propietario",
-  editor: "Editor",
-  viewer: "Lector",
 };
 
 type PendingInvitation = {
@@ -41,6 +38,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 }
 
 export default function ProjectTeamPage() {
+  const t = useTranslations("projects.members");
   const params = useParams<{ id: string }>();
   const projectId = params?.id ?? "";
 
@@ -74,19 +72,19 @@ export default function ProjectTeamPage() {
       const res = await fetch(`/api/projects/${projectId}/members`, { headers });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setErrorMsg((data as { error?: string }).error ?? "Error al cargar el equipo.");
+        setErrorMsg((data as { error?: string }).error ?? t("errors.loadTeam"));
         setMembers([]);
         return;
       }
       const payload = data as { members?: ProjectMember[] };
       setMembers(payload.members ?? []);
     } catch {
-      setErrorMsg("Error de conexión.");
+      setErrorMsg(t("errors.connection"));
       setMembers([]);
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, t]);
 
   const [hasGlobalOverride, setHasGlobalOverride] = useState(false);
   const [isExplicitMember, setIsExplicitMember] = useState(false);
@@ -153,7 +151,7 @@ export default function ProjectTeamPage() {
     if (!projectId || !trimmedEmail) return;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
-      setSubmitError("Introduce una dirección de correo válida.");
+      setSubmitError(t("errors.invalidEmail"));
       return;
     }
     setSubmitting(true);
@@ -184,16 +182,16 @@ export default function ProjectTeamPage() {
       };
       if (!res.ok) {
         if (res.status === 403) {
-          setSubmitError("No tiene permiso para gestionar miembros.");
+          setSubmitError(t("errors.noPermission"));
         } else if (res.status === 409 && data.quota?.limit != null) {
-          setSubmitError(`Has alcanzado el máximo permitido para este proyecto (${data.quota.current ?? 0} / ${data.quota.limit}).`);
+          setSubmitError(t("errors.quotaReached", { current: data.quota.current ?? 0, limit: data.quota.limit ?? 0 }));
         } else {
-          setSubmitError(data.error ?? "No se pudo añadir al miembro.");
+          setSubmitError(data.error ?? t("errors.addMemberFailed"));
         }
         return;
       }
       if (data.mode === "already_member") {
-        setSuccessMsg(data.message ?? "El usuario ya pertenece a este proyecto.");
+        setSuccessMsg(data.message ?? t("success.alreadyMember"));
         setAddEmail("");
         setAddRole("editor");
         // Light refresh to ensure UI is in sync, without extra side effects.
@@ -203,11 +201,10 @@ export default function ProjectTeamPage() {
       if (data.added) {
         if (data.mode === "direct_member_add") {
           setSuccessMsg(
-            data.message ??
-              "El usuario ya existía en la plataforma y se añadió directamente al equipo. No aparecerá en «Invitaciones pendientes»."
+            data.message ?? t("success.directAdd")
           );
         } else {
-          setSuccessMsg(data.message ?? "Usuario añadido al proyecto correctamente.");
+          setSuccessMsg(data.message ?? t("success.memberAdded"));
         }
         setAddEmail("");
         setAddRole("editor");
@@ -215,23 +212,23 @@ export default function ProjectTeamPage() {
       } else if (data.invited) {
         if (data.mode === "pending_invitation") {
           if (data.emailSent === true) {
-            setSuccessMsg("Se creó una invitación pendiente y se envió el correo.");
+            setSuccessMsg(t("success.inviteSent"));
           } else if (data.actionLink) {
-            setSuccessMsg("Se creó la invitación pendiente, pero no se pudo enviar el correo. Usa el enlace de invitación disponible.");
+            setSuccessMsg(t("success.inviteNoEmailWithLink"));
           } else {
-            setSuccessMsg("Se creó la invitación pendiente, pero no se pudo enviar el correo.");
+            setSuccessMsg(t("success.inviteNoEmail"));
           }
         } else {
-          setSuccessMsg(data.message ?? "Invitación creada. El usuario aparecerá en el equipo cuando acepte la invitación.");
+          setSuccessMsg(data.message ?? t("success.inviteCreated"));
         }
         setAddEmail("");
         if (data.actionLink) setActionLink(data.actionLink);
         await loadInvitations();
       } else {
-        setSubmitError("Respuesta inesperada del servidor. Inténtalo de nuevo.");
+        setSubmitError(t("errors.unexpectedResponse"));
       }
     } catch {
-      setSubmitError("Error de conexión.");
+      setSubmitError(t("errors.connection"));
     } finally {
       setSubmitting(false);
     }
@@ -252,7 +249,7 @@ export default function ProjectTeamPage() {
       const data = await res.json().catch(() => ({})) as { error?: string; quota?: { current?: number; limit?: number | null } };
       if (!res.ok) {
         if (res.status === 409 && data.quota?.limit != null) {
-          setErrorMsg(`Este proyecto ha alcanzado el máximo de miembros permitidos (${data.quota.current ?? 0} / ${data.quota.limit}).`);
+          setErrorMsg(t("errors.projectQuotaReached", { current: data.quota.current ?? 0, limit: data.quota.limit ?? 0 }));
         } else {
           setErrorMsg(data.error ?? "Error al cambiar el rol.");
         }
@@ -261,7 +258,7 @@ export default function ProjectTeamPage() {
       setSuccessMsg("Rol actualizado.");
       await loadMembers();
     } catch {
-      setErrorMsg("Error de conexión.");
+      setErrorMsg(t("errors.connection"));
     } finally {
       setChangingRoleId(null);
     }
@@ -271,7 +268,7 @@ export default function ProjectTeamPage() {
     if (!projectId || !canManageMembers) return;
     const owners = members.filter((m) => m.role === "owner");
     if (member.role === "owner" && owners.length <= 1) {
-      setErrorMsg("No se puede eliminar al último propietario del proyecto.");
+      setErrorMsg(t("errors.cannotRemoveLastOwner"));
       return;
     }
     setRemovingId(member.id);
@@ -293,7 +290,7 @@ export default function ProjectTeamPage() {
       setSuccessMsg("Miembro eliminado del equipo.");
       await loadMembers();
     } catch {
-      setErrorMsg("Error de conexión.");
+      setErrorMsg(t("errors.connection"));
     } finally {
       setRemovingId(null);
     }
@@ -321,7 +318,7 @@ export default function ProjectTeamPage() {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     } catch {
-      setSubmitError("No se pudo copiar al portapapeles.");
+      setSubmitError(t("errors.copyFailed"));
     }
   };
 
@@ -331,60 +328,60 @@ export default function ProjectTeamPage() {
   if (!projectId) {
     return (
       <div className="space-y-4">
-        <p className="text-sm text-slate-400">No se ha encontrado el identificador del proyecto.</p>
+        <p className="text-sm text-slate-400">{t("missingProjectId")}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold text-slate-100 flex items-center gap-2">
-          <Users className="h-5 w-5 text-slate-500" />
-          Equipo
+    <div className={PROJECT_WORKSPACE_PAGE}>
+      <header className={PROJECT_WORKSPACE_HERO}>
+        <h1 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
+          <Users className="h-5 w-5 text-slate-400" />
+          {t("title")}
         </h1>
-        <p className="mt-0.5 text-sm text-slate-500">
-          Miembros del proyecto y sus roles. Quienes tengan permiso pueden añadir miembros, cambiar roles o eliminar del equipo.
+        <p className="mt-0.5 text-sm text-slate-600">
+          {t("subtitle")}
         </p>
         {hasGlobalOverride && !isExplicitMember && (
-          <p className="mt-2 text-sm text-amber-300 bg-amber-500/15 border border-amber-500/40 rounded-xl px-3 py-2">
-            <strong>Acceso global por rol.</strong> Tienes permisos de administrador sobre este proyecto sin ser miembro del equipo. Para aparecer en la lista, un propietario puede añadirte como miembro del proyecto.
+          <p className="mt-2 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+            <strong>{t("globalAccess.title")}</strong> {t("globalAccess.body")}
           </p>
         )}
       </header>
 
       {successMsg && (
-        <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-4 py-3 text-sm text-emerald-300">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           {successMsg}
         </div>
       )}
 
       {errorMsg && (
-        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {errorMsg}
         </div>
       )}
 
       {canManageMembers && (
-        <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
-          <div className="border-b border-slate-700/60 px-5 py-4 bg-slate-800/50">
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100 overflow-hidden">
+          <div className="border-b border-slate-200/90 px-5 py-4 bg-slate-50/85">
             <h2 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
-              Añadir miembro
+              {t("addMember.title")}
             </h2>
-            <p className="mt-0.5 text-sm text-slate-400">
+            <p className="mt-0.5 text-sm text-slate-600">
               Introduce el email y el rol.
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              Si el usuario ya existe en la plataforma, se añadirá al equipo al instante. Si no existe, se creará una invitación pendiente y aparecerá abajo hasta que la acepte.
+              {t("addMember.help")}
             </p>
             {memberQuota?.atLimit && (
-              <p className="mt-2 text-sm text-red-400 font-medium">
-                Has alcanzado el máximo de miembros permitidos para este proyecto ({memberQuota.current} / {memberQuota.limit}). No puedes añadir más hasta que un administrador aumente el límite.
+              <p className="mt-2 text-sm text-red-700 font-medium">
+                {t("addMember.atLimit", { current: memberQuota.current, limit: memberQuota.limit ?? 0 })}
               </p>
             )}
             {memberQuota?.limit != null && !memberQuota.atLimit && memberQuota.current >= memberQuota.limit * 0.8 && (
               <p className="mt-2 text-sm text-amber-400 font-medium">
-                Te acercas al límite de miembros ({memberQuota.current} / {memberQuota.limit}). Cuando lo alcances no podrás añadir más hasta que un administrador aumente la cuota.
+                {t("addMember.nearLimit", { current: memberQuota.current, limit: memberQuota.limit ?? 0 })}
               </p>
             )}
           </div>
@@ -401,7 +398,7 @@ export default function ProjectTeamPage() {
                     value={addEmail}
                     onChange={(e) => setAddEmail(e.target.value)}
                     placeholder="usuario@ejemplo.com"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
                     disabled={submitting}
                     required
                   />
@@ -414,40 +411,40 @@ export default function ProjectTeamPage() {
                     id="member-role"
                     value={addRole}
                     onChange={(e) => setAddRole(e.target.value as "owner" | "editor" | "viewer")}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
                     disabled={submitting}
                   >
-                    <option value="owner">Propietario</option>
+                    <option value="owner">{t("roles.owner")}</option>
                     <option value="editor">Editor</option>
-                    <option value="viewer">Lector</option>
+                    <option value="viewer">{t("roles.viewer")}</option>
                   </select>
                 </div>
               </div>
-              {submitError && <p className="text-sm text-red-400">{submitError}</p>}
+              {submitError && <p className="text-sm text-red-700">{submitError}</p>}
               {actionLink && (
-                <div className="rounded-xl border border-amber-500/40 bg-amber-500/15 p-4 space-y-3">
-                  <p className="text-sm text-amber-200">
-                    Copia o abre el enlace para que el usuario pueda aceptar la invitación.
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+                  <p className="text-sm text-amber-900">
+                    {t("invitation.linkHelp")}
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
                     <input
                       type="text"
                       readOnly
                       value={actionLink}
-                      className="flex-1 min-w-[200px] rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-xs text-slate-300 font-mono"
+                      className="flex-1 min-w-[200px] rounded-xl border border-slate-200/90 bg-white px-3 py-2 text-xs text-slate-700 font-mono"
                     />
                     <button
                       type="button"
                       onClick={copyActionLink}
-                      className="rounded-xl border border-amber-500/50 bg-amber-500/20 px-3 py-2 text-sm font-medium text-amber-200 hover:bg-amber-500/30"
+                      className="rounded-xl border border-amber-300 bg-amber-100 px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-200"
                     >
-                      {linkCopied ? "Copiado" : "Copiar enlace de invitación"}
+                      {linkCopied ? t("invitation.copied") : t("invitation.copyLink")}
                     </button>
                     <a
                       href={actionLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-xl border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                     >
                       Abrir enlace
                     </a>
@@ -457,9 +454,9 @@ export default function ProjectTeamPage() {
               <button
                 type="submit"
                 disabled={submitting || memberQuota?.atLimit === true}
-                className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-xl rb-btn-primary px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {submitting ? "Añadiendo…" : "Añadir al equipo"}
+                {submitting ? t("addMember.adding") : t("addMember.addToTeam")}
               </button>
             </form>
           </div>
@@ -467,56 +464,60 @@ export default function ProjectTeamPage() {
       )}
 
       {canManageMembers && (
-        <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
-          <div className="border-b border-amber-500/30 px-5 py-4 bg-amber-500/10">
-            <h2 className="text-[11px] font-semibold uppercase tracking-widest text-amber-400/90">
-              Invitaciones pendientes
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100 overflow-hidden">
+          <div className="border-b border-amber-200 px-5 py-4 bg-amber-50/80">
+            <h2 className="text-[11px] font-semibold uppercase tracking-widest text-amber-700/90">
+              {t("pendingInvites.title")}
             </h2>
-            <p className="mt-0.5 text-xs text-amber-300/80">
-              Usuarios invitados que aún no han aceptado. Aparecerán en «Miembros del equipo» cuando acepten.
+            <p className="mt-0.5 text-xs text-amber-700/80">
+              {t("pendingInvites.subtitle")}
             </p>
             {pendingInvitationsQuota?.limit != null && (
               <p className="mt-1 text-xs font-medium text-amber-300">
                 {pendingInvitationsQuota.current} / {pendingInvitationsQuota.limit} invitaciones pendientes
-                {pendingInvitationsQuota.atLimit && " · Has alcanzado el máximo. No puedes crear más invitaciones hasta que un administrador aumente el límite."}
-                {!pendingInvitationsQuota.atLimit && pendingInvitationsQuota.current >= (pendingInvitationsQuota.limit ?? 0) * 0.8 && " · Te acercas al límite."}
+                {pendingInvitationsQuota.atLimit && t("pendingInvites.maxReached")}
+                {!pendingInvitationsQuota.atLimit && pendingInvitationsQuota.current >= (pendingInvitationsQuota.limit ?? 0) * 0.8 && t("pendingInvites.nearLimit")}
               </p>
             )}
           </div>
           <div className="p-5">
             {invitationsLoading ? (
-              <p className="text-sm text-slate-500">Cargando invitaciones…</p>
+              <div className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-11/12" />
+              </div>
             ) : invitations.length === 0 ? (
               <div className="text-sm text-slate-500 space-y-1">
-                <p>No hay invitaciones pendientes.</p>
+                <p>{t("pendingInvites.none")}</p>
                 <p className="text-xs text-slate-500">
-                  Si el email pertenece a un usuario ya registrado, se añadirá directamente al equipo y no aparecerá aquí.
+                  {t("pendingInvites.noneHelp")}
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-700/50">
+              <div className="overflow-x-auto rounded-xl border border-slate-200/90">
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="bg-slate-800/50 border-b border-slate-700/60 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <tr className="bg-slate-50/85 border-b border-slate-200/90 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                       <th className="py-3 px-4">Email</th>
                       <th className="py-3 px-4">Rol</th>
                       <th className="py-3 px-4">Estado</th>
                       <th className="py-3 px-4">Creada</th>
-                      <th className="py-3 px-4 text-right">Acción</th>
+                      <th className="py-3 px-4 text-right">{t("action")}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700/40">
+                  <tbody className="divide-y divide-slate-100">
                     {invitations.map((inv) => (
-                      <tr key={inv.id} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="py-3 px-4 text-slate-200">{inv.email}</td>
+                      <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3 px-4 text-slate-800">{inv.email}</td>
                         <td className="py-3 px-4">
                           <span className="inline-flex rounded-md bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-400">
-                            {ROLE_LABELS[inv.role] ?? inv.role}
+                            {t(`roles.${inv.role}`)}
                           </span>
                         </td>
                         <td className="py-3 px-4">
-                          <span className="inline-flex rounded-md bg-slate-700/60 px-2 py-0.5 text-xs font-medium text-slate-400">
-                            Pendiente
+                          <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200/80">
+                            {t("pendingInvites.pending")}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-slate-400">
@@ -526,9 +527,9 @@ export default function ProjectTeamPage() {
                           <button
                             type="button"
                             onClick={() => handleRevokeInvitation(inv.id)}
-                            className="text-xs font-medium text-red-400 hover:text-red-300"
+                            className="text-xs font-medium text-red-700 hover:text-red-900"
                           >
-                            Revocar
+                            {t("pendingInvites.revoke")}
                           </button>
                         </td>
                       </tr>
@@ -541,13 +542,13 @@ export default function ProjectTeamPage() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/5 ring-1 ring-slate-700/30 overflow-hidden">
-        <div className="border-b border-slate-700/60 px-5 py-4 bg-slate-800/50">
+      <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100 overflow-hidden">
+        <div className="border-b border-slate-200/90 px-5 py-4 bg-slate-50/85">
           <h2 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
-            Miembros del equipo
+            {t("teamMembers.title")}
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Solo aparecen aquí los usuarios con membresía explícita en el proyecto (tabla de miembros). Quien tenga acceso por rol global no figura en esta lista.
+            {t("teamMembers.subtitle")}
           </p>
           {memberQuota?.limit != null && (
             <p className="mt-1 text-xs font-medium text-slate-400">
@@ -557,16 +558,20 @@ export default function ProjectTeamPage() {
         </div>
         <div className="p-5">
           {loading ? (
-            <p className="text-sm text-slate-500">Cargando equipo…</p>
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-10/12" />
+            </div>
           ) : members.length === 0 ? (
             <div className="py-8 text-center text-sm text-slate-500">
-              Aún no hay miembros en este proyecto. Añade al primer miembro arriba si tienes permiso.
+              {t("teamMembers.empty")}
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-slate-700/50">
+              <div className="overflow-x-auto rounded-xl border border-slate-200/90">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="bg-slate-800/50 border-b border-slate-700/60 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <tr className="bg-slate-50/85 border-b border-slate-200/90 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                     <th className="py-3 px-4">Nombre</th>
                     <th className="py-3 px-4">Email</th>
                     <th className="py-3 px-4">Rol</th>
@@ -574,13 +579,13 @@ export default function ProjectTeamPage() {
                     {canManageMembers && <th className="py-3 px-4 text-right">Acciones</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700/40">
+                <tbody className="divide-y divide-slate-100">
                   {members.map((member) => (
-                    <tr key={member.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="py-3 px-4 text-slate-100 font-medium">
+                    <tr key={member.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-4 text-slate-900 font-medium">
                         {member.user_full_name || "—"}
                       </td>
-                      <td className="py-3 px-4 text-slate-400">
+                      <td className="py-3 px-4 text-slate-600">
                         {member.user_email || "—"}
                       </td>
                       <td className="py-3 px-4">
@@ -589,21 +594,21 @@ export default function ProjectTeamPage() {
                             value={member.role}
                             onChange={(e) => handleChangeRole(member.id, member.user_id, e.target.value as "owner" | "editor" | "viewer")}
                             disabled={changingRoleId === member.id}
-                            className="rounded-xl border border-slate-600/80 bg-slate-800/80 px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
+                            className="rounded-xl border border-slate-200/90 bg-white px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/30 disabled:opacity-60"
                           >
-                            <option value="owner">{ROLE_LABELS.owner}</option>
-                            <option value="editor">{ROLE_LABELS.editor}</option>
-                            <option value="viewer">{ROLE_LABELS.viewer}</option>
+                            <option value="owner">{t("roles.owner")}</option>
+                            <option value="editor">{t("roles.editor")}</option>
+                            <option value="viewer">{t("roles.viewer")}</option>
                           </select>
                         ) : (
-                          <span className="inline-flex rounded-md bg-indigo-500/20 px-2 py-0.5 text-xs font-medium text-indigo-300">
-                            {ROLE_LABELS[member.role] ?? member.role}
+                          <span className="inline-flex rounded-md bg-[rgb(var(--rb-brand-surface))] px-2 py-0.5 text-xs font-medium text-[rgb(var(--rb-brand-primary-active))] ring-1 ring-[rgb(var(--rb-brand-primary))]/20">
+                            {t(`roles.${member.role}`)}
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-slate-400">
-                        <span className="inline-flex rounded-md bg-slate-700/60 px-2 py-0.5 text-xs text-slate-400">
-                          Activo
+                      <td className="py-3 px-4 text-slate-500">
+                        <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600 ring-1 ring-slate-200/80">
+                          {t("teamMembers.active")}
                         </span>
                       </td>
                       {canManageMembers && (
@@ -612,10 +617,10 @@ export default function ProjectTeamPage() {
                             type="button"
                             onClick={() => handleRemoveMember(member)}
                             disabled={removingId === member.id || isLastOwner(member)}
-                            title={isLastOwner(member) ? "No se puede eliminar al último propietario" : "Eliminar del equipo"}
-                            className="text-xs font-medium text-red-400 hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={isLastOwner(member) ? t("errors.cannotRemoveLastOwner") : t("teamMembers.remove")}
+                            className="text-xs font-medium text-red-700 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {removingId === member.id ? "Eliminando…" : "Eliminar"}
+                            {removingId === member.id ? t("teamMembers.removing") : t("teamMembers.remove")}
                           </button>
                         </td>
                       )}

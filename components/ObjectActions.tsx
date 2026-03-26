@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Pencil, Trash2, Archive } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -22,6 +23,8 @@ export type ObjectActionsProps = {
   onArchived?: () => void;
   /** Use "dark" when rendering inside a dark header/shell (e.g. project workspace header). */
   variant?: "light" | "dark";
+  /** Stack action buttons vertically (e.g. inside a dropdown menu). */
+  stacked?: boolean;
 };
 
 const ENTITY_LABELS: Record<ObjectActionsEntity, string> = {
@@ -48,7 +51,6 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 export function ObjectActions({
   entity,
-  id,
   canEdit,
   canDelete,
   canArchive = false,
@@ -58,7 +60,9 @@ export function ObjectActions({
   listPath: listPathOverride,
   onArchived,
   variant = "light",
+  stacked = false,
 }: ObjectActionsProps) {
+  const t = useTranslations("common.actions");
   const router = useRouter();
   const [modal, setModal] = useState<"delete" | "archive" | null>(null);
   const [loading, setLoading] = useState(false);
@@ -100,14 +104,14 @@ export function ObjectActions({
       const data = (await res.json().catch(() => ({}))) as { error?: string };
 
       if (!res.ok) {
-        setErrorMessage(data?.error ?? "No se pudo completar la acción.");
+        setErrorMessage(data?.error ?? t("actionFailed"));
         setLoading(false);
         return;
       }
       closeModal();
       router.push(listPath);
     } catch {
-      setErrorMessage("Error de conexión. Inténtalo de nuevo.");
+      setErrorMessage(t("connectionError"));
       setLoading(false);
     }
   };
@@ -126,7 +130,7 @@ export function ObjectActions({
       const data = (await res.json().catch(() => ({}))) as { error?: string };
 
       if (!res.ok) {
-        setErrorMessage(data?.error ?? "No se pudo archivar.");
+        setErrorMessage(data?.error ?? t("archiveFailed"));
         setLoading(false);
         return;
       }
@@ -137,7 +141,7 @@ export function ObjectActions({
         router.push(listPath);
       }
     } catch {
-      setErrorMessage("Error de conexión. Inténtalo de nuevo.");
+      setErrorMessage(t("connectionError"));
       setLoading(false);
     }
   };
@@ -147,7 +151,13 @@ export function ObjectActions({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
+      <div
+        className={
+          stacked
+            ? "flex w-full flex-col gap-1.5"
+            : "flex flex-wrap items-center gap-2"
+        }
+      >
         {canEdit && editHref && (
           <button
             type="button"
@@ -155,7 +165,7 @@ export function ObjectActions({
             className={editBtnClass}
           >
             <Pencil className="h-3.5 w-3.5" />
-            Editar
+            {t("edit")}
           </button>
         )}
         {canArchive && archiveEndpoint && (
@@ -165,7 +175,7 @@ export function ObjectActions({
             className={archiveBtnClass}
           >
             <Archive className="h-3.5 w-3.5" />
-            Archivar
+            {t("archive")}
           </button>
         )}
         {canDelete && deleteEndpoint && (
@@ -175,7 +185,7 @@ export function ObjectActions({
             className={deleteBtnClass}
           >
             <Trash2 className="h-3.5 w-3.5" />
-            Eliminar
+            {t("delete")}
           </button>
         )}
       </div>
@@ -189,10 +199,10 @@ export function ObjectActions({
             onKeyDown={(e) => { if (e.key === "Escape") closeModal(); }}
           >
             <h3 id="object-delete-title" className="text-lg font-semibold text-slate-900">
-              Eliminar {label}
+              {t("deleteTitle", { label })}
             </h3>
             <p className="mt-2 text-sm text-slate-600">
-              ¿Seguro que quieres eliminar esta {label}? Esta acción no se puede deshacer.
+              {t("deleteBody", { label })}
             </p>
             {errorMessage && (
               <p className="mt-3 text-sm text-rose-600 bg-rose-50 rounded-lg px-3 py-2">
@@ -206,7 +216,7 @@ export function ObjectActions({
                 disabled={loading}
                 className="rounded-full border border-slate-200 px-3 h-8 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
               >
-                Cancelar
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -214,7 +224,7 @@ export function ObjectActions({
                 disabled={loading}
                 className="rounded-full bg-rose-600 px-3 h-8 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
               >
-                {loading ? "Eliminando…" : "Eliminar"}
+                {loading ? t("deleting") : t("delete")}
               </button>
             </div>
           </div>
@@ -230,10 +240,10 @@ export function ObjectActions({
             onKeyDown={(e) => { if (e.key === "Escape") closeModal(); }}
           >
             <h3 id="object-archive-title" className="text-lg font-semibold text-slate-900">
-              Archivar {label}
+              {t("archiveTitle", { label })}
             </h3>
             <p className="mt-2 text-sm text-slate-600">
-              ¿Seguro que quieres archivar este {label}? Dejará de aparecer en la lista de activos.
+              {t("archiveBody", { label })}
             </p>
             {errorMessage && (
               <p className="mt-3 text-sm text-rose-600 bg-rose-50 rounded-lg px-3 py-2">
@@ -247,7 +257,7 @@ export function ObjectActions({
                 disabled={loading}
                 className="rounded-full border border-slate-200 px-3 h-8 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
               >
-                Cancelar
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -255,7 +265,7 @@ export function ObjectActions({
                 disabled={loading}
                 className="rounded-full bg-indigo-600 px-3 h-8 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
               >
-                {loading ? "Archivando…" : "Archivar"}
+                {loading ? t("archiving") : t("archive")}
               </button>
             </div>
           </div>

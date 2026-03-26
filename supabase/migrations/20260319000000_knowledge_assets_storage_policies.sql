@@ -4,7 +4,9 @@
 -- If ownership is not set by the client in your Supabase setup, UPDATE/DELETE
 -- will be denied (upload + public read still work).
 
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- NOTE:
+-- storage.objects RLS is managed by Supabase platform internals in some environments.
+-- Do not run ALTER TABLE ... ENABLE ROW LEVEL SECURITY here to avoid ownership errors.
 
 -- INSERT
 DO $$

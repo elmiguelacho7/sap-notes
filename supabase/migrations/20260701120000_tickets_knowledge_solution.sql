@@ -28,6 +28,40 @@ CREATE TABLE IF NOT EXISTS public.ticket_comments (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Backward-safe alignment for environments where ticket_comments already existed
+-- with a different author column naming.
+ALTER TABLE public.ticket_comments
+  ADD COLUMN IF NOT EXISTS author_id uuid;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'ticket_comments'
+      AND column_name = 'created_by'
+  ) THEN
+    EXECUTE 'UPDATE public.ticket_comments SET author_id = created_by WHERE author_id IS NULL';
+  ELSIF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'ticket_comments'
+      AND column_name = 'user_id'
+  ) THEN
+    EXECUTE 'UPDATE public.ticket_comments SET author_id = user_id WHERE author_id IS NULL';
+  ELSIF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'ticket_comments'
+      AND column_name = 'profile_id'
+  ) THEN
+    EXECUTE 'UPDATE public.ticket_comments SET author_id = profile_id WHERE author_id IS NULL';
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_ticket_comments_ticket_id ON public.ticket_comments (ticket_id);
 CREATE INDEX IF NOT EXISTS idx_ticket_comments_created_at ON public.ticket_comments (created_at);
 
@@ -41,7 +75,7 @@ CREATE POLICY ticket_comments_select ON public.ticket_comments FOR SELECT TO aut
   USING (
     EXISTS (
       SELECT 1 FROM public.tickets t
-      LEFT JOIN public.project_members pm ON pm.project_id = t.project_id AND pm.profile_id = auth.uid()
+      LEFT JOIN public.project_members pm ON pm.project_id = t.project_id AND pm.user_id = auth.uid()
       LEFT JOIN public.profiles p ON p.id = auth.uid()
       WHERE t.id = ticket_comments.ticket_id
         AND (t.project_id IS NULL OR pm.project_id IS NOT NULL OR (p.app_role = 'superadmin'))
@@ -54,7 +88,7 @@ CREATE POLICY ticket_comments_insert ON public.ticket_comments FOR INSERT TO aut
     author_id = auth.uid()
     AND EXISTS (
       SELECT 1 FROM public.tickets t
-      LEFT JOIN public.project_members pm ON pm.project_id = t.project_id AND pm.profile_id = auth.uid()
+      LEFT JOIN public.project_members pm ON pm.project_id = t.project_id AND pm.user_id = auth.uid()
       LEFT JOIN public.profiles p ON p.id = auth.uid()
       WHERE t.id = ticket_comments.ticket_id
         AND (t.project_id IS NULL OR pm.project_id IS NOT NULL OR (p.app_role = 'superadmin'))
@@ -84,7 +118,7 @@ CREATE POLICY ticket_references_select ON public.ticket_references FOR SELECT TO
   USING (
     EXISTS (
       SELECT 1 FROM public.tickets t
-      LEFT JOIN public.project_members pm ON pm.project_id = t.project_id AND pm.profile_id = auth.uid()
+      LEFT JOIN public.project_members pm ON pm.project_id = t.project_id AND pm.user_id = auth.uid()
       LEFT JOIN public.profiles p ON p.id = auth.uid()
       WHERE t.id = ticket_references.ticket_id
         AND (t.project_id IS NULL OR pm.project_id IS NOT NULL OR (p.app_role = 'superadmin'))
@@ -96,7 +130,7 @@ CREATE POLICY ticket_references_insert ON public.ticket_references FOR INSERT TO
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.tickets t
-      LEFT JOIN public.project_members pm ON pm.project_id = t.project_id AND pm.profile_id = auth.uid()
+      LEFT JOIN public.project_members pm ON pm.project_id = t.project_id AND pm.user_id = auth.uid()
       LEFT JOIN public.profiles p ON p.id = auth.uid()
       WHERE t.id = ticket_references.ticket_id
         AND (t.project_id IS NULL OR pm.project_id IS NOT NULL OR (p.app_role = 'superadmin'))
@@ -108,7 +142,7 @@ CREATE POLICY ticket_references_delete ON public.ticket_references FOR DELETE TO
   USING (
     EXISTS (
       SELECT 1 FROM public.tickets t
-      LEFT JOIN public.project_members pm ON pm.project_id = t.project_id AND pm.profile_id = auth.uid()
+      LEFT JOIN public.project_members pm ON pm.project_id = t.project_id AND pm.user_id = auth.uid()
       LEFT JOIN public.profiles p ON p.id = auth.uid()
       WHERE t.id = ticket_references.ticket_id
         AND (t.project_id IS NULL OR pm.project_id IS NOT NULL OR (p.app_role = 'superadmin'))

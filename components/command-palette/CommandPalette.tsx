@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   FileText,
   Ticket,
@@ -29,124 +30,126 @@ type Command = {
   icon?: React.ReactNode;
 };
 
-function buildCommands(projectId: string | null, recent: RecentItem[]): Command[] {
+type TPalette = (key: string) => string;
+
+function buildCommands(projectId: string | null, recent: RecentItem[], t: TPalette): Command[] {
   const create: Command[] = [
     {
       id: "new-ticket",
-      label: "New ticket",
+      label: t("newTicket"),
       group: "create" as const,
       href: projectId ? `/projects/${projectId}/tickets/new` : "/tickets/new",
       keywords: ["ticket", "new", "crear", "nuevo"],
-      icon: <Ticket className="h-4 w-4 shrink-0 text-slate-400 mr-2" />,
+      icon: <Ticket className="h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))] mr-2" />,
     },
     {
       id: "new-activity",
-      label: "New activity",
+      label: t("newActivity"),
       group: "create" as const,
       href: projectId ? `/projects/${projectId}/planning` : "",
       keywords: ["activity", "actividad", "new", "planning"],
-      icon: <ListTodo className="h-4 w-4 shrink-0 text-slate-400 mr-2" />,
+      icon: <ListTodo className="h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))] mr-2" />,
     },
     {
       id: "new-note",
-      label: "New note",
+      label: t("newNote"),
       group: "create" as const,
       href: "/notes/new",
       keywords: ["note", "nota", "new", "crear"],
-      icon: <FileText className="h-4 w-4 shrink-0 text-slate-400 mr-2" />,
+      icon: <FileText className="h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))] mr-2" />,
     },
   ].filter((c) => c.href);
 
   const nav: Command[] = [
     {
       id: "nav-dashboard",
-      label: "Go to Dashboard",
+      label: t("navDashboard"),
       group: "navigation" as const,
       href: "/dashboard",
       keywords: ["dashboard", "home", "inicio"],
-      icon: <LayoutDashboard className="h-4 w-4 shrink-0 text-slate-400 mr-2" />,
+      icon: <LayoutDashboard className="h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))] mr-2" />,
     },
     {
       id: "nav-projects",
-      label: "Go to Projects",
+      label: t("navProjects"),
       group: "navigation" as const,
       href: "/projects",
       keywords: ["projects", "proyectos", "list"],
-      icon: <FolderKanban className="h-4 w-4 shrink-0 text-slate-400 mr-2" />,
+      icon: <FolderKanban className="h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))] mr-2" />,
     },
     ...(projectId
       ? [
           {
             id: "nav-planning",
-            label: "Go to Planning",
+            label: t("navPlanning"),
             group: "navigation" as const,
             href: `/projects/${projectId}/planning`,
             keywords: ["planning", "planificación", "calendar"],
-            icon: <CalendarDays className="h-4 w-4 shrink-0 text-slate-400 mr-2" />,
+            icon: <CalendarDays className="h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))] mr-2" />,
           },
           {
             id: "nav-activities",
-            label: "Go to Activities",
+            label: t("navActivities"),
             group: "navigation" as const,
             href: `/projects/${projectId}/planning/activities`,
             keywords: ["activities", "actividades"],
-            icon: <ListTodo className="h-4 w-4 shrink-0 text-slate-400 mr-2" />,
+            icon: <ListTodo className="h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))] mr-2" />,
           },
           {
             id: "nav-tasks",
-            label: "Go to Tasks",
+            label: t("navTasks"),
             group: "navigation" as const,
             href: `/projects/${projectId}/tasks`,
             keywords: ["tasks", "tareas"],
-            icon: <CheckSquare className="h-4 w-4 shrink-0 text-slate-400 mr-2" />,
+            icon: <CheckSquare className="h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))] mr-2" />,
           },
           {
             id: "nav-notes",
-            label: "Go to Notes",
+            label: t("navNotes"),
             group: "navigation" as const,
             href: `/projects/${projectId}/notes`,
             keywords: ["notes", "notas"],
-            icon: <FileText className="h-4 w-4 shrink-0 text-slate-400 mr-2" />,
+            icon: <FileText className="h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))] mr-2" />,
           },
           {
             id: "nav-brain",
-            label: "Go to Brain",
+            label: t("navBrain"),
             group: "navigation" as const,
             href: `/projects/${projectId}/brain`,
             keywords: ["brain", "sapito"],
-            icon: <Brain className="h-4 w-4 shrink-0 text-slate-400 mr-2" />,
+            icon: <Brain className="h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))] mr-2" />,
           },
           {
             id: "nav-links",
-            label: "Go to Links",
+            label: t("navLinks"),
             group: "navigation" as const,
             href: `/projects/${projectId}/links`,
             keywords: ["links", "enlaces"],
-            icon: <LinkIcon className="h-4 w-4 shrink-0 text-slate-400 mr-2" />,
+            icon: <LinkIcon className="h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))] mr-2" />,
           },
           {
             id: "nav-knowledge",
-            label: "Go to Knowledge",
+            label: t("navKnowledge"),
             group: "navigation" as const,
             href: `/projects/${projectId}/knowledge`,
             keywords: ["knowledge", "conocimiento"],
-            icon: <BookOpen className="h-4 w-4 shrink-0 text-slate-400 mr-2" />,
+            icon: <BookOpen className="h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))] mr-2" />,
           },
           {
             id: "nav-tickets",
-            label: "Go to Tickets",
+            label: t("navTickets"),
             group: "navigation" as const,
             href: `/projects/${projectId}/tickets`,
             keywords: ["tickets", "incidencias"],
-            icon: <AlertCircle className="h-4 w-4 shrink-0 text-slate-400 mr-2" />,
+            icon: <AlertCircle className="h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))] mr-2" />,
           },
           {
             id: "nav-members",
-            label: "Go to Team",
+            label: t("navMembers"),
             group: "navigation" as const,
             href: `/projects/${projectId}/members`,
             keywords: ["team", "equipo", "members"],
-            icon: <Users className="h-4 w-4 shrink-0 text-slate-400 mr-2" />,
+            icon: <Users className="h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))] mr-2" />,
           },
         ]
       : []),
@@ -154,15 +157,15 @@ function buildCommands(projectId: string | null, recent: RecentItem[]): Command[
 
   const recentCommands: Command[] = recent.map((r) => ({
     id: `recent-${r.type}-${r.id}`,
-    label: r.title || (r.type === "note" ? "Note" : "Ticket"),
+    label: r.title || (r.type === "note" ? t("recentNote") : t("recentTicket")),
     group: "recent" as const,
     href: r.href,
     keywords: [r.title, r.type],
     icon:
       r.type === "note" ? (
-        <FileText className="h-4 w-4 shrink-0 text-slate-500" />
+        <FileText className="mr-2 h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))]" />
       ) : (
-        <Ticket className="h-4 w-4 shrink-0 text-slate-500" />
+        <Ticket className="mr-2 h-4 w-4 shrink-0 text-[rgb(var(--rb-brand-primary))]" />
       ),
   }));
 
@@ -178,15 +181,10 @@ function filterCommands(commands: Command[], query: string): Command[] {
   });
 }
 
-const GROUP_LABELS: Record<CommandGroup, string> = {
-  create: "Create",
-  navigation: "Navigation",
-  recent: "Recent",
-};
-
 export function CommandPalette() {
   const router = useRouter();
   const pathname = usePathname();
+  const t = useTranslations("common.commandPalette");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlightIndex, setHighlightIndex] = useState(0);
@@ -203,8 +201,8 @@ export function CommandPalette() {
 
   const recentItems = useMemo(() => getRecentItems(), [open]);
   const allCommands = useMemo(
-    () => buildCommands(projectId, recentItems),
-    [projectId, recentItems]
+    () => buildCommands(projectId, recentItems, t as TPalette),
+    [projectId, recentItems, t]
   );
   const filtered = useMemo(
     () => filterCommands(allCommands, query),
@@ -230,6 +228,40 @@ export function CommandPalette() {
     setOpen(false);
     setQuery("");
   }, []);
+
+  const executeCommand = useCallback(
+    (cmd: Command) => {
+      const recent = recentItems.find(
+        (r) => r.href === cmd.href || cmd.id.startsWith(`recent-${r.type}-${r.id}`)
+      );
+      if (recent) {
+        addToRecent(recent);
+      } else if (cmd.group === "recent") {
+        const r = recentItems.find((r2) => `recent-${r2.type}-${r2.id}` === cmd.id);
+        if (r) addToRecent(r);
+      } else {
+        const noteMatch = cmd.href.match(/^\/notes\/([^/]+)$/);
+        const ticketMatch = cmd.href.match(/^\/tickets\/([^/]+)$/);
+        if (noteMatch)
+          addToRecent({
+            type: "note",
+            id: noteMatch[1],
+            title: cmd.label,
+            href: cmd.href,
+          });
+        if (ticketMatch)
+          addToRecent({
+            type: "ticket",
+            id: ticketMatch[1],
+            title: cmd.label,
+            href: cmd.href,
+          });
+      }
+      router.push(cmd.href);
+      closePalette();
+    },
+    [recentItems, router, closePalette]
+  );
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -304,39 +336,6 @@ export function CommandPalette() {
     }
   }, [highlightedCommand]);
 
-  function executeCommand(cmd: Command) {
-    const recent = recentItems.find(
-      (r) => r.href === cmd.href || cmd.id.startsWith(`recent-${r.type}-${r.id}`)
-    );
-    if (recent) {
-      addToRecent(recent);
-    } else if (cmd.group === "recent") {
-      const r = recentItems.find(
-        (r) => `recent-${r.type}-${r.id}` === cmd.id
-      );
-      if (r) addToRecent(r);
-    } else {
-      const noteMatch = cmd.href.match(/^\/notes\/([^/]+)$/);
-      const ticketMatch = cmd.href.match(/^\/tickets\/([^/]+)$/);
-      if (noteMatch)
-        addToRecent({
-          type: "note",
-          id: noteMatch[1],
-          title: cmd.label,
-          href: cmd.href,
-        });
-      if (ticketMatch)
-        addToRecent({
-          type: "ticket",
-          id: ticketMatch[1],
-          title: cmd.label,
-          href: cmd.href,
-        });
-    }
-    router.push(cmd.href);
-    closePalette();
-  }
-
   if (!open) return null;
 
   return (
@@ -345,23 +344,23 @@ export function CommandPalette() {
       onClick={closePalette}
       role="dialog"
       aria-modal="true"
-      aria-label="Command palette"
+      aria-label={t("aria")}
     >
       <div
-        className="w-full max-w-[640px] rounded-2xl border border-slate-700/60 bg-slate-900 shadow-xl overflow-hidden"
+        className="w-full max-w-[640px] overflow-hidden rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] shadow-lg"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           if (e.key === "Escape") closePalette();
         }}
       >
-        <div className="border-b border-slate-700/50 px-4 py-3">
+        <div className="border-b border-[rgb(var(--rb-surface-border))]/60 px-4 py-3">
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search or run a command..."
+            placeholder={t("placeholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-0"
+            className="w-full rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))]/90 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:ring-offset-0"
             aria-autocomplete="list"
             aria-controls="command-palette-list"
             aria-activedescendant={
@@ -374,12 +373,12 @@ export function CommandPalette() {
         <div
           id="command-palette-list"
           ref={listRef}
-          className="max-h-[min(60vh,400px)] overflow-y-auto py-2"
+          className="max-h-[min(60vh,400px)] overflow-y-auto py-2 [scrollbar-width:thin] [scrollbar-color:rgb(var(--rb-surface-border))_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgb(var(--rb-surface-border))]"
           role="listbox"
         >
           {filtered.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-slate-500">
-              No commands match &quot;{query}&quot;
+            <div className="px-4 py-8 text-center text-sm text-[rgb(var(--rb-text-muted))]">
+              {t("noResults", { query })}
             </div>
           ) : (
             <>
@@ -388,8 +387,8 @@ export function CommandPalette() {
                 if (inGroup.length === 0) return null;
                 return (
                   <div key={group} className="mb-2">
-                    <div className="px-4 py-1.5 text-xs uppercase text-slate-400 tracking-wide">
-                      {GROUP_LABELS[group]}
+                    <div className="px-4 py-1.5 text-xs uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">
+                      {(t as (key: string) => string)(`groups.${group}`)}
                     </div>
                     {inGroup.map((cmd) => {
                       const isHighlighted = highlightedCommand?.id === cmd.id;
@@ -406,10 +405,10 @@ export function CommandPalette() {
                             const idx = filtered.indexOf(cmd);
                             if (idx >= 0) setHighlightIndex(idx);
                           }}
-                          className={`w-full flex items-center px-4 py-2.5 text-left text-sm rounded-md transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-inset ${
+                          className={`flex w-full items-center border px-4 py-2.5 text-left text-sm text-[rgb(var(--rb-text-primary))] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/40 focus-visible:ring-inset ${
                             isHighlighted
-                              ? "bg-indigo-500/20 border border-indigo-500/30 text-slate-100"
-                              : "text-slate-300 hover:bg-slate-800/50"
+                              ? "rounded-md bg-[rgb(var(--rb-brand-primary))]/12 border-[rgb(var(--rb-brand-primary))]/30"
+                              : "rounded-md border-transparent hover:bg-[rgb(var(--rb-surface))]/80 hover:translate-x-[2px]"
                           }`}
                         >
                           {cmd.icon}

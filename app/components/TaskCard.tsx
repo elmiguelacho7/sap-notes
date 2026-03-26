@@ -1,11 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ChevronRight } from "lucide-react";
 import { AssigneeDropdown } from "@/app/components/AssigneeDropdown";
 import type { BoardTask } from "@/app/components/TasksBoard";
+import { getTaskDuePresentation, type TaskDuePresentationLabels } from "@/app/components/taskDuePresentation";
 
 type TaskCardProps = {
   task: BoardTask;
@@ -18,6 +20,8 @@ type TaskCardProps = {
   assigneeOptions?: { value: string; label: string }[];
   onAssigneeChange?: (taskId: string, assigneeProfileId: string | null) => void | Promise<void>;
   onOpenDetail?: (task: BoardTask) => void;
+  /** En tablero Kanban el estado ya se infiere por columna: el select se muestra más discreto. */
+  demoteStatusSelect?: boolean;
 };
 
 function TaskCardComponent({
@@ -31,7 +35,23 @@ function TaskCardComponent({
   assigneeOptions,
   onAssigneeChange,
   onOpenDetail,
+  demoteStatusSelect = false,
 }: TaskCardProps) {
+  const tPriority = useTranslations("tasks.priority");
+  const tCard = useTranslations("tasks.taskCard");
+  const tDue = useTranslations("tasks.due");
+
+  const dueLabels: TaskDuePresentationLabels = useMemo(
+    () => ({
+      overdue: tDue("overdue"),
+      dueToday: tDue("dueToday"),
+      dueTomorrow: tDue("dueTomorrow"),
+      inDays: (n: number) => tDue("inDays", { n }),
+      limit: tDue("limit"),
+    }),
+    [tDue]
+  );
+
   const {
     attributes,
     listeners,
@@ -46,48 +66,88 @@ function TaskCardComponent({
     transition,
   };
 
+  const duePresent = useMemo(
+    () => getTaskDuePresentation(task.due_date, dueLabels),
+    [task.due_date, dueLabels]
+  );
+
+  const priorityKey = (task.priority ?? "").toLowerCase();
+  const priorityShort =
+    priorityKey === "high"
+      ? tPriority("high")
+      : priorityKey === "medium"
+        ? tPriority("medium")
+        : priorityKey === "low"
+          ? tPriority("low")
+          : null;
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
-      className={`relative rounded-lg bg-slate-900 border border-slate-700 p-3 hover:bg-slate-800 transition-all flex flex-col min-w-0 ${
-        isDragging ? "ring-2 ring-indigo-500 shadow-lg opacity-90 z-10" : ""
+      className={`relative rounded-xl bg-[rgb(var(--rb-surface))] border border-[rgb(var(--rb-surface-border))]/65 p-3 shadow-sm hover:border-[rgb(var(--rb-surface-border))]/85 hover:shadow-md hover:-translate-y-[1px] transition-[border-color,box-shadow,opacity,transform] duration-150 flex flex-col min-w-0 ${
+        isDragging
+          ? "opacity-[0.92] shadow-lg ring-1 ring-[rgb(var(--rb-brand-primary))]/15 z-10"
+          : ""
       }`}
     >
-      <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-lg ${leftBarClass}`} />
-      <div className="pl-4 min-w-0 flex-1 flex flex-col">
-        <div className="pr-0 space-y-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap min-w-0">
-            <p className="text-sm font-semibold text-slate-100 truncate min-w-0" title={task.title}>{task.title}</p>
-            {task.priority && ["high", "medium", "low"].includes((task.priority ?? "").toLowerCase()) && (
+      <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-[10px] ${leftBarClass}`} />
+      <div className="pl-3 min-w-0 flex-1 flex flex-col">
+        <div className="pr-0 space-y-2.5 min-w-0">
+          <div className="flex items-start gap-2 min-w-0">
+            <p
+              className="text-[15px] font-semibold leading-snug tracking-tight text-[rgb(var(--rb-text-primary))] truncate min-w-0 flex-1"
+              title={task.title}
+            >
+              {task.title}
+            </p>
+            {task.priority && ["high", "medium", "low"].includes(priorityKey) && priorityShort && (
               <span
-                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
-                  (task.priority ?? "").toLowerCase() === "high"
-                    ? "bg-red-500/20 text-red-300 border border-red-500/30"
-                    : (task.priority ?? "").toLowerCase() === "medium"
-                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                      : "bg-slate-500/20 text-slate-400 border border-slate-500/30"
+                className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
+                  priorityKey === "high"
+                    ? "bg-rose-50 text-rose-800 ring-1 ring-inset ring-rose-200/80"
+                    : priorityKey === "medium"
+                      ? "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200/80"
+                      : "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200/90"
                 }`}
               >
-                {(task.priority ?? "").toLowerCase() === "high" ? "Alta" : (task.priority ?? "").toLowerCase() === "medium" ? "Media" : "Baja"}
+                {priorityShort}
               </span>
             )}
           </div>
-          {activityLabel != null && (
-            <p className="text-[11px] text-slate-500 leading-tight min-w-0 flex items-baseline gap-1">
-              <span className="shrink-0">Actividad:</span>
-              <span className="text-slate-400 truncate" title={activityLabel}>{activityLabel}</span>
-            </p>
+
+          {/* Meta row: due + activity (lightweight) */}
+          {(duePresent || activityLabel != null) && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {duePresent ? (
+                <span
+                  className={`inline-flex items-center rounded-full border border-[rgb(var(--rb-surface-border))]/45 bg-[rgb(var(--rb-surface-3))]/12 px-2 py-0.5 text-[11px] tabular-nums ${duePresent.className}`}
+                >
+                  <span className="font-medium">{duePresent.line}</span>
+                  {duePresent.sub ? <span className="font-normal opacity-90"> {duePresent.sub}</span> : null}
+                </span>
+              ) : null}
+              {activityLabel != null ? (
+                <span
+                  className="inline-flex min-w-0 max-w-full items-center rounded-full border border-[rgb(var(--rb-surface-border))]/40 bg-[rgb(var(--rb-surface-3))]/10 px-2 py-0.5 text-[11px] text-[rgb(var(--rb-text-muted))] truncate"
+                  title={activityLabel}
+                >
+                  <span className="text-[rgb(var(--rb-text-muted))]">{tCard("activity")}</span>
+                  <span className="mx-1 text-[rgb(var(--rb-text-muted))]">·</span>
+                  <span className="truncate text-[rgb(var(--rb-text-secondary))]">{activityLabel}</span>
+                </span>
+              ) : null}
+            </div>
           )}
-          {/* Responsable: [pill] — compact, truncates long names, stays inside card */}
+
+          {/* Assignee: compact + secondary */}
           {assigneeOptions !== undefined && (
-            <p className="text-[11px] text-slate-500 leading-tight flex items-center gap-1.5 min-w-0">
-              <span className="shrink-0">Responsable:</span>
+            <div className="flex items-center gap-2 min-w-0">
               {onAssigneeChange ? (
                 <span
-                  className="inline-flex min-w-0 max-w-full"
+                  className="inline-flex min-w-0 max-w-[12.5rem] opacity-95"
                   onClick={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
                 >
@@ -95,59 +155,73 @@ function TaskCardComponent({
                     options={assigneeOptions}
                     value={task.assignee_profile_id ?? null}
                     onChange={(profileId) => onAssigneeChange(task.id, profileId)}
-                    placeholder="Sin asignar"
+                    placeholder={tCard("unassigned")}
                     variant={assigneeLabel ? "assigned" : "unassigned"}
+                    appearance="light"
+                    className="h-8 rounded-full px-2.5 py-1 text-xs border-[rgb(var(--rb-surface-border))]/45 bg-[rgb(var(--rb-surface-3))]/10 hover:bg-[rgb(var(--rb-surface-3))]/20"
                   />
                 </span>
               ) : (
-                <span className={`truncate min-w-0 ${assigneeLabel ? "text-slate-300" : "text-slate-500"}`} title={assigneeLabel ?? "Sin asignar"}>
-                  👤 {assigneeLabel ?? "Sin asignar"}
+                <span
+                  className={`inline-flex max-w-full items-center truncate rounded-full border border-[rgb(var(--rb-surface-border))]/40 bg-[rgb(var(--rb-surface-3))]/10 px-2 py-0.5 text-[11px] ${
+                    assigneeLabel ? "text-[rgb(var(--rb-text-secondary))]" : "text-[rgb(var(--rb-text-muted))]"
+                  }`}
+                  title={assigneeLabel ?? tCard("unassigned")}
+                >
+                  {assigneeLabel ?? tCard("unassigned")}
                 </span>
               )}
-            </p>
+            </div>
           )}
-          {task.due_date && (
-            <p className="text-xs text-slate-400 mt-0.5 truncate">
-              Límite: {new Date(task.due_date).toLocaleDateString()}
-            </p>
-          )}
+
           {task.description && (
-            <p className="text-xs text-slate-400 line-clamp-2 mt-0.5 break-words">{task.description}</p>
+            <p className="text-[10px] text-[rgb(var(--rb-text-secondary))] line-clamp-2 mt-1 break-words leading-relaxed">
+              {task.description}
+            </p>
           )}
         </div>
-        <div className="pt-2 mt-1 border-t border-slate-700 flex items-center justify-between gap-2 min-w-0">
-          <select
-            value={currentStatusKey}
-            onChange={(e) => onStatusChange(task.id, e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            className="flex-1 min-w-0 rounded-lg border border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+
+        {/* Footer row: status + quick action (very compact) */}
+        <div className="mt-3 pt-2.5 border-t border-[rgb(var(--rb-surface-border))]/45 flex items-center justify-between gap-2 min-w-0">
+          <div
+            className={
+              demoteStatusSelect ? "flex justify-end min-w-0" : "flex items-center gap-2 min-w-0 flex-1"
+            }
           >
-            {columns.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {task.created_at && (
-              <span className="text-[11px] text-slate-500">
-                {new Date(task.created_at).toLocaleDateString()}
-              </span>
-            )}
-            {onOpenDetail && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenDetail(task);
-                }}
-                className="inline-flex items-center gap-0.5 rounded px-1.5 py-1 text-[11px] font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 transition-colors"
-              >
-                Open
-                <ChevronRight className="h-3 w-3" />
-              </button>
-            )}
+            <select
+              value={currentStatusKey}
+              onChange={(e) => onStatusChange(task.id, e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              title={tCard("changeStatusTitle")}
+              aria-label={tCard("changeStatusAria")}
+              className={
+                demoteStatusSelect
+                  ? "max-w-[7rem] cursor-pointer rounded-full border border-[rgb(var(--rb-surface-border))]/45 bg-[rgb(var(--rb-surface-3))]/10 py-0.5 px-2 text-[9px] leading-tight text-[rgb(var(--rb-text-muted))] shadow-none hover:border-[rgb(var(--rb-surface-border))]/75 hover:bg-[rgb(var(--rb-surface-3))]/20 hover:text-[rgb(var(--rb-text-secondary))] focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35"
+                  : "h-8 flex-1 min-w-0 cursor-pointer rounded-full border border-[rgb(var(--rb-surface-border))]/45 bg-[rgb(var(--rb-surface-3))]/10 px-2.5 text-[11px] text-[rgb(var(--rb-text-primary))] hover:border-[rgb(var(--rb-surface-border))]/75 hover:bg-[rgb(var(--rb-surface-3))]/20 focus:outline-none focus:ring-1 focus:ring-[rgb(var(--rb-brand-ring))]/35"
+              }
+            >
+              {columns.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
           </div>
+
+          {onOpenDetail && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenDetail(task);
+              }}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[rgb(var(--rb-surface-border))]/40 bg-[rgb(var(--rb-surface-3))]/10 px-2.5 text-[11px] font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/20 hover:border-[rgb(var(--rb-surface-border))]/70 transition-colors shrink-0"
+              title={tCard("openDetailTitle")}
+            >
+              {tCard("open")}
+              <ChevronRight className="h-3 w-3 opacity-60" strokeWidth={2} />
+            </button>
+          )}
         </div>
       </div>
     </div>

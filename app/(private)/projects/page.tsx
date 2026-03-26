@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { AppPageShell } from "@/components/ui/layout/AppPageShell";
 import { ProjectCard, type ProjectCardProject } from "@/components/projects/ProjectCard";
 import { ContentSkeleton } from "@/components/skeletons/ContentSkeleton";
@@ -32,6 +33,7 @@ type StatusFilter = "" | "planned" | "in_progress" | "completed" | "archived";
 type SortOption = "priority" | "newest" | "recently_updated" | "name";
 
 export default function ProjectsPage() {
+  const t = useTranslations("projects");
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [projects, setProjects] = useState<ProjectCardProject[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -74,7 +76,7 @@ export default function ProjectsPage() {
 
       if (error) {
         handleSupabaseError("projects", error);
-        setErrorMsg("No se pudieron cargar los proyectos.");
+        setErrorMsg(t("errors.loadProjects"));
         setProjects([]);
         setLoadingProjects(false);
         return;
@@ -83,7 +85,7 @@ export default function ProjectsPage() {
       const rows = (projData ?? []) as ProjectRow[];
 
       const clientIds = Array.from(new Set(rows.map((p) => p.client_id).filter(Boolean))) as string[];
-      let clientNames = new Map<string, string>();
+      const clientNames = new Map<string, string>();
       if (clientIds.length > 0) {
         const { data: clients } = await supabase
           .from("clients")
@@ -153,7 +155,7 @@ export default function ProjectsPage() {
     };
 
     void load();
-  }, []);
+  }, [t]);
 
   const normalizedStatus = (s: string | null) => (s ?? "").toLowerCase().trim();
 
@@ -227,97 +229,114 @@ export default function ProjectsPage() {
 
   return (
     <AppPageShell>
-      <div className="space-y-6">
-      {/* Header: stronger title, cleaner subtitle, metrics below, primary action right */}
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-white">Proyectos</h1>
-          <p className="mt-0.5 text-sm text-slate-500">
+      <div className="space-y-7">
+      {/* Header + portfolio snapshot: authoritative title, embedded summary rail */}
+      <header className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_24px_-8px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/40 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
+        <div className="min-w-0 flex-1 space-y-1">
+          <h1 className="text-[1.625rem] font-semibold leading-tight tracking-tight text-[rgb(var(--rb-text-primary))] sm:text-3xl sm:tracking-tight">
+            {t("page.title")}
+          </h1>
+          <p className="max-w-2xl text-sm leading-relaxed text-[rgb(var(--rb-text-secondary))]">
             {projectsQuota?.limit != null
-              ? `${projectsQuota.current} / ${projectsQuota.limit} proyectos`
-              : "Gestiona y abre el workspace de cada proyecto."}
+              ? t("page.quotaSummary", { current: projectsQuota.current, limit: projectsQuota.limit })
+              : t("page.subtitle")}
           </p>
-          {/* Compact metrics row below title */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2.5 py-1 text-xs text-slate-400">
-              <LayoutGrid className="h-3.5 w-3.5" />
-              <span className="font-medium text-slate-300">{loadingProjects ? "—" : summary.active}</span>
-              <span>activos</span>
+          <div className="pt-4">
+            <div className="rounded-xl border border-slate-200/70 bg-slate-50/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+              <div className="flex flex-wrap items-stretch gap-2">
+            <span className="inline-flex items-center gap-2 rounded-lg border border-slate-200/80 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm">
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-slate-500 ring-1 ring-slate-200/60">
+                <LayoutGrid className="h-3.5 w-3.5" aria-hidden />
+              </span>
+              <span className="tabular-nums font-semibold text-slate-900">{loadingProjects ? "—" : summary.active}</span>
+              <span className="text-slate-500">{t("summary.active")}</span>
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-xs text-sky-400/90">
-              <CalendarClock className="h-3.5 w-3.5" />
-              {loadingProjects ? "—" : summary.planned}
+            <span className="inline-flex items-center gap-2 rounded-lg border border-sky-200/80 bg-sky-50/90 px-3 py-1.5 text-xs text-sky-800 shadow-sm">
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-sky-100/90 text-sky-700 ring-1 ring-sky-200/60">
+                <CalendarClock className="h-3.5 w-3.5" aria-hidden />
+              </span>
+              <span className="tabular-nums font-semibold text-sky-900">{loadingProjects ? "—" : summary.planned}</span>
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-2.5 py-1 text-xs text-indigo-400/90">
-              <FolderOpen className="h-3.5 w-3.5" />
-              {loadingProjects ? "—" : summary.inProgress}
+            <span className="inline-flex items-center gap-2 rounded-lg border border-indigo-200/80 bg-indigo-50/90 px-3 py-1.5 text-xs text-indigo-900 shadow-sm">
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-100/90 text-indigo-700 ring-1 ring-indigo-200/60">
+                <FolderOpen className="h-3.5 w-3.5" aria-hidden />
+              </span>
+              <span className="tabular-nums font-semibold text-indigo-950">{loadingProjects ? "—" : summary.inProgress}</span>
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2.5 py-1 text-xs text-slate-500">
-              <Archive className="h-3.5 w-3.5" />
-              {loadingProjects ? "—" : summary.closed}
+            <span className="inline-flex items-center gap-2 rounded-lg border border-slate-200/80 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm">
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-slate-500 ring-1 ring-slate-200/60">
+                <Archive className="h-3.5 w-3.5" aria-hidden />
+              </span>
+              <span className="tabular-nums font-medium text-slate-800">{loadingProjects ? "—" : summary.closed}</span>
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2.5 py-1 text-xs text-slate-500">
-              <Ticket className="h-3.5 w-3.5" />
-              <span className="font-medium text-slate-300">{loadingProjects ? "—" : summary.totalOpenTickets}</span>
-              <span>tickets</span>
+            <span className="inline-flex items-center gap-2 rounded-lg border border-slate-200/80 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm">
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-slate-500 ring-1 ring-slate-200/60">
+                <Ticket className="h-3.5 w-3.5" aria-hidden />
+              </span>
+              <span className="tabular-nums font-semibold text-slate-900">{loadingProjects ? "—" : summary.totalOpenTickets}</span>
+              <span className="text-slate-500">{t("summary.tickets")}</span>
             </span>
+              </div>
+            </div>
           </div>
         </div>
         {canCreateProject && (
           <Link
             href="/projects/new"
-            className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-100 transition-colors hover:bg-slate-700 hover:border-slate-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:ring-offset-2 focus:ring-offset-slate-950"
+            className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl border border-[rgb(var(--rb-brand-primary))]/35 bg-[rgb(var(--rb-brand-primary))] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-[rgb(var(--rb-brand-primary))]/18 transition-all hover:border-[rgb(var(--rb-brand-primary))]/50 hover:bg-[rgb(var(--rb-brand-primary-hover))] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/40 focus:ring-offset-2 focus:ring-offset-white"
           >
-            Nuevo proyecto
+            {t("page.createCta")}
           </Link>
         )}
+        </div>
       </header>
 
-      {/* Quota alerts (dark style) */}
+      {/* Quota alerts */}
       {projectsQuota?.limit != null && projectsQuota.atLimit && (
-        <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
-          Has alcanzado el máximo de proyectos permitidos ({projectsQuota.current} / {projectsQuota.limit}). No puedes crear más hasta que un administrador aumente el límite.
+        <div className="rounded-xl border border-red-200/90 bg-red-50/95 px-4 py-3 text-sm text-red-900 shadow-sm">
+          {t("quota.atLimit", { current: projectsQuota.current, limit: projectsQuota.limit })}
         </div>
       )}
       {projectsQuota?.limit != null && !projectsQuota.atLimit && projectsQuota.current >= (projectsQuota.limit ?? 0) * 0.8 && (
-        <div className="rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
-          Te acercas al límite de proyectos ({projectsQuota.current} / {projectsQuota.limit}). Cuando lo alcances no podrás crear más hasta que un administrador aumente la cuota.
+        <div className="rounded-xl border border-amber-200/90 bg-amber-50/95 px-4 py-3 text-sm text-amber-950 shadow-sm">
+          {t("quota.nearLimit", { current: projectsQuota.current, limit: projectsQuota.limit })}
         </div>
       )}
 
-      {/* Filter bar: search first, status, sort; compact and aligned */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <div className="relative flex-1 sm:max-w-[280px]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+      {/* Find & order */}
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.06)] ring-1 ring-slate-100 sm:flex sm:flex-wrap sm:items-center sm:gap-3 sm:p-3.5">
+        <div className="relative flex-1 sm:max-w-[min(100%,320px)]">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre, cliente o estado..."
-            className="w-full rounded-lg border border-slate-800 bg-slate-900/80 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500 focus:border-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-600"
+            placeholder={t("filters.searchPlaceholder")}
+            className="w-full rounded-xl border border-slate-200/90 bg-slate-50/50 py-2.5 pl-10 pr-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 transition-shadow focus:border-[rgb(var(--rb-brand-primary))]/45 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/22"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="mt-2 flex min-w-0 flex-1 items-center gap-2 sm:mt-0 sm:flex-initial">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            className="w-full sm:w-auto min-w-0 rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-200 focus:border-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-600 [&>option]:bg-slate-900"
+            className="min-h-[2.5rem] w-full min-w-0 flex-1 rounded-xl border border-slate-200/90 bg-slate-50/50 px-3 py-2 text-sm font-medium text-slate-800 shadow-sm focus:border-[rgb(var(--rb-brand-primary))]/45 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/22 sm:w-auto sm:flex-initial [&>option]:bg-white"
           >
-            <option value="">Todos los estados</option>
-            <option value="planned">Planificado</option>
-            <option value="in_progress">En progreso</option>
-            <option value="completed">Completado</option>
-            <option value="archived">Archivado</option>
+            <option value="">{t("filters.status.all")}</option>
+            <option value="planned">{t("status.planned")}</option>
+            <option value="in_progress">{t("status.in_progress")}</option>
+            <option value="completed">{t("status.completed")}</option>
+            <option value="archived">{t("status.archived")}</option>
           </select>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="w-full sm:w-auto min-w-0 rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm text-slate-200 focus:border-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-600 [&>option]:bg-slate-900"
+            className="min-h-[2.5rem] w-full min-w-0 flex-1 rounded-xl border border-slate-200/90 bg-slate-50/50 px-3 py-2 text-sm font-medium text-slate-800 shadow-sm focus:border-[rgb(var(--rb-brand-primary))]/45 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/22 sm:w-auto sm:flex-initial [&>option]:bg-white"
           >
-            <option value="priority">Activos primero</option>
-            <option value="newest">Más recientes</option>
-            <option value="name">Por nombre</option>
-            <option value="recently_updated">Recientemente actualizados</option>
+            <option value="priority">{t("sort.priority")}</option>
+            <option value="newest">{t("sort.newest")}</option>
+            <option value="name">{t("sort.name")}</option>
+            <option value="recently_updated">{t("sort.recentlyUpdated")}</option>
           </select>
         </div>
       </div>
@@ -325,22 +344,22 @@ export default function ProjectsPage() {
       {/* Project grid */}
       <section>
         {loadingProjects ? (
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 px-6 py-8">
+          <div className="rounded-2xl border border-slate-200/80 bg-white px-6 py-8 shadow-sm">
             <ContentSkeleton title={false} lines={0} cards={6} />
           </div>
         ) : errorMsg ? (
-          <div className="rounded-2xl border border-red-800/50 bg-red-950/30 px-5 py-4 text-sm text-red-200">
+          <div className="rounded-2xl border border-red-200/90 bg-red-50/90 px-5 py-4 text-sm text-red-900 shadow-sm">
             {errorMsg}
           </div>
         ) : filteredAndSortedProjects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/60 py-16 text-center">
-            <p className="text-base font-medium text-slate-300">No se han encontrado proyectos</p>
-            <p className="mt-2 max-w-sm text-sm text-slate-500">
-              Ajusta el filtro o crea un nuevo proyecto para empezar.
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white py-16 text-center shadow-sm">
+            <p className="text-base font-medium text-slate-900">{t("empty.title")}</p>
+            <p className="mt-2 max-w-sm text-sm text-slate-600">
+              {t("empty.description")}
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3 2xl:grid-cols-4">
             {filteredAndSortedProjects.map((project) => (
               <ProjectCard key={project.id} project={project} />
             ))}

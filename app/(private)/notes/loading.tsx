@@ -1,10 +1,10 @@
-import { PageShell } from "@/components/layout/PageShell";
+import { AppPageShell } from "@/components/ui/layout/AppPageShell";
 import { ContentSkeleton } from "@/components/skeletons/ContentSkeleton";
 
 export default function NotesLoading() {
   return (
-    <PageShell>
+    <AppPageShell>
       <ContentSkeleton title lines={2} cards={4} />
-    </PageShell>
+    </AppPageShell>
   );
 }

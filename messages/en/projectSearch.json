@@ -1,0 +1,19 @@
+{
+  "eyebrow": "Project workspace",
+  "title": "Search",
+  "subtitle": "Search across this project's tasks, tickets, activities, notes, and knowledge.",
+  "results": {
+    "tasks": "Tasks",
+    "tickets": "Tickets",
+    "activities": "Activities",
+    "notes": "Notes",
+    "knowledge": "Knowledge"
+  },
+  "states": {
+    "emptyQueryTitle": "Search inside this project",
+    "emptyQueryBody": "Type a keyword to search tasks, tickets, notes, and knowledge for this project.",
+    "noResultsTitle": "No results",
+    "noResultsBody": "Try a different keyword or a shorter query."
+  }
+}
+

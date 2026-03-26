@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 const cardBase =
-  "rounded-2xl border border-slate-700/80 bg-slate-800/40 px-5 py-4 shadow-sm transition-[border-color,background-color,box-shadow] duration-200";
+  "rounded-2xl border border-[rgb(var(--rb-surface-border))]/85 bg-[rgb(var(--rb-surface))]/95 px-5 py-4 rb-depth-card transition-[border-color,background-color,box-shadow,transform] duration-200";
 
 const cardInteractive =
-  "cursor-pointer hover:border-slate-600 hover:bg-slate-800/70 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900";
+  "cursor-pointer rb-depth-hover hover:-translate-y-0.5 hover:border-[rgb(var(--rb-brand-ring))]/38 hover:bg-[rgb(var(--rb-surface-2))]/95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--rb-shell-bg))]";
 
 /**
  * Stat card for KPIs. Design system v1 — dark.
@@ -29,12 +29,12 @@ export function StatCard({
 }) {
   const content = (
     <>
-      <div className="flex items-center gap-2">
-        {icon != null ? <span className="text-slate-500">{icon}</span> : null}
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      <div className="flex items-center gap-2.5">
+        {icon != null ? <span className="text-[rgb(var(--rb-brand-primary-hover))]/85">{icon}</span> : null}
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[rgb(var(--rb-text-secondary))]">{label}</p>
       </div>
-      <div className="mt-3 text-2xl font-bold text-slate-100 tracking-tight">{value}</div>
-      {trend != null ? <div className="mt-1.5 text-xs text-slate-500">{trend}</div> : null}
+      <div className="mt-3 text-[1.65rem] leading-none font-bold text-[rgb(var(--rb-text-primary))] tracking-[-0.03em] tabular-nums">{value}</div>
+      {trend != null ? <div className="mt-1.5 text-xs text-[rgb(var(--rb-text-secondary))]">{trend}</div> : null}
     </>
   );
 

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 
 export type ProjectPageHeaderProps = {
+  /** Optional eyebrow above title (e.g. module name) */
+  eyebrow?: string;
   title: string;
   subtitle?: string;
   primaryActionLabel?: string;
@@ -20,6 +22,7 @@ export type ProjectPageHeaderProps = {
 };
 
 export function ProjectPageHeader({
+  eyebrow,
   title,
   subtitle,
   primaryActionLabel,
@@ -34,6 +37,10 @@ export function ProjectPageHeader({
   const hasPrimary = primaryActionLabel && (primaryActionHref ?? primaryActionOnClick);
   const icon = primaryActionIcon ?? <Plus className="h-4 w-4" />;
   const isSection = variant === "section";
+
+  const eyebrowClass = dark
+    ? "text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+    : "text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400";
 
   const titleClass = dark
     ? "text-xl font-semibold text-slate-100 sm:text-2xl"
@@ -53,6 +60,7 @@ export function ProjectPageHeader({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
       <div className="min-w-0">
+        {eyebrow && <p className={`${eyebrowClass} mb-1`}>{eyebrow}</p>}
         <h1 className={titleClass}>{title}</h1>
         {subtitle && <p className={subtitleClass}>{subtitle}</p>}
       </div>

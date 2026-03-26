@@ -89,10 +89,12 @@ export default function ClientDetailPage() {
 
   if (!id) {
     return (
-      <PageShell wide={false} className="bg-slate-950">
-        <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-5 py-12 text-center">
-          <p className="text-sm text-slate-400">Invalid client ID.</p>
-          <Link href="/clients" className="mt-3 inline-block text-sm text-indigo-400 hover:text-indigo-300">Back to clients</Link>
+      <PageShell wide={false}>
+        <div className="rounded-xl border border-slate-200/90 bg-white px-5 py-12 text-center shadow-sm ring-1 ring-slate-100">
+          <p className="text-sm text-slate-600">Invalid client ID.</p>
+          <Link href="/clients" className="mt-3 inline-block text-sm font-medium text-[rgb(var(--rb-brand-primary-active))] hover:text-[rgb(var(--rb-brand-primary-hover))]">
+            Back to clients
+          </Link>
         </div>
       </PageShell>
     );
@@ -100,14 +102,14 @@ export default function ClientDetailPage() {
 
   if (loading && !client) {
     return (
-      <PageShell wide={false} className="bg-slate-950">
+      <PageShell wide={false}>
         <div className="space-y-6">
-          <div className="h-8 w-64 rounded-lg bg-slate-800 animate-pulse" />
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5">
-            <div className="h-10 w-full rounded-lg bg-slate-700/50 animate-pulse mb-4" />
+          <div className="h-8 w-64 rounded-lg bg-slate-200/80 animate-pulse" />
+          <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm ring-1 ring-slate-100">
+            <div className="h-10 w-full rounded-lg bg-slate-100/90 animate-pulse mb-4" />
             <div className="space-y-3">
-              <div className="h-4 w-full rounded bg-slate-700/50 animate-pulse" />
-              <div className="h-4 w-3/4 rounded bg-slate-700/50 animate-pulse" />
+              <div className="h-4 w-full rounded bg-slate-100/90 animate-pulse" />
+              <div className="h-4 w-3/4 rounded bg-slate-100/90 animate-pulse" />
             </div>
           </div>
         </div>
@@ -117,13 +119,13 @@ export default function ClientDetailPage() {
 
   if (error || !client) {
     return (
-      <PageShell wide={false} className="bg-slate-950">
-        <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-5 py-12 text-center">
-          <p className="text-sm font-medium text-slate-200">{error ?? "Client not found."}</p>
+      <PageShell wide={false}>
+        <div className="rounded-xl border border-slate-200/90 bg-white px-5 py-12 text-center shadow-sm ring-1 ring-slate-100">
+          <p className="text-sm font-semibold text-slate-900">{error ?? "Client not found."}</p>
           <button
             type="button"
             onClick={() => router.push("/clients")}
-            className="mt-3 text-sm text-indigo-400 hover:text-indigo-300"
+            className="mt-3 text-sm font-medium text-[rgb(var(--rb-brand-primary-active))] hover:text-[rgb(var(--rb-brand-primary-hover))]"
           >
             Back to clients
           </button>
@@ -139,11 +141,11 @@ export default function ClientDetailPage() {
     }`;
 
   return (
-    <PageShell wide={false} className="bg-slate-950">
+    <PageShell wide={false}>
       <div className="space-y-6">
         <Link
           href="/clients"
-          className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+          className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 transition-colors"
         >
           <ChevronLeft className="h-4 w-4" />
           Back to clients
@@ -151,14 +153,14 @@ export default function ClientDetailPage() {
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="text-xl sm:text-2xl font-semibold text-slate-100">{displayName}</h1>
-            <p className="text-sm text-slate-500">
+            <h1 className="text-xl sm:text-2xl font-semibold text-slate-900">{displayName}</h1>
+            <p className="text-sm text-slate-600">
               {client.industry ?? "—"} · {getCountryDisplayName(client.country) ?? "—"}
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 rounded-lg border border-slate-700/60 bg-slate-900 p-1">
+        <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200/90 bg-slate-50 p-1 ring-1 ring-slate-100">
           <button type="button" onClick={() => setActiveTab("overview")} className={tabClass("overview")}>
             <LayoutDashboard className="size-4" aria-hidden />
             Overview

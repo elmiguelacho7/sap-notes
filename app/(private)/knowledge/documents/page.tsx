@@ -22,6 +22,102 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { blockNoteDocumentToText } from "@/lib/knowledge/blockNoteToText";
 import { getKnowledgeTemplateBlocks, type KnowledgeTemplateId } from "@/lib/knowledge/knowledgeTemplates";
+import { FORM_PAGE_BLOCK_CLASS, FORM_PAGE_SHELL_CLASS } from "@/components/layout/formPageClasses";
+
+type SpaceAccent = {
+  key: "indigo" | "cyan" | "emerald" | "amber" | "rose" | "violet";
+  selectedBg: string;
+  selectedText: string;
+  iconSelected: string;
+  leftBorderUnselected: string;
+  leftBorderSelected: string;
+  ringSelected: string;
+  pageBorder: string;
+  pageBorderHover: string;
+};
+
+const SPACE_ACCENTS: SpaceAccent[] = [
+  {
+    key: "indigo",
+    selectedBg: "bg-[rgb(var(--rb-brand-primary))]/8",
+    selectedText: "text-[rgb(var(--rb-text-primary))]",
+    iconSelected: "text-[rgb(var(--rb-brand-primary))]",
+    leftBorderUnselected: "border-l-[rgb(var(--rb-surface-border))]/40",
+    leftBorderSelected: "border-l-[rgb(var(--rb-brand-primary))]/40",
+    ringSelected: "ring-[rgb(var(--rb-brand-ring))]/35",
+    pageBorder: "border-l-[rgb(var(--rb-brand-primary))]/25 pl-2",
+    pageBorderHover: "hover:border-l-[rgb(var(--rb-brand-primary))]/35",
+  },
+  {
+    key: "cyan",
+    selectedBg: "bg-[rgb(var(--rb-brand-primary))]/8",
+    selectedText: "text-[rgb(var(--rb-text-primary))]",
+    iconSelected: "text-[rgb(var(--rb-brand-primary))]",
+    leftBorderUnselected: "border-l-[rgb(var(--rb-surface-border))]/40",
+    leftBorderSelected: "border-l-[rgb(var(--rb-brand-primary))]/40",
+    ringSelected: "ring-[rgb(var(--rb-brand-ring))]/35",
+    pageBorder: "border-l-[rgb(var(--rb-brand-primary))]/25 pl-2",
+    pageBorderHover: "hover:border-l-[rgb(var(--rb-brand-primary))]/35",
+  },
+  {
+    key: "emerald",
+    selectedBg: "bg-[rgb(var(--rb-brand-primary))]/8",
+    selectedText: "text-[rgb(var(--rb-text-primary))]",
+    iconSelected: "text-[rgb(var(--rb-brand-primary))]",
+    leftBorderUnselected: "border-l-[rgb(var(--rb-surface-border))]/40",
+    leftBorderSelected: "border-l-[rgb(var(--rb-brand-primary))]/40",
+    ringSelected: "ring-[rgb(var(--rb-brand-ring))]/35",
+    pageBorder: "border-l-[rgb(var(--rb-brand-primary))]/25 pl-2",
+    pageBorderHover: "hover:border-l-[rgb(var(--rb-brand-primary))]/35",
+  },
+  {
+    key: "amber",
+    selectedBg: "bg-[rgb(var(--rb-brand-primary))]/8",
+    selectedText: "text-[rgb(var(--rb-text-primary))]",
+    iconSelected: "text-[rgb(var(--rb-brand-primary))]",
+    leftBorderUnselected: "border-l-[rgb(var(--rb-surface-border))]/40",
+    leftBorderSelected: "border-l-[rgb(var(--rb-brand-primary))]/40",
+    ringSelected: "ring-[rgb(var(--rb-brand-ring))]/35",
+    pageBorder: "border-l-[rgb(var(--rb-brand-primary))]/25 pl-2",
+    pageBorderHover: "hover:border-l-[rgb(var(--rb-brand-primary))]/35",
+  },
+  {
+    key: "rose",
+    selectedBg: "bg-[rgb(var(--rb-brand-primary))]/8",
+    selectedText: "text-[rgb(var(--rb-text-primary))]",
+    iconSelected: "text-[rgb(var(--rb-brand-primary))]",
+    leftBorderUnselected: "border-l-[rgb(var(--rb-surface-border))]/40",
+    leftBorderSelected: "border-l-[rgb(var(--rb-brand-primary))]/40",
+    ringSelected: "ring-[rgb(var(--rb-brand-ring))]/35",
+    pageBorder: "border-l-[rgb(var(--rb-brand-primary))]/25 pl-2",
+    pageBorderHover: "hover:border-l-[rgb(var(--rb-brand-primary))]/35",
+  },
+  {
+    key: "violet",
+    selectedBg: "bg-[rgb(var(--rb-brand-primary))]/8",
+    selectedText: "text-[rgb(var(--rb-text-primary))]",
+    iconSelected: "text-[rgb(var(--rb-brand-primary))]",
+    leftBorderUnselected: "border-l-[rgb(var(--rb-surface-border))]/40",
+    leftBorderSelected: "border-l-[rgb(var(--rb-brand-primary))]/40",
+    ringSelected: "ring-[rgb(var(--rb-brand-ring))]/35",
+    pageBorder: "border-l-[rgb(var(--rb-brand-primary))]/25 pl-2",
+    pageBorderHover: "hover:border-l-[rgb(var(--rb-brand-primary))]/35",
+  },
+];
+
+function hashAccent(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function getSpaceAccent(spaceIdOrName: string | null | undefined): SpaceAccent {
+  const basis = (spaceIdOrName ?? "").trim();
+  const idx = SPACE_ACCENTS.length === 0 ? 0 : hashAccent(basis) % SPACE_ACCENTS.length;
+  return SPACE_ACCENTS[idx] ?? SPACE_ACCENTS[0];
+}
 
 export default function KnowledgeDocumentsPage() {
   const router = useRouter();
@@ -210,112 +306,156 @@ export default function KnowledgeDocumentsPage() {
   }, [detailPageId]);
 
   const selectedSpace = spaces.find((s) => s.id === selectedSpaceId);
+  const selectedAccent = selectedSpace ? getSpaceAccent(selectedSpace.id) : null;
   const spaceOptions = spaces.map((s) => ({ value: s.id, label: s.name }));
 
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const recentlyUpdatedCount = pages.filter((p) => new Date(p.updated_at) >= sevenDaysAgo).length;
+  const publishedCount = pages.filter((p) => p.is_published).length;
+
   return (
-    <div className="w-full min-w-0 bg-slate-950 px-4 sm:px-5 lg:px-6 xl:px-8 2xl:px-10 py-8">
-      <div className="mx-auto w-full max-w-[1600px] space-y-6 sm:space-y-8">
-        <header className="space-y-1">
+    <div className={FORM_PAGE_SHELL_CLASS}>
+      <div className="space-y-6">
+        <div className={FORM_PAGE_BLOCK_CLASS}>
           <Link
             href="/knowledge"
-            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-[rgb(var(--rb-text-muted))] hover:text-[rgb(var(--rb-text-secondary))] transition-colors"
           >
-            ← Knowledge
+            <span aria-hidden>←</span> Knowledge
           </Link>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-            <div className="min-w-0">
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-100">
-                Spaces & Pages
-              </h1>
-              <p className="mt-1 text-sm text-slate-400 max-w-2xl">
-                Create spaces and pages for structured knowledge. Use Search to find content across all documents.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <Button
-                variant="secondary"
-                onClick={() => setAskSapitoOpen(true)}
-                className="border-slate-600 bg-slate-800/80 text-slate-200 hover:bg-slate-700"
-              >
-                <MessageCircle className="h-4 w-4" />
-                Sapito
-              </Button>
-              <Link href="/knowledge/search">
-                <Button
-                  variant="secondary"
-                  className="border-slate-600 bg-slate-800/80 text-slate-200 hover:bg-slate-700"
-                >
-                  <Search className="h-4 w-4" />
-                  Search
-                </Button>
-              </Link>
-              <Button
-                variant="secondary"
-                onClick={() => { setSaveError(null); setModalSpace(true); }}
-                className="border-slate-600 bg-slate-800/80 text-slate-200 hover:bg-slate-700"
-              >
-                <Plus className="h-4 w-4" />
-                New space
-              </Button>
-              <Button
-                disabled={!selectedSpaceId}
-                onClick={() => { setSaveError(null); setModalPage(true); }}
-                className="border-indigo-500/50 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50"
-              >
-                <Plus className="h-4 w-4" />
-                New page
-              </Button>
-            </div>
+        </div>
+
+        <header className={`${FORM_PAGE_BLOCK_CLASS} flex items-start justify-between gap-4`}>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight text-[rgb(var(--rb-text-primary))]">
+              Spaces & Pages
+            </h1>
+            <p className="mt-1 text-sm text-[rgb(var(--rb-text-muted))] max-w-3xl">
+              Create spaces and pages for structured knowledge. Search finds content across all documents.
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-slate-500">
-            <span>{spaces.length} {spaces.length === 1 ? "space" : "spaces"}</span>
-            <span>{pages.length} {pages.length === 1 ? "page" : "pages"}</span>
+          <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setAskSapitoOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-transparent px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface))]/70 transition-colors"
+              title="Knowledge assistant"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Ask Sapito
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSaveError(null);
+                setModalSpace(true);
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface))]/80 transition-colors"
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              New space
+            </button>
+            <button
+              type="button"
+              disabled={!selectedSpaceId}
+              onClick={() => {
+                setSaveError(null);
+                setModalPage(true);
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-transparent bg-[rgb(var(--rb-brand-primary))] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[rgb(var(--rb-brand-primary-hover))] active:bg-[rgb(var(--rb-brand-primary-active))] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              New page
+            </button>
           </div>
         </header>
 
+        <div className={`${FORM_PAGE_BLOCK_CLASS} grid grid-cols-2 gap-4 sm:grid-cols-4`}>
+          <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-4 shadow-sm">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">Spaces</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums text-[rgb(var(--rb-text-primary))]">{spaces.length}</p>
+          </div>
+          <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-4 shadow-sm">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">Pages</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums text-[rgb(var(--rb-text-primary))]">{pages.length}</p>
+          </div>
+          <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-4 shadow-sm">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">Recently updated (7d)</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums text-[rgb(var(--rb-text-primary))]">{recentlyUpdatedCount}</p>
+          </div>
+          <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-4 shadow-sm">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">Published</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums text-[rgb(var(--rb-text-primary))]">{publishedCount}</p>
+          </div>
+        </div>
+
+        <div className={`${FORM_PAGE_BLOCK_CLASS} flex flex-wrap gap-3 rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] p-3 shadow-sm`}>
+          <Link
+            href="/knowledge/search"
+            className="relative block flex-1 min-w-[240px] rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 transition-colors hover:bg-[rgb(var(--rb-surface-3))]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-primary))]/30"
+          >
+            <span className="sr-only">Search knowledge</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--rb-text-muted))]" />
+            <span className="block w-full h-10 py-2 pl-9 pr-3 text-left text-sm text-[rgb(var(--rb-text-muted))]">
+              Search knowledge…
+            </span>
+          </Link>
+        </div>
+
         {error && (
-          <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+          <div className={`${FORM_PAGE_BLOCK_CLASS} rounded-xl border border-red-200/90 bg-red-50 px-4 py-3 text-sm text-red-800`}>
             {error}
           </div>
         )}
 
-        <section>
-          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden flex flex-col min-h-[320px]">
-              <div className="border-b border-slate-700/50 px-4 sm:px-5 py-4 shrink-0">
-                <h2 className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                  Spaces
-                </h2>
+        <section className={FORM_PAGE_BLOCK_CLASS}>
+          <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-6">
+            <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] shadow-sm overflow-hidden flex flex-col min-h-[420px]">
+              <div className="border-b border-[rgb(var(--rb-surface-border))]/60 px-4 sm:px-5 py-4 shrink-0">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">Spaces</h2>
+                  <span className="tabular-nums rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/40 px-2 py-0.5 text-[11px] font-semibold text-[rgb(var(--rb-text-muted))]">
+                    {spaces.length}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-[rgb(var(--rb-text-muted))]">Select a container for your pages.</p>
               </div>
-              <div className="p-3 flex-1 min-h-0 flex flex-col">
+              <div className="p-4 flex-1 min-h-0 flex flex-col">
                 {loading ? (
                   <div className="space-y-2">
-                    <Skeleton className="h-11 w-full rounded-xl bg-slate-700/50" />
-                    <Skeleton className="h-11 w-full rounded-xl bg-slate-700/50" />
-                    <Skeleton className="h-11 w-4/5 rounded-xl bg-slate-700/50" />
+                    <Skeleton className="h-11 w-full rounded-xl bg-[rgb(var(--rb-surface-3))]/45" />
+                    <Skeleton className="h-11 w-full rounded-xl bg-[rgb(var(--rb-surface-3))]/45" />
+                    <Skeleton className="h-11 w-4/5 rounded-xl bg-[rgb(var(--rb-surface-3))]/45" />
                   </div>
                 ) : spaces.length === 0 ? (
-                  <div className="py-12 flex-1 flex flex-col items-center justify-center text-center rounded-xl bg-slate-800/20">
-                    <FolderOpen className="w-10 h-10 text-slate-500 mb-3" />
-                    <p className="text-sm font-medium text-slate-200">No spaces</p>
-                    <p className="mt-1 text-xs text-slate-500">Create one with «New space».</p>
+                  <div className="py-12 flex-1 flex flex-col items-center justify-center text-center rounded-xl border border-dashed border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/15">
+                    <FolderOpen className="w-10 h-10 text-[rgb(var(--rb-text-muted))] mb-3" />
+                    <p className="text-sm font-medium text-[rgb(var(--rb-text-primary))]">No spaces</p>
+                    <p className="mt-1 text-xs text-[rgb(var(--rb-text-muted))]">Create one with “New space”.</p>
                   </div>
                 ) : (
-                  <ul className="space-y-1">
+                  <ul className="space-y-1.5">
                     {spaces.map((space) => (
                       <li key={space.id}>
+                        {(() => {
+                          const a = getSpaceAccent(space.id);
+                          const isSelected = selectedSpaceId === space.id;
+                          return (
                         <button
                           type="button"
                           onClick={() => setSelectedSpaceId(space.id)}
-                          className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-medium transition-all duration-150 border ${
-                            selectedSpaceId === space.id
-                              ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-300"
-                              : "border-transparent text-slate-300 hover:bg-slate-800/60"
+                          className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-medium transition-all duration-150 border border-[rgb(var(--rb-surface-border))]/60 border-l-2 shadow-[0_0_0_0_rgba(0,0,0,0)] hover:shadow-sm ${
+                            isSelected
+                              ? `bg-[rgb(var(--rb-brand-primary))]/8 border-[rgb(var(--rb-brand-primary))]/30 ring-1 ring-[rgb(var(--rb-brand-primary))]/15 ${a.leftBorderSelected} text-[rgb(var(--rb-text-primary))]`
+                              : `text-[rgb(var(--rb-text-secondary))] ${a.leftBorderUnselected} hover:bg-[rgb(var(--rb-surface-3))]/25 hover:border-[rgb(var(--rb-surface-border))]/75`
                           }`}
                         >
-                          <FolderOpen className={`h-4 w-4 shrink-0 ${selectedSpaceId === space.id ? "text-indigo-400" : "text-slate-500"}`} />
-                          <span className="truncate">{space.name}</span>
+                          <FolderOpen className={`h-4 w-4 shrink-0 ${isSelected ? "text-[rgb(var(--rb-brand-primary))]" : "text-[rgb(var(--rb-text-muted))]"}`} />
+                          <span className="truncate leading-snug">{space.name}</span>
                         </button>
+                          );
+                        })()}
                       </li>
                     ))}
                   </ul>
@@ -323,38 +463,61 @@ export default function KnowledgeDocumentsPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-visible flex flex-col min-h-[320px]">
-              <div className="border-b border-slate-700/50 px-4 sm:px-5 py-5 flex items-center justify-between gap-3 shrink-0">
-                <div>
-                  <h2 className="text-sm font-medium text-slate-100">Pages</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Manage and organize your documents</p>
+            <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] shadow-sm overflow-hidden flex flex-col min-h-[420px]">
+              <div className="border-b border-[rgb(var(--rb-surface-border))]/60 px-4 sm:px-5 py-4 shrink-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-base font-semibold text-[rgb(var(--rb-text-primary))] tracking-tight">Pages</h2>
+                {selectedAccent && selectedSpace ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-2.5">
+                    <span
+                      className={`h-2 w-2 shrink-0 rounded-full bg-[rgb(var(--rb-brand-primary))] ring-1 ring-[rgb(var(--rb-brand-ring))]/35`}
+                    />
+                    <span
+                      className="inline-flex max-w-full items-center truncate rounded-full border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/20 px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--rb-text-secondary))]"
+                    >
+                      {selectedSpace.name}
+                    </span>
+                    <span className="tabular-nums rounded-lg border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/40 px-2 py-0.5 text-[11px] font-semibold text-[rgb(var(--rb-text-muted))]">
+                      {pages.length}
+                    </span>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-[rgb(var(--rb-text-muted))]">Choose a space to list its pages.</p>
+                )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!selectedSpaceId}
+                    onClick={() => {
+                      setSaveError(null);
+                      setModalPage(true);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface))] px-3 py-2 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="h-4 w-4" />
+                    New page
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => { setSaveError(null); setModalPage(true); }}
-                  disabled={!selectedSpaceId}
-                  className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50 transition-colors shrink-0"
-                >
-                  <Plus className="h-4 w-4" />
-                  New page
-                </button>
               </div>
               <div className="p-4 flex-1 min-h-0 flex flex-col">
                 {!selectedSpaceId ? (
-                  <div className="py-12 flex-1 flex flex-col items-center justify-center text-center rounded-xl bg-slate-800/20">
-                    <FolderOpen className="w-10 h-10 text-slate-500 mb-3" />
-                    <p className="text-sm font-medium text-slate-200">Select a space</p>
-                    <p className="mt-1 text-xs text-slate-500 max-w-xs">Choose a space from the list to see its pages.</p>
+                  <div className="py-12 flex-1 flex flex-col items-center justify-center text-center rounded-xl border border-dashed border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/15">
+                    <FolderOpen className="w-9 h-9 text-[rgb(var(--rb-text-muted))] mb-3" />
+                    <p className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">Select a space</p>
+                    <p className="mt-1 text-xs text-[rgb(var(--rb-text-muted))] max-w-xs leading-relaxed">Choose a space from the left to browse its pages.</p>
                   </div>
                 ) : pages.length === 0 ? (
-                  <div className="py-12 flex-1 flex flex-col items-center justify-center text-center rounded-xl bg-slate-800/20">
-                    <FileText className="w-10 h-10 text-slate-500 mb-3" />
-                    <p className="text-sm font-medium text-slate-200">No pages yet</p>
-                    <p className="text-xs text-slate-500 mb-4 max-w-xs">Create your first page to start documenting this space.</p>
+                  <div className="py-12 flex-1 flex flex-col items-center justify-center text-center rounded-xl border border-dashed border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/15">
+                    <FileText className="w-9 h-9 text-[rgb(var(--rb-text-muted))] mb-3" />
+                    <p className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">No pages yet</p>
+                    <p className="text-xs text-[rgb(var(--rb-text-muted))] mb-4 max-w-sm leading-relaxed">
+                      Start documenting procedures, troubleshooting guides, configuration notes, and decisions for this space.
+                    </p>
                     <button
                       type="button"
                       onClick={() => { setSaveError(null); setModalPage(true); }}
-                      className="mt-2 inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors"
+                      className="mt-2 inline-flex items-center gap-2 rounded-xl border border-transparent bg-[rgb(var(--rb-brand-primary))] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[rgb(var(--rb-brand-primary-hover))] active:bg-[rgb(var(--rb-brand-primary-active))]"
                     >
                       <Plus className="h-4 w-4" />
                       New page
@@ -363,10 +526,17 @@ export default function KnowledgeDocumentsPage() {
                 ) : (
                   <ul className="space-y-1">
                     {pages.map((page) => (
-                      <li key={page.id}>
+                      <li
+                        key={page.id}
+                        className={
+                          selectedAccent
+                            ? `border-l-2 border-[rgb(var(--rb-surface-border))]/60 ${selectedAccent.pageBorder} ${selectedAccent.pageBorderHover}`
+                            : undefined
+                        }
+                      >
                         <KnowledgePageRow
                           page={page}
-                          dark
+                          dark={false}
                           onOpen={handleOpenDetail}
                           onEdit={handleOpenDetail}
                           onDelete={(p) => setDeleteConfirmPage(p)}
@@ -401,15 +571,15 @@ export default function KnowledgeDocumentsPage() {
 
       {deleteConfirmPage && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
           onClick={() => !deleteLoading && setDeleteConfirmPage(null)}
         >
           <div
-            className="rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-xl max-w-md w-full ring-1 ring-slate-700/50"
+            className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-6 shadow-xl max-w-md w-full ring-1 ring-[rgb(var(--rb-surface-border))]/40"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-slate-100">Delete page</h2>
-            <p className="mt-2 text-sm text-slate-400">
+            <h2 className="text-lg font-semibold text-[rgb(var(--rb-text-primary))]">Delete page</h2>
+            <p className="mt-2 text-sm text-[rgb(var(--rb-text-muted))]">
               Delete «{deleteConfirmPage.title}»? This can be undone later by restoring the page.
             </p>
             <div className="flex gap-2 pt-4">
@@ -417,7 +587,7 @@ export default function KnowledgeDocumentsPage() {
                 type="button"
                 onClick={() => setDeleteConfirmPage(null)}
                 disabled={deleteLoading}
-                className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors"
+                className="rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/25 transition-colors disabled:opacity-60"
               >
                 Cancel
               </button>
@@ -425,7 +595,7 @@ export default function KnowledgeDocumentsPage() {
                 type="button"
                 onClick={() => handleDeletePage(deleteConfirmPage)}
                 disabled={deleteLoading}
-                className="rounded-xl border border-red-500/50 bg-red-500/10 px-4 py-2.5 text-sm font-medium text-red-200 hover:bg-red-500/20 disabled:opacity-50 transition-colors"
+                className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-700 hover:bg-rose-500/15 disabled:opacity-50 transition-colors"
               >
                 {deleteLoading ? "Deleting…" : "Delete"}
               </button>
@@ -435,18 +605,18 @@ export default function KnowledgeDocumentsPage() {
       )}
 
       {askSapitoOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setAskSapitoOpen(false)}>
-          <div className="rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-xl max-w-md w-full ring-1 ring-slate-700/50" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onClick={() => setAskSapitoOpen(false)}>
+          <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-6 shadow-xl max-w-md w-full ring-1 ring-[rgb(var(--rb-surface-border))]/40" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="h-10 w-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
-                <MessageCircle className="h-5 w-5 text-indigo-400" />
+              <div className="h-10 w-10 rounded-xl bg-[rgb(var(--rb-brand-primary))]/10 flex items-center justify-center border border-[rgb(var(--rb-brand-primary))]/15">
+                <MessageCircle className="h-5 w-5 text-[rgb(var(--rb-brand-primary))]" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-slate-100">Sapito</h2>
-                <p className="text-xs text-slate-500">Knowledge assistant</p>
+                <h2 className="text-lg font-semibold text-[rgb(var(--rb-text-primary))]">Sapito</h2>
+                <p className="text-xs text-[rgb(var(--rb-text-muted))]">Knowledge assistant</p>
               </div>
             </div>
-            <p className="text-sm text-slate-400 mb-6">
+            <p className="text-sm text-[rgb(var(--rb-text-muted))] mb-6">
               Ask Sapito about your synced documentation. Use Search to open the chat.
             </p>
             <div className="flex justify-end">
@@ -454,7 +624,7 @@ export default function KnowledgeDocumentsPage() {
                 <Button
                   variant="secondary"
                   onClick={() => setAskSapitoOpen(false)}
-                  className="border-slate-600 bg-slate-800/80 text-slate-200 hover:bg-slate-700"
+                  className="rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/25"
                 >
                   Open Search
                 </Button>
@@ -466,51 +636,51 @@ export default function KnowledgeDocumentsPage() {
 
       {modalSpace && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
           onClick={() => !saving && setModalSpace(false)}
         >
           <div
-            className="rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-xl max-w-md w-full ring-1 ring-slate-700/50"
+            className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-6 shadow-xl max-w-md w-full ring-1 ring-[rgb(var(--rb-surface-border))]/40"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-slate-100">New space</h2>
+            <h2 className="text-lg font-semibold text-[rgb(var(--rb-text-primary))]">New space</h2>
             <form onSubmit={handleCreateSpace} className="mt-4 space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Name *</label>
+                <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1">Name *</label>
                 <input
                   type="text"
                   value={newSpaceName}
                   onChange={(e) => setNewSpaceName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50"
+                  className="w-full h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface-3))]/20 px-3 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30 focus:border-[rgb(var(--rb-brand-primary))]/30"
                   placeholder="e.g. SAP Configuration"
                   disabled={saving}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Description (optional)</label>
+                <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1">Description (optional)</label>
                 <textarea
                   value={newSpaceDesc}
                   onChange={(e) => setNewSpaceDesc(e.target.value)}
                   rows={2}
-                  className="w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50"
+                  className="w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30 focus:border-[rgb(var(--rb-brand-primary))]/30"
                   placeholder="Brief description"
                   disabled={saving}
                 />
               </div>
-              {saveError && <p className="text-sm text-red-400">{saveError}</p>}
+              {saveError && <p className="text-sm text-rose-800 bg-rose-50 border border-rose-200/80 rounded-lg px-3 py-2">{saveError}</p>}
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setModalSpace(false)}
                   disabled={saving}
-                  className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors"
+                  className="rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/25 transition-colors disabled:opacity-60"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving || !newSpaceName.trim()}
-                  className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50 transition-colors"
+                  className="rounded-xl border border-transparent bg-[rgb(var(--rb-brand-primary))] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[rgb(var(--rb-brand-primary-hover))] active:bg-[rgb(var(--rb-brand-primary-active))] disabled:opacity-50 transition-colors"
                 >
                   {saving ? "Creating…" : "Create"}
                 </button>
@@ -522,35 +692,35 @@ export default function KnowledgeDocumentsPage() {
 
       {modalPage && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
           onClick={() => !saving && setModalPage(false)}
         >
           <div
-            className="rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-xl max-w-md w-full ring-1 ring-slate-700/50"
+            className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-6 shadow-xl max-w-md w-full ring-1 ring-[rgb(var(--rb-surface-border))]/40"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-slate-100">New page</h2>
+            <h2 className="text-lg font-semibold text-[rgb(var(--rb-text-primary))]">New page</h2>
             <form onSubmit={handleCreatePage} className="mt-4 space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Title *</label>
+                <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1">Title *</label>
                 <input
                   type="text"
                   value={newPageTitle}
                   onChange={(e) => setNewPageTitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50"
+                  className="w-full h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30 focus:border-[rgb(var(--rb-brand-primary))]/30"
                   placeholder="e.g. How to configure variant valuation"
                   disabled={saving}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">
+                <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1">
                   Template (optional)
                 </label>
                 <select
                   value={newPageTemplateId}
                   onChange={(e) => setNewPageTemplateId(e.target.value as KnowledgeTemplateId | "")}
                   disabled={saving}
-                  className="w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50"
+                  className="w-full h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface-3))]/20 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-primary))]/30 focus:border-[rgb(var(--rb-brand-primary))]/30"
                 >
                   <option value="">Blank</option>
                   <option value="sap_procedure">SAP Procedure</option>
@@ -558,20 +728,20 @@ export default function KnowledgeDocumentsPage() {
                   <option value="troubleshooting_guide">Troubleshooting Guide</option>
                 </select>
               </div>
-              {saveError && <p className="text-sm text-red-400">{saveError}</p>}
+              {saveError && <p className="text-sm text-rose-800 bg-rose-50 border border-rose-200/80 rounded-lg px-3 py-2">{saveError}</p>}
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setModalPage(false)}
                   disabled={saving}
-                  className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors"
+                  className="rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-3))]/25 transition-colors disabled:opacity-60"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving || !newPageTitle.trim()}
-                  className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50 transition-colors"
+                  className="rounded-xl border border-transparent bg-[rgb(var(--rb-brand-primary))] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[rgb(var(--rb-brand-primary-hover))] active:bg-[rgb(var(--rb-brand-primary-active))] disabled:opacity-50 transition-colors"
                 >
                   {saving ? "Creating…" : "Create"}
                 </button>

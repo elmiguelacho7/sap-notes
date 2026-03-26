@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabaseClient";
 import { AppPageShell } from "@/components/ui/layout/AppPageShell";
 import { ChevronLeft, Cloud, FileText, Globe, Share2 } from "lucide-react";
@@ -23,13 +24,15 @@ async function getAdminAuthHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-const CARD_CLASS = "rounded-xl border border-slate-700/60 bg-slate-800/40 p-5";
+const CARD_CLASS =
+  "rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm ring-1 ring-slate-100";
 const BTN_PRIMARY =
-  "inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0";
+  "inline-flex items-center justify-center rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-medium disabled:opacity-60 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/30 focus-visible:ring-offset-2";
 const BTN_SECONDARY =
-  "inline-flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0";
+  "inline-flex items-center justify-center rounded-xl border border-slate-200/90 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/25 focus-visible:ring-offset-2";
 
 export default function AdminKnowledgeSourcesPage() {
+  const t = useTranslations("admin.knowledgeSources");
   const [loading, setLoading] = useState(true);
   const [appRole, setAppRole] = useState<string | null>(null);
   const [integrations, setIntegrations] = useState<IntegrationOption[]>([]);
@@ -97,7 +100,7 @@ export default function AdminKnowledgeSourcesPage() {
       const res = await fetch("/api/integrations/google/connect?return_url=/admin/knowledge-sources", { headers });
       const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
       if (!res.ok) {
-        setConnectError(data.error ?? "Error al iniciar la conexión con Google.");
+        setConnectError(data.error ?? t("errors.startGoogleConnect"));
         return;
       }
       if (data.url) {
@@ -106,7 +109,7 @@ export default function AdminKnowledgeSourcesPage() {
       }
       setConnectError("Respuesta inesperada del servidor.");
     } catch {
-      setConnectError("Error de conexión.");
+      setConnectError(t("errors.connection"));
     } finally {
       setGoogleConnectPending(false);
     }
@@ -114,10 +117,10 @@ export default function AdminKnowledgeSourcesPage() {
 
   if (loading) {
     return (
-      <div className="bg-slate-950 min-h-full">
+      <div className="bg-[rgb(var(--rb-shell-bg))] min-h-full">
         <AppPageShell>
           <div className="py-12 text-center">
-            <p className="text-sm font-medium text-slate-300">Cargando…</p>
+            <p className="text-sm font-medium text-slate-700">{t("loading")}</p>
           </div>
         </AppPageShell>
       </div>
@@ -126,13 +129,13 @@ export default function AdminKnowledgeSourcesPage() {
 
   if (appRole !== "superadmin") {
     return (
-      <div className="bg-slate-950 min-h-full">
+      <div className="bg-[rgb(var(--rb-shell-bg))] min-h-full">
         <AppPageShell>
           <div className={CARD_CLASS}>
-            <p className="text-sm font-medium text-slate-200">Acceso restringido</p>
-            <p className="mt-1 text-sm text-slate-500">Solo los administradores pueden ver esta página.</p>
+            <p className="text-sm font-semibold text-slate-900">{t("restricted")}</p>
+            <p className="mt-1 text-sm text-slate-500">{t("restrictedBody")}</p>
             <Link href="/admin" className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-indigo-400 hover:text-indigo-300">
-              <ChevronLeft className="h-4 w-4" /> Volver a Admin
+              <ChevronLeft className="h-4 w-4" /> {t("backToAdmin")}
             </Link>
           </div>
         </AppPageShell>
@@ -144,28 +147,30 @@ export default function AdminKnowledgeSourcesPage() {
   const googleIntegration = integrations[0];
 
   return (
-    <div className="bg-slate-950 min-h-full">
+    <div className="bg-[rgb(var(--rb-shell-bg))] min-h-full">
       <AppPageShell>
       <div className="space-y-6">
         <div className="flex flex-col gap-1">
           <Link
             href="/admin"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-400 hover:text-slate-300 transition-colors duration-150"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors duration-150"
           >
             <ChevronLeft className="h-4 w-4" /> Admin
           </Link>
-          <h1 className="text-xl sm:text-2xl font-semibold text-slate-100">
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900">
             Knowledge Sources
           </h1>
-          <p className="text-sm text-slate-500 max-w-2xl">
+          <p className="text-sm text-slate-600 max-w-2xl">
             Manage the external sources that feed Sapito, Knowledge, and Project Brain.
           </p>
         </div>
 
         {/* Sapito context */}
-        <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 px-4 py-3">
-          <p className="text-xs text-slate-400">
-            These sources are used by <span className="text-slate-300">Sapito</span>, the global <span className="text-slate-300">Knowledge</span> base, and <span className="text-slate-300">Project Brain</span> to provide context and answers. They are system-level integrations, not personal account connections.
+        <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 px-4 py-3 shadow-sm ring-1 ring-slate-100">
+          <p className="text-xs text-slate-700">
+            These sources are used by <span className="font-medium text-slate-900">Sapito</span>, the global{" "}
+            <span className="font-medium text-slate-900">Knowledge</span> base, and{" "}
+            <span className="font-medium text-slate-900">Project Brain</span> to provide context and answers. They are system-level integrations, not personal account connections.
           </p>
         </div>
 
@@ -174,18 +179,18 @@ export default function AdminKnowledgeSourcesPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-700/80">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200/90 bg-white text-slate-500 shadow-sm ring-1 ring-slate-100">
                   <Cloud className="h-5 w-5 text-slate-400" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-semibold text-slate-200">Google Drive</h2>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <h2 className="text-sm font-semibold text-slate-900">Google Drive</h2>
+                  <p className="mt-0.5 text-xs text-slate-600">
                     Connect a Google account to use Drive folders or files as knowledge sources (global or per project).
                   </p>
                 </div>
               </div>
               {connectError && (
-                <div className="mt-3 rounded-lg border border-red-800/50 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+                <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
                   {connectError}
                 </div>
               )}
@@ -195,19 +200,19 @@ export default function AdminKnowledgeSourcesPage() {
                 <dl className="mt-3 space-y-1 text-sm">
                   <div>
                     <dt className="text-slate-500">Connected account</dt>
-                    <dd className="text-slate-200">
+                    <dd className="text-slate-900">
                       {googleIntegration?.account_email ?? googleIntegration?.display_name ?? "—"}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-slate-500">Status</dt>
-                    <dd className="text-slate-200">
+                    <dd className="text-slate-900">
                       {googleIntegration?.status === "active" ? "Active" : "Review"}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-slate-500">Last sync</dt>
-                    <dd className="text-slate-400">Per source in Admin</dd>
+                    <dd className="text-slate-600">Per source in Admin</dd>
                   </div>
                 </dl>
               ) : (
@@ -250,12 +255,12 @@ export default function AdminKnowledgeSourcesPage() {
               <div key={name} className={CARD_CLASS}>
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-700/80">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200/90 bg-white text-slate-500 shadow-sm ring-1 ring-slate-100">
                       <Icon className="h-5 w-5 text-slate-400" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-200">{name}</p>
-                      <p className="text-xs text-slate-500">Not connected</p>
+                      <p className="text-sm font-semibold text-slate-900">{name}</p>
+                      <p className="text-xs text-slate-600">Not connected</p>
                     </div>
                   </div>
                   <button

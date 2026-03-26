@@ -1,20 +1,32 @@
 // app/layout.tsx
 import type { Metadata } from "next";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Project Hub",
-  description: "Entorno interno para gestión de proyectos SAP",
+  title: "ribbit",
+  description: "Internal workspace for SAP project management",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // i18n: flat App Router (no app/[locale]/ segment). Locale comes from the request
+  // pipeline (NEXT_LOCALE cookie → i18n/request.ts). Do not expect URL prefixes.
+  // Details: docs/i18n.md
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="es">
-      <body className="min-h-screen bg-slate-50">{children}</body>
+    <html lang={locale}>
+      <body className="min-h-screen bg-[rgb(var(--rb-shell-bg))] text-[rgb(var(--rb-text-primary))]">
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          {children}
+        </NextIntlClientProvider>
+      </body>
     </html>
   );
 }

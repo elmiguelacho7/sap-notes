@@ -5,22 +5,37 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { handleSupabaseError } from "@/lib/supabaseError";
 import { ClientSelector } from "./ClientSelector";
+import { AssigneeSelect } from "@/components/AssigneeSelect";
 import type { TicketPriority, TicketStatus } from "@/lib/types/ticketTypes";
+import {
+  FORM_FOOTER_ACTIONS_CLASS,
+  FORM_PAGE_BLOCK_CLASS,
+  FORM_PAGE_SHELL_CLASS,
+  FORM_PAGE_SUBTITLE_CLASS,
+  FORM_PAGE_TITLE_BLOCK_CLASS,
+  FORM_PAGE_TITLE_CLASS,
+  FORM_SECTION_DIVIDER_CLASS,
+  FORM_SECTION_HELPER_CLASS,
+  FORM_SECTION_TITLE_CLASS,
+} from "@/components/layout/formPageClasses";
 
 const PRIORITY_OPTIONS: { value: TicketPriority; label: string }[] = [
-  { value: "low", label: "Baja" },
-  { value: "medium", label: "Media" },
-  { value: "high", label: "Alta" },
-  { value: "urgent", label: "Urgente" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+  { value: "urgent", label: "Urgent" },
 ];
 
 const STATUS_OPTIONS: { value: TicketStatus; label: string }[] = [
-  { value: "open", label: "Abierto" },
-  { value: "in_progress", label: "En progreso" },
-  { value: "resolved", label: "Resuelto" },
-  { value: "closed", label: "Cerrado" },
-  { value: "cancelled", label: "Cancelado" },
+  { value: "open", label: "Open" },
+  { value: "in_progress", label: "In progress" },
+  { value: "resolved", label: "Resolved" },
+  { value: "closed", label: "Closed" },
 ];
+
+const inputClass =
+  "w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2.5 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:border-[rgb(var(--rb-brand-primary))]/35 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35";
+const labelClass = "mb-1.5 block text-xs font-medium text-[rgb(var(--rb-text-secondary))]";
 
 export default function NewTicketPage() {
   const router = useRouter();
@@ -34,6 +49,8 @@ export default function NewTicketPage() {
   const [projectId, setProjectId] = useState("");
   const [clientId, setClientId] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [assignedTo, setAssignedTo] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -43,6 +60,26 @@ export default function NewTicketPage() {
       setClientId("");
     }
   }, [projectIdFromQuery]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (cancelled) return;
+        const uid = user?.id ?? null;
+        setCurrentUserId(uid);
+        setAssignedTo(uid);
+      } catch (error) {
+        console.error("Tickets error:", error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const effectiveProjectId = (projectIdFromQuery?.trim() || projectId.trim()) || null;
   const effectiveClientId = clientId.trim() || null;
@@ -54,7 +91,7 @@ export default function NewTicketPage() {
     if (v.trim()) setClientId("");
   };
 
-  const handleClientChange = (id: string | null) => {
+  const handleClientChange = (id: string | null, _name: string | null) => {
     setClientId(id ?? "");
     if (id) setProjectId("");
   };
@@ -65,7 +102,7 @@ export default function NewTicketPage() {
 
     const titleTrim = title.trim();
     if (!titleTrim) {
-      setErrorMsg("El título es obligatorio.");
+      setErrorMsg("Title is required.");
       return;
     }
 
@@ -73,7 +110,7 @@ export default function NewTicketPage() {
     const cli = clientId.trim() || null;
 
     if (proj && cli) {
-      setErrorMsg("El ticket solo puede asociarse a un proyecto o a un cliente, pero no a ambos.");
+      setErrorMsg("A ticket can be linked to either a project or a client, not both.");
       return;
     }
 
@@ -89,21 +126,34 @@ export default function NewTicketPage() {
       client_id: cli ?? null,
     };
 
-    const { data, error } = await supabase
-      .from("tickets")
-      .insert(payload)
-      .select("id")
-      .single();
+    if (!currentUserId) {
+      setErrorMsg("Could not identify the current user.");
+      setSubmitting(false);
+      return;
+    }
 
-    if (error) {
-      handleSupabaseError("tickets insert", error);
-      const code = (error as { code?: string }).code;
-      const msg = String((error as { message?: string }).message ?? "");
-      if (code === "23514" || msg.includes("tickets_client_or_project_chk")) {
-        setErrorMsg("El ticket no puede estar asociado a un proyecto y a un cliente al mismo tiempo.");
-      } else {
-        setErrorMsg("No se pudo crear el ticket. Inténtalo de nuevo más tarde.");
+    payload.assigned_to = assignedTo ?? null;
+    payload.created_by = currentUserId;
+
+    let data: { id?: string } | null = null;
+    try {
+      const res = await supabase.from("tickets").insert(payload).select("id").single();
+      data = res.data as { id?: string } | null;
+      if (res.error) {
+        handleSupabaseError("tickets insert", res.error);
+        const code = (res.error as { code?: string }).code;
+        const msg = String((res.error as { message?: string }).message ?? "");
+        if (code === "23514" || msg.includes("tickets_client_or_project_chk")) {
+          setErrorMsg("A ticket cannot be linked to a project and a client at the same time.");
+        } else {
+          setErrorMsg("Could not create the ticket. Please try again later.");
+        }
+        setSubmitting(false);
+        return;
       }
+    } catch (error) {
+      console.error("Tickets error:", error);
+      setErrorMsg("Could not create the ticket. Please try again later.");
       setSubmitting(false);
       return;
     }
@@ -116,166 +166,166 @@ export default function NewTicketPage() {
         router.push(`/tickets/${createdId}`);
       }
     } else {
-      setErrorMsg("El ticket se creó pero no se pudo redirigir. Ve a la lista de tickets.");
+      setErrorMsg("The ticket was created but redirect failed. Open the ticket list.");
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-6">
-      <div>
-        <h1 className="text-xl md:text-2xl font-semibold text-slate-900">
-          Nuevo ticket
-        </h1>
-        <p className="text-xs md:text-sm text-slate-500 max-w-2xl">
-          Completa los datos para crear un nuevo ticket.
-        </p>
-      </div>
-
-      {errorMsg && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {errorMsg}
-        </div>
-      )}
-
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <form onSubmit={handleSubmit} className="px-4 py-4 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              Título *
-            </label>
-            <input
-              type="text"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
-              placeholder="Resumen del ticket"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              Descripción (opcional)
-            </label>
-            <textarea
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
-              rows={3}
-              placeholder="Detalles del ticket"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Prioridad
-              </label>
-              <select
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0 bg-white"
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as TicketPriority)}
-              >
-                {PRIORITY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Estado
-              </label>
-              <select
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0 bg-white"
-                value={status}
-                onChange={(e) => setStatus(e.target.value as TicketStatus)}
-              >
-                {STATUS_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <p className="text-[11px] text-slate-500 mb-2">
-            Un ticket puede ser global (sin proyecto ni cliente), de proyecto o de cliente. No se puede asociar a proyecto y cliente a la vez.
+    <div className="w-full min-w-0 bg-[rgb(var(--rb-shell-bg))]">
+      <div className={FORM_PAGE_SHELL_CLASS}>
+        <header className={FORM_PAGE_TITLE_BLOCK_CLASS}>
+          <h1 className={FORM_PAGE_TITLE_CLASS}>New ticket</h1>
+          <p className={FORM_PAGE_SUBTITLE_CLASS}>
+            Create a ticket, set assignee, priority, and context. Link it to a project or a client if
+            needed.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Proyecto (opcional)
-              </label>
-              <input
-                type="text"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0 disabled:opacity-60 disabled:cursor-not-allowed"
-                placeholder="ID del proyecto"
-                value={projectId}
-                onChange={(e) => handleProjectChange(e.target.value)}
-                disabled={hasClient}
-              />
-              {hasClient && (
-                <p className="mt-0.5 text-[11px] text-amber-600">
-                  Deselecciona el cliente para elegir un proyecto.
-                </p>
-              )}
+        </header>
+
+        {errorMsg && (
+          <div className={`${FORM_PAGE_BLOCK_CLASS} rounded-xl border border-red-200/90 bg-red-50 px-4 py-3 text-sm text-red-800`}>
+            {errorMsg}
+          </div>
+        )}
+
+        <div className={`${FORM_PAGE_BLOCK_CLASS} rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-6 shadow-md md:p-8`}>
+          <form onSubmit={handleSubmit} className="space-y-0">
+            <div className="space-y-4">
+              <h2 className={FORM_SECTION_TITLE_CLASS}>Main information</h2>
+              <div>
+                <label className={labelClass}>Title *</label>
+                <input
+                  type="text"
+                  className={inputClass}
+                  placeholder="Ticket summary"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Description (optional)</label>
+                <textarea
+                  className={`${inputClass} min-h-[120px] resize-y`}
+                  rows={4}
+                  placeholder="Ticket details"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Cliente (opcional)
-              </label>
-              <ClientSelector
-                value={clientId}
-                onChange={handleClientChange}
-                disabled={hasProject}
-                placeholder="Buscar cliente…"
-              />
-              {hasProject && (
-                <p className="mt-0.5 text-[11px] text-amber-600">
-                  Deselecciona el proyecto para elegir un cliente.
-                </p>
-              )}
+            <div className={`space-y-4 ${FORM_SECTION_DIVIDER_CLASS}`}>
+              <h2 className={FORM_SECTION_TITLE_CLASS}>Assignment and status</h2>
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div>
+                  <label className={labelClass}>Assignee</label>
+                  <AssigneeSelect
+                    contextType="global"
+                    value={assignedTo}
+                    onChange={setAssignedTo}
+                    placeholder="Unassigned"
+                    className="w-full"
+                    appearance="light"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Priority</label>
+                  <select
+                    className={inputClass}
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value as TicketPriority)}
+                  >
+                    {PRIORITY_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Status</label>
+                  <select
+                    className={inputClass}
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as TicketStatus)}
+                  >
+                    {STATUS_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="hidden lg:block" aria-hidden />
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Fecha límite (opcional)
-              </label>
-              <input
-                type="date"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-              />
+            <div className={`space-y-4 ${FORM_SECTION_DIVIDER_CLASS}`}>
+              <h2 className={FORM_SECTION_TITLE_CLASS}>Context</h2>
+              <p className={FORM_SECTION_HELPER_CLASS}>
+                A ticket can be global (no project or client), project-scoped, or client-scoped. You cannot
+                link both a project and a client.
+              </p>
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div>
+                  <label className={labelClass}>Project (optional)</label>
+                  <input
+                    type="text"
+                    className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-60`}
+                    placeholder="Project ID"
+                    value={projectId}
+                    onChange={(e) => handleProjectChange(e.target.value)}
+                    disabled={hasClient}
+                  />
+                  {hasClient && (
+                    <p className="mt-1 text-[11px] text-amber-700">Clear the client to select a project.</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className={labelClass}>Client (optional)</label>
+                  <ClientSelector
+                    value={clientId}
+                    onChange={handleClientChange}
+                    disabled={hasProject}
+                    placeholder="Search client…"
+                  />
+                  {hasProject && (
+                    <p className="mt-1 text-[11px] text-amber-700">Clear the project to select a client.</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className={labelClass}>Due date (optional)</label>
+                  <input
+                    type="date"
+                    className={inputClass}
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
-            <div />
-          </div>
 
-          <div className="flex items-center gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-slate-50 shadow-sm hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {submitting ? "Creando…" : "Crear ticket"}
-            </button>
-          </div>
-        </form>
-      </section>
+            <div className={FORM_FOOTER_ACTIONS_CLASS}>
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="inline-flex items-center rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-primary))] transition-colors hover:bg-[rgb(var(--rb-surface))]/80"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="inline-flex items-center rounded-xl border border-transparent bg-[rgb(var(--rb-brand-primary))] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[rgb(var(--rb-brand-primary-hover))] active:bg-[rgb(var(--rb-brand-primary-active))] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting ? "Creating…" : "Create ticket"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

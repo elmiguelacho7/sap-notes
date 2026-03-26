@@ -11,7 +11,7 @@ export type TaskWorkspaceHeaderProps = {
 
 /**
  * Shared header for task workspace (global /tasks and project /projects/[id]/tasks).
- * Dark premium style: rounded-xl, slate borders, strong hierarchy.
+ * Ribbit light workspace style: tokenized, premium hierarchy.
  */
 export function TaskWorkspaceHeader({
   title,
@@ -21,10 +21,10 @@ export function TaskWorkspaceHeader({
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight text-slate-100 sm:text-2xl">
+        <h1 className="text-xl font-semibold tracking-tight text-[rgb(var(--rb-text-primary))] sm:text-2xl">
           {title}
         </h1>
-        <p className="mt-0.5 text-sm text-slate-500 max-w-2xl">
+        <p className="mt-1 text-sm text-[rgb(var(--rb-text-muted))] max-w-2xl">
           {subtitle}
         </p>
       </div>

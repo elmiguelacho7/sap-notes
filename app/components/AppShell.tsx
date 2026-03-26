@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * Legacy light marketing/internal shell (separate from the private app).
+ * Authenticated dark UI uses `components/ui/layout/AppShell.tsx` + Ribbit tokens in `app/globals.css`.
+ */
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -18,13 +22,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <main className="min-h-screen bg-slate-50 flex">
       {/* Sidebar */}
       <aside className="w-60 bg-white border-r border-slate-200 flex flex-col">
-        <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
-          <div className="h-8 w-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
-            PH
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-slate-900">Project Hub</p>
-            <p className="text-[11px] text-slate-500">Entorno interno</p>
+        <div className="px-5 py-4 border-b border-slate-200">
+          <div className="leading-none">
+            <p className="rb-wordmark text-xl text-slate-900">
+              r<span className="rb-accent">i</span>bbit
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500">Entorno interno</p>
           </div>
         </div>
 
@@ -33,7 +36,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => router.push("/dashboard")}
             className={`w-full text-left px-3 py-2 rounded-lg transition ${
               isActive("/dashboard")
-                ? "bg-blue-50 text-blue-700 font-semibold"
+                ? "bg-[rgb(var(--rb-brand-surface))] text-[rgb(var(--rb-brand-primary-hover))] font-semibold"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >
@@ -44,7 +47,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => router.push("/notes")}
             className={`w-full text-left px-3 py-2 rounded-lg transition ${
               isActive("/notes")
-                ? "bg-blue-50 text-blue-700 font-semibold"
+                ? "bg-[rgb(var(--rb-brand-surface))] text-[rgb(var(--rb-brand-primary-hover))] font-semibold"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >
@@ -55,7 +58,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => router.push("/projects")}
             className={`w-full text-left px-3 py-2 rounded-lg transition ${
               isActive("/projects")
-                ? "bg-blue-50 text-blue-700 font-semibold"
+                ? "bg-[rgb(var(--rb-brand-surface))] text-[rgb(var(--rb-brand-primary-hover))] font-semibold"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >
@@ -66,7 +69,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => router.push("/process-flows/demo")}
             className={`w-full text-left px-3 py-2 rounded-lg transition ${
               pathname.startsWith("/process-flows")
-                ? "bg-blue-50 text-blue-700 font-semibold"
+                ? "bg-[rgb(var(--rb-brand-surface))] text-[rgb(var(--rb-brand-primary-hover))] font-semibold"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >
@@ -77,7 +80,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => router.push("/update-password")}
             className={`w-full text-left px-3 py-2 rounded-lg transition ${
               isActive("/update-password")
-                ? "bg-blue-50 text-blue-700 font-semibold"
+                ? "bg-[rgb(var(--rb-brand-surface))] text-[rgb(var(--rb-brand-primary-hover))] font-semibold"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >

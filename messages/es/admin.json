@@ -1,0 +1,279 @@
+{
+  "page": {
+    "loading": "Cargando…",
+    "loadingSubtext": "Un momento.",
+    "restricted": "Acceso restringido",
+    "restrictedBody": "Solo los administradores pueden ver este panel.",
+    "title": "Admin",
+    "subtitle": "Administración de la plataforma y configuración del sistema.",
+    "tabs": {
+      "users": "Usuarios",
+      "activations": "Activaciones",
+      "globalRoles": "Roles globales",
+      "roleLimits": "Límites por rol",
+      "userLimits": "Límites por usuario",
+      "capacity": "Capacidad"
+    },
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "close": "Cerrar",
+    "quotaLabels": {
+      "maxProjects": "Máx. proyectos creados",
+      "maxInvitations": "Máx. invitaciones pendientes por proyecto",
+      "maxMembers": "Máx. miembros por proyecto",
+      "maxClients": "Máx. clientes creados"
+    },
+    "roleLimits": {
+      "title": "Límites por rol",
+      "subtitle": "Cuotas por defecto para cada rol (superadmin no tiene límite). Vacío = sin límite."
+    },
+    "userLimits": {
+      "title": "Límites por usuario",
+      "subtitle": "Overrides por usuario (vacío = usar límite del rol). Solo superadmin.",
+      "loadingUsers": "Cargando usuarios…",
+      "configure": "Configurar límites",
+      "modalTitle": "Límites",
+      "defaultRoleLimits": "Límites por defecto del rol",
+      "overrideHelp": "Override por usuario (vacío = usar valor del rol):",
+      "effective": "Efectivo"
+    },
+    "capacity": {
+      "title": "Uso y límites",
+      "subtitle": "Resumen de uso de cuotas por usuario y por proyecto. Umbral: >=80% cerca del límite, >=100% al límite.",
+      "usersAtLimit": "Usuarios al límite",
+      "usersNearLimit": "Usuarios cerca del límite",
+      "withOverrides": "Con overrides",
+      "projectsAtMemberLimit": "Proyectos al límite (miembros)",
+      "invitationsAtLimit": "Al límite (invit.)",
+      "views": "Vistas",
+      "atLimitOnly": "Solo al límite",
+      "nearLimitOnly": "Solo cerca del límite",
+      "all": "Todos",
+      "allRoles": "Todos los roles",
+      "allStatuses": "Todos los estados",
+      "atLimit": "Al límite",
+      "nearLimit": "Cerca del límite",
+      "unlimited": "Sin límite",
+      "overridesOnly": "Solo con overrides",
+      "limitedProjectsOnly": "Solo proyectos con límite",
+      "byUser": "Por usuario",
+      "byProject": "Por proyecto",
+      "table": {
+        "user": "Usuario",
+        "role": "Rol",
+        "projects": "Proyectos",
+        "clients": "Clientes",
+        "overrides": "Overrides",
+        "status": "Estado",
+        "actions": "Acciones"
+      },
+      "projectTable": {
+        "project": "Proyecto",
+        "client": "Cliente",
+        "members": "Miembros",
+        "pendingInvitations": "Invit. pend.",
+        "status": "Estado",
+        "actions": "Acciones",
+        "viewProject": "Ver proyecto",
+        "viewTeam": "Ver equipo"
+      }
+    },
+    "activations": {
+      "title": "Activación de usuarios",
+      "subtitle": "Los usuarios de registro público quedan pendientes hasta activación de un administrador.",
+      "pending": "Pendientes",
+      "active": "Activos",
+      "canSignIn": "Pueden iniciar sesión",
+      "manage": "Gestionar usuarios y activaciones"
+    },
+    "usersRoles": {
+      "roleUpdated": "Rol actualizado correctamente.",
+      "loadingUsers": "Cargando usuarios...",
+      "untitled": "Sin nombre",
+      "consultant": "Consultor",
+      "manage": "Gestionar",
+      "table": {
+        "user": "Usuario",
+        "role": "Rol",
+        "activation": "Activación",
+        "actions": "Acciones"
+      }
+    },
+    "projectAccess": {
+      "title": "Acceso a proyectos",
+      "subtitle": "Define qué usuarios pueden ver y editar cada proyecto.",
+      "projects": "Proyectos",
+      "loadingProjects": "Cargando proyectos...",
+      "selectProject": "Selecciona un proyecto para gestionar sus miembros.",
+      "membersTitle": "Miembros del proyecto",
+      "loadingMembers": "Cargando miembros...",
+      "unnamedUser": "Usuario sin nombre",
+      "removing": "Eliminando...",
+      "removeAccess": "Quitar acceso",
+      "addMember": "Añadir miembro",
+      "selectUser": "Seleccionar usuario",
+      "selectRole": "Seleccionar rol",
+      "adding": "Agregando...",
+      "add": "Agregar",
+      "table": {
+        "user": "Usuario",
+        "role": "Rol",
+        "action": "Acción"
+      },
+      "roles": {
+        "owner": "Propietario",
+        "editor": "Editor",
+        "viewer": "Lector"
+      },
+      "errors": {
+        "loadData": "Se produjo un error al cargar los datos.",
+        "loadMembers": "No se pudieron cargar los miembros del proyecto."
+      }
+    },
+    "knowledge": {
+      "connected": "Conectado",
+      "integrationHelp": "Usado para fuentes globales y de proyecto. Conecta aquí para gestionar desde Admin.",
+      "connectHelp": "Conecta una cuenta de Google Drive para crear fuentes de conocimiento global o por proyecto.",
+      "redirecting": "Redirigiendo…",
+      "reconnectDrive": "Reconectar Google Drive",
+      "connectDrive": "Conectar Google Drive",
+      "retry": "Reintentar",
+      "createGlobalSource": "Crear fuente global",
+      "createSectionHint": "Añade una URL curada o una fuente basada en Drive. Los campos cambian según el tipo.",
+      "sourcesRegistryTitle": "Fuentes registradas",
+      "sourcesRegistryHint": "Filtra por ámbito. Sincronizar y eliminar se aplican por fila.",
+      "type": "Tipo",
+      "curatedUrlHelp": "Añade la URL de la página (una por fuente). Al sincronizar se indexará solo esa página.",
+      "guide": "Guía",
+      "guideBody": "Las páginas SAP Help solo se indexan cuando el contenido legible está en el HTML inicial. Las que cargan todo por JavaScript no se pueden indexar con este flujo. Si una URL falla, prueba otra página curada o usa un documento/PDF como alternativa.",
+      "sapHelpTitle": "SAP Help Portal",
+      "sapHelpBody": "Solo URLs de help.sap.com. No uses community.sap.com (esas páginas usan JavaScript y no se pueden indexar aquí).",
+      "sapOfficialTitle": "SAP Official",
+      "sapOfficialBody": "Documentación oficial SAP aprobada (p. ej. help.sap.com u otras fuentes oficiales).",
+      "officialWebTitle": "Official Web",
+      "officialWebBody": "Páginas públicas curadas (p. ej. community.sap.com u otros dominios). Si la página requiere JavaScript o verificación anti-bot, la sincronización fallará con un mensaje claro.",
+      "nameRequired": "Nombre *",
+      "sourceNamePlaceholder": "Nombre de la fuente",
+      "driveAccount": "Cuenta Google Drive",
+      "selectAccount": "Seleccionar cuenta",
+      "connectDriveAbove": "Conecta Google Drive arriba.",
+      "url": "URL",
+      "externalRef": "Ref externa (ej. ID carpeta)",
+      "optional": "Opcional",
+      "creating": "Creando…",
+      "list": "Listado",
+      "loadingSources": "Cargando fuentes…",
+      "emptyGlobal": "No hay fuentes globales. Crea una para que Sapito use conocimiento reutilizable (por ejemplo SAP Help o Google Drive).",
+      "syncHintSap": "Añade URL de página SAP en la fuente",
+      "syncHintDrive": "Configura cuenta Google Drive y referencia externa (ID carpeta) en la fuente",
+      "syncNow": "Sincronizar ahora",
+      "syncing": "Sincronizando…",
+      "syncOnlyHint": "Sync solo disponible para Google Drive o SAP oficial (sap_help, sap_official, official_web)",
+      "deleting": "Eliminando…",
+      "delete": "Eliminar",
+      "syncCompleted": "Sincronización completada. {docs} documentos, {chunks} fragmentos.",
+      "syncWithErrors": "Sincronización con errores. {docs} documentos, {chunks} fragmentos.",
+      "scope": {
+        "global": "Global",
+        "project": "Proyecto",
+        "all": "Todos"
+      },
+      "table": {
+        "name": "Nombre",
+        "type": "Tipo",
+        "project": "Proyecto",
+        "lastSync": "Última sync",
+        "actions": "Acciones"
+      },
+      "errors": {
+        "startGoogle": "Error al iniciar la conexión con Google.",
+        "unexpectedResponse": "Respuesta inesperada del servidor.",
+        "loadSources": "Error al cargar las fuentes.",
+        "createSource": "Error al crear la fuente.",
+        "deleteSource": "Error al eliminar la fuente."
+      }
+    },
+    "errors": {
+      "saveFailed": "No se pudo guardar.",
+      "loadFailed": "No se pudo cargar.",
+      "loadConfig": "No se pudo cargar la configuración.",
+      "loadData": "No se pudieron cargar los datos.",
+      "loadUsers": "No se pudieron cargar los usuarios."
+    }
+  },
+  "users": {
+    "title": "Usuarios",
+    "loading": "Cargando...",
+    "backToAdmin": "Volver al panel de administración",
+    "adminPanel": "Panel Admin",
+    "createUser": "Crear usuario",
+    "creating": "Creando…",
+    "existingUsers": "Usuarios existentes",
+    "emailPlaceholder": "usuario@ejemplo.com",
+    "fullNamePlaceholder": "Nombre completo",
+    "active": "Activo",
+    "pending": "Pendiente",
+    "activate": "Activar",
+    "deactivate": "Desactivar",
+    "deleting": "Eliminando…",
+    "name": "Nombre",
+    "status": "Estado",
+    "action": "Acción",
+    "roleAria": "Rol de {name}",
+    "empty": "Aún no hay usuarios. Crea uno arriba.",
+    "actions": {
+      "delete": "Eliminar",
+      "cancel": "Cancelar"
+    },
+    "delete": {
+      "title": "Eliminar usuario",
+      "thisUser": "este usuario",
+      "bodyPrefix": "¿Eliminar a ",
+      "bodySuffix": "? Se borrará la cuenta y el perfil."
+    },
+    "success": {
+      "userCreated": "Usuario creado correctamente."
+    },
+    "errors": {
+      "loadUsers": "Error al cargar los usuarios.",
+      "createUser": "Error al crear el usuario.",
+      "deleteFailed": "Error al eliminar.",
+      "connection": "Error de conexión."
+    }
+  },
+  "roles": {
+    "title": "Roles y permisos",
+    "subtitle": "Matriz de permisos por rol. Los roles de plataforma se asignan en el perfil; los de proyecto, en cada proyecto.",
+    "platformSectionTitle": "Roles de plataforma",
+    "platformSectionHint": "Definen lo que un usuario puede hacer en toda la plataforma.",
+    "projectSectionTitle": "Roles de proyecto",
+    "projectSectionHint": "Se asignan dentro de cada proyecto para controlar el acceso específico.",
+    "editRole": "Editar rol",
+    "userCount": "Usuarios con este rol: {count}",
+    "scopeLabel": "Ámbito: {scope}",
+    "typePlatform": "Rol de plataforma",
+    "typeProject": "Rol de proyecto",
+    "scopePlatform": "Plataforma",
+    "scopeProject": "Proyecto",
+    "loading": "Cargando...",
+    "loadingRoles": "Cargando roles…",
+    "restricted": "Acceso restringido",
+    "signInRequired": "Debes iniciar sesión para ver esta página.",
+    "backToAdmin": "Volver al panel de administración",
+    "footer": "La aplicación utiliza esta matriz para el control de acceso. Los permisos se leen desde tablas de roles en base de datos.",
+    "errors": {
+      "noPermission": "No tiene permiso para ver esta página.",
+      "loadMatrix": "No se pudo cargar la matriz de permisos."
+    }
+  },
+  "knowledgeSources": {
+    "loading": "Cargando…",
+    "restricted": "Acceso restringido",
+    "restrictedBody": "Solo los administradores pueden ver esta página.",
+    "backToAdmin": "Volver a Admin",
+    "errors": {
+      "startGoogleConnect": "Error al iniciar la conexión con Google.",
+      "connection": "Error de conexión."
+    }
+  }
+}

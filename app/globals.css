@@ -1,10 +1,8 @@
 @import "tailwindcss";
 
-@import "tailwindcss";
-
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8faf9;
+  --foreground: #0f172a;
   /* Design tokens — Notion-like (light) */
   --bg: 255 255 255;
   --panel: 255 255 255;
@@ -14,20 +12,87 @@
   --subtext: 71 85 105;
   --brand: 79 70 229;
   --brand-soft: 238 242 255;
-  --shadow: 0 1px 2px rgba(0,0,0,.06);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+
+  /* ----- Ribbit — brand (RGB tuples for rgb(var(--x)) / opacity) ----- */
+  --rb-brand-primary: 46 155 102;
+  --rb-brand-primary-hover: 36 138 88;
+  --rb-brand-primary-active: 30 111 72;
+  --rb-brand-ring: 42 157 103;
+  --rb-brand-text-accent: 35 138 90;
+  --rb-brand-wordmark-accent-dark: 99 199 142;
+  /* Light / marketing surfaces */
+  --rb-brand-surface: 241 245 243;
+  --rb-brand-surface-strong: 6 78 59;
+  /* Stops for --rb-gradient-main (forest → deep) */
+  --rb-brand-gradient-start: 5 46 34;
+  --rb-brand-gradient-end: 15 23 42;
+
+  /**
+   * Full Ribbit hero gradient — use ONLY via .rb-brand-gradient
+   * (auth hero, large brand surfaces). Do not use on data cards.
+   */
+  --rb-gradient-main: linear-gradient(135deg, #0b3d2e, #0e5a3d, #0a2f3a);
+  --rb-gradient-soft: linear-gradient(135deg, rgba(46, 155, 102, 0.15), rgba(46, 155, 102, 0.05));
+
+  /* ----- Private shell chrome (Ribbit light premium) ----- */
+  --rb-shell-bg: 248 250 249;
+  --rb-shell-bg-strong: 241 245 243;
+  /** Sidebar/footer strip with soft brand tint */
+  --rb-shell-tint: 233 244 238;
+
+  /* ----- Workspace (main column) ----- */
+  --rb-workspace-bg: 250 253 251;
+  --rb-workspace-bg-soft: 244 250 247;
+
+  /* ----- Data surfaces (cards, tables) ----- */
+  --rb-surface: 255 255 255;
+  --rb-surface-2: 248 252 250;
+  --rb-surface-3: 241 248 245;
+  --rb-surface-border: 226 232 229;
+  /* ----- Premium depth (subtle, reusable) ----- */
+  --rb-shadow-shell: 0 22px 44px -34px rgba(15, 23, 42, 0.28);
+  --rb-shadow-card: 0 10px 24px -18px rgba(15, 23, 42, 0.22);
+  --rb-shadow-featured: 0 20px 42px -26px rgba(20, 85, 61, 0.22);
+  --rb-shadow-hover: 0 16px 34px -20px rgba(15, 23, 42, 0.24);
+
+  /* ----- Text on private UI ----- */
+  --rb-text-primary: 15 23 42;
+  --rb-text-secondary: 71 85 105;
+  --rb-text-muted: 148 163 184;
+
+  /**
+   * Legacy aliases (same RGB values) — prefer canonical names above.
+   * Safe for stale bundles / gradual migration.
+   */
+  --rb-shell-base: 248 250 249;
+  --rb-shell-sidebar-from: 241 245 243;
+  --rb-shell-sidebar-to: 233 244 238;
+  --rb-ws-surface: 255 255 255;
+  --rb-ws-surface-raised: 248 252 250;
+  --rb-ws-surface-row: 241 248 245;
+  --rb-ws-border: 226 232 229;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-primary: rgb(var(--rb-brand-primary));
+  --color-primary-hover: rgb(var(--rb-brand-primary-hover));
+  --color-primary-active: rgb(var(--rb-brand-primary-active));
+  --color-card: rgb(var(--rb-surface));
+  --color-card-soft: rgb(var(--rb-surface-2));
+  --color-border: rgb(var(--rb-surface-border));
+  --color-muted-foreground: rgb(var(--rb-text-secondary));
+  --color-subtle-foreground: rgb(var(--rb-text-muted));
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #f8faf9;
+    --foreground: #0f172a;
   }
 }
 
@@ -37,8 +102,187 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+@layer utilities {
+  /** Marketing / auth hero only */
+  .rb-brand-gradient {
+    background-image: var(--rb-gradient-main);
+  }
 
-@import 'reactflow/dist/style.css';
+  .rb-soft-gradient {
+    background-image: var(--rb-gradient-soft);
+  }
+
+  .rb-shell-bg {
+    background-color: rgb(var(--rb-shell-bg));
+  }
+
+  /**
+   * Main scrollable workspace column (calm gradient — not .rb-brand-gradient).
+   */
+  .rb-workspace-bg {
+    background: linear-gradient(
+      to bottom,
+      rgb(var(--rb-workspace-bg)) 0%,
+      rgb(var(--rb-shell-bg)) 45%,
+      rgb(var(--rb-workspace-bg-soft)) 100%
+    );
+  }
+
+  /* Project Mode: slightly more contextual workspace tint (subtle, premium, not themed). */
+  .rb-project-workspace-bg {
+    background: linear-gradient(
+      to bottom,
+      rgb(var(--rb-workspace-bg-soft)) 0%,
+      rgb(var(--rb-shell-tint)) 52%,
+      rgb(var(--rb-workspace-bg)) 100%
+    );
+  }
+
+  /** Default data card / panel */
+  .rb-surface {
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--rb-surface-border) / 0.78);
+    background-color: rgb(var(--rb-surface) / 0.96);
+  }
+
+  .rb-surface-deep {
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--rb-surface-border) / 0.82);
+    background-color: rgb(var(--rb-surface-2) / 0.96);
+  }
+
+  .rb-surface-header {
+    border-bottom: 1px solid rgb(var(--rb-surface-border) / 0.7);
+  }
+
+  .rb-surface-row {
+    border: 1px solid rgb(var(--rb-surface-border) / 0.72);
+    background-color: rgb(var(--rb-surface-3) / 0.88);
+  }
+
+  .rb-row-interactive {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      transform 180ms ease;
+  }
+  .rb-row-interactive:hover {
+    background-color: rgb(var(--rb-surface) / 0.98);
+    border-color: rgb(var(--rb-brand-ring) / 0.26);
+    transform: translateY(-1px);
+    box-shadow: var(--rb-shadow-hover);
+  }
+
+  .rb-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 0.16rem 0.5rem;
+    line-height: 1.1;
+  }
+  .rb-badge-neutral {
+    border-color: rgb(var(--rb-surface-border) / 0.9);
+    background-color: rgb(var(--rb-surface-2) / 0.95);
+    color: rgb(var(--rb-text-secondary));
+  }
+  .rb-badge-success {
+    border-color: rgba(22, 163, 74, 0.28);
+    background-color: rgba(22, 163, 74, 0.12);
+    color: rgb(22, 101, 52);
+  }
+  .rb-badge-warning {
+    border-color: rgba(217, 119, 6, 0.28);
+    background-color: rgba(217, 119, 6, 0.12);
+    color: rgb(146, 64, 14);
+  }
+  .rb-badge-error {
+    border-color: rgba(220, 38, 38, 0.28);
+    background-color: rgba(220, 38, 38, 0.12);
+    color: rgb(153, 27, 27);
+  }
+
+  .rb-depth-shell {
+    box-shadow: var(--rb-shadow-shell);
+  }
+
+  .rb-depth-card {
+    box-shadow: var(--rb-shadow-card);
+  }
+
+  .rb-depth-featured {
+    box-shadow: var(--rb-shadow-featured);
+  }
+
+  .rb-depth-hover:hover {
+    box-shadow: var(--rb-shadow-hover);
+  }
+
+  .rb-wordmark {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .rb-accent {
+    color: rgb(var(--rb-brand-text-accent));
+  }
+
+  .rb-accent-dark {
+    color: rgb(var(--rb-brand-wordmark-accent-dark));
+  }
+
+  .rb-btn-primary {
+    background: rgb(var(--rb-brand-primary));
+    color: white;
+    box-shadow: 0 16px 35px -18px rgba(35, 138, 90, 0.75);
+  }
+
+  .rb-btn-primary:hover {
+    background: rgb(var(--rb-brand-primary-hover));
+  }
+
+  .rb-btn-primary:active {
+    background: rgb(var(--rb-brand-primary-active));
+  }
+
+  /** Shell control focus (ring + offset matches shell bg) */
+  .rb-focus-shell {
+    outline: none;
+  }
+  .rb-focus-shell:focus-visible {
+    box-shadow:
+      0 0 0 2px rgb(var(--rb-shell-bg)),
+      0 0 0 4px rgb(var(--rb-brand-ring) / 0.4);
+  }
+
+  /* Deprecated aliases — use .rb-surface* */
+  .rb-ws-panel {
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--rb-surface-border) / 0.72);
+    background-color: rgb(var(--rb-surface) / 0.58);
+  }
+
+  .rb-ws-panel-deep {
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--rb-surface-border) / 0.75);
+    background-color: rgb(var(--rb-surface-2) / 0.5);
+  }
+
+  .rb-ws-panel-header {
+    border-bottom: 1px solid rgb(var(--rb-surface-border) / 0.5);
+  }
+
+  .rb-ws-row {
+    border: 1px solid rgb(var(--rb-surface-border) / 0.65);
+    background-color: rgb(var(--rb-surface-3) / 0.45);
+  }
+}
+
+@import "reactflow/dist/style.css";
 
 /* Vis timeline polish */
 .vis-timeline {
@@ -79,4 +323,14 @@ body {
 .risk-low.vis-item {
   background: rgba(16, 185, 129, 0.15);
   border-color: rgba(16, 185, 129, 0.35);
+}
+
+/* BlockNote (Knowledge): nested .bn-editor regions must not stack full editor chrome */
+.knowledge-bn-editor-root .bn-editor .bn-editor {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  min-height: 0;
 }

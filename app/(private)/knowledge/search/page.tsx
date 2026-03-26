@@ -27,23 +27,23 @@ const SUGGESTED_PROMPTS = [
 export default function KnowledgeSearchPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, isSending]);
 
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || loading) return;
+      if (!trimmed || isSending) return;
 
       setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
       setInput("");
       setError(null);
-      setLoading(true);
+      setIsSending(true);
 
       try {
         const {
@@ -69,7 +69,7 @@ export default function KnowledgeSearchPage() {
         if (!res.ok) {
           const data = (await res.json().catch(() => ({}))) as { error?: string };
           setError(data?.error ?? "Could not get a response from Sapito.");
-          setLoading(false);
+          setIsSending(false);
           return;
         }
 
@@ -96,10 +96,10 @@ export default function KnowledgeSearchPage() {
         console.error("Global Sapito request failed", err);
         setError("Connection error. Please try again.");
       } finally {
-        setLoading(false);
+        setIsSending(false);
       }
     },
-    [loading]
+    [isSending]
   );
 
   const handleSubmit = (e: FormEvent) => {
@@ -114,16 +114,16 @@ export default function KnowledgeSearchPage() {
     }
   };
 
-  const isEmpty = messages.length === 0 && !loading;
+  const isEmpty = messages.length === 0;
 
   return (
-    <PageShell className="bg-slate-950">
+    <PageShell>
       <div className="flex flex-col min-h-0 w-full">
         {/* Back link */}
         <div className="shrink-0 mb-4">
           <Link
             href="/knowledge"
-            className="inline-block text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            className="inline-block text-xs text-slate-500 hover:text-slate-700 transition-colors"
           >
             ← Back to Knowledge Explorer
           </Link>
@@ -135,19 +135,19 @@ export default function KnowledgeSearchPage() {
             <SapitoAvatar size="lg" className="shrink-0" />
           </div>
           <div className="text-center space-y-1 mb-6">
-            <h1 className="text-xl sm:text-2xl font-semibold text-slate-100">Sapito</h1>
+            <h1 className="text-xl sm:text-2xl font-semibold text-slate-900">Sapito</h1>
             <p className="text-sm text-slate-500 max-w-xl mx-auto">
               Ask questions across platform knowledge, architecture, governance, and global
               insights.
             </p>
             <div className="flex flex-wrap justify-center gap-2 mt-2">
-              <span className="rounded-md border border-slate-600/60 bg-slate-800/60 px-2 py-0.5 text-xs text-slate-400">
+              <span className="rounded-md border border-slate-200/90 bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
                 Global Knowledge
               </span>
-              <span className="rounded-md border border-slate-600/60 bg-slate-800/60 px-2 py-0.5 text-xs text-slate-400">
+              <span className="rounded-md border border-slate-200/90 bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
                 AI Assistant
               </span>
-              <span className="rounded-md border border-slate-600/60 bg-slate-800/60 px-2 py-0.5 text-xs text-slate-400">
+              <span className="rounded-md border border-slate-200/90 bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
                 Cross-platform insights
               </span>
             </div>
@@ -163,17 +163,17 @@ export default function KnowledgeSearchPage() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask Sapito about platform knowledge, architecture, governance, or SAP documentation..."
-              disabled={loading}
+              disabled={isSending}
               rows={1}
-              className="flex-1 min-h-[48px] max-h-[160px] resize-y rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 disabled:opacity-60"
+              className="flex-1 min-h-[48px] max-h-[160px] resize-y rounded-xl border border-slate-200/90 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30 disabled:opacity-70"
               aria-label="Message to Sapito"
             />
             <button
               type="submit"
-              disabled={loading || !input.trim()}
-              className="shrink-0 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 h-[48px]"
+              disabled={isSending || !input.trim()}
+              className="shrink-0 rounded-xl rb-btn-primary px-4 py-3 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 h-[48px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2"
             >
-              {loading ? "Sending…" : "Send"}
+              {isSending ? "Sending..." : "Send"}
             </button>
           </form>
 
@@ -184,8 +184,7 @@ export default function KnowledgeSearchPage() {
                 key={text}
                 type="button"
                 onClick={() => sendMessage(text)}
-                disabled={loading}
-                className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:border-slate-600 hover:text-slate-200 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-xl border border-slate-200/90 bg-white px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/25 focus-visible:ring-offset-2"
               >
                 {text}
               </button>
@@ -194,9 +193,9 @@ export default function KnowledgeSearchPage() {
         </div>
 
         {/* Conversation area */}
-        <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100 overflow-hidden">
           {error && (
-            <div className="shrink-0 px-5 py-2.5 text-xs text-red-300 bg-red-950/30 border-b border-red-800/50">
+            <div className="shrink-0 px-5 py-2.5 text-xs text-red-700 bg-red-50 border-b border-red-200">
               {error}
             </div>
           )}
@@ -204,7 +203,7 @@ export default function KnowledgeSearchPage() {
             ref={scrollRef}
             className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth [scroll-padding-bottom:1rem] min-h-[120px]"
           >
-            {isEmpty && !loading && (
+            {isEmpty && (
               <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
                 <p className="text-sm text-slate-500 max-w-md">
                   Your conversation with Sapito will appear here. Use the input above or try a suggested prompt.
@@ -227,12 +226,12 @@ export default function KnowledgeSearchPage() {
                     <div
                       className={`max-w-[85%] min-w-0 rounded-2xl px-4 py-3 ${
                         msg.role === "user"
-                          ? "bg-slate-700 text-slate-100"
-                          : "bg-slate-800/90 text-slate-200 border border-slate-700/60"
+                          ? "bg-[rgb(var(--rb-brand-primary))] text-white"
+                          : "bg-slate-50 text-slate-800 border border-slate-200/90"
                       }`}
                     >
                       {msg.role === "assistant" && (msg.groundingLabel ?? msg.grounded !== undefined) && (
-                        <p className="text-[11px] text-slate-500 mb-2.5 pb-2 border-b border-slate-700 font-medium">
+                        <p className="text-[11px] text-slate-500 mb-2.5 pb-2 border-b border-slate-200 font-medium">
                           {msg.groundingLabel ??
                             (msg.grounded === true
                               ? "Based on synced documentation"
@@ -240,7 +239,7 @@ export default function KnowledgeSearchPage() {
                         </p>
                       )}
                       {msg.role === "assistant" ? (
-                        <div className="[&_.sapito-heading]:!text-slate-200 [&_.sapito-paragraph]:!text-slate-300 [&_.sapito-list]:!text-slate-300 [&_strong]:!text-slate-200">
+                        <div className="[&_.sapito-heading]:!text-slate-900 [&_.sapito-paragraph]:!text-slate-700 [&_.sapito-list]:!text-slate-700 [&_strong]:!text-slate-900">
                           <AssistantMessageContent content={msg.content} />
                         </div>
                       ) : (
@@ -249,12 +248,12 @@ export default function KnowledgeSearchPage() {
                     </div>
                   </div>
                 ))}
-                {loading && (
+                {isSending && (
                   <div className="flex gap-3 justify-start">
                     <div className="mt-1 shrink-0">
                       <SapitoAvatar size="sm" thinking />
                     </div>
-                    <div className="rounded-2xl px-4 py-3 bg-slate-800/90 border border-slate-700/60 text-slate-500 text-sm">
+                    <div className="rounded-2xl px-4 py-3 bg-slate-50 border border-slate-200/90 text-slate-600 text-sm">
                       Sapito is thinking…
                     </div>
                   </div>
