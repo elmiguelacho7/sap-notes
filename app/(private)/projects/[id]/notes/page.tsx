@@ -415,7 +415,7 @@ export default function ProjectNotesPage() {
                 </p>
                 <Link
                   href={`/notes/new?projectId=${projectId}`}
-                  className="mt-5 inline-flex items-center gap-2 rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-medium transition-colors"
+                  className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2"
                 >
                   {t("empty.createFirst")}
                 </Link>

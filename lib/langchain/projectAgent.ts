@@ -7,6 +7,7 @@ import type {
   ProjectLinkSummary,
 } from "@/lib/services/projectService";
 import type { SapIntentCategory } from "@/lib/ai/sapitoIntent";
+import type { RetrievalTrace } from "@/lib/ai/sapitoContext";
 import { shouldIncludeWorkspaceSummary, isSapKnowledgeIntent, isWeeklyFocusIntent, isProjectRiskIntent } from "@/lib/ai/sapitoIntent";
 import { SYSTEM_PROMPT_SAP_KNOWLEDGE } from "@/lib/langchain/prompts/sapKnowledgePrompt";
 
@@ -56,6 +57,15 @@ export type AgentContext = {
   sapitoContextSummary?: string;
   /** Optional SAP intent (error/transaction/customizing/process/solution_design) for answer format */
   sapIntent?: SapIntentCategory;
+  /** Sapito 2.0 Phase 1: deterministic routing result (optional, additive). */
+  sapitoRoute?: {
+    intent: string;
+    responseMode: string;
+    reason?: string;
+    needsConnectedSources?: boolean;
+  };
+  /** Phase 5: retrieval observability trace (dev/debug only). */
+  retrievalTrace?: RetrievalTrace;
   /** When true, user is asking about this project's own history/decisions/solutions; answer only from project evidence */
   isProjectHistoryQuestion?: boolean;
   /** Optional retrieval debug (chunk count, document titles); included in response in development only */
@@ -379,6 +389,39 @@ Cuando incluya documentación técnica recuperada (Contexto del proyecto o Conte
       ? `${ANSWER_FORMAT_BY_INTENT[ctx.sapIntent]}${structureNote ? `\n\n${structureNote}` : ""}`
       : "";
 
+  // Sapito 2.0 Phase 1: response modes (lightweight). These are additive instructions to improve SAP-specific structure.
+  const responseMode = ctx.sapitoRoute?.responseMode;
+  const responseModeInstruction =
+    responseMode === "troubleshooting_mode"
+      ? `Responde en modo troubleshooting con esta estructura (usa ##):
+## Diagnosis
+## Likely cause
+## What to check
+## Recommended solution
+## Risk / caveat`
+      : responseMode === "process_explanation_mode"
+        ? `Responde en modo explicación de proceso con esta estructura (usa ##):
+## Overview
+## How it works
+## Key configuration points
+## SAP impact
+## Best practice`
+        : responseMode === "project_intelligence_mode"
+          ? `Responde en modo inteligencia de proyecto con esta estructura (usa ##):
+## What we know
+## Evidence found
+## Suggested next action
+## Related documentation`
+          : responseMode === "decision_support_mode"
+            ? `Responde en modo apoyo a decisión con esta estructura (usa ##):
+## Option A
+## Option B
+## Pros / cons
+## Recommended direction`
+            : "";
+
+  const finalSapFormatInstruction = [sapFormatInstruction, responseModeInstruction].filter(Boolean).join("\n\n");
+
   const projectContext = includeWorkspaceSummary || isWeeklyFocusIntent(ctx.sapIntent) || isProjectRiskIntent(ctx.sapIntent)
     ? isProjectMode && !isWeeklyFocusIntent(ctx.sapIntent) && !isProjectRiskIntent(ctx.sapIntent)
       ? buildProjectContextText(ctx.notes, ctx.links)
@@ -398,7 +441,7 @@ Cuando incluya documentación técnica recuperada (Contexto del proyecto o Conte
   const prompt = await template.format({
     systemPrompt,
     knowledgeInstruction,
-    sapFormatInstruction,
+    sapFormatInstruction: finalSapFormatInstruction,
     sapitoContextBlock,
     projectContext,
     userMessage: params.message,

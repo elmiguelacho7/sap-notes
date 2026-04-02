@@ -27,10 +27,12 @@ import {
 } from "@/lib/ai/knowledgeSearch";
 import { getOfficialSapKnowledgeContext } from "@/lib/ai/officialSapKnowledge";
 import { normalizeQueryForSap } from "@/lib/ai/queryNormalize";
-import { shouldIncludeWorkspaceSummary, isSapKnowledgeIntent, isWeeklyFocusIntent, type SapIntentCategory } from "@/lib/ai/sapitoIntent";
+import { shouldIncludeWorkspaceSummary, isSapKnowledgeIntent, isWeeklyFocusIntent, type SapIntentCategory, type SapitoIntentRoute } from "@/lib/ai/sapitoIntent";
 import type { RetrievalDebug } from "@/lib/ai/sapitoContext";
 import { analyzeWeeklyFocus, type WeeklyFocusResult } from "@/lib/ai/workspaceFocus";
 import type { ProjectRiskReport } from "@/lib/ai/projectRisk";
+import { rankKnowledgeChunks } from "@/lib/ai/retrievalRanking";
+import { getExternalSapFallbackProvider } from "@/lib/ai/externalSapFallback";
 
 const CHUNK_CONTENT_CAP = 1000;
 const MAX_CHUNKS_AFTER_DIVERSITY = 8;
@@ -151,6 +153,21 @@ function formatKnowledgeContext(chunks: KnowledgeChunk[], fromProject: boolean):
   return lines.join("\n");
 }
 
+function formatExternalSapFallback(docs: Array<{ title: string; snippet: string; source_url?: string | null; provider?: string }>): string {
+  if (docs.length === 0) return "";
+  const lines: string[] = [
+    "External SAP fallback (siempre indica que es una fuente externa; úsala solo si no hay suficiente evidencia interna):",
+  ];
+  for (const d of docs) {
+    const url = d.source_url?.trim() ? ` | URL: ${d.source_url.trim()}` : "";
+    const prov = d.provider ? ` | Provider: ${d.provider}` : "";
+    const snippet = (d.snippet ?? "").trim().slice(0, 900) + ((d.snippet ?? "").trim().length > 900 ? "…" : "");
+    lines.push(`- ${d.title}${prov}${url}`);
+    if (snippet) lines.push(`  Snippet: ${snippet}`);
+  }
+  return lines.join("\n");
+}
+
 /** Official SAP docs: instruct model to ground with 'According to SAP documentation...' when used. */
 function formatOfficialSapContext(chunks: KnowledgeChunk[]): string {
   const lines: string[] = [
@@ -226,11 +243,14 @@ export type ResolverResult = {
   contextText: string;
   retrievalDebug: RetrievalDebug;
   retrievalScopes: string[];
+  retrievalTrace?: import("@/lib/ai/sapitoContext").RetrievalTrace;
 };
 
 export type GlobalResolverParams = {
   message: string;
   sapIntent?: SapIntentCategory;
+  /** Sapito 2.0 Phase 1 intent route (optional, additive). */
+  sapitoRoute?: SapitoIntentRoute;
   /** When true, include notes insights instead of platform stats for workspace summary (e.g. notes page). */
   notesVariant?: boolean;
   /** User id for scoped platform metrics (required for counts to match dashboard). */
@@ -247,11 +267,14 @@ export type GlobalResolverParams = {
 export async function resolveGlobalContext(
   params: GlobalResolverParams
 ): Promise<ResolverResult> {
-  const { message, sapIntent, notesVariant, userId } = params;
+  const { message, sapIntent, notesVariant, userId, sapitoRoute } = params;
   const accessToken = params.accessToken ?? null;
   const sections: string[] = [];
   const retrievalScopes: string[] = [];
   let retrievalDebug: RetrievalDebug = { chunkCount: 0, documentTitles: [], usedRetrieval: false };
+  const queriedGroups: string[] = [];
+  const skippedGroups: string[] = [];
+  let fallbackConsidered = false;
 
   const includeSummary = shouldIncludeWorkspaceSummary(sapIntent);
   if (includeSummary) {
@@ -280,28 +303,97 @@ export async function resolveGlobalContext(
   const runRetrieval = searchQuery.length > 0 && !isWeeklyFocusIntent(sapIntent);
   if (runRetrieval) {
     try {
+      // Sapito 2.0 Phase 1: deterministic narrowing by v2 intent (optional).
+      // Keep v1 behavior as fallback when sapitoRoute is absent.
+      const v2Intent = sapitoRoute?.intent;
+      const wantsConnected = sapitoRoute?.needsConnectedSources === true || v2Intent === "needs_connected_sources";
+
       const isSapIntent = isSapKnowledgeIntent(sapIntent);
       const maxChunks = isSapIntent ? MAX_CHUNKS_SAP : MAX_CHUNKS_AFTER_DIVERSITY;
-      retrievalScopes.push("official_sap", "global_knowledge");
 
-      // Global mode: 1) official SAP knowledge, 2) other global knowledge.
+      // Decide which retrieval groups to run.
+      const shouldRunOfficialSap =
+        v2Intent == null
+          ? true
+          : v2Intent === "sap_error_troubleshooting" ||
+            v2Intent === "sap_configuration" ||
+            v2Intent === "sap_process_explanation" ||
+            v2Intent === "sap_best_practice" ||
+            v2Intent === "sap_comparison_or_design" ||
+            v2Intent === "sap_general_knowledge" ||
+            v2Intent === "project_plus_sap_general";
+
+      const shouldRunKnowledgeDocs =
+        v2Intent == null ? true : v2Intent !== "project_status" && v2Intent !== "project_operational_summary";
+
+      const shouldRunFullTextPages =
+        accessToken != null && accessToken.trim() !== "" && (v2Intent == null || v2Intent !== "project_status");
+
+      // External SAP fallback slot (architecture): only for global SAP intents when internal retrieval is weak.
+      const shouldConsiderExternalFallback =
+        v2Intent === "sap_general_knowledge" ||
+        v2Intent === "sap_error_troubleshooting" ||
+        v2Intent === "sap_configuration" ||
+        v2Intent === "sap_process_explanation" ||
+        v2Intent === "sap_best_practice" ||
+        v2Intent === "sap_comparison_or_design";
+
+      // Keep backward compatible scope labels (official_sap) while adding semantic group (sap_general_knowledge).
+      if (shouldRunOfficialSap) retrievalScopes.push("official_sap", "sap_general_knowledge");
+      if (shouldRunKnowledgeDocs) retrievalScopes.push("global_knowledge");
+      if (shouldRunOfficialSap) queriedGroups.push("official_sap");
+      else skippedGroups.push("official_sap");
+      if (shouldRunKnowledgeDocs) queriedGroups.push("global_knowledge");
+      else skippedGroups.push("global_knowledge");
+
+      // Global mode: official SAP + global multitenant (which becomes global-only when p_project_id is NULL).
       const [officialChunks, multiResult] = await Promise.all([
-        getOfficialSapKnowledgeContext(searchQuery, 4),
-        searchMultiTenantKnowledge(null, null, searchQuery, isSapIntent ? 6 : 10),
+        shouldRunOfficialSap ? getOfficialSapKnowledgeContext(searchQuery, 4) : Promise.resolve([]),
+        shouldRunKnowledgeDocs
+          ? searchMultiTenantKnowledge(null, null, searchQuery, isSapIntent ? 8 : 12)
+          : Promise.resolve({ chunks: [], scopeBreakdown: { project: 0, user: 0, global: 0 } }),
       ]);
 
+      // Connected sources first-class: for now, recognize connected docs as chunks with external_ref (Drive file/folder ids, etc).
+      const connectedChunksRaw = wantsConnected
+        ? (multiResult.chunks ?? []).filter((c) => (c.external_ref ?? "").trim() !== "")
+        : [];
+      const connectedChunks = connectedChunksRaw.length > 0
+        ? rankKnowledgeChunks(connectedChunksRaw, { mode: "global", v2Intent: v2Intent ?? null, query: searchQuery })
+        : [];
+      const remainingChunks = (multiResult.chunks ?? []).filter((c) => !connectedChunksRaw.includes(c));
+
       const officialIds = new Set(officialChunks.map((c) => c.id));
-      const otherChunks = (multiResult.chunks ?? []).filter((c) => !officialIds.has(c.id));
+      const otherChunks = remainingChunks.filter((c) => !officialIds.has(c.id));
       const diverse = ensureChunkDiversity(otherChunks, MAX_PER_SOURCE, maxChunks);
 
-      if (officialChunks.length > 0) {
-        sections.push(formatOfficialSapContext(officialChunks));
+      if (connectedChunks.length > 0) {
+        sections.push(formatKnowledgeContext(ensureChunkDiversity(connectedChunks, 2, Math.min(6, maxChunks)), false));
+        // Keep backward compatible label (connected_documents) while adding semantic group.
+        retrievalScopes.push("connected_documents", "connected_documents_global");
         retrievalDebug = {
-          chunkCount: officialChunks.length,
-          documentTitles: Array.from(new Set(officialChunks.map((c) => c.title || "(sin título)"))),
+          chunkCount: connectedChunks.length,
+          documentTitles: Array.from(new Set(connectedChunks.map((c) => c.title || c.source_name || "(sin título)"))),
           usedRetrieval: true,
         };
       }
+
+      if (officialChunks.length > 0) {
+        sections.push(formatOfficialSapContext(officialChunks));
+        if (!retrievalDebug.usedRetrieval) {
+          retrievalDebug = {
+            chunkCount: officialChunks.length,
+            documentTitles: Array.from(new Set(officialChunks.map((c) => c.title || "(sin título)"))),
+            usedRetrieval: true,
+          };
+        } else {
+          retrievalDebug.documentTitles = Array.from(
+            new Set([...(retrievalDebug.documentTitles ?? []), ...officialChunks.map((c) => c.title || "(sin título)")])
+          );
+          retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + officialChunks.length;
+        }
+      }
+
       if (diverse.length > 0) {
         sections.push(formatKnowledgeContext(diverse, false));
         if (!retrievalDebug.usedRetrieval) {
@@ -312,9 +404,29 @@ export async function resolveGlobalContext(
           };
         } else {
           retrievalDebug.documentTitles = Array.from(
-            new Set([...retrievalDebug.documentTitles, ...diverse.map((c) => c.title || "(sin título)")])
+            new Set([...(retrievalDebug.documentTitles ?? []), ...diverse.map((c) => c.title || "(sin título)")])
           );
           retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + diverse.length;
+        }
+      }
+
+      // External SAP fallback (disabled provider by default): only when no internal evidence was found.
+      if (shouldConsiderExternalFallback && officialChunks.length === 0 && connectedChunks.length === 0 && diverse.length === 0) {
+        const provider = getExternalSapFallbackProvider();
+        fallbackConsidered = true;
+        if (provider.enabled()) {
+          try {
+            const docs = await provider.search({ query: searchQuery, topK: 3 });
+            if (docs.length > 0) {
+              sections.push(formatExternalSapFallback(docs));
+              retrievalScopes.push("external_sap_fallback");
+              retrievalDebug.documentTitles = Array.from(
+                new Set([...(retrievalDebug.documentTitles ?? []), ...docs.map((d) => d.title)])
+              );
+            }
+          } catch (err) {
+            console.error("[GlobalContextResolver] external fallback error", err);
+          }
         }
       }
 
@@ -337,14 +449,16 @@ export async function resolveGlobalContext(
       }
 
       // Full-text knowledge pages (complementary to vector search).
-      const fullTextPages = await searchKnowledgePagesFullText(searchQuery, 4, { accessToken });
-      if (fullTextPages.length > 0) {
-        sections.push(formatFullTextKnowledgePagesContext(fullTextPages));
-        retrievalScopes.push("fulltext_knowledge_pages");
-        retrievalDebug.documentTitles = Array.from(
-          new Set([...(retrievalDebug.documentTitles ?? []), ...fullTextPages.map((p) => p.title ?? "(sin título)")])
-        );
-        retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + fullTextPages.length;
+      if (shouldRunFullTextPages) {
+        const fullTextPages = await searchKnowledgePagesFullText(searchQuery, 4, { accessToken });
+        if (fullTextPages.length > 0) {
+          sections.push(formatFullTextKnowledgePagesContext(fullTextPages));
+          retrievalScopes.push("fulltext_knowledge_pages");
+          retrievalDebug.documentTitles = Array.from(
+            new Set([...(retrievalDebug.documentTitles ?? []), ...fullTextPages.map((p) => p.title ?? "(sin título)")])
+          );
+          retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + fullTextPages.length;
+        }
       }
     } catch (err) {
       console.error("[GlobalContextResolver] retrieval error", err);
@@ -352,7 +466,21 @@ export async function resolveGlobalContext(
   }
 
   const contextText = sections.length === 0 ? "" : sections.join("\n\n");
-  return { contextText, retrievalDebug, retrievalScopes };
+  const retrievalTrace = {
+    mode: notesVariant ? ("notes" as const) : ("global" as const),
+    detectedIntent: sapIntent ?? null,
+    detectedV2Intent: sapitoRoute?.intent ?? null,
+    sapTaxonomy: sapitoRoute?.sapTaxonomy
+      ? { domains: sapitoRoute.sapTaxonomy.domains, themes: sapitoRoute.sapTaxonomy.themes, matched: sapitoRoute.sapTaxonomy.matched }
+      : null,
+    queriedGroups,
+    skippedGroups,
+    earlyExit: false,
+    strongEvidence: (retrievalScopes.includes("official_sap") || retrievalScopes.includes("global_knowledge") || retrievalScopes.includes("connected_documents_global")) ? true : false,
+    fallbackConsidered,
+    winningSourceLabels: Array.from(new Set(retrievalScopes)).slice(0, 12),
+  };
+  return { contextText, retrievalDebug, retrievalScopes, retrievalTrace };
 }
 
 export type ProjectResolverParams = {
@@ -360,6 +488,8 @@ export type ProjectResolverParams = {
   userId: string | null;
   message: string;
   sapIntent?: SapIntentCategory;
+  /** Sapito 2.0 Phase 1 intent route (optional, additive). */
+  sapitoRoute?: SapitoIntentRoute;
   /** User JWT so full-text knowledge search runs with RLS (optional). */
   accessToken?: string | null;
 };
@@ -372,11 +502,15 @@ export type ProjectResolverParams = {
 export async function resolveProjectContext(
   params: ProjectResolverParams
 ): Promise<ResolverResult> {
-  const { projectId, userId, message, sapIntent } = params;
+  const { projectId, userId, message, sapIntent, sapitoRoute } = params;
   const accessToken = params.accessToken ?? null;
   const sections: string[] = [];
   const retrievalScopes: string[] = [];
   let retrievalDebug: RetrievalDebug = { chunkCount: 0, documentTitles: [], usedRetrieval: false };
+  const queriedGroups: string[] = [];
+  const skippedGroups: string[] = [];
+  let earlyExit = false;
+  let strongEvidence = false;
 
   const includeSummary = shouldIncludeWorkspaceSummary(sapIntent);
   if (includeSummary) {
@@ -450,24 +584,75 @@ export async function resolveProjectContext(
   const runRetrieval = searchQuery.length > 0 && !isWeeklyFocusIntent(sapIntent) && !detectProjectRiskIntent(message);
   if (runRetrieval) {
     try {
+      const v2Intent = sapitoRoute?.intent;
+      const wantsConnected = sapitoRoute?.needsConnectedSources === true || v2Intent === "needs_connected_sources";
+
       const isSapIntent = isSapKnowledgeIntent(sapIntent);
       const maxChunks = isSapIntent ? MAX_CHUNKS_SAP : MAX_CHUNKS_AFTER_DIVERSITY;
-      const topK = isSapIntent ? 6 : 10;
+      const topK = isSapIntent ? 8 : 14;
 
-      const [memoryChunks, extractedMemory, multiResult, officialChunks] = await Promise.all([
-        searchProjectMemory(projectId, userId, searchQuery, MAX_MEMORY_ITEMS),
-        getExtractedProjectMemory(projectId, 12),
-        searchMultiTenantKnowledge(projectId, userId, searchQuery, topK),
-        getOfficialSapKnowledgeContext(searchQuery, 4),
+      // Phase 1: explicit priority rules + evidence-first early exits.
+      const isHistoryOrDecision =
+        v2Intent === "project_history" ||
+        v2Intent === "project_decision" ||
+        v2Intent === "project_issue_resolution";
+      const isDocLookup = v2Intent === "project_documentation_lookup";
+      const isOperational = v2Intent === "project_status" || v2Intent === "project_operational_summary";
+
+      // Narrow retrieval groups.
+      const shouldRunProjectMemory = !isOperational;
+      // Confidence-aware retrieval ordering:
+      // - History/decision: memory first; docs only when explicitly needed.
+      // - Docs lookup: favor docs/connected.
+      // - SAP troubleshooting/design: allow docs even in project mode, but prefer project/connected first via ranking.
+      const shouldRunKnowledgeDocs =
+        !isOperational && (isDocLookup || wantsConnected || !isHistoryOrDecision);
+      // Only consult official SAP in project mode when the question is clearly SAP-general/troubleshooting/design,
+      // or when connected/docs retrieval is empty (handled by existing evidence-first logic).
+      const shouldRunOfficialSap =
+        !isOperational && (isSapIntent || v2Intent === "project_plus_sap_general");
+      const shouldRunFullTextPages =
+        !isOperational && accessToken != null && accessToken.trim() !== "";
+
+      const [memoryChunks, extractedMemory] = await Promise.all([
+        shouldRunProjectMemory ? searchProjectMemory(projectId, userId, searchQuery, MAX_MEMORY_ITEMS) : Promise.resolve([]),
+        shouldRunProjectMemory ? getExtractedProjectMemory(projectId, 12) : Promise.resolve([]),
       ]);
+      if (shouldRunProjectMemory) queriedGroups.push("project_memory");
+      else skippedGroups.push("project_memory");
+
+      const hasStrongProjectMemory = extractedMemory.length > 0 || memoryChunks.length > 0;
+      const shouldSkipDocsDueToStrongEvidence =
+        isHistoryOrDecision && hasStrongProjectMemory && !isDocLookup && !wantsConnected;
+      if (shouldSkipDocsDueToStrongEvidence) earlyExit = true;
+
+      const [multiResult, officialChunks] = await Promise.all([
+        shouldRunKnowledgeDocs && !shouldSkipDocsDueToStrongEvidence
+          ? searchMultiTenantKnowledge(projectId, userId, searchQuery, topK)
+          : Promise.resolve({ chunks: [], scopeBreakdown: { project: 0, user: 0, global: 0 } }),
+        shouldRunOfficialSap && !shouldSkipDocsDueToStrongEvidence
+          ? getOfficialSapKnowledgeContext(searchQuery, 4)
+          : Promise.resolve([]),
+      ]);
+      if (shouldRunKnowledgeDocs && !shouldSkipDocsDueToStrongEvidence) queriedGroups.push("project_documents");
+      else skippedGroups.push("project_documents");
+      if (shouldRunOfficialSap && !shouldSkipDocsDueToStrongEvidence) queriedGroups.push("official_sap");
+      else skippedGroups.push("official_sap");
 
       const memoriesFound = memoryChunks.length;
       const projectsUsed = memoriesFound > 0 ? [projectId] : [];
-      console.log("[Sapito memory retrieval]", { memoriesFound, projectsUsed, extractedCount: extractedMemory.length });
+      console.log("[Sapito memory retrieval]", { memoriesFound, projectsUsed, extractedCount: extractedMemory.length, v2Intent });
 
       const multiChunks = multiResult.chunks;
       const officialIds = new Set(officialChunks.map((c) => c.id));
-      const otherChunks = multiChunks.filter((c) => !officialIds.has(c.id));
+      const connectedChunksRaw = wantsConnected
+        ? multiChunks.filter((c) => (c.external_ref ?? "").trim() !== "")
+        : [];
+      const connectedChunks = connectedChunksRaw.length > 0
+        ? rankKnowledgeChunks(connectedChunksRaw, { mode: "project", v2Intent: v2Intent ?? null, query: searchQuery, projectId })
+        : [];
+      const remainingChunks = multiChunks.filter((c) => !connectedChunksRaw.includes(c));
+      const otherChunks = remainingChunks.filter((c) => !officialIds.has(c.id));
       const diverse = ensureChunkDiversity(otherChunks, MAX_PER_SOURCE, maxChunks);
 
       console.log("[Sapito multi-tenant retrieval]", {
@@ -475,7 +660,10 @@ export async function resolveProjectContext(
         projectId,
         documentsRetrieved: multiChunks.length,
         officialCount: officialChunks.length,
+        connectedCount: connectedChunks.length,
         scopeBreakdown: multiResult.scopeBreakdown,
+        v2Intent,
+        skippedDocs: shouldSkipDocsDueToStrongEvidence,
       });
 
       if (extractedMemory.length > 0) {
@@ -502,7 +690,22 @@ export async function resolveProjectContext(
         };
       }
 
-      // Project mode order: memory → project/global docs → official SAP (so official is support/fallback).
+      // Project mode order: memory → connected docs → project/global docs → official SAP (official is support/fallback).
+      if (connectedChunks.length > 0) {
+        sections.push(formatKnowledgeContext(ensureChunkDiversity(connectedChunks, 2, Math.min(6, maxChunks)), true));
+        // Keep backward compatible label (connected_documents) while adding semantic group.
+        retrievalScopes.push("connected_documents", "connected_documents_project");
+        retrievalDebug = {
+          chunkCount: (retrievalDebug.chunkCount ?? 0) + connectedChunks.length,
+          documentTitles: Array.from(
+            new Set([...(retrievalDebug.documentTitles ?? []), ...connectedChunks.map((c) => c.title || c.source_name || "(sin título)")])
+          ).slice(0, 30),
+          usedRetrieval: true,
+          usedProjectMemory: retrievalDebug.usedProjectMemory ?? false,
+          memoryCount: retrievalDebug.memoryCount ?? 0,
+        };
+      }
+
       if (diverse.length > 0) {
         sections.push(formatKnowledgeContext(diverse, true));
         retrievalScopes.push("project_documents");
@@ -516,22 +719,29 @@ export async function resolveProjectContext(
       }
       if (officialChunks.length > 0) {
         sections.push(formatOfficialSapContext(officialChunks));
-        retrievalScopes.push("official_sap");
+        retrievalScopes.push("official_sap", "sap_general_knowledge");
         retrievalDebug.documentTitles = Array.from(
           new Set([...retrievalDebug.documentTitles, ...officialChunks.map((c) => c.title || "(sin título)")])
         );
         retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + officialChunks.length;
       }
 
+      strongEvidence =
+        retrievalScopes.includes("project_memory") ||
+        retrievalScopes.includes("project_documents") ||
+        retrievalScopes.includes("connected_documents_project");
+
       // Full-text knowledge pages (complementary to vector search).
-      const fullTextPages = await searchKnowledgePagesFullText(searchQuery, 3, { accessToken });
-      if (fullTextPages.length > 0) {
-        sections.push(formatFullTextKnowledgePagesContext(fullTextPages));
-        retrievalScopes.push("fulltext_knowledge_pages");
-        retrievalDebug.documentTitles = Array.from(
-          new Set([...(retrievalDebug.documentTitles ?? []), ...fullTextPages.map((p) => p.title ?? "(sin título)")])
-        );
-        retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + fullTextPages.length;
+      if (shouldRunFullTextPages && !shouldSkipDocsDueToStrongEvidence) {
+        const fullTextPages = await searchKnowledgePagesFullText(searchQuery, 3, { accessToken });
+        if (fullTextPages.length > 0) {
+          sections.push(formatFullTextKnowledgePagesContext(fullTextPages));
+          retrievalScopes.push("fulltext_knowledge_pages");
+          retrievalDebug.documentTitles = Array.from(
+            new Set([...(retrievalDebug.documentTitles ?? []), ...fullTextPages.map((p) => p.title ?? "(sin título)")])
+          );
+          retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + fullTextPages.length;
+        }
       }
     } catch (err) {
       console.error("[ProjectContextResolver] retrieval error", err);
@@ -539,5 +749,19 @@ export async function resolveProjectContext(
   }
 
   const contextText = sections.length === 0 ? "" : sections.join("\n\n");
-  return { contextText, retrievalDebug, retrievalScopes };
+  const retrievalTrace = {
+    mode: "project" as const,
+    detectedIntent: sapIntent ?? null,
+    detectedV2Intent: sapitoRoute?.intent ?? null,
+    sapTaxonomy: sapitoRoute?.sapTaxonomy
+      ? { domains: sapitoRoute.sapTaxonomy.domains, themes: sapitoRoute.sapTaxonomy.themes, matched: sapitoRoute.sapTaxonomy.matched }
+      : null,
+    queriedGroups,
+    skippedGroups,
+    earlyExit,
+    strongEvidence,
+    fallbackConsidered: false,
+    winningSourceLabels: Array.from(new Set(retrievalScopes)).slice(0, 12),
+  };
+  return { contextText, retrievalDebug, retrievalScopes, retrievalTrace };
 }

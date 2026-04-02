@@ -374,12 +374,12 @@ export default function KnowledgePageDetail() {
         </div>
 
         {error && (
-          <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             {error}
           </div>
         )}
         {saveError && (
-          <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             {saveError}
           </div>
         )}
@@ -397,7 +397,7 @@ export default function KnowledgePageDetail() {
         />
 
         {/* Backlinks: pages that link to this one */}
-        <div className="mt-14 pt-5 border-t border-slate-900/80">
+        <div className="mt-14 pt-5 border-t border-[rgb(var(--rb-surface-border))]/80">
           <h2 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600 mb-3">
             Linked from
           </h2>
@@ -414,10 +414,12 @@ export default function KnowledgePageDetail() {
                   <li key={`${edge.from_page_id}-${edge.to_page_id}-${edge.link_type}-${i}`}>
                     <Link
                       href={`/knowledge/${otherId}${projectIdFromQuery ? `?projectId=${projectIdFromQuery}` : ""}`}
-                      className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-slate-300 hover:bg-slate-900/35 transition-colors"
+                      className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-2))]/60 hover:text-[rgb(var(--rb-text-primary))] transition-colors"
                     >
                       <span className="font-medium truncate flex-1 min-w-0">{title}</span>
-                      <Badge variant="brand" className="bg-indigo-500/10 text-indigo-300/90 shrink-0">{edge.link_type.replace(/_/g, " ")}</Badge>
+                      <Badge variant="brand" className="bg-[rgb(var(--rb-brand-surface))] text-[rgb(var(--rb-brand-primary-active))] shrink-0 ring-1 ring-[rgb(var(--rb-brand-primary))]/18">
+                        {edge.link_type.replace(/_/g, " ")}
+                      </Badge>
                     </Link>
                   </li>
                 );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Plus, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
@@ -114,6 +114,8 @@ export default function ClientsPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string | boolean>>({ ...EMPTY_FORM });
   const [clientsQuota, setClientsQuota] = useState<{ atLimit: boolean; current: number; limit: number | null } | null>(null);
+  const [projectCounts, setProjectCounts] = useState<Record<string, number>>({});
+  const [loadingProjectCounts, setLoadingProjectCounts] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -193,7 +195,47 @@ export default function ClientsPage() {
       )
     : clients;
 
+  const filteredClientIds = useMemo(
+    () => Array.from(new Set(filteredClients.map((c) => c.id).filter(Boolean))),
+    [filteredClients]
+  );
+
   const canManage = appRole === "superadmin" || appRole === "admin";
+
+  // Load project counts for the currently visible clients (single query; avoids N+1).
+  useEffect(() => {
+    if (!canManage) return;
+    if (filteredClientIds.length === 0) {
+      setProjectCounts({});
+      return;
+    }
+    let cancelled = false;
+    setLoadingProjectCounts(true);
+    (async () => {
+      try {
+        const { data, error: qErr } = await supabase
+          .from("projects")
+          .select("id, client_id")
+          .in("client_id", filteredClientIds);
+
+        if (qErr) throw qErr;
+
+        const counts: Record<string, number> = {};
+        for (const row of (data ?? []) as { id: string; client_id: string | null }[]) {
+          if (!row.client_id) continue;
+          counts[row.client_id] = (counts[row.client_id] ?? 0) + 1;
+        }
+        if (!cancelled) setProjectCounts(counts);
+      } catch {
+        if (!cancelled) setProjectCounts({});
+      } finally {
+        if (!cancelled) setLoadingProjectCounts(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canManage, filteredClientIds]);
 
   if (loading && appRole === null) {
     return (
@@ -317,7 +359,11 @@ export default function ClientsPage() {
                       </td>
                       <td className="py-3 px-4 text-slate-600">{c.industry ?? "—"}</td>
                       <td className="py-3 px-4 text-slate-600">{getCountryDisplayName(c.country) ?? "—"}</td>
-                      <td className="py-3 px-4 text-slate-500">—</td>
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center rounded-md border border-slate-200/80 bg-white px-2 py-0.5 text-xs font-medium text-slate-700">
+                          {loadingProjectCounts ? "…" : (projectCounts[c.id] ?? 0)}
+                        </span>
+                      </td>
                       <td className="py-3 px-4 text-slate-500">—</td>
                       <td className="py-3 px-4">{statusBadge(c.is_active)}</td>
                     </tr>

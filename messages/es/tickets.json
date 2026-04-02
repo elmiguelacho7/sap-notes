@@ -85,6 +85,7 @@
     "invalidProjectId": "Identificador de proyecto no válido.",
     "backToProjects": "Volver a proyectos",
     "creatingBanner": "Creando…",
+    "eyebrow": "Tickets",
     "title": "Nuevo ticket del proyecto",
     "subtitle": "Crea un ticket vinculado a este proyecto. Quedará visible en la sección Tickets del proyecto.",
     "sectionMain": "Información principal",

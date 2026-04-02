@@ -72,6 +72,7 @@ export default function ProjectBrainPage() {
       t("quickActions.lessonsSummary"),
       t("quickActions.decisionsSummary"),
       t("quickActions.knowledgeSummary"),
+      t("quickActions.docsSummary"),
     ],
     [t]
   );

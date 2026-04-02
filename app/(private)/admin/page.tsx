@@ -115,20 +115,36 @@ export default function AdminPage() {
 }
 
 type OverviewStats = {
+  usersTotal: number | null;
   usersActive: number | null;
+  usersPending: number | null;
+  adminsTotal: number | null;
+  consultantsTotal: number | null;
   projectsTotal: number | null;
   knowledgeIntegrations: number | null;
   capacityPct: number | null;
+  usersAtLimit: number | null;
+  usersNearLimit: number | null;
+  projectsAtLimit: number | null;
+  projectsNearLimit: number | null;
 };
 
 function AdminPanel() {
   const t = useTranslations("admin.page");
   const [activeTab, setActiveTab] = useState<TabId>("users");
   const [overview, setOverview] = useState<OverviewStats>({
+    usersTotal: null,
     usersActive: null,
+    usersPending: null,
+    adminsTotal: null,
+    consultantsTotal: null,
     projectsTotal: null,
     knowledgeIntegrations: null,
     capacityPct: null,
+    usersAtLimit: null,
+    usersNearLimit: null,
+    projectsAtLimit: null,
+    projectsNearLimit: null,
   });
 
   useEffect(() => {
@@ -145,8 +161,18 @@ function AdminPanel() {
 
         if (cancelled) return;
 
-        const usersData = usersRes.ok ? ((await usersRes.json()) as { users?: { is_active?: boolean }[] }) : null;
+        const usersData = usersRes.ok
+          ? ((await usersRes.json()) as { users?: { is_active?: boolean; app_role?: string }[] })
+          : null;
+        const usersTotal = usersData?.users?.length ?? null;
         const usersActive = usersData?.users?.filter((u) => u.is_active === true).length ?? null;
+        const usersPending = usersData?.users?.filter((u) => u.is_active !== true).length ?? null;
+        const adminsTotal =
+          usersData?.users?.filter((u) => (u.app_role ?? "").toLowerCase() === "admin" || (u.app_role ?? "").toLowerCase() === "superadmin").length ??
+          null;
+        const consultantsTotal =
+          usersData?.users?.filter((u) => (u.app_role ?? "").toLowerCase() === "consultant").length ??
+          null;
 
         const projectsTotal = projectsRes.error ? null : (projectsRes.count ?? null);
 
@@ -157,20 +183,49 @@ function AdminPanel() {
         }
 
         let capacityPct: number | null = null;
+        let usersAtLimit: number | null = null;
+        let usersNearLimit: number | null = null;
+        let projectsAtLimit: number | null = null;
+        let projectsNearLimit: number | null = null;
         if (capacityRes.ok) {
           const cap = (await capacityRes.json()) as {
-            summary?: { usersAtLimit?: number; usersNearLimit?: number; userUsage?: unknown[] };
+            summary?: {
+              usersAtLimit?: number;
+              usersNearLimit?: number;
+              usersWithOverrides?: number;
+              projectsAtMemberLimit?: number;
+              projectsNearMemberLimit?: number;
+              projectsAtInvitationLimit?: number;
+              projectsNearInvitationLimit?: number;
+              userUsage?: unknown[];
+            };
           };
           const total = cap.summary?.userUsage?.length ?? 0;
           const atLimit = cap.summary?.usersAtLimit ?? 0;
           const nearLimit = cap.summary?.usersNearLimit ?? 0;
           if (total > 0) capacityPct = Math.round(((atLimit + nearLimit * 0.5) / total) * 100);
+          usersAtLimit = atLimit;
+          usersNearLimit = nearLimit;
+          const projAt =
+            (cap.summary?.projectsAtMemberLimit ?? 0) + (cap.summary?.projectsAtInvitationLimit ?? 0);
+          const projNear =
+            (cap.summary?.projectsNearMemberLimit ?? 0) + (cap.summary?.projectsNearInvitationLimit ?? 0);
+          projectsAtLimit = projAt;
+          projectsNearLimit = projNear;
         }
         setOverview({
+          usersTotal,
           usersActive,
+          usersPending,
+          adminsTotal,
+          consultantsTotal,
           projectsTotal,
           knowledgeIntegrations,
           capacityPct,
+          usersAtLimit,
+          usersNearLimit,
+          projectsAtLimit,
+          projectsNearLimit,
         });
       } catch {
         if (!cancelled) setOverview((o) => ({ ...o }));
@@ -195,6 +250,84 @@ function AdminPanel() {
   const kpiCell =
     "relative min-w-0 overflow-hidden rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 py-3.5 pl-4 pr-3 shadow-sm before:absolute before:left-0 before:top-3 before:bottom-3 before:w-[3px] before:rounded-full before:bg-[rgb(var(--rb-brand-primary))]/35 before:content-['']";
 
+  const insightCell =
+    "rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-4 py-3 shadow-sm ring-1 ring-slate-100";
+  const insightLabel =
+    "text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--rb-text-muted))]";
+  const insightValue =
+    "mt-1 text-sm font-semibold text-[rgb(var(--rb-text-primary))]";
+  const insightSub =
+    "mt-0.5 text-xs text-[rgb(var(--rb-text-muted))]";
+
+  const accessHealth =
+    overview.usersPending === null
+      ? { title: "Access health", value: "—", sub: "Pending activations" }
+      : overview.usersPending === 0
+        ? { title: "Access health", value: "No activation backlog", sub: "All users are active" }
+        : { title: "Access health", value: `${overview.usersPending} pending`, sub: "Users awaiting activation" };
+
+  const governanceHealth =
+    overview.adminsTotal === null
+      ? { title: "Governance", value: "—", sub: "Admin coverage" }
+      : overview.adminsTotal <= 1
+        ? { title: "Governance", value: "Single admin", sub: "Consider adding a backup admin" }
+        : { title: "Governance", value: `${overview.adminsTotal} admin users`, sub: "Admin-level coverage" };
+
+  const knowledgeHealth =
+    overview.knowledgeIntegrations === null
+      ? { title: "Knowledge", value: "—", sub: "Connected sources" }
+      : overview.knowledgeIntegrations === 0
+        ? { title: "Knowledge", value: "No sources connected", sub: "Connect a source to start ingesting" }
+        : { title: "Knowledge", value: `${overview.knowledgeIntegrations} connected`, sub: "Active integrations" };
+
+  const capacityHealth = (() => {
+    const at = overview.usersAtLimit ?? null;
+    const near = overview.usersNearLimit ?? null;
+    const projAt = overview.projectsAtLimit ?? null;
+    const projNear = overview.projectsNearLimit ?? null;
+    if (at == null && near == null && projAt == null && projNear == null) {
+      return { title: "Capacity", value: "—", sub: "Limits and near-limit users" };
+    }
+    const flags =
+      (at ?? 0) + (near ?? 0) + (projAt ?? 0) + (projNear ?? 0);
+    if (flags === 0) {
+      return { title: "Capacity", value: "No alerts", sub: "No users/projects near limits" };
+    }
+    const parts: string[] = [];
+    if ((at ?? 0) > 0) parts.push(`${at} at limit`);
+    if ((near ?? 0) > 0) parts.push(`${near} near limit`);
+    if ((projAt ?? 0) > 0) parts.push(`${projAt} projects at limit`);
+    if ((projNear ?? 0) > 0) parts.push(`${projNear} projects near limit`);
+    return { title: "Capacity", value: parts[0] ?? "Alerts", sub: parts.slice(1).join(" · ") || "Review capacity dashboard" };
+  })();
+
+  const sectionMeta: Record<TabId, { title: string; subtitle: string }> = {
+    users: {
+      title: "Users",
+      subtitle: "Manage identities, roles, and access state across the platform.",
+    },
+    activations: {
+      title: "Activations",
+      subtitle: "Review pending users and activate access when appropriate.",
+    },
+    knowledge: {
+      title: "Knowledge sources",
+      subtitle: "Connect and monitor ingestion sources that feed the knowledge system.",
+    },
+    limits: {
+      title: "Role limits",
+      subtitle: "Set default quotas per role to enforce governance at scale.",
+    },
+    userLimits: {
+      title: "User limits",
+      subtitle: "Override quotas for specific users when needed.",
+    },
+    capacity: {
+      title: "Capacity",
+      subtitle: "Monitor quota pressure across users and projects to prevent throttling.",
+    },
+  };
+
   return (
     <AppPageShell>
       <div className={FORM_PAGE_SHELL_CLASS}>
@@ -209,28 +342,48 @@ function AdminPanel() {
           <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-3 shadow-sm sm:p-4">
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3.5">
               <div className={kpiCell}>
-                <p className={kpiLabel}>Users</p>
-                <p className={kpiValue}>{overview.usersActive !== null ? overview.usersActive : "—"}</p>
-                <p className={kpiHint}>Active users in the system</p>
+                <p className={kpiLabel}>Total users</p>
+                <p className={kpiValue}>{overview.usersTotal !== null ? overview.usersTotal : "—"}</p>
+                <p className={kpiHint}>
+                  {overview.usersActive !== null && overview.usersPending !== null
+                    ? `${overview.usersActive} active · ${overview.usersPending} pending`
+                    : "Active and pending users"}
+                </p>
               </div>
               <div className={kpiCell}>
                 <p className={kpiLabel}>Projects</p>
                 <p className={kpiValue}>{overview.projectsTotal !== null ? overview.projectsTotal : "—"}</p>
-                <p className={kpiHint}>Total projects</p>
+                <p className={kpiHint}>Portfolio footprint</p>
               </div>
               <div className={kpiCell}>
                 <p className={kpiLabel}>Knowledge sources</p>
                 <p className={kpiValue}>
                   {overview.knowledgeIntegrations !== null ? overview.knowledgeIntegrations : "—"}
                 </p>
-                <p className={kpiHint}>Connected integrations</p>
+                <p className={kpiHint}>Connected ingestion sources</p>
               </div>
               <div className={kpiCell}>
-                <p className={kpiLabel}>Capacity</p>
-                <p className={kpiValue}>{overview.capacityPct !== null ? `${overview.capacityPct}%` : "—"}</p>
-                <p className={kpiHint}>Usage / near limit</p>
+                <p className={kpiLabel}>Capacity alerts</p>
+                <p className={kpiValue}>
+                  {overview.capacityPct !== null ? `${overview.capacityPct}%` : "—"}
+                </p>
+                <p className={kpiHint}>
+                  {overview.usersAtLimit !== null && overview.usersNearLimit !== null
+                    ? `${overview.usersAtLimit} at limit · ${overview.usersNearLimit} near limit`
+                    : "Users near quota limits"}
+                </p>
               </div>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-4 sm:gap-3.5">
+            {[accessHealth, governanceHealth, knowledgeHealth, capacityHealth].map((x) => (
+              <div key={x.title} className={insightCell}>
+                <p className={insightLabel}>{x.title}</p>
+                <p className={insightValue}>{x.value}</p>
+                <p className={insightSub}>{x.sub}</p>
+              </div>
+            ))}
           </div>
 
           <nav
@@ -291,12 +444,24 @@ function AdminPanel() {
             </button>
           </nav>
 
-          {activeTab === "users" && <UsersRolesPanel />}
-          {activeTab === "activations" && <ActivationsPanel />}
-          {activeTab === "knowledge" && <GlobalKnowledgeSourcesPanel />}
-          {activeTab === "limits" && <RoleLimitsPanel />}
-          {activeTab === "userLimits" && <UserLimitsPanel />}
-          {activeTab === "capacity" && <CapacityDashboard />}
+          <section className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] shadow-sm ring-1 ring-slate-100 overflow-hidden">
+            <div className="border-b border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-2))]/55 px-5 py-4">
+              <h2 className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">
+                {sectionMeta[activeTab].title}
+              </h2>
+              <p className="mt-1 text-xs text-[rgb(var(--rb-text-muted))]">
+                {sectionMeta[activeTab].subtitle}
+              </p>
+            </div>
+            <div className="p-5">
+              {activeTab === "users" && <UsersRolesPanel />}
+              {activeTab === "activations" && <ActivationsPanel />}
+              {activeTab === "knowledge" && <GlobalKnowledgeSourcesPanel />}
+              {activeTab === "limits" && <RoleLimitsPanel />}
+              {activeTab === "userLimits" && <UserLimitsPanel />}
+              {activeTab === "capacity" && <CapacityDashboard />}
+            </div>
+          </section>
         </div>
       </div>
     </AppPageShell>

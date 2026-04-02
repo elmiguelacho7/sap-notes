@@ -9,10 +9,11 @@
     "quickSuggestionsAria": "Sugerencias de consulta"
   },
   "quickActions": {
-    "problemSummary": "What problems have we solved in this project?",
-    "lessonsSummary": "What lessons should we remember from this project?",
-    "decisionsSummary": "What decisions have we made in this project?",
-    "knowledgeSummary": "Summarize the most important project knowledge."
+    "problemSummary": "¿Qué problemas hemos resuelto en este proyecto?",
+    "lessonsSummary": "¿Qué lecciones debemos recordar de este proyecto?",
+    "decisionsSummary": "¿Qué decisiones hemos tomado en este proyecto?",
+    "knowledgeSummary": "Resume el conocimiento más importante del proyecto.",
+    "docsSummary": "Resume la documentación conectada del proyecto (Drive)."
   },
   "groups": {
     "problem": "Problemas resueltos",

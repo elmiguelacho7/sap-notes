@@ -178,14 +178,22 @@ export default function ProjectNewTicketPage() {
   }
 
   return (
-    <div className="w-full min-w-0 space-y-8">
+    <div className="w-full min-w-0 space-y-10">
       {showCreandoBanner && (
         <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-3 py-2 text-xs text-[rgb(var(--rb-text-muted))] shadow-sm">
           {t("creatingBanner")}
         </div>
       )}
       <header>
-        <ProjectPageHeader variant="section" title={t("title")} subtitle={t("subtitle")} />
+        <div className="space-y-3">
+          <ProjectPageHeader
+            variant="page"
+            eyebrow={t("eyebrow")}
+            title={t("title")}
+            subtitle={t("subtitle")}
+          />
+          <div className="h-px bg-[rgb(var(--rb-surface-border))]/60" />
+        </div>
       </header>
 
       {errorMsg && (
@@ -194,8 +202,8 @@ export default function ProjectNewTicketPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] shadow-md">
-        <form onSubmit={handleSubmit} className="space-y-8 p-6 md:p-8">
+      <div className="overflow-hidden rounded-3xl border border-[rgb(var(--rb-surface-border))]/75 bg-[rgb(var(--rb-surface))] shadow-md ring-1 ring-[rgb(var(--rb-brand-primary))]/5">
+        <form onSubmit={handleSubmit} className="space-y-9 p-7 md:p-9">
           <div className="space-y-6">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">
               {t("sectionMain")}
@@ -238,6 +246,7 @@ export default function ProjectNewTicketPage() {
                     onChange={setAssigneeUserId}
                     placeholder={t("assigneePlaceholder")}
                     className="w-full max-w-xs"
+                    appearance="light"
                   />
                 </div>
               </div>

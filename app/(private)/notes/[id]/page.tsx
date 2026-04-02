@@ -136,7 +136,7 @@ export default function NoteDetailPage() {
     <div className="min-h-screen w-full min-w-0 rb-workspace-bg px-6 py-7 xl:px-8 2xl:px-10">
       <Link
         href={backHref}
-        className="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 transition-colors mb-6"
+        className="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 transition-colors mb-4"
       >
         <ArrowLeft className="h-4 w-4" />
         Volver a notas
@@ -159,32 +159,43 @@ export default function NoteDetailPage() {
       ) : (
         <div className="space-y-6">
           {/* Header */}
-          <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                {note.project_id && (
-                  <span className="inline-flex items-center rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-2.5 py-0.5 text-xs font-medium text-indigo-300">
-                    Nota de proyecto
+          <header className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/75 bg-[rgb(var(--rb-surface))] p-5 shadow-sm ring-1 ring-slate-100 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  {note.project_id && (
+                    <span className="inline-flex items-center rounded-lg border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface-2))]/70 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[rgb(var(--rb-text-secondary))]">
+                      Nota de proyecto
+                    </span>
+                  )}
+                  <span className="inline-flex items-center rounded-lg border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface-2))]/70 px-2.5 py-0.5 text-[11px] font-medium text-[rgb(var(--rb-text-muted))]">
+                    Creada el{" "}
+                    {new Date(note.created_at).toLocaleDateString("es-ES", {
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    })}
                   </span>
-                )}
+                </div>
+
+                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[rgb(var(--rb-text-primary))] sm:text-[2.15rem]">
+                  {note.title}
+                </h1>
               </div>
-              <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-100 sm:text-2xl">
-                {note.title}
-              </h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Creada el {new Date(note.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })}
-              </p>
+
+              {canDeleteNote && (
+                <div className="shrink-0 pt-1 sm:pt-0">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-900 shadow-sm transition-colors hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Eliminar
+                  </button>
+                </div>
+              )}
             </div>
-            {canDeleteNote && (
-              <button
-                type="button"
-                onClick={() => setDeleteOpen(true)}
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm font-medium text-rose-300 hover:bg-rose-500/20 transition-colors"
-              >
-                <Trash2 className="h-4 w-4" />
-                Eliminar
-              </button>
-            )}
           </header>
 
           {/* Metadata grid */}
@@ -196,9 +207,13 @@ export default function NoteDetailPage() {
               </div>
             )}
             {note.module && (
-              <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Módulo</p>
-                <p className="mt-0.5 text-sm text-slate-200">{note.module}</p>
+              <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/75 bg-[rgb(var(--rb-surface))] px-4 py-3 shadow-sm ring-1 ring-slate-100">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[rgb(var(--rb-text-muted))]">
+                  Módulo
+                </p>
+                <p className="mt-0.5 text-sm font-medium text-[rgb(var(--rb-text-primary))]">
+                  {note.module}
+                </p>
               </div>
             )}
             {note.scope_item && (
@@ -216,14 +231,18 @@ export default function NoteDetailPage() {
           </div>
 
           {/* Detalle */}
-          <section className="rounded-2xl border border-slate-700/80 bg-slate-900/60 shadow-lg ring-1 ring-slate-700/30 overflow-hidden">
-            <div className="border-b border-slate-700/60 px-5 py-3 bg-slate-800/40">
-              <h2 className="text-sm font-semibold text-slate-300">Detalle</h2>
-            </div>
-            <div className="px-5 py-4">
-              <p className="whitespace-pre-wrap text-sm text-slate-300 leading-relaxed">
-                {note.body?.trim() ?? "Sin descripción."}
+          <section className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/75 bg-[rgb(var(--rb-surface))] shadow-sm ring-1 ring-slate-100 overflow-hidden">
+            <div className="px-5 pt-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[rgb(var(--rb-text-muted))]">
+                Detalle
               </p>
+            </div>
+            <div className="px-5 pb-5 pt-3">
+              <div className="rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface-2))]/55 px-4 py-4 ring-1 ring-slate-100">
+                <p className="whitespace-pre-wrap text-[15px] text-[rgb(var(--rb-text-secondary))] leading-7">
+                  {note.body?.trim() ?? "Sin descripción."}
+                </p>
+              </div>
             </div>
           </section>
 

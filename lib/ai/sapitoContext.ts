@@ -32,12 +32,29 @@ export type RetrievalDebug = {
 };
 
 /**
+ * Phase 5: Retrieval observability trace (safe, lightweight).
+ * Should be returned only in development/debug contexts.
+ */
+export type RetrievalTrace = {
+  mode: "global" | "project" | "notes";
+  detectedIntent?: string | null;
+  detectedV2Intent?: string | null;
+  sapTaxonomy?: { domains: string[]; themes: string[]; matched: string[] } | null;
+  queriedGroups: string[];
+  skippedGroups: string[];
+  earlyExit?: boolean;
+  strongEvidence?: boolean;
+  fallbackConsidered?: boolean;
+  winningSourceLabels?: string[];
+};
+
+/**
  * Builds context string and optional retrieval debug for the model prompt.
  * Delegates to context resolvers by mode; kept for backward compatibility (e.g. direct callers with scope).
  */
 export async function buildSapitoContext(
   params: BuildSapitoContextParams
-): Promise<{ contextText: string; retrievalDebug?: RetrievalDebug }> {
+): Promise<{ contextText: string; retrievalDebug?: RetrievalDebug; retrievalTrace?: RetrievalTrace }> {
   const { scope, projectId, userId, message, sapIntent } = params;
   if (scope === "project" && projectId?.trim()) {
     const result = await resolveProjectContext({
@@ -46,7 +63,7 @@ export async function buildSapitoContext(
       message: message ?? "",
       sapIntent,
     });
-    return { contextText: result.contextText, retrievalDebug: result.retrievalDebug };
+    return { contextText: result.contextText, retrievalDebug: result.retrievalDebug, retrievalTrace: result.retrievalTrace };
   }
   const notesVariant = scope === "notes";
   const result = await resolveGlobalContext({
@@ -55,6 +72,6 @@ export async function buildSapitoContext(
     notesVariant,
     userId: userId ?? undefined,
   });
-  return { contextText: result.contextText, retrievalDebug: result.retrievalDebug };
+  return { contextText: result.contextText, retrievalDebug: result.retrievalDebug, retrievalTrace: result.retrievalTrace };
 }
 

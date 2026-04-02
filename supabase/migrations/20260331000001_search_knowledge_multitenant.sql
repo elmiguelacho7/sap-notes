@@ -15,7 +15,14 @@ RETURNS TABLE(
   module text,
   source_name text,
   external_ref text,
-  scope_type text
+  scope_type text,
+  source_type text,
+  source_url text,
+  document_type text,
+  topic text,
+  sap_component text,
+  mime_type text,
+  chunk_index int
 )
 LANGUAGE sql
 STABLE
@@ -32,6 +39,13 @@ AS $$
       kd.source_name,
       kd.external_ref,
       kd.scope_type,
+      kd.source_type,
+      kd.source_url,
+      kd.document_type,
+      kd.topic,
+      kd.sap_component,
+      kd.mime_type,
+      kd.chunk_index,
       kd.embedding,
       CASE kd.scope_type
         WHEN 'project' THEN 1
@@ -59,7 +73,14 @@ AS $$
     a.module,
     a.source_name,
     a.external_ref,
-    a.scope_type
+    a.scope_type,
+    a.source_type,
+    a.source_url,
+    a.document_type,
+    a.topic,
+    a.sap_component,
+    a.mime_type,
+    a.chunk_index
   FROM allowed a
   ORDER BY a.priority ASC, a.embedding <=> query_embedding
   LIMIT LEAST(match_limit, 50);

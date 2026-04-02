@@ -53,8 +53,8 @@ export function ProjectPageHeader({
       ? "mt-0.5 text-sm text-slate-500 max-w-2xl"
       : "mt-1 text-sm text-slate-500 max-w-2xl";
   const primaryBtnBase = dark
-    ? "inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0"
-    : "inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-2";
+    ? "inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--rb-brand-primary))]/50 bg-[rgb(var(--rb-brand-primary))]/12 px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-brand-wordmark-accent-dark))] hover:bg-[rgb(var(--rb-brand-primary))]/20 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/40 focus-visible:ring-offset-0"
+    : "inline-flex items-center justify-center gap-2 rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2";
   const primaryBtnClass = primaryActionClassName ? `${primaryBtnBase} ${primaryActionClassName}` : primaryBtnBase;
 
   return (

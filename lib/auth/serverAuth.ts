@@ -7,6 +7,38 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+/** Parse `Cookie` request header into { name, value } pairs (read-only helpers). */
+function parseCookieHeader(header: string | null): { name: string; value: string }[] {
+  if (!header?.trim()) return [];
+  const out: { name: string; value: string }[] = [];
+  for (const segment of header.split(";")) {
+    const idx = segment.indexOf("=");
+    if (idx === -1) continue;
+    const name = segment.slice(0, idx).trim();
+    const value = segment.slice(idx + 1).trim();
+    if (name) out.push({ name, value });
+  }
+  return out;
+}
+
+/**
+ * Supabase server client bound to the **incoming Request**'s Cookie header.
+ * Route Handlers should resolve auth from the same bytes the browser sent; `cookies()` from
+ * next/headers can occasionally miss session cookies on client `fetch` to API routes.
+ */
+export function createSupabaseServerClientFromRequestCookies(request: Request) {
+  return createServerClient(supabaseUrl!, supabaseAnonKey!, {
+    cookies: {
+      getAll() {
+        return parseCookieHeader(request.headers.get("cookie"));
+      },
+      setAll() {
+        // read-only
+      },
+    },
+  });
+}
+
 /**
  * Creates a Supabase client that uses the current request's cookies (session).
  * Use in API routes and server code where you need the authenticated user.
@@ -56,6 +88,13 @@ export async function getAccessTokenFromRequest(request: Request): Promise<strin
   const authHeader = request.headers.get("authorization");
   const token = authHeader?.replace(/^Bearer\s+/i, "").trim();
   if (token) return token;
+
+  const fromReq = createSupabaseServerClientFromRequestCookies(request);
+  const {
+    data: { session: s1 },
+  } = await fromReq.auth.getSession();
+  if (s1?.access_token) return s1.access_token;
+
   const supabase = await createServerSupabaseClient();
   const {
     data: { session },
@@ -80,6 +119,14 @@ export async function getCurrentUserIdFromRequest(request: Request): Promise<str
     } = await supabase.auth.getUser(token);
     if (!error && user) return user.id;
   }
+
+  const fromReq = createSupabaseServerClientFromRequestCookies(request);
+  const {
+    data: { user: u1 },
+    error: err1,
+  } = await fromReq.auth.getUser();
+  if (!err1 && u1) return u1.id;
+
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },

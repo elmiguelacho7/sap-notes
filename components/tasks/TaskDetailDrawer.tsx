@@ -94,30 +94,32 @@ export function TaskDetailDrawer({
   if (!open) return null;
 
   const inputClass =
-    "w-full rounded-xl border border-slate-600/80 bg-slate-800/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50";
-  const labelClass = "block text-xs font-medium text-slate-500 mb-1";
+    "w-full h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/25";
+  const textareaClass =
+    "w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2.5 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/25";
+  const labelClass = "block text-xs font-medium text-[rgb(var(--rb-text-muted))] mb-1.5";
 
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/50 transition-opacity"
+        className="fixed inset-0 z-40 bg-slate-900/45 backdrop-blur-[2px] transition-opacity"
         onClick={onClose}
         aria-hidden
       />
       <div
-        className="fixed top-0 right-0 bottom-0 z-50 w-full md:max-w-xl bg-slate-900 border-l border-slate-700/80 shadow-xl flex flex-col"
+        className="fixed top-0 right-0 bottom-0 z-50 w-full md:max-w-xl bg-[rgb(var(--rb-surface))] border-l border-[rgb(var(--rb-surface-border))]/80 shadow-xl flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="task-detail-title"
       >
-        <div className="flex items-center justify-between shrink-0 border-b border-slate-700/60 px-4 py-3">
-          <h2 id="task-detail-title" className="text-lg font-semibold text-slate-100">
+        <div className="flex items-center justify-between shrink-0 border-b border-[rgb(var(--rb-surface-border))]/70 px-4 py-3 bg-[rgb(var(--rb-surface))]">
+          <h2 id="task-detail-title" className="text-lg font-semibold text-[rgb(var(--rb-text-primary))]">
             {t("title")}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            className="rounded-lg p-2 text-[rgb(var(--rb-text-muted))] hover:text-[rgb(var(--rb-text-primary))] hover:bg-[rgb(var(--rb-surface-2))]/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/30"
             aria-label={t("closeAria")}
           >
             <X className="h-5 w-5" />
@@ -143,7 +145,7 @@ export function TaskDetailDrawer({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className={inputClass}
+              className={textareaClass}
               placeholder={t("descriptionPlaceholder")}
             />
           </div>
@@ -227,7 +229,7 @@ export function TaskDetailDrawer({
           {context === "project" && projectName != null && (
             <div>
               <label className={labelClass}>{t("project")}</label>
-              <p className="text-sm text-slate-400">{projectName}</p>
+              <p className="text-sm text-[rgb(var(--rb-text-secondary))]">{projectName}</p>
             </div>
           )}
 
@@ -235,14 +237,14 @@ export function TaskDetailDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors"
+              className="h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-4 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-2))]/60 hover:text-[rgb(var(--rb-text-primary))] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/30 disabled:opacity-50"
             >
               {t("cancel")}
             </button>
             <button
               type="submit"
               disabled={saving || !title.trim()}
-              className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50 transition-colors"
+              className="h-10 rounded-xl rb-btn-primary px-4 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2 disabled:opacity-50"
             >
               {saving ? t("saving") : t("save")}
             </button>

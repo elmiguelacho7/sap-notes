@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent, useCallback } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabaseAuthForApiRequest } from "@/lib/supabaseClient";
 import { SapitoAvatar } from "./SapitoAvatar";
 import { AssistantSuggestionChips } from "./AssistantSuggestionChips";
 import { AssistantMessageContent } from "./AssistantMessageContent";
@@ -34,15 +34,16 @@ export function GlobalAssistantBubble() {
     setLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const userId = session?.user?.id ?? null;
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (session?.access_token) {
-        headers.Authorization = `Bearer ${session.access_token}`;
+      const { userId, headers } = await getSupabaseAuthForApiRequest();
+      if (!userId) {
+        setError("Debes iniciar sesión para usar Sapito.");
+        setLoading(false);
+        return;
       }
 
       const res = await fetch(AGENT_URL, {
         method: "POST",
+        credentials: "include",
         headers,
         body: JSON.stringify({
           message: trimmed,

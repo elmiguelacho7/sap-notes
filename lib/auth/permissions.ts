@@ -70,6 +70,21 @@ export async function requireAuthAndGlobalPermission(
 }
 
 /**
+ * Authenticates the request (Bearer or cookies). Does not check app-level RBAC permissions.
+ * Use when any logged-in user should be allowed (e.g. global Sapito SAP Q&A); gate sensitive
+ * features separately or via /api/me if needed.
+ */
+export async function requireAuthenticatedUser(
+  request: Request
+): Promise<{ userId: string } | NextResponse> {
+  const userId = await getCurrentUserIdFromRequest(request);
+  if (!userId?.trim()) {
+    return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+  }
+  return { userId: userId.trim() };
+}
+
+/**
  * Authenticates the request and requires the given project permission.
  * Returns { userId } on success, or a NextResponse for 401/403 that the route should return.
  */

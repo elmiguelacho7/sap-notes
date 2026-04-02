@@ -11,6 +11,7 @@ import { ViewModeToggle } from "@/components/tasks/ViewModeToggle";
 import { TaskDetailDrawer, type TaskDetailPayload } from "@/components/tasks/TaskDetailDrawer";
 import TasksBoard from "@/app/components/TasksBoard";
 import { useAssignableUsers } from "@/components/hooks/useAssignableUsers";
+import { Plus } from "lucide-react";
 
 type TaskStatusRow = { id: string; code: string; name: string };
 
@@ -28,6 +29,7 @@ export default function GlobalTasksPage() {
   const [detailTask, setDetailTask] = useState<BoardTask | null>(null);
   const [detailSaving, setDetailSaving] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [createSignal, setCreateSignal] = useState(0);
 
   const { users: assignableUsers } = useAssignableUsers({ contextType: "global" });
   const assigneeFilterOptions = useMemo(
@@ -108,13 +110,24 @@ export default function GlobalTasksPage() {
   }, []);
 
   return (
-    <div className="rb-workspace-bg min-h-full">
-      <AppPageShell>
-      <div className="space-y-6">
+    <AppPageShell>
+      <div className="space-y-6 w-full min-w-0">
       <TaskWorkspaceHeader
         title={t("globalPage.title")}
         subtitle={t("globalPage.subtitle")}
-        actions={<ViewModeToggle value={viewMode} onChange={setViewMode} />}
+        actions={
+          <>
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            <button
+              type="button"
+              onClick={() => setCreateSignal((n) => n + 1)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2 shrink-0"
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              {t("board.newTask")}
+            </button>
+          </>
+        }
       />
 
       <TaskFilterBar
@@ -140,6 +153,8 @@ export default function GlobalTasksPage() {
           projectId={null}
           title={t("globalPage.boardTitle")}
           subtitle={t("globalPage.boardSubtitle")}
+          showHeader={false}
+          externalCreateSignal={createSignal}
           filterByUserId={scope === "my" ? currentUserId : null}
           assigneeFilterId={assigneeFilter ? assigneeFilter : null}
           searchQuery={searchQuery}
@@ -169,7 +184,6 @@ export default function GlobalTasksPage() {
         saving={detailSaving}
       />
       </div>
-      </AppPageShell>
-    </div>
+    </AppPageShell>
   );
 }

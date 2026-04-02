@@ -30,6 +30,8 @@ export type TaskListProps = {
   /** For global: "Scope" column - e.g. "Global" / "My" based on filter; optional */
   scopeLabel?: string;
   loading?: boolean;
+  /** Visual variant only. */
+  variant?: "standalone" | "embedded";
 };
 
 const PRIORITY_ORDER: TaskPriorityKey[] = ["high", "medium", "low"];
@@ -50,6 +52,7 @@ export function TaskList({
   getActivityLabel,
   scopeLabel,
   loading = false,
+  variant = "standalone",
 }: TaskListProps) {
   const t = useTranslations("tasks.list");
   const tPriority = useTranslations("tasks.priority");
@@ -101,17 +104,30 @@ export function TaskList({
     );
   }
 
-  const baseTh =
-    `text-left ${FORM_SECTION_TITLE_CLASS} pb-2 pr-3 whitespace-nowrap`;
-  const baseTd = "py-2.5 pr-3 text-sm text-[rgb(var(--rb-text-primary))] align-middle";
+  const baseTh = `text-left ${FORM_SECTION_TITLE_CLASS} py-3 pr-4 whitespace-nowrap`;
+  const baseTd = "py-3 pr-4 text-sm text-[rgb(var(--rb-text-primary))] align-middle";
+  const controlClass =
+    "h-8 rounded-lg border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-2.5 text-xs text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/30 focus:border-[rgb(var(--rb-brand-primary))]/25";
 
   return (
-    <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] overflow-hidden shadow-sm">
-      <div className="overflow-x-auto [scrollbar-width:thin] [scrollbar-color:rgb(var(--rb-surface-border))_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgb(var(--rb-surface-border))]">
-        <table className="w-full min-w-[800px] border-collapse">
+    <div
+      className={
+        variant === "embedded"
+          ? "bg-transparent shadow-none border-0 rounded-none overflow-hidden"
+          : "rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] overflow-hidden shadow-sm"
+      }
+    >
+      <div
+        className={
+          variant === "embedded"
+            ? "overflow-x-auto px-5 sm:px-6 [scrollbar-width:thin] [scrollbar-color:rgb(var(--rb-surface-border))_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgb(var(--rb-surface-border))]"
+            : "overflow-x-auto px-4 sm:px-5 [scrollbar-width:thin] [scrollbar-color:rgb(var(--rb-surface-border))_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgb(var(--rb-surface-border))]"
+        }
+      >
+        <table className="w-full min-w-[920px] border-collapse">
           <thead>
             <tr className="border-b border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/80">
-              <th className={baseTh}>{t("colTask")}</th>
+              <th className={`${baseTh} pl-0.5`}>{t("colTask")}</th>
               {context === "global" && scopeLabel != null && <th className={baseTh}>{t("colScope")}</th>}
               {context === "global" && getProjectName && <th className={baseTh}>{t("colProject")}</th>}
               {context === "project" && getActivityLabel && <th className={baseTh}>{t("colActivity")}</th>}
@@ -133,28 +149,31 @@ export function TaskList({
               return (
                 <tr
                   key={task.id}
-                  className="border-b border-slate-700/40 hover:bg-slate-800/60 transition-colors"
+                  className="border-b border-[rgb(var(--rb-surface-border))]/65 hover:bg-[rgb(var(--rb-surface-2))]/60 transition-colors"
                 >
-                  <td className={baseTd}>
+                  <td className={`${baseTd} pl-0.5`}>
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-medium text-slate-100 truncate" title={task.title}>
+                      <span className="font-medium text-[rgb(var(--rb-text-primary))] truncate" title={task.title}>
                         {task.title}
                       </span>
                     </div>
                     {task.description && (
-                      <p className="text-xs text-slate-500 truncate max-w-[200px] mt-0.5" title={task.description}>
+                      <p
+                        className="text-xs text-[rgb(var(--rb-text-muted))] truncate max-w-[420px] mt-0.5"
+                        title={task.description}
+                      >
                         {task.description}
                       </p>
                     )}
                   </td>
                   {context === "global" && scopeLabel != null && (
                     <td className={baseTd}>
-                      <span className="text-slate-400">{scopeLabel}</span>
+                      <span className="text-[rgb(var(--rb-text-secondary))]">{scopeLabel}</span>
                     </td>
                   )}
                   {context === "global" && getProjectName && (
                     <td className={baseTd}>
-                      <span className="text-slate-400">
+                      <span className="text-[rgb(var(--rb-text-secondary))]">
                         {getProjectName((task as BoardTask & { project_id?: string | null }).project_id ?? null) ??
                           t("emDash")}
                       </span>
@@ -163,7 +182,7 @@ export function TaskList({
                   {context === "project" && getActivityLabel && (
                     <td className={baseTd}>
                       <span
-                        className="text-slate-400 truncate max-w-[140px] block"
+                        className="text-[rgb(var(--rb-text-secondary))] truncate max-w-[180px] block"
                         title={getActivityLabel(task.activity_id ?? null) ?? undefined}
                       >
                         {getActivityLabel(task.activity_id ?? null) ?? t("emDash")}
@@ -174,7 +193,7 @@ export function TaskList({
                     <select
                       value={statusKey}
                       onChange={(e) => onStatusChange(task.id, e.target.value)}
-                      className="rounded-lg border border-slate-600 bg-slate-800/80 px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 min-w-[100px]"
+                      className={`min-w-[132px] ${controlClass}`}
                     >
                       {statusOptions.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -188,7 +207,7 @@ export function TaskList({
                       <select
                         value={(task.priority ?? "medium").toLowerCase()}
                         onChange={(e) => onPriorityChange(task.id, e.target.value)}
-                        className="rounded-lg border border-slate-600 bg-slate-800/80 px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 min-w-[80px]"
+                        className={`min-w-[108px] ${controlClass}`}
                       >
                         {PRIORITY_ORDER.map((p) => (
                           <option key={p} value={p}>
@@ -197,7 +216,7 @@ export function TaskList({
                         ))}
                       </select>
                     ) : (
-                      <span className="text-slate-400">{priorityLabel(task.priority ?? "")}</span>
+                      <span className="text-[rgb(var(--rb-text-secondary))]">{priorityLabel(task.priority ?? "")}</span>
                     )}
                   </td>
                   {(assigneeOptions != null || onAssigneeChange) && (
@@ -209,9 +228,10 @@ export function TaskList({
                           onChange={(id) => onAssigneeChange(task.id, id)}
                           placeholder={tTaskCard("unassigned")}
                           variant={assigneeLabel ? "assigned" : "unassigned"}
+                          appearance="light"
                         />
                       ) : (
-                        <span className="text-slate-400">{assigneeLabel ?? tTaskCard("unassigned")}</span>
+                        <span className="text-[rgb(var(--rb-text-secondary))]">{assigneeLabel ?? tTaskCard("unassigned")}</span>
                       )}
                     </td>
                   )}
@@ -223,27 +243,27 @@ export function TaskList({
                           defaultValue={task.due_date ?? ""}
                           onBlur={(e) => handleDueDateBlur(task.id, e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && setEditingDueId(null)}
-                          className="rounded-lg border border-slate-600 bg-slate-800/80 px-2 py-1 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-36"
+                          className={`w-36 ${controlClass}`}
                           autoFocus
                         />
                       ) : (
                         <button
                           type="button"
                           onClick={() => setEditingDueId(task.id)}
-                          className="text-slate-400 hover:text-slate-200 text-xs flex items-center gap-1"
+                          className="text-[rgb(var(--rb-text-secondary))] hover:text-[rgb(var(--rb-text-primary))] text-xs flex items-center gap-1"
                         >
                           {task.due_date ? new Date(task.due_date).toLocaleDateString() : t("emDash")}
                           <Pencil className="h-3 w-3 opacity-60" />
                         </button>
                       )
                     ) : (
-                      <span className="text-slate-400">
+                      <span className="text-[rgb(var(--rb-text-secondary))]">
                         {task.due_date ? new Date(task.due_date).toLocaleDateString() : t("emDash")}
                       </span>
                     )}
                   </td>
                   <td className={baseTd}>
-                    <span className="text-slate-500 text-xs">
+                    <span className="text-[rgb(var(--rb-text-muted))] text-xs">
                       {task.updated_at
                         ? new Date(String(task.updated_at)).toLocaleDateString()
                         : task.created_at
@@ -256,7 +276,7 @@ export function TaskList({
                       <button
                         type="button"
                         onClick={() => onOpenDetail(task)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-600/80 bg-slate-800/60 px-2 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-slate-100 transition-colors"
+                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/90 px-2.5 text-xs font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-2))]/60 hover:text-[rgb(var(--rb-text-primary))] transition-colors"
                       >
                         {t("open")}
                         <ChevronRight className="h-3.5 w-3.5" />

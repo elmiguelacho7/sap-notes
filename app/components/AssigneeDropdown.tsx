@@ -242,15 +242,15 @@ export function AssigneeDropdown({
       : "border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 text-[rgb(var(--rb-text-primary))] hover:border-[rgb(var(--rb-surface-border))]/85 hover:bg-[rgb(var(--rb-surface))]";
 
   const triggerLayout = isLight
-    ? `inline-flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-sm font-normal ${lightTriggerClass}`
+    ? `inline-flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-lg border px-2.5 text-xs font-medium ${lightTriggerClass}`
     : `inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${darkTriggerClass}`;
 
   const avatarClass = isLight
     ? value
       ? variant === "assigned"
-        ? "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[rgb(var(--rb-brand-primary))]/22 bg-[rgb(var(--rb-brand-primary))]/12 text-xs font-medium text-[rgb(var(--rb-brand-primary))]"
-        : "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/40 text-xs font-medium text-[rgb(var(--rb-text-muted))]"
-      : "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/35 text-[rgb(var(--rb-text-muted))]"
+        ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-[rgb(var(--rb-brand-primary))]/22 bg-[rgb(var(--rb-brand-primary))]/12 text-[10px] font-semibold text-[rgb(var(--rb-brand-primary))]"
+        : "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/40 text-[10px] font-semibold text-[rgb(var(--rb-text-muted))]"
+      : "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-[rgb(var(--rb-surface-border))]/60 bg-[rgb(var(--rb-surface-3))]/35 text-[rgb(var(--rb-text-muted))]"
     : value
       ? variant === "assigned"
         ? "flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-600 text-[10px] font-medium leading-none text-slate-200"
@@ -258,7 +258,7 @@ export function AssigneeDropdown({
       : "flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-700/80 text-slate-500";
 
   const chevronClass = isLight
-    ? `h-4 w-4 shrink-0 transition-transform ${variant === "unassigned" ? "text-[rgb(var(--rb-text-muted))]" : "text-[rgb(var(--rb-text-secondary))]"} ${open ? "rotate-180" : ""}`
+    ? `h-3.5 w-3.5 shrink-0 transition-transform ${variant === "unassigned" ? "text-[rgb(var(--rb-text-muted))]" : "text-[rgb(var(--rb-text-secondary))]"} ${open ? "rotate-180" : ""}`
     : `h-3.5 w-3.5 shrink-0 transition-transform ${variant === "unassigned" ? "text-slate-500" : "text-slate-400"} ${open ? "rotate-180" : ""}`;
 
   const labelSpanClass = isLight ? "min-w-0 flex-1 truncate text-left" : "min-w-0 max-w-[90px] truncate";

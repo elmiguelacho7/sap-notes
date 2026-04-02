@@ -30,7 +30,14 @@ RETURNS TABLE(
   source text,
   module text,
   source_name text,
-  external_ref text
+  external_ref text,
+  source_type text,
+  source_url text,
+  document_type text,
+  topic text,
+  sap_component text,
+  mime_type text,
+  chunk_index int
 )
 LANGUAGE sql
 STABLE
@@ -44,7 +51,14 @@ AS $$
     kd.source,
     kd.module,
     kd.source_name,
-    kd.external_ref
+    kd.external_ref,
+    kd.source_type,
+    kd.source_url,
+    kd.document_type,
+    kd.topic,
+    kd.sap_component,
+    kd.mime_type,
+    kd.chunk_index
   FROM public.knowledge_documents kd
   WHERE kd.project_id = p_project_id
     AND kd.embedding IS NOT NULL

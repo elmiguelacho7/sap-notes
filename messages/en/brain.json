@@ -12,7 +12,8 @@
     "problemSummary": "What problems have we solved in this project?",
     "lessonsSummary": "What lessons should we remember from this project?",
     "decisionsSummary": "What decisions have we made in this project?",
-    "knowledgeSummary": "Summarize the most important project knowledge."
+    "knowledgeSummary": "Summarize the most important project knowledge.",
+    "docsSummary": "Summarize connected project documentation (Drive)."
   },
   "groups": {
     "problem": "Solved problems",

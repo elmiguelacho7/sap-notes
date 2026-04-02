@@ -7,9 +7,9 @@ import {
   ProjectNotFoundError,
 } from "@/lib/services/projectService";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { resolveGlobalContext, resolveProjectContext } from "@/lib/ai/contextResolvers";
-import { type RetrievalDebug } from "@/lib/ai/sapitoContext";
-import { classifySapIntent, shouldIncludeWorkspaceSummary, isProjectStatusQuestion, isProjectHistoryQuestion, hasProjectEvidence, hasStrongProjectHistoryEvidence, getProjectHistoryMatchReason } from "@/lib/ai/sapitoIntent";
+import { resolveGlobalContext, resolveProjectContext, type ResolverResult } from "@/lib/ai/contextResolvers";
+import { type RetrievalDebug, type RetrievalTrace } from "@/lib/ai/sapitoContext";
+import { classifySapIntent, shouldIncludeWorkspaceSummary, isProjectStatusQuestion, isProjectHistoryQuestion, hasProjectEvidence, hasStrongProjectHistoryEvidence, getProjectHistoryMatchReason, routeSapitoIntentV2 } from "@/lib/ai/sapitoIntent";
 import {
   resolveProjectByName,
   extractProjectNameFromMessage,
@@ -17,7 +17,8 @@ import {
 } from "@/lib/ai/projectResolution";
 import { getProjectMetrics } from "@/lib/metrics/platformMetrics";
 import { getCurrentUserIdFromRequest, getAccessTokenFromRequest } from "@/lib/auth/serverAuth";
-import { requireAuthAndProjectPermission, requireAuthAndGlobalPermission } from "@/lib/auth/permissions";
+import { requireAuthAndProjectPermission, requireAuthenticatedUser } from "@/lib/auth/permissions";
+import { getActionSuggestions, type SapitoAction } from "@/lib/ai/actionSuggestions";
 
 /** Human-readable grounding labels for UI. */
 const GROUNDING_LABELS: Record<string, string> = {
@@ -37,6 +38,130 @@ const GROUNDING_LABELS: Record<string, string> = {
 
 /** Assistant mode: global (SAP Copilot) or project (Project Copilot). Single engine, behavior by mode. */
 export type SapitoMode = "global" | "project";
+
+type SapitoGroundingType =
+  | "project_evidence"
+  | "connected_docs"
+  | "global_knowledge"
+  | "sap_general"
+  | "mixed";
+
+type SapitoConfidenceLevel = "high" | "medium" | "low";
+
+type SapitoAnswerMeta = {
+  /** Semantic source groups used (Phase 3). */
+  sourceLabelsUsed: string[];
+  confidenceLevel: SapitoConfidenceLevel;
+  groundingType: SapitoGroundingType;
+  /** Phase 1/4: response mode used for shaping. */
+  responseMode?: string;
+  /** Phase 5: detected SAP domains/themes (safe product signal; no raw match tokens). */
+  sapTaxonomy?: { domains: string[]; themes: string[] };
+  /** Lightweight suggested follow-ups (2–4). */
+  followUps?: string[];
+  /** Human readable one-liner */
+  sourceSummary?: string;
+  /** Phase 6: actionable suggestions (navigation or chat prompts only). */
+  actions?: SapitoAction[];
+};
+
+function uniqueNonEmpty(values: (string | null | undefined)[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const v of values) {
+    const s = typeof v === "string" ? v.trim() : "";
+    if (!s) continue;
+    if (seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
+}
+
+function computeAnswerMeta(
+  scopes: string[],
+  mode: SapitoMode,
+  sapitoRoute?: { responseMode?: string; sapTaxonomy?: { domains: readonly string[]; themes: readonly string[] } } | null
+): SapitoAnswerMeta {
+  const s = scopes ?? [];
+  const hasProjectEvidence = s.includes("project_memory") || s.includes("project_documents") || s.includes("project_summary") || s.includes("project_health") || s.includes("project_risk");
+  const hasConnectedProject = s.includes("connected_documents_project");
+  const hasConnectedGlobal = s.includes("connected_documents_global");
+  const hasConnected = hasConnectedProject || hasConnectedGlobal || s.includes("connected_documents");
+  const hasGlobalKnowledge = s.includes("global_knowledge") || s.includes("fulltext_knowledge_pages");
+  const hasSap = s.includes("official_sap") || s.includes("sap_general_knowledge");
+  const hasExternal = s.includes("external_sap_fallback");
+
+  const sourceLabelsUsed = uniqueNonEmpty([
+    hasProjectEvidence ? "project_memory" : null,
+    s.includes("project_documents") ? "project_documents" : null,
+    hasConnectedProject ? "connected_documents_project" : null,
+    hasConnectedGlobal ? "connected_documents_global" : null,
+    hasGlobalKnowledge ? "global_knowledge" : null,
+    s.includes("official_sap") ? "official_sap" : null,
+    hasSap ? "sap_general_knowledge" : null,
+    hasExternal ? "external_sap_fallback" : null,
+  ]);
+
+  let groundingType: SapitoGroundingType = "sap_general";
+  if (hasProjectEvidence && hasConnected) groundingType = "mixed";
+  else if (hasProjectEvidence) groundingType = "project_evidence";
+  else if (hasConnected) groundingType = "connected_docs";
+  else if (hasGlobalKnowledge) groundingType = "global_knowledge";
+  else if (hasSap) groundingType = "sap_general";
+
+  // Confidence heuristic (honest + conservative):
+  // - high: project evidence (memory/docs) or official SAP + connected/global knowledge
+  // - medium: connected/global knowledge OR official SAP alone
+  // - low: none of the above
+  let confidenceLevel: SapitoConfidenceLevel = "low";
+  if (mode === "project" && (s.includes("project_memory") || s.includes("project_documents"))) confidenceLevel = "high";
+  else if (mode === "project" && (hasConnectedProject || s.includes("project_summary"))) confidenceLevel = "medium";
+  else if (mode === "global" && (s.includes("official_sap") || hasGlobalKnowledge || hasConnectedGlobal)) confidenceLevel = "medium";
+  if (mode === "global" && s.includes("official_sap") && (hasGlobalKnowledge || hasConnectedGlobal)) confidenceLevel = "high";
+
+  const sourceSummary =
+    groundingType === "project_evidence"
+      ? "Based on project evidence"
+      : groundingType === "connected_docs"
+        ? "Based on connected documentation"
+        : groundingType === "global_knowledge"
+          ? "Based on global knowledge"
+          : groundingType === "mixed"
+            ? "Based on mixed evidence (project + docs)"
+            : "Based on general SAP knowledge";
+
+  const responseMode = sapitoRoute?.responseMode;
+  const tax = sapitoRoute?.sapTaxonomy;
+  const sapTaxonomy =
+    tax && (tax.domains.length > 0 || tax.themes.length > 0)
+      ? { domains: [...tax.domains], themes: [...tax.themes] }
+      : undefined;
+
+  const followUps: string[] = (() => {
+    // Keep small and context-aware.
+    if (groundingType === "project_evidence") {
+      return ["Show related project documentation", "What decisions have we made about this?", "What is the next recommended action?"].slice(0, 3);
+    }
+    if (groundingType === "connected_docs") {
+      return ["Summarize the connected documentation", "Which source is most relevant for this topic?", "What does the project documentation say about this?"].slice(0, 3);
+    }
+    if (groundingType === "global_knowledge" || groundingType === "sap_general") {
+      return ["What should I check in configuration?", "Compare standard alternatives", "What are the risks of this approach?"].slice(0, 3);
+    }
+    return ["Show related documentation", "What should we do next?"].slice(0, 2);
+  })();
+
+  return {
+    sourceLabelsUsed,
+    confidenceLevel,
+    groundingType,
+    responseMode,
+    sapTaxonomy,
+    followUps,
+    sourceSummary,
+  };
+}
 
 function getGroundingLabel(scopes: string[], resolvedProjectTitle?: string | null): string {
   if (resolvedProjectTitle) {
@@ -138,9 +263,11 @@ export async function POST(req: Request) {
       const authResult = await requireAuthAndProjectPermission(req, effectiveProjectId, "use_project_ai");
       if (authResult instanceof NextResponse) return authResult;
     }
-    // Global mode: require authentication and use_global_ai.
+    // Global mode: any authenticated user may use global Sapito (SAP Q&A + platform context).
+    // Do not require use_global_ai here — that incorrectly blocked valid SAP questions when RBAC
+    // was missing/out of sync; project mode still enforces use_project_ai.
     if (mode === "global") {
-      const authResult = await requireAuthAndGlobalPermission(req, "use_global_ai");
+      const authResult = await requireAuthenticatedUser(req);
       if (authResult instanceof NextResponse) return authResult;
       effectiveUserId = authResult.userId;
     }
@@ -154,7 +281,10 @@ export async function POST(req: Request) {
       });
     }
 
-    let sapIntent = classifySapIntent(message, effectiveProjectId ?? undefined);
+    // Sapito 2.0 Phase 1: intent router (deterministic) that feeds retrieval orchestration + response modes.
+    const sapitoRoute = routeSapitoIntentV2(message, { mode, projectId: effectiveProjectId });
+
+    let sapIntent = sapitoRoute.legacySapIntent ?? classifySapIntent(message, effectiveProjectId ?? undefined);
     // Ensure project-status questions in project mode never get generic (so we use PROJECT prompt and inject context).
     if (mode === "project" && effectiveProjectId && sapIntent === "generic" && isProjectStatusQuestion(message)) {
       sapIntent = "project_status";
@@ -178,10 +308,12 @@ export async function POST(req: Request) {
               userId,
               message,
               sapIntent,
+              sapitoRoute,
               accessToken: accessToken ?? undefined,
             }),
           ]);
-        const { contextText: sapitoContextSummary, retrievalDebug, retrievalScopes: scopes } = resolverResult;
+        const { contextText: sapitoContextSummary, retrievalDebug, retrievalScopes: scopes, retrievalTrace } =
+          resolverResult as ResolverResult;
         retrievalScopes = scopes;
         const isProjectHistory = isProjectHistoryQuestion(message);
         context = {
@@ -192,6 +324,8 @@ export async function POST(req: Request) {
           mode: "project",
           sapitoContextSummary: sapitoContextSummary ?? "",
           sapIntent,
+          sapitoRoute,
+          retrievalTrace,
           retrievalDebug: retrievalDebug ?? { chunkCount: 0, documentTitles: [], usedRetrieval: false },
           isProjectHistoryQuestion: isProjectHistory,
         };
@@ -311,11 +445,12 @@ Si documentas la solución o la decisión, Sapito podrá usarla la próxima vez.
       const resolverResult = await resolveGlobalContext({
         message,
         sapIntent,
+        sapitoRoute,
         notesVariant,
         userId: effectiveUserId ?? undefined,
         accessToken: accessToken ?? undefined,
       });
-      const { contextText: sapitoContextSummary, retrievalDebug, retrievalScopes: scopes } = resolverResult;
+      const { contextText: sapitoContextSummary, retrievalDebug, retrievalScopes: scopes, retrievalTrace } = resolverResult;
       retrievalScopes = scopes;
       const combinedSummary =
         resolvedProjectSummary != null
@@ -336,6 +471,8 @@ Si documentas la solución o la decisión, Sapito podrá usarla la próxima vez.
         mode: notesVariant ? "notes" : "global",
         sapitoContextSummary: combinedSummary,
         sapIntent,
+        sapitoRoute,
+        retrievalTrace,
         retrievalDebug: retrievalDebug ?? { chunkCount: 0, documentTitles: [], usedRetrieval: false },
       };
     }
@@ -407,13 +544,34 @@ Si documentas la solución o la decisión, Sapito podrá usarla la próxima vez.
 
     console.log("project-agent success");
     const groundingLabel = getGroundingLabel(retrievalScopes, resolvedProjectTitle);
-    const payload: { reply: string; grounded?: boolean; groundingLabel?: string; debug?: RetrievalDebug } = {
+    const meta = computeAnswerMeta(retrievalScopes, mode, sapitoRoute ?? null);
+    meta.actions = getActionSuggestions({
+      mode,
+      responseMode: meta.responseMode,
+      groundingType: meta.groundingType,
+      sapTaxonomy: meta.sapTaxonomy,
+      sourceLabelsUsed: meta.sourceLabelsUsed,
+      confidenceLevel: meta.confidenceLevel,
+      projectId: effectiveProjectId,
+    });
+    const payload: {
+      reply: string;
+      grounded?: boolean;
+      groundingLabel?: string;
+      meta?: SapitoAnswerMeta;
+      debug?: RetrievalDebug;
+      debugTrace?: RetrievalTrace;
+    } = {
       reply,
       grounded: (context.retrievalDebug?.usedRetrieval ?? false) === true,
       groundingLabel,
+      meta,
     };
     if (process.env.NODE_ENV === "development" && context.retrievalDebug) {
       payload.debug = context.retrievalDebug;
+    }
+    if (process.env.NODE_ENV === "development") {
+      payload.debugTrace = context.retrievalTrace;
     }
     return NextResponse.json(payload);
   } catch (err) {

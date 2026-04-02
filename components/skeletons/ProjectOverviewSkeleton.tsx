@@ -1,5 +1,10 @@
 import { PageShell } from "@/components/layout/PageShell";
 import { Skeleton } from "@/components/ui/Skeleton";
+import {
+  PROJECT_WORKSPACE_HERO,
+  PROJECT_WORKSPACE_CARD,
+  PROJECT_WORKSPACE_TOOLBAR,
+} from "@/lib/projectWorkspaceUi";
 
 /**
  * Reusable skeleton for project overview / dashboard.
@@ -8,7 +13,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 export function ProjectOverviewSkeleton({ wrapInPageShell = true }: { wrapInPageShell?: boolean }) {
   const content = (
     <div className="space-y-8">
-      <div className="relative overflow-hidden rounded-2xl border border-slate-700/90 bg-slate-900/95 p-4 sm:p-6 md:p-8 lg:p-10">
+      <div className={`relative overflow-hidden ${PROJECT_WORKSPACE_HERO}`}>
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0 flex-1 space-y-3">
             <div>
@@ -20,7 +25,7 @@ export function ProjectOverviewSkeleton({ wrapInPageShell = true }: { wrapInPage
               </div>
               <Skeleton className="mt-2 h-3 w-48" />
             </div>
-            <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3 border-t border-slate-700/80 pt-5">
+            <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3 border-t border-slate-200/80 pt-5">
               {[1, 2, 3, 4].map((i) => (
                 <span key={i} className="flex flex-col gap-1.5">
                   <Skeleton className="h-3 w-16" />
@@ -37,13 +42,13 @@ export function ProjectOverviewSkeleton({ wrapInPageShell = true }: { wrapInPage
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5">
+          <div key={i} className={`${PROJECT_WORKSPACE_TOOLBAR} rounded-xl p-4 sm:p-5`}>
             <Skeleton className="h-3 w-20" />
             <Skeleton className="mt-2 h-6 w-16" />
           </div>
         ))}
       </div>
-      <div className="rounded-xl border border-slate-700/80 bg-slate-900/60 p-6">
+      <div className={`${PROJECT_WORKSPACE_CARD} rounded-xl p-6`}>
         <Skeleton className="mb-4 h-6 w-48" />
         <div className="space-y-3">
           <Skeleton className="h-4 w-full" />
@@ -55,7 +60,7 @@ export function ProjectOverviewSkeleton({ wrapInPageShell = true }: { wrapInPage
   );
 
   if (wrapInPageShell) {
-    return <PageShell className="bg-slate-950">{content}</PageShell>;
+    return <PageShell>{content}</PageShell>;
   }
   return content;
 }

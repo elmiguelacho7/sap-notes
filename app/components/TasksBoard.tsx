@@ -76,6 +76,13 @@ type TasksBoardProps = {
   projectId?: string | null; // null → global board (load from "tasks"); when using controlled mode, pass tasks/onCreateTask instead
   title?: string;
   subtitle?: string;
+  /** When false, hides the embedded board header (title/subtitle/CTA) so the page can own the top-level hierarchy. */
+  showHeader?: boolean;
+  /**
+   * When this number changes, the create-task modal opens.
+   * Useful when the primary CTA lives in the page header (not inside the board).
+   */
+  externalCreateSignal?: number;
   /** When provided, board is in "controlled" mode: use these tasks, no internal load. Requires columns, getStatusKey, onCreateTask, onStatusChange. */
   tasks?: BoardTask[];
   columns?: { id: string; label: string }[];
@@ -315,6 +322,8 @@ export default function TasksBoard({
   projectId = null,
   title,
   subtitle,
+  showHeader = true,
+  externalCreateSignal,
   tasks: controlledTasks,
   columns: controlledColumns,
   getStatusKey: controlledGetStatusKey,
@@ -424,6 +433,10 @@ export default function TasksBoard({
   const controlledTasksRef = useRef<BoardTask[] | undefined>(undefined);
   const hasCompletedInitialLoadRef = useRef(false);
   const newTitleInputRef = useRef<HTMLInputElement>(null);
+
+  // UX: only show skeletons/placeholders on first load when there is no data yet.
+  // During background refreshes, keep existing content visible and use subtle indicators.
+  const initialLoading = !isControlled && !hasCompletedInitialLoadRef.current && loading;
 
   useLayoutEffect(() => {
     if (isControlled && controlledTasks !== undefined) {
@@ -911,59 +924,89 @@ export default function TasksBoard({
     setActiveDragTaskId(String(event.active.id));
   }, []);
 
+  const externalCreatePrevRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (externalCreateSignal == null) return;
+    // Avoid auto-opening on first mount when the parent passes an initial signal (e.g. 0).
+    // Only open when the signal value changes after mount.
+    if (externalCreatePrevRef.current === undefined) {
+      externalCreatePrevRef.current = externalCreateSignal;
+      return;
+    }
+    if (externalCreatePrevRef.current === externalCreateSignal) return;
+    externalCreatePrevRef.current = externalCreateSignal;
+    setError(null);
+    setCreateAttempted(false);
+    setShowCreateModal(true);
+  }, [externalCreateSignal]);
+
+  const boardSurfaceClass = showHeader
+    ? "flex flex-col gap-5 rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] pt-4 pb-4 pl-4 pr-4 sm:pl-6 sm:pr-6 sm:pt-6 sm:pb-5 shadow-sm"
+    : "flex flex-col gap-4 rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] p-4 sm:p-5 shadow-sm ring-1 ring-slate-100";
+
+  const isGlobalListSurface = !showHeader && !isControlled && viewMode === "list";
+
   return (
-    <div className="flex flex-col gap-5 rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] pt-4 pb-4 pl-4 pr-4 sm:pl-6 sm:pr-6 sm:pt-6 sm:pb-5 shadow-sm">
-      {/* Header + Nueva tarea button */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pb-4 border-b border-[rgb(var(--rb-surface-border))]/50">
-        <div>
-          <h2 className="text-xl font-semibold text-[rgb(var(--rb-text-primary))]">
-            {headerTitle}
-          </h2>
-          <p className="text-sm text-[rgb(var(--rb-text-muted))]">
-            {boardSubtitle}
-          </p>
+    <div className={boardSurfaceClass}>
+      {!showHeader && isRefreshing && !isControlled ? (
+        <div className="flex items-center justify-end">
+          <span className="text-xs font-medium text-[rgb(var(--rb-text-muted))]">
+            Actualizando…
+          </span>
         </div>
+      ) : null}
+      {showHeader ? (
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pb-4 border-b border-[rgb(var(--rb-surface-border))]/50">
+          <div>
+            <h2 className="text-xl font-semibold text-[rgb(var(--rb-text-primary))]">
+              {headerTitle}
+            </h2>
+            <p className="text-sm text-[rgb(var(--rb-text-muted))]">
+              {boardSubtitle}
+            </p>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {isRefreshing && !isControlled ? (
-            <span className="text-xs font-medium text-[rgb(var(--rb-text-muted))]">
-              Actualizando...
-            </span>
-          ) : null}
-          {projectId && !isControlled && (
-            <div className="w-full sm:w-44">
-              <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1">
-                {tBoard("phaseLabel")}
-              </label>
-              <select
-                value={phaseFilter}
-                onChange={(e) => setPhaseFilter(e.target.value)}
-                className="w-full h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
-              >
-                {activatePhaseOptions.map((opt) => (
-                  <option key={opt.value || "all"} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {isRefreshing && !isControlled ? (
+              <span className="text-xs font-medium text-[rgb(var(--rb-text-muted))]">
+                Actualizando...
+              </span>
+            ) : null}
+            {projectId && !isControlled && (
+              <div className="w-full sm:w-44">
+                <label className="block text-xs font-medium text-[rgb(var(--rb-text-secondary))] mb-1">
+                  {tBoard("phaseLabel")}
+                </label>
+                <select
+                  value={phaseFilter}
+                  onChange={(e) => setPhaseFilter(e.target.value)}
+                  className="w-full h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35 focus:border-[rgb(var(--rb-brand-primary))]/30"
+                >
+                  {activatePhaseOptions.map((opt) => (
+                    <option key={opt.value || "all"} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-          <button
-            type="button"
-            onClick={() => {
-              setError(null);
-              setCreateAttempted(false);
-              setShowCreateModal(true);
-            }}
-            disabled={!isControlled && !defaultStatusId}
-            className="inline-flex items-center gap-2 rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span className="text-lg leading-none">+</span>
-            {tBoard("newTask")}
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setCreateAttempted(false);
+                setShowCreateModal(true);
+              }}
+              disabled={!isControlled && !defaultStatusId}
+              className="inline-flex items-center gap-2 rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="text-lg leading-none">+</span>
+              {tBoard("newTask")}
+            </button>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {effectiveError && (
         <div className="rounded-xl border border-red-200/90 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -1130,23 +1173,31 @@ export default function TasksBoard({
       )}
 
       {/* Executive activity KPI row */}
-      {!effectiveLoading && displayMetrics && (
-        <TaskSummary
-          total={displayMetrics.totalActivities}
-          active={displayMetrics.activeActivities}
-          blocked={displayMetrics.blockedActivities}
-          overdue={displayMetrics.overdueActivities}
-          completedPercent={displayMetrics.completionRate}
-          riskLevel={displayMetrics.riskLevel}
-          review={!isControlled ? displayMetrics.reviewActivities : undefined}
-          assignedToMe={
-            propAssignedToMeCount !== undefined
-              ? propAssignedToMeCount
-              : !isControlled && "assignedToMeCount" in displayMetrics
-                ? (displayMetrics as { assignedToMeCount?: number }).assignedToMeCount
-                : undefined
+      {!effectiveLoading && displayMetrics && !isGlobalListSurface && (
+        <div
+          className={
+            showHeader
+              ? ""
+              : "rounded-3xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface-2))]/55 p-2 shadow-sm ring-1 ring-[rgb(var(--rb-brand-primary))]/5"
           }
-        />
+        >
+          <TaskSummary
+            total={displayMetrics.totalActivities}
+            active={displayMetrics.activeActivities}
+            blocked={displayMetrics.blockedActivities}
+            overdue={displayMetrics.overdueActivities}
+            completedPercent={displayMetrics.completionRate}
+            riskLevel={displayMetrics.riskLevel}
+            review={!isControlled ? displayMetrics.reviewActivities : undefined}
+            assignedToMe={
+              propAssignedToMeCount !== undefined
+                ? propAssignedToMeCount
+                : !isControlled && "assignedToMeCount" in displayMetrics
+                  ? (displayMetrics as { assignedToMeCount?: number }).assignedToMeCount
+                  : undefined
+            }
+          />
+        </div>
       )}
 
       {/* List view: controlled mode (project tasks) */}
@@ -1282,39 +1333,95 @@ export default function TasksBoard({
       {/* List view (global mode) */}
       {!isControlled && viewMode === "list" && (
         <div className="relative w-full min-w-0">
-          <TaskList
-            tasks={filteredTasks.map((t) => ({
-              id: t.id,
-              title: t.title,
-              status_id: t.status_id,
-              priority: t.priority,
-              due_date: t.due_date,
-              description: t.description,
-              created_at: t.created_at,
-              updated_at: t.updated_at,
-              assignee_profile_id: (t as Task).assignee_id ?? null,
-            }))}
-            context="global"
-            statusOptions={statuses.map((s) => ({ value: s.id, label: s.name }))}
-            getStatusKey={(t) => t.status_id ?? ""}
-            onStatusChange={handleStatusChange}
-            priorityOptions={prioritySelectOptions}
-            onPriorityChange={handlePriorityChange}
-            assigneeOptions={assigneeOptions?.length ? assigneeOptions : undefined}
-            onAssigneeChange={assigneeOptions?.length ? handleAssigneeChange : undefined}
-            onDueDateChange={handleDueDateChange}
-            onOpenDetail={onOpenDetail ?? undefined}
-            scopeLabel={filterByUserId ? tList("scopeMy") : tList("scopeGlobal")}
-            getProjectName={() => null}
-            loading={loading}
-          />
+          {isGlobalListSurface ? (
+            <div className="rounded-3xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] overflow-hidden shadow-sm ring-1 ring-[rgb(var(--rb-brand-primary))]/5">
+              <div className="bg-[rgb(var(--rb-surface-2))]/55 p-3 sm:p-4">
+                {displayMetrics && (
+                  <TaskSummary
+                    variant="embedded"
+                    total={displayMetrics.totalActivities}
+                    active={displayMetrics.activeActivities}
+                    blocked={displayMetrics.blockedActivities}
+                    overdue={displayMetrics.overdueActivities}
+                    completedPercent={displayMetrics.completionRate}
+                    riskLevel={displayMetrics.riskLevel}
+                    review={!isControlled ? displayMetrics.reviewActivities : undefined}
+                    assignedToMe={
+                      propAssignedToMeCount !== undefined
+                        ? propAssignedToMeCount
+                        : !isControlled && "assignedToMeCount" in displayMetrics
+                          ? (displayMetrics as { assignedToMeCount?: number }).assignedToMeCount
+                          : undefined
+                    }
+                  />
+                )}
+              </div>
+              <div className="h-px bg-[rgb(var(--rb-surface-border))]/60" />
+              <div className="bg-[rgb(var(--rb-surface))] py-1">
+                <TaskList
+                  variant="embedded"
+                  tasks={filteredTasks.map((t) => ({
+                    id: t.id,
+                    title: t.title,
+                    status_id: t.status_id,
+                    priority: t.priority,
+                    due_date: t.due_date,
+                    description: t.description,
+                    created_at: t.created_at,
+                    updated_at: t.updated_at,
+                    assignee_profile_id: (t as Task).assignee_id ?? null,
+                  }))}
+                  context="global"
+                  statusOptions={statuses.map((s) => ({ value: s.id, label: s.name }))}
+                  getStatusKey={(t) => t.status_id ?? ""}
+                  onStatusChange={handleStatusChange}
+                  priorityOptions={prioritySelectOptions}
+                  onPriorityChange={handlePriorityChange}
+                  assigneeOptions={assigneeOptions?.length ? assigneeOptions : undefined}
+                  onAssigneeChange={assigneeOptions?.length ? handleAssigneeChange : undefined}
+                  onDueDateChange={handleDueDateChange}
+                  onOpenDetail={onOpenDetail ?? undefined}
+                  scopeLabel={filterByUserId ? tList("scopeMy") : tList("scopeGlobal")}
+                  getProjectName={() => null}
+                  loading={initialLoading}
+                />
+              </div>
+            </div>
+          ) : (
+            <TaskList
+              tasks={filteredTasks.map((t) => ({
+                id: t.id,
+                title: t.title,
+                status_id: t.status_id,
+                priority: t.priority,
+                due_date: t.due_date,
+                description: t.description,
+                created_at: t.created_at,
+                updated_at: t.updated_at,
+                assignee_profile_id: (t as Task).assignee_id ?? null,
+              }))}
+              context="global"
+              statusOptions={statuses.map((s) => ({ value: s.id, label: s.name }))}
+              getStatusKey={(t) => t.status_id ?? ""}
+              onStatusChange={handleStatusChange}
+              priorityOptions={prioritySelectOptions}
+              onPriorityChange={handlePriorityChange}
+              assigneeOptions={assigneeOptions?.length ? assigneeOptions : undefined}
+              onAssigneeChange={assigneeOptions?.length ? handleAssigneeChange : undefined}
+              onDueDateChange={handleDueDateChange}
+              onOpenDetail={onOpenDetail ?? undefined}
+              scopeLabel={filterByUserId ? tList("scopeMy") : tList("scopeGlobal")}
+              getProjectName={() => null}
+              loading={initialLoading}
+            />
+          )}
         </div>
       )}
 
       {/* Board con drag & drop (global mode) — scroll container with end padding */}
       {!isControlled && viewMode !== "list" && (
       <div className="relative w-full min-w-0">
-        {loading ? (
+        {initialLoading ? (
           <TasksBoardSkeleton />
         ) : (
           <DragDropContext onDragEnd={handleDragEnd}>

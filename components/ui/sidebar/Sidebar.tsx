@@ -16,6 +16,7 @@ import {
   ListTodo,
   Brain,
   Link as LinkIcon,
+  Users,
   ShieldCheck,
   Settings,
   ChevronLeft,
@@ -88,6 +89,7 @@ function buildProjectContextNavItems(projectId: string): NavItem[] {
     { navKey: "links", href: `${base}/links`, icon: LinkIcon },
     { navKey: "knowledge", href: `${base}/knowledge`, icon: BookOpen },
     { navKey: "timeline", href: `${base}/planning/calendar`, icon: CalendarDays },
+    { navKey: "team", href: `${base}/members`, icon: Users },
     { navKey: "search", href: `${base}/search`, icon: Search },
   ];
 }

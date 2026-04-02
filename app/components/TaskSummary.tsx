@@ -15,6 +15,8 @@ export type TaskSummaryProps = {
   review?: number;
   /** When provided, show assigned-to-me card. */
   assignedToMe?: number;
+  /** Visual variant only. */
+  variant?: "standalone" | "embedded";
 };
 
 const labelClass = "text-[11px] uppercase tracking-wide text-[rgb(var(--rb-text-muted))]";
@@ -31,6 +33,7 @@ export function TaskSummary({
   riskLevel = "low",
   review,
   assignedToMe,
+  variant = "standalone",
 }: TaskSummaryProps) {
   const t = useTranslations("tasks.summary");
   const showReview = review !== undefined;
@@ -46,18 +49,27 @@ export function TaskSummary({
   const riskLabel =
     riskLevel === "high" ? t("riskHigh") : riskLevel === "medium" ? t("riskMedium") : t("riskLow");
 
+  const shellClass =
+    variant === "embedded"
+      ? "rounded-2xl bg-transparent px-0 py-0 shadow-none border-0"
+      : "rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-3 py-3 sm:px-4 sm:py-3.5 shadow-sm";
+  const cellTone =
+    variant === "embedded"
+      ? "rounded-xl border border-[rgb(var(--rb-surface-border))]/65 bg-[rgb(var(--rb-surface))] px-3 py-3 min-w-0 shadow-sm"
+      : cellClass;
+
   return (
-    <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))] px-3 py-3 sm:px-4 sm:py-3.5 shadow-sm">
+    <div className={shellClass}>
       <div className={`grid ${gridCols} gap-2.5 sm:gap-3.5`}>
-        <div className={cellClass}>
+        <div className={cellTone}>
           <p className={labelClass}>{t("total")}</p>
           <p className={`${valueClass} mt-1`}>{total}</p>
         </div>
-        <div className={cellClass}>
+        <div className={cellTone}>
           <p className={labelClass}>{t("active")}</p>
           <p className={`${valueClass} mt-1`}>{active}</p>
         </div>
-        <div className={cellClass}>
+        <div className={cellTone}>
           <p className={labelClass}>{t("blocked")}</p>
           <p
             className={`mt-1 text-lg font-semibold tabular-nums ${
@@ -68,12 +80,12 @@ export function TaskSummary({
           </p>
         </div>
         {showReview && (
-          <div className={cellClass}>
+          <div className={cellTone}>
             <p className={labelClass}>{t("inReview")}</p>
             <p className={`${valueClass} mt-1`}>{review}</p>
           </div>
         )}
-        <div className={cellClass}>
+        <div className={cellTone}>
           <p className={labelClass}>{t("overdue")}</p>
           <p
             className={`mt-1 text-lg font-semibold tabular-nums ${
@@ -83,7 +95,7 @@ export function TaskSummary({
             {overdue}
           </p>
         </div>
-        <div className={cellClass}>
+        <div className={cellTone}>
           <p className={labelClass}>{t("completed")}</p>
           <p className={`text-xl font-semibold text-[rgb(var(--rb-text-primary))] mt-1 tabular-nums`}>{completedPercent}%</p>
           <div className="mt-2 h-1 rounded-full bg-[rgb(var(--rb-surface-border))]/50 overflow-hidden">
@@ -94,7 +106,7 @@ export function TaskSummary({
           </div>
         </div>
         {showAssignedToMe && (
-          <div className={cellClass}>
+          <div className={cellTone}>
             <p className={labelClass}>{t("assignedToMe")}</p>
             <p className={`${valueClass} mt-1`}>{assignedToMe}</p>
           </div>

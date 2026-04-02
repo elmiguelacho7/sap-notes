@@ -5,6 +5,7 @@
  */
 
 import { hasSapPattern } from "@/lib/ai/sapPatternDetection";
+import { detectSapTaxonomy, type SapTaxonomySignal } from "@/lib/ai/sapTaxonomy";
 
 export type SapIntentCategory =
   | "sap_error"
@@ -423,4 +424,229 @@ export function isProjectHistoryQuestion(message: string): boolean {
   if (hasProjectContextTerm(normalized) && hasHistoryExperienceTerm(normalized)) return true;
 
   return false;
+}
+
+// ==========================
+// Sapito 2.0 (Phase 1) — Intent router + response modes (lightweight)
+// ==========================
+
+/**
+ * Sapito v2 intent categories used by the retrieval orchestrator.
+ * This is intentionally separate from SapIntentCategory to keep changes incremental and backward compatible.
+ */
+export type SapitoIntentV2 =
+  // Global SAP / platform
+  | "sap_general_knowledge"
+  | "sap_error_troubleshooting"
+  | "sap_configuration"
+  | "sap_process_explanation"
+  | "sap_best_practice"
+  | "sap_comparison_or_design"
+  // Project-specific
+  | "project_history"
+  | "project_decision"
+  | "project_issue_resolution"
+  | "project_status"
+  | "project_documentation_lookup"
+  | "project_operational_summary"
+  // Mixed / routing
+  | "project_plus_sap_general"
+  | "needs_connected_sources"
+  | "unclear_general";
+
+export type SapitoResponseMode =
+  | "troubleshooting_mode"
+  | "process_explanation_mode"
+  | "project_intelligence_mode"
+  | "decision_support_mode"
+  | "default_mode";
+
+export type SapitoIntentRoute = {
+  intent: SapitoIntentV2;
+  responseMode: SapitoResponseMode;
+  /**
+   * Legacy intent used by existing prompting / formatting.
+   * This preserves current behavior while enabling v2 routing for retrieval.
+   */
+  legacySapIntent: SapIntentCategory;
+  /** Deterministic reason to help debug routing (development only). */
+  reason: string;
+  /** True when the question likely requires consulting connected document sources (e.g. Drive). */
+  needsConnectedSources: boolean;
+  /** Phase 5: SAP taxonomy signal used for ranking + observability. */
+  sapTaxonomy?: SapTaxonomySignal;
+};
+
+function detectConnectedSourceRequest(message: string): boolean {
+  const m = normalizeForMatch(message || "");
+  if (!m) return false;
+  return (
+    /\b(google\s+drive|drive|gdrive|docs?|documentos?\s+(sincronizados?|conectados)|confluence|notion|sharepoint)\b/i.test(m) ||
+    /\b(busca(r|me)\s+en\s+(drive|google\s+drive|documentos|docs)|search\s+(in|on)\s+(drive|google\s+drive|documents))\b/i.test(m)
+  );
+}
+
+function detectDocumentationLookup(message: string): boolean {
+  const m = normalizeForMatch(message || "");
+  if (!m) return false;
+  return (
+    /\b(documentacion|documentación|doc|docs|manual|guia|guía|spec|especificacion|especificación|arquitectura|diagram(a|as)|runbook)\b/i.test(m) ||
+    /\b(where\s+is\s+the\s+(doc|documentation)|show\s+me\s+the\s+doc|find\s+the\s+documentation)\b/i.test(m)
+  );
+}
+
+function detectBestPractice(message: string): boolean {
+  const m = normalizeForMatch(message || "");
+  if (!m) return false;
+  return /\b(best\s+practice|recommended|recommendation|good\s+practice|mejor(es)?\s+practica(s)?|recomendad[oa]s?)\b/i.test(m);
+}
+
+function detectComparisonOrDesign(message: string): boolean {
+  const m = normalizeForMatch(message || "");
+  if (!m) return false;
+  return (
+    /\b(vs\.?|versus|compare|comparison|trade[-\s]?off|pros\s+and\s+cons|option\s+a|option\s+b|alternatives?)\b/i.test(m) ||
+    /\b(arquitectura|dise[nñ]o|integracion|integración|soluci[oó]n|solution\s+design)\b/i.test(m)
+  );
+}
+
+/**
+ * Phase 1 intent router.
+ * Deterministic + lightweight:
+ * - Uses existing SapIntentCategory detection as the backbone for SAP intents.
+ * - Uses explicit project-history detection for anti-hallucination behavior.
+ * - Adds routing flags for connected sources + documentation lookup.
+ */
+export function routeSapitoIntentV2(message: string, opts?: { mode?: "global" | "project"; projectId?: string | null }): SapitoIntentRoute {
+  const mode = opts?.mode ?? (opts?.projectId ? "project" : "global");
+  const projectId = opts?.projectId ?? null;
+  const msg = (message ?? "").trim();
+
+  const needsConnectedSources = detectConnectedSourceRequest(msg);
+  const docsLookup = detectDocumentationLookup(msg);
+  const isHistory = mode === "project" && isProjectHistoryQuestion(msg);
+  const sapTaxonomy = detectSapTaxonomy(msg);
+
+  // Start from existing SAP v1 classifier to preserve stable behavior.
+  const legacySapIntent = classifySapIntent(msg, projectId ?? undefined);
+
+  // 1) Project history / decisions / issue resolution (strong guardrails)
+  if (isHistory) {
+    return {
+      intent: docsLookup ? "project_documentation_lookup" : "project_history",
+      responseMode: "project_intelligence_mode",
+      legacySapIntent,
+      reason: docsLookup ? "project history + docs lookup signals" : "project history signals",
+      needsConnectedSources,
+      sapTaxonomy,
+    };
+  }
+
+  // 2) Project operational / status questions
+  if (mode === "project" && (legacySapIntent === "project_status" || isProjectStatusQuestion(msg))) {
+    return {
+      intent: "project_status",
+      responseMode: "project_intelligence_mode",
+      legacySapIntent: "project_status",
+      reason: "project status signals",
+      needsConnectedSources,
+      sapTaxonomy,
+    };
+  }
+
+  // 3) SAP troubleshooting vs process/config/design
+  if (legacySapIntent === "sap_error") {
+    return {
+      intent: mode === "project" ? "project_plus_sap_general" : "sap_error_troubleshooting",
+      responseMode: "troubleshooting_mode",
+      legacySapIntent,
+      reason: "sap_error legacy intent",
+      needsConnectedSources,
+      sapTaxonomy,
+    };
+  }
+  if (legacySapIntent === "sap_customizing") {
+    return {
+      intent: "sap_configuration",
+      responseMode: "process_explanation_mode",
+      legacySapIntent,
+      reason: "sap_customizing legacy intent",
+      needsConnectedSources,
+      sapTaxonomy,
+    };
+  }
+  if (legacySapIntent === "sap_process" || legacySapIntent === "sap_transaction") {
+    return {
+      intent: "sap_process_explanation",
+      responseMode: "process_explanation_mode",
+      legacySapIntent,
+      reason: "sap_process/transaction legacy intent",
+      needsConnectedSources,
+      sapTaxonomy,
+    };
+  }
+  if (legacySapIntent === "sap_solution_design" || detectComparisonOrDesign(msg)) {
+    return {
+      intent: "sap_comparison_or_design",
+      responseMode: "decision_support_mode",
+      legacySapIntent,
+      reason: legacySapIntent === "sap_solution_design" ? "sap_solution_design legacy intent" : "comparison/design signals",
+      needsConnectedSources,
+      sapTaxonomy,
+    };
+  }
+  if (detectBestPractice(msg)) {
+    return {
+      intent: "sap_best_practice",
+      responseMode: "process_explanation_mode",
+      legacySapIntent,
+      reason: "best practice signals",
+      needsConnectedSources,
+      sapTaxonomy,
+    };
+  }
+
+  // 4) Documentation lookup routing
+  if (docsLookup && mode === "project") {
+    return {
+      intent: "project_documentation_lookup",
+      responseMode: "project_intelligence_mode",
+      legacySapIntent,
+      reason: "docs lookup signals (project)",
+      needsConnectedSources,
+      sapTaxonomy,
+    };
+  }
+  if (docsLookup && mode === "global") {
+    return {
+      intent: "needs_connected_sources",
+      responseMode: "process_explanation_mode",
+      legacySapIntent,
+      reason: "docs lookup signals (global)",
+      needsConnectedSources: true,
+      sapTaxonomy,
+    };
+  }
+
+  // 5) Connected sources explicitly requested
+  if (needsConnectedSources) {
+    return {
+      intent: "needs_connected_sources",
+      responseMode: mode === "project" ? "project_intelligence_mode" : "process_explanation_mode",
+      legacySapIntent,
+      reason: "connected sources request",
+      needsConnectedSources: true,
+      sapTaxonomy,
+    };
+  }
+
+  // 6) Default/general
+  return {
+    intent: legacySapIntent === "generic" ? "unclear_general" : "sap_general_knowledge",
+    responseMode: "default_mode",
+    legacySapIntent,
+    reason: legacySapIntent === "generic" ? "no strong intent match" : "fallback to sap_general_knowledge",
+    needsConnectedSources: false,
+    sapTaxonomy,
+  };
 }

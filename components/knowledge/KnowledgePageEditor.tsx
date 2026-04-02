@@ -119,14 +119,52 @@ const SAP_CALLOUT_STYLES: Record<
   SapCalloutVariant,
   { bg: string; label: string; sideBorder: string; iconBg: string }
 > = {
-  procedure: { bg: "bg-indigo-500/8", label: "text-indigo-200", sideBorder: "border-indigo-500/55", iconBg: "bg-indigo-500/12" },
-  tip: { bg: "bg-emerald-500/8", label: "text-emerald-200", sideBorder: "border-emerald-500/55", iconBg: "bg-emerald-500/12" },
-  warning: { bg: "bg-amber-500/9", label: "text-amber-200", sideBorder: "border-amber-500/60", iconBg: "bg-amber-500/12" },
-  configuration: { bg: "bg-violet-500/8", label: "text-violet-200", sideBorder: "border-violet-500/55", iconBg: "bg-violet-500/12" },
-  reference: { bg: "bg-sky-500/8", label: "text-sky-200", sideBorder: "border-sky-500/55", iconBg: "bg-sky-500/12" },
-  expected: { bg: "bg-fuchsia-500/8", label: "text-fuchsia-200", sideBorder: "border-fuchsia-500/55", iconBg: "bg-fuchsia-500/12" },
-  quote: { bg: "bg-slate-900/20", label: "text-slate-300", sideBorder: "border-slate-400/45", iconBg: "bg-slate-900/25" },
-  knowledge_reference: { bg: "bg-indigo-500/7", label: "text-indigo-200", sideBorder: "border-indigo-500/55", iconBg: "bg-indigo-500/12" },
+  /** Ribbit brand primary callout (green) */
+  procedure: {
+    bg: "bg-[rgb(var(--rb-brand-primary))]/10",
+    label: "text-[rgb(var(--rb-brand-primary-active))]",
+    sideBorder: "border-[rgb(var(--rb-brand-primary))]/30",
+    iconBg: "bg-[rgb(var(--rb-brand-primary))]/12",
+  },
+  /** Keep distinct but still green-family */
+  tip: {
+    bg: "bg-[rgb(var(--rb-brand-primary))]/7",
+    label: "text-[rgb(var(--rb-brand-primary-active))]",
+    sideBorder: "border-[rgb(var(--rb-brand-primary))]/24",
+    iconBg: "bg-[rgb(var(--rb-brand-primary))]/10",
+  },
+  warning: { bg: "bg-amber-50/70", label: "text-amber-950", sideBorder: "border-amber-200/90", iconBg: "bg-amber-100/80" },
+  /**
+   * Neutral surface + green accent (keeps semantics, avoids fuchsia).
+   * Reads as a "result / confirmation" without feeling off-brand.
+   */
+  expected: {
+    bg: "bg-[rgb(var(--rb-surface-2))]/65",
+    label: "text-[rgb(var(--rb-brand-primary-active))]",
+    sideBorder: "border-[rgb(var(--rb-brand-primary))]/28",
+    iconBg: "bg-[rgb(var(--rb-brand-primary))]/10",
+  },
+  /** Calm neutral with slight brand tint */
+  configuration: {
+    bg: "bg-[rgb(var(--rb-surface-2))]/55",
+    label: "text-[rgb(var(--rb-text-secondary))]",
+    sideBorder: "border-[rgb(var(--rb-brand-primary))]/18",
+    iconBg: "bg-[rgb(var(--rb-surface-3))]/60",
+  },
+  /** Reference gets a cool-neutral but still within ribbit shell */
+  reference: {
+    bg: "bg-[rgb(var(--rb-surface-2))]/55",
+    label: "text-[rgb(var(--rb-text-secondary))]",
+    sideBorder: "border-[rgb(var(--rb-surface-border))]/90",
+    iconBg: "bg-[rgb(var(--rb-surface-3))]/60",
+  },
+  quote: { bg: "bg-[rgb(var(--rb-surface-2))]/55", label: "text-[rgb(var(--rb-text-secondary))]", sideBorder: "border-[rgb(var(--rb-surface-border))]/90", iconBg: "bg-[rgb(var(--rb-surface-3))]/60" },
+  knowledge_reference: {
+    bg: "bg-[rgb(var(--rb-brand-surface))]/85",
+    label: "text-[rgb(var(--rb-brand-primary-active))]",
+    sideBorder: "border-[rgb(var(--rb-brand-primary))]/25",
+    iconBg: "bg-[rgb(var(--rb-brand-primary))]/10",
+  },
 };
 
 const SapCallout = Node.create({
@@ -181,23 +219,23 @@ const SapCallout = Node.create({
         "data-label": label,
         "data-page-id": HTMLAttributes.pageId ?? undefined,
         class:
-          `sap-callout relative rounded-2xl border border-slate-800/70 ${styles.bg} ` +
+          `sap-callout relative rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 ${styles.bg} ` +
           "border-l-4 " +
           `${styles.sideBorder} p-5 my-5 transition-colors ` +
-          "hover:border-slate-600/90 focus-within:border-indigo-500/70",
+          "hover:border-[rgb(var(--rb-surface-border))]/90 focus-within:border-[rgb(var(--rb-brand-primary))]/35",
       }),
       [
         "div",
         {
           class:
-            "flex items-center gap-3 border-b border-slate-700/45 pb-3 mb-4 " +
+            "flex items-center gap-3 border-b border-[rgb(var(--rb-surface-border))]/60 pb-3 mb-4 " +
             "text-[11px] uppercase tracking-widest font-bold",
         },
         [
           "span",
           {
             class:
-              `inline-flex items-center justify-center w-10 h-10 rounded-xl border border-slate-700/50 text-[16px] leading-none ${styles.iconBg} ${styles.label}`,
+              `inline-flex items-center justify-center w-10 h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/65 text-[16px] leading-none ${styles.iconBg} ${styles.label}`,
           },
           icon,
         ],
@@ -402,7 +440,7 @@ export function KnowledgePageEditor({
     autofocus: "start",
     editorProps: {
       attributes: {
-        className: "outline-none text-slate-100",
+        className: "outline-none text-[rgb(var(--rb-text-primary))]",
       },
       handlePaste: (view, event) => {
         if (!editable) return false;
@@ -1097,7 +1135,7 @@ export function KnowledgePageEditor({
               placeholder="Untitled"
               spellCheck={false}
               disabled={!editable}
-              className="w-full text-4xl font-semibold bg-transparent border-none text-slate-100 placeholder:text-slate-500 leading-tight tracking-tight focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 focus-visible:ring-offset-0"
+              className="w-full text-4xl font-semibold bg-transparent border-none text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] leading-tight tracking-tight focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-0"
               aria-label="Page title"
             />
           </div>
@@ -1108,7 +1146,7 @@ export function KnowledgePageEditor({
                 type="button"
                 onClick={performSaveNow}
                 disabled={!onSave || !editable}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+                className="inline-flex items-center justify-center gap-2 rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-medium transition-colors duration-150 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--rb-shell-bg))]"
               >
                 <Save className="h-4 w-4" />
                 {saveButtonLabel}
@@ -1117,7 +1155,7 @@ export function KnowledgePageEditor({
               {viewGraphHref && (
                 <Link
                   href={viewGraphHref}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700/60 bg-slate-900/20 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-900/40"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-2))]/60 hover:text-[rgb(var(--rb-text-primary))] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/30"
                 >
                   <Network className="h-4 w-4" />
                   View Graph
@@ -1127,7 +1165,7 @@ export function KnowledgePageEditor({
               <div className="relative">
                 <button
                   type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700/60 bg-slate-900/20 text-slate-300 hover:bg-slate-900/40"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 text-[rgb(var(--rb-text-muted))] hover:bg-[rgb(var(--rb-surface-2))]/60 hover:text-[rgb(var(--rb-text-primary))] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/30"
                   aria-label="More actions"
                   title="More actions"
                   onClick={openImagePicker}
@@ -1140,7 +1178,7 @@ export function KnowledgePageEditor({
         </div>
 
         {imageUploadError && (
-          <div className="rounded-xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             {imageUploadError}
           </div>
         )}
@@ -1150,17 +1188,23 @@ export function KnowledgePageEditor({
           ref={editorHostRef}
           className="
             relative
+            rounded-3xl
+            border border-[rgb(var(--rb-surface-border))]/80
+            bg-[rgb(var(--rb-surface))]
+            shadow-sm
+            ring-1 ring-[rgb(var(--rb-brand-primary))]/6
+            overflow-hidden
             [&_.ProseMirror]:min-h-[320px]
-            [&_.ProseMirror]:px-2
-            [&_.ProseMirror]:py-3
-            [&_.ProseMirror]:text-slate-200
+            [&_.ProseMirror]:px-6
+            [&_.ProseMirror]:py-6
+            [&_.ProseMirror]:text-[rgb(var(--rb-text-primary))]
             [&_.ProseMirror]:outline-none
             [&_.ProseMirror]:transition-shadow
             [&_.ProseMirror]:focus-visible:ring-2
-            [&_.ProseMirror]:focus-visible:ring-indigo-500/30
+            [&_.ProseMirror]:focus-visible:ring-[rgb(var(--rb-brand-ring))]/35
             [&_.ProseMirror]:focus-visible:ring-offset-0
             [&_.ProseMirror-selectednode]:ring-2
-            [&_.ProseMirror-selectednode]:ring-indigo-500/45
+            [&_.ProseMirror-selectednode]:ring-[rgb(var(--rb-brand-ring))]/40
             [&_.ProseMirror-selectednode]:ring-offset-0
             [&_.ProseMirror-selectednode]:rounded-xl
             [&_.ProseMirror_p]:my-4
@@ -1168,15 +1212,15 @@ export function KnowledgePageEditor({
             [&_.ProseMirror_h1]:text-4xl [&_.ProseMirror_h1]:font-semibold [&_.ProseMirror_h1]:mt-8 [&_.ProseMirror_h1]:mb-4
             [&_.ProseMirror_h2]:text-2xl [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_h2]:mt-7 [&_.ProseMirror_h2]:mb-4
             [&_.ProseMirror_h3]:text-xl [&_.ProseMirror_h3]:font-semibold [&_.ProseMirror_h3]:mt-5 [&_.ProseMirror_h3]:mb-3
-            [&_.ProseMirror_blockquote]:border-l-2 [&_.ProseMirror_blockquote]:border-slate-700 [&_.ProseMirror_blockquote]:pl-4 [&_.ProseMirror_blockquote]:my-4 [&_.ProseMirror_blockquote]:text-slate-200
+            [&_.ProseMirror_blockquote]:border-l-2 [&_.ProseMirror_blockquote]:border-[rgb(var(--rb-surface-border))]/80 [&_.ProseMirror_blockquote]:pl-4 [&_.ProseMirror_blockquote]:my-4 [&_.ProseMirror_blockquote]:text-[rgb(var(--rb-text-primary))]
             [&_.ProseMirror ul]:my-4 [&_.ProseMirror ul]:list-disc [&_.ProseMirror ul]:ml-6 [&_.ProseMirror ol]:my-4 [&_.ProseMirror ol]:list-decimal [&_.ProseMirror ol]:ml-6
             [&_.ProseMirror li]:my-1.5
-            [&_.ProseMirror code]:font-mono [&_.ProseMirror pre]:bg-slate-900/60 [&_.ProseMirror pre]:border [&_.ProseMirror pre]:border-slate-800 [&_.ProseMirror pre]:rounded-xl [&_.ProseMirror pre]:p-4 [&_.ProseMirror pre]:overflow-x-auto
+            [&_.ProseMirror code]:font-mono [&_.ProseMirror pre]:bg-[rgb(var(--rb-surface-2))]/70 [&_.ProseMirror pre]:border [&_.ProseMirror pre]:border-[rgb(var(--rb-surface-border))]/75 [&_.ProseMirror pre]:rounded-xl [&_.ProseMirror pre]:p-4 [&_.ProseMirror pre]:overflow-x-auto
             [&_.ProseMirror pre]:my-5
-            [&_.ProseMirror img]:my-8 [&_.ProseMirror img]:mx-auto [&_.ProseMirror img]:w-full [&_.ProseMirror img]:max-w-4xl [&_.ProseMirror img]:h-auto [&_.ProseMirror img]:rounded-xl [&_.ProseMirror img]:border [&_.ProseMirror img]:border-slate-800/70 [&_.ProseMirror img]:bg-slate-900/20 [&_.ProseMirror img]:shadow-sm
-            [&_.ProseMirror hr]:border-slate-800
-            [&_.ProseMirror table]:w-full [&_.ProseMirror table]:border-collapse [&_.ProseMirror th]:border [&_.ProseMirror th]:border-slate-700 [&_.ProseMirror th]:bg-slate-800/60 [&_.ProseMirror th]:p-2 [&_.ProseMirror th]:text-slate-200
-            [&_.ProseMirror td]:border [&_.ProseMirror td]:border-slate-700 [&_.ProseMirror td]:p-2 [&_.ProseMirror td]:text-slate-200
+            [&_.ProseMirror img]:my-8 [&_.ProseMirror img]:mx-auto [&_.ProseMirror img]:w-full [&_.ProseMirror img]:max-w-4xl [&_.ProseMirror img]:h-auto [&_.ProseMirror img]:rounded-xl [&_.ProseMirror img]:border [&_.ProseMirror img]:border-[rgb(var(--rb-surface-border))]/75 [&_.ProseMirror img]:bg-[rgb(var(--rb-surface))] [&_.ProseMirror img]:shadow-sm
+            [&_.ProseMirror hr]:border-[rgb(var(--rb-surface-border))]/80
+            [&_.ProseMirror table]:w-full [&_.ProseMirror table]:border-collapse [&_.ProseMirror th]:border [&_.ProseMirror th]:border-[rgb(var(--rb-surface-border))]/75 [&_.ProseMirror th]:bg-[rgb(var(--rb-surface-2))]/70 [&_.ProseMirror th]:p-2 [&_.ProseMirror th]:text-[rgb(var(--rb-text-primary))]
+            [&_.ProseMirror td]:border [&_.ProseMirror td]:border-[rgb(var(--rb-surface-border))]/75 [&_.ProseMirror td]:p-2 [&_.ProseMirror td]:text-[rgb(var(--rb-text-primary))]
             [&_.ProseMirror table]:my-6
             [&_.ProseMirror .task-list]:my-2
           "
@@ -1186,21 +1230,21 @@ export function KnowledgePageEditor({
               {/* Slash menu (basic placeholder menu) */}
               {slashOpen && slashPos && (
                 <div
-                  className="absolute z-20 w-[320px] rounded-2xl border border-slate-800/80 bg-slate-950/88 backdrop-blur-md px-2 py-2 shadow-2xl shadow-black/30"
+                  className="absolute z-20 w-[320px] rounded-2xl border border-[rgb(var(--rb-surface-border))]/80 bg-[rgb(var(--rb-surface))]/96 backdrop-blur-md px-2 py-2 shadow-2xl shadow-black/10"
                   style={{ top: slashPos.top + 10, left: Math.max(8, slashPos.left - 8) }}
                   role="dialog"
                   aria-label="Slash menu"
                 >
-                  <div className="px-3 py-2 text-xs font-medium text-slate-400 border-b border-slate-800/70 mb-1">
+                  <div className="px-3 py-2 text-xs font-medium text-[rgb(var(--rb-text-muted))] border-b border-[rgb(var(--rb-surface-border))]/70 mb-1">
                     / {slashQuery ? slashQuery : "comando"}
                   </div>
-                  <div className="max-h-80 overflow-auto px-1 pb-1 [scrollbar-width:thin] [scrollbar-color:rgba(71,85,105,0.35)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-700/60 [&::-webkit-scrollbar-track]:bg-transparent">
+                  <div className="max-h-80 overflow-auto px-1 pb-1 [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.55)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgb(var(--rb-surface-border))] [&::-webkit-scrollbar-track]:bg-transparent">
                     {(["Text", "Lists", "Media", "Structure", "SAP Documentation"] as const).map((group) => {
                       const groupItems = filteredSlashActions.filter((a) => a.group === group);
                       if (groupItems.length === 0) return null;
                       return (
                         <div key={group} className="px-2 pb-1">
-                          <div className="px-2 pb-1 pt-1 text-[11px] uppercase tracking-wide text-slate-500">
+                          <div className="px-2 pb-1 pt-1 text-[11px] uppercase tracking-wide text-[rgb(var(--rb-text-muted))]">
                             {group === "Text"
                               ? "Texto"
                               : group === "Lists"
@@ -1223,10 +1267,10 @@ export function KnowledgePageEditor({
                                   setSlashOpen(false);
                                   setSlashQuery("");
                                 }}
-                                className={`w-full px-3 py-2.5 text-left text-sm rounded-xl transition-colors flex items-center gap-2 ${
+                                className={`w-full px-3 py-2.5 text-left text-sm rounded-xl transition-colors flex items-center gap-2 border ${
                                   active
-                                    ? "bg-indigo-500/15 border border-indigo-500/35 shadow-sm"
-                                    : "hover:bg-slate-900/70"
+                                    ? "bg-[rgb(var(--rb-brand-primary))]/10 border-[rgb(var(--rb-brand-primary))]/25 text-[rgb(var(--rb-text-primary))]"
+                                    : "border-transparent text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-2))]/70 hover:text-[rgb(var(--rb-text-primary))]"
                                 }`}
                               >
                                 <span className="shrink-0">{it.icon}</span>
@@ -1248,7 +1292,7 @@ export function KnowledgePageEditor({
                 <button
                   type="button"
                   onClick={removeSelectedImage}
-                  className="absolute z-20 rounded-lg border border-slate-700/70 bg-slate-900/90 px-2.5 py-1.5 text-xs text-slate-100 hover:bg-slate-800/95"
+                  className="absolute z-20 rounded-lg border border-[rgb(var(--rb-surface-border))]/80 bg-[rgb(var(--rb-surface))]/95 px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-2))]/70 hover:text-[rgb(var(--rb-text-primary))] shadow-sm"
                   style={{
                     top: Math.max(4, selectedImageOverlay.top),
                     left: Math.max(4, selectedImageOverlay.left),
@@ -1259,15 +1303,15 @@ export function KnowledgePageEditor({
               )}
 
               {linkPickerOpen && (
-                <div className="absolute inset-0 z-30 bg-slate-950/60 backdrop-blur-sm flex items-start justify-center p-4">
-                  <div className="w-full max-w-xl rounded-2xl border border-slate-800/80 bg-slate-950/95 px-4 py-4 shadow-2xl shadow-black/30">
+                <div className="absolute inset-0 z-30 bg-slate-900/35 backdrop-blur-[2px] flex items-start justify-center p-4">
+                  <div className="w-full max-w-xl rounded-2xl border border-[rgb(var(--rb-surface-border))]/80 bg-[rgb(var(--rb-surface))]/98 px-4 py-4 shadow-2xl shadow-black/10">
                     <div className="flex items-center gap-2">
                       <input
                         ref={linkPickerInputRef}
                         value={linkPickerQuery}
                         onChange={(e) => setLinkPickerQuery(e.target.value)}
                         placeholder="Buscar página de conocimiento…"
-                        className="w-full rounded-xl border border-slate-800/80 bg-slate-900/40 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30"
+                        className="w-full h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/80 bg-[rgb(var(--rb-surface))]/95 px-3 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/30 focus-visible:border-[rgb(var(--rb-brand-primary))]/25"
                         aria-label="Buscar páginas"
                       />
                       <button
@@ -1277,7 +1321,7 @@ export function KnowledgePageEditor({
                           setLinkPickerQuery("");
                           setLinkPickerError(null);
                         }}
-                        className="rounded-xl border border-slate-800/80 bg-slate-900/20 px-3 py-2 text-sm text-slate-200 hover:bg-slate-900/40"
+                        className="h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/80 bg-[rgb(var(--rb-surface))]/95 px-3 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-2))]/70 hover:text-[rgb(var(--rb-text-primary))] transition-colors"
                       >
                         Cancelar
                       </button>
@@ -1296,24 +1340,24 @@ export function KnowledgePageEditor({
                             Resultados
                           </div>
                           {linkPickerLoading ? (
-                            <div className="text-sm text-slate-400 py-2">Buscando…</div>
+                            <div className="text-sm text-[rgb(var(--rb-text-secondary))] py-2">Buscando…</div>
                           ) : linkPickerResults.length === 0 ? (
-                            <div className="text-sm text-slate-500 py-2">
+                            <div className="text-sm text-[rgb(var(--rb-text-muted))] py-2">
                               Escribe para buscar. (Se muestran solo páginas a las que tienes acceso.)
                             </div>
                           ) : (
-                            <div className="max-h-72 overflow-auto pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(71,85,105,0.35)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-slate-700/60 [&::-webkit-scrollbar-track]:bg-transparent">
+                            <div className="max-h-72 overflow-auto pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.55)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgb(var(--rb-surface-border))] [&::-webkit-scrollbar-track]:bg-transparent">
                               <div className="space-y-2">
                                 {linkPickerResults.slice(0, 10).map((r) => (
                                   <button
                                     key={r.page_id}
                                     type="button"
                                     onClick={() => insertKnowledgeReference(r)}
-                                    className="w-full text-left rounded-xl border border-slate-800/60 bg-slate-900/20 px-3 py-2.5 hover:bg-slate-900/40 transition-colors"
+                                    className="w-full text-left rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2.5 hover:bg-[rgb(var(--rb-surface-2))]/70 transition-colors"
                                   >
-                                    <div className="text-sm font-medium text-slate-100">{r.title}</div>
+                                    <div className="text-sm font-semibold text-[rgb(var(--rb-text-primary))]">{r.title}</div>
                                     {r.summary ? (
-                                      <div className="text-xs text-slate-500 mt-0.5 line-clamp-2">{r.summary}</div>
+                                      <div className="text-xs text-[rgb(var(--rb-text-muted))] mt-0.5 line-clamp-2">{r.summary}</div>
                                     ) : null}
                                   </button>
                                 ))}
@@ -1332,21 +1376,21 @@ export function KnowledgePageEditor({
               {/* Empty state hint */}
               {editor.isEmpty && (
                 <div className="absolute inset-0 flex items-center justify-center px-2 py-8">
-                  <div className="w-full max-w-[760px] rounded-2xl bg-slate-900/20 px-5 py-5">
+                  <div className="w-full max-w-[760px] rounded-3xl border border-[rgb(var(--rb-surface-border))]/75 bg-[rgb(var(--rb-surface))]/98 px-6 py-6 shadow-lg ring-1 ring-[rgb(var(--rb-brand-primary))]/10">
                     <div className="flex items-start gap-4">
-                      <div className="shrink-0 h-11 w-11 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-200 font-semibold">
+                      <div className="shrink-0 h-11 w-11 rounded-2xl bg-[rgb(var(--rb-brand-primary))]/12 flex items-center justify-center text-[rgb(var(--rb-brand-primary-active))] font-semibold border border-[rgb(var(--rb-brand-primary))]/18">
                         SAP
                       </div>
                       <div className="min-w-0">
-                        <h3 className="text-lg font-semibold text-slate-100">
+                        <h3 className="text-lg font-semibold text-[rgb(var(--rb-text-primary))]">
                           Start writing your SAP documentation
                         </h3>
-                        <p className="mt-1 text-sm text-slate-400 leading-6">
+                        <p className="mt-1 text-sm text-[rgb(var(--rb-text-secondary))] leading-6">
                           Build procedures, configuration notes, and troubleshooting guides with structured blocks and screenshots.
                         </p>
-                        <p className="mt-2 text-sm text-slate-400">
+                        <p className="mt-2 text-sm text-[rgb(var(--rb-text-secondary))]">
                           Type{" "}
-                          <span className="px-1.5 py-0.5 rounded-md border border-slate-700 bg-slate-950/40 text-slate-200 font-mono text-[12px]">
+                          <span className="px-1.5 py-0.5 rounded-md border border-[rgb(var(--rb-surface-border))]/80 bg-[rgb(var(--rb-surface-2))]/70 text-[rgb(var(--rb-text-primary))] font-mono text-[12px]">
                             /
                           </span>{" "}
                           to insert blocks (steps, warnings, config, results, tables, code, images).
@@ -1358,7 +1402,7 @@ export function KnowledgePageEditor({
                       <button
                         type="button"
                         onClick={() => insertTemplate("sap_procedure")}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-500/40 bg-indigo-500/10 px-4 py-2.5 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl rb-btn-primary px-4 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2"
                       >
                         <span className="text-base" aria-hidden>
                           📋
@@ -1368,7 +1412,7 @@ export function KnowledgePageEditor({
                       <button
                         type="button"
                         onClick={() => insertTemplate("sap_configuration")}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700/60 bg-slate-900/10 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-900/30 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-2))]/60 hover:text-[rgb(var(--rb-text-primary))] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/30"
                       >
                         <span className="text-base" aria-hidden>
                           ⚙️
@@ -1378,7 +1422,7 @@ export function KnowledgePageEditor({
                       <button
                         type="button"
                         onClick={() => insertTemplate("troubleshooting_guide")}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700/60 bg-slate-900/10 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-900/30 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-4 py-2.5 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-2))]/60 hover:text-[rgb(var(--rb-text-primary))] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/30"
                       >
                         <span className="text-base" aria-hidden>
                           🧯
@@ -1388,15 +1432,15 @@ export function KnowledgePageEditor({
                     </div>
 
                     <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="rounded-xl bg-slate-950/20 px-4 py-3">
-                        <p className="text-xs font-medium text-slate-300 uppercase tracking-wide">SAP-aware guidance</p>
-                        <p className="mt-1 text-sm text-slate-400 leading-6">
+                      <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface-2))]/55 px-4 py-3">
+                        <p className="text-xs font-semibold text-[rgb(var(--rb-text-muted))] uppercase tracking-wide">SAP-aware guidance</p>
+                        <p className="mt-1 text-sm text-[rgb(var(--rb-text-secondary))] leading-6">
                           Procedure steps, warnings/risks, configuration notes, transaction references, expected results.
                         </p>
                       </div>
-                      <div className="rounded-xl bg-slate-950/20 px-4 py-3">
-                        <p className="text-xs font-medium text-slate-300 uppercase tracking-wide">Screenshot-first docs</p>
-                        <p className="mt-1 text-sm text-slate-400 leading-6">
+                      <div className="rounded-2xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface-2))]/55 px-4 py-3">
+                        <p className="text-xs font-semibold text-[rgb(var(--rb-text-muted))] uppercase tracking-wide">Screenshot-first docs</p>
+                        <p className="mt-1 text-sm text-[rgb(var(--rb-text-secondary))] leading-6">
                           Paste screenshots, add tables and code/config snippets, keep everything clean and consistent.
                         </p>
                       </div>

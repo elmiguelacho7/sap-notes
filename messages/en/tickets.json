@@ -85,6 +85,7 @@
     "invalidProjectId": "Invalid project identifier.",
     "backToProjects": "Back to projects",
     "creatingBanner": "Creating…",
+    "eyebrow": "Tickets",
     "title": "New project ticket",
     "subtitle": "Create a ticket linked to this project. It will appear in the project Tickets section.",
     "sectionMain": "Main information",

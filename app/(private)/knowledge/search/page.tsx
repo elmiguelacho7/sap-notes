@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
+import { useRouter } from "next/navigation";
+import { getSupabaseAuthForApiRequest } from "@/lib/supabaseClient";
 import { PageShell } from "@/components/layout/PageShell";
 import { SapitoAvatar } from "@/components/ai/SapitoAvatar";
 import { AssistantMessageContent } from "@/components/ai/AssistantMessageContent";
+import type { SapitoAction } from "@/lib/ai/actionSuggestions";
 
 const AGENT_URL = "/api/project-agent";
 
@@ -14,17 +16,27 @@ type ChatMessage = {
   content: string;
   grounded?: boolean;
   groundingLabel?: string;
+  meta?: {
+    sourceLabelsUsed?: string[];
+    confidenceLevel?: "high" | "medium" | "low";
+    groundingType?: string;
+    responseMode?: string;
+    followUps?: string[];
+    sourceSummary?: string;
+    actions?: SapitoAction[];
+  };
 };
 
 const SUGGESTED_PROMPTS = [
-  "Summarize the platform architecture",
-  "What do we know about roles and permissions?",
-  "Show governance decisions",
-  "What has changed in invitations?",
-  "Search global knowledge about RBAC",
+  "Troubleshoot an SAP error: ST22 dump when posting billing document",
+  "Explain the SAP process for pricing determination in SD",
+  "How do I configure output types? (Customizing overview)",
+  "Compare options: IDoc vs API integration for master data sync",
+  "What are best practices for transport management across QA/PRD?",
 ];
 
 export default function KnowledgeSearchPage() {
+  const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -46,17 +58,16 @@ export default function KnowledgeSearchPage() {
       setIsSending(true);
 
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        const userId = session?.user?.id ?? null;
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (session?.access_token) {
-          headers.Authorization = `Bearer ${session.access_token}`;
+        const { userId, headers } = await getSupabaseAuthForApiRequest();
+        if (!userId) {
+          setError("Please sign in to use Sapito.");
+          setIsSending(false);
+          return;
         }
 
         const res = await fetch(AGENT_URL, {
           method: "POST",
+          credentials: "include",
           headers,
           body: JSON.stringify({
             message: trimmed,
@@ -77,6 +88,7 @@ export default function KnowledgeSearchPage() {
           reply?: string;
           grounded?: boolean;
           groundingLabel?: string;
+          meta?: ChatMessage["meta"];
         };
         const reply =
           typeof data?.reply === "string"
@@ -90,6 +102,7 @@ export default function KnowledgeSearchPage() {
             grounded: data?.grounded === true,
             groundingLabel:
               typeof data?.groundingLabel === "string" ? data.groundingLabel : undefined,
+            meta: data?.meta,
           },
         ]);
       } catch (err) {
@@ -113,6 +126,21 @@ export default function KnowledgeSearchPage() {
       sendMessage(input);
     }
   };
+
+  const handleSapitoAction = useCallback(
+    (action: SapitoAction) => {
+      const path = action.payload?.path;
+      const prompt = action.payload?.message;
+      if (typeof path === "string" && path.startsWith("/")) {
+        router.push(path);
+        return;
+      }
+      if (typeof prompt === "string" && prompt.trim()) {
+        void sendMessage(prompt);
+      }
+    },
+    [router, sendMessage]
+  );
 
   const isEmpty = messages.length === 0;
 
@@ -244,6 +272,56 @@ export default function KnowledgeSearchPage() {
                         </div>
                       ) : (
                         <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+                      )}
+
+                      {msg.role === "assistant" && msg.meta && (
+                        <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {msg.meta.confidenceLevel && (
+                              <span className="rounded-md border border-slate-200/90 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                                Confidence: {msg.meta.confidenceLevel}
+                              </span>
+                            )}
+                            {Array.isArray(msg.meta.sourceLabelsUsed) &&
+                              msg.meta.sourceLabelsUsed.slice(0, 6).map((s) => (
+                                <span
+                                  key={s}
+                                  className="rounded-md border border-slate-200/90 bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600"
+                                >
+                                  {s}
+                                </span>
+                              ))}
+                          </div>
+
+                          {Array.isArray(msg.meta.followUps) && msg.meta.followUps.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {msg.meta.followUps.slice(0, 4).map((text) => (
+                                <button
+                                  key={text}
+                                  type="button"
+                                  onClick={() => sendMessage(text)}
+                                  className="rounded-lg border border-slate-200/90 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/25 focus-visible:ring-offset-2"
+                                >
+                                  {text}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {Array.isArray(msg.meta.actions) && msg.meta.actions.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {msg.meta.actions.slice(0, 6).map((action) => (
+                                <button
+                                  key={`${action.type}-${action.label}`}
+                                  type="button"
+                                  onClick={() => handleSapitoAction(action)}
+                                  className="rounded-lg border border-dashed border-slate-300/90 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/25 focus-visible:ring-offset-2"
+                                >
+                                  {action.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

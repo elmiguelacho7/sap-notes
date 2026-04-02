@@ -17,10 +17,10 @@ import { AssigneeSelect } from "@/components/AssigneeSelect";
 
 function PriorityBadge({ priority, label }: { priority: TicketPriority; label: string }) {
   const colors: Record<TicketPriority, string> = {
-    low: "bg-slate-700/80 text-slate-300",
-    medium: "bg-blue-900/60 text-blue-300",
-    high: "bg-amber-900/60 text-amber-300",
-    urgent: "bg-red-900/60 text-red-300",
+    low: "border border-slate-200/90 bg-slate-50 text-slate-700",
+    medium: "border border-sky-200/90 bg-sky-50 text-sky-900",
+    high: "border border-amber-200/90 bg-amber-50 text-amber-950",
+    urgent: "border border-rose-200/90 bg-rose-50 text-rose-900",
   };
   return (
     <span
@@ -33,12 +33,12 @@ function PriorityBadge({ priority, label }: { priority: TicketPriority; label: s
 
 function StatusBadge({ status, label }: { status: TicketStatus; label: string }) {
   const colors: Record<TicketStatus, string> = {
-    open: "bg-slate-700/80 text-slate-300",
-    in_progress: "bg-blue-900/60 text-blue-300",
-    pending: "bg-slate-700/80 text-slate-300",
-    resolved: "bg-emerald-900/60 text-emerald-300",
-    closed: "bg-slate-700/60 text-slate-400",
-    cancelled: "bg-red-900/60 text-red-300",
+    open: "border border-slate-200/90 bg-white text-slate-700",
+    in_progress: "border border-sky-200/90 bg-sky-50 text-sky-900",
+    pending: "border border-slate-200/90 bg-slate-50 text-slate-700",
+    resolved: "border border-emerald-200/90 bg-emerald-50 text-emerald-900",
+    closed: "border border-slate-200/90 bg-slate-50 text-slate-500",
+    cancelled: "border border-rose-200/90 bg-rose-50 text-rose-900",
   };
   return (
     <span
@@ -383,16 +383,30 @@ export default function TicketDetailPage() {
     "rounded-2xl border border-slate-200/90 bg-white p-5 space-y-4 shadow-sm ring-1 ring-slate-100";
   const inputClass =
     "w-full rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/25 focus:border-[rgb(var(--rb-brand-primary))]/30";
+  const softPanelClass =
+    "rounded-2xl border border-[rgb(var(--rb-surface-border))]/75 bg-[rgb(var(--rb-surface-2))]/55 p-4 shadow-sm ring-1 ring-slate-100";
+  const railCardClass =
+    "rounded-2xl border border-slate-200/90 bg-white p-5 space-y-4 shadow-sm ring-1 ring-slate-100";
 
   return (
-    <div className="w-full min-w-0 rb-workspace-bg px-4 sm:px-5 lg:px-6 xl:px-8 2xl:px-10 py-6">
-      <div className="mx-auto w-full max-w-7xl space-y-6">
-        <Link
-          href={backHref}
-          className="inline-flex items-center text-[11px] text-slate-500 hover:text-slate-900"
-        >
-          {t("backToTickets")}
-        </Link>
+    <div className="w-full min-w-0 rb-workspace-bg px-4 sm:px-6 lg:px-8 2xl:px-10 py-6">
+      <div className="mx-auto w-full max-w-[96rem] space-y-6">
+        <nav className="flex items-center justify-between gap-3">
+          <Link
+            href={backHref}
+            className="inline-flex items-center text-[11px] font-medium text-slate-500 hover:text-slate-900 transition-colors"
+          >
+            {t("backToTickets")}
+          </Link>
+          {ticket.project_id ? (
+            <Link
+              href={`/projects/${ticket.project_id}/tickets`}
+              className="inline-flex items-center text-[11px] font-medium text-[rgb(var(--rb-brand-primary-active))] hover:text-[rgb(var(--rb-brand-primary-hover))] transition-colors"
+            >
+              {t("linkedProject")}
+            </Link>
+          ) : null}
+        </nav>
 
         {errorMsg && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm ring-1 ring-red-100">
@@ -400,13 +414,13 @@ export default function TicketDetailPage() {
           </div>
         )}
 
-        <section className={cardClass}>
+        <section className="rounded-3xl border border-slate-200/90 bg-white p-7 shadow-sm ring-1 ring-slate-100">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-semibold text-slate-100 truncate">
+              <h1 className="text-3xl sm:text-[2.15rem] font-semibold tracking-tight text-slate-900 truncate">
                 {ticket.title}
               </h1>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="mt-4 flex flex-wrap items-center gap-2.5">
                 <PriorityBadge
                   priority={(ticket.priority ?? "medium") as TicketPriority}
                   label={tPriority((ticket.priority ?? "medium") as TicketPriority)}
@@ -418,19 +432,28 @@ export default function TicketDetailPage() {
                 {ticket.project_id ? (
                   <Link
                     href={`/projects/${ticket.project_id}`}
-                    className="inline-flex items-center rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-[11px] font-medium text-indigo-300 hover:bg-indigo-500/25 transition-colors"
+                    className="inline-flex items-center rounded-full bg-[rgb(var(--rb-brand-surface))] px-2.5 py-0.5 text-[11px] font-medium text-[rgb(var(--rb-brand-primary-active))] ring-1 ring-inset ring-[rgb(var(--rb-brand-primary))]/18 hover:bg-[rgb(var(--rb-brand-surface))]/80 transition-colors"
                   >
                     {t("linkedProject")}
                   </Link>
                 ) : null}
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-                <span>{t("created")}: {new Date(ticket.created_at).toLocaleString(localeTag)}</span>
+              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500">
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 ring-1 ring-slate-100">
+                  <span className="font-semibold text-slate-600">{t("created")}</span>
+                  <span className="tabular-nums text-slate-500">{new Date(ticket.created_at).toLocaleString(localeTag)}</span>
+                </span>
                 {ticket.due_date ? (
-                  <span>{t("due")}: {new Date(ticket.due_date).toLocaleDateString(localeTag)}</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 ring-1 ring-slate-100">
+                    <span className="font-semibold text-slate-600">{t("due")}</span>
+                    <span className="tabular-nums text-slate-500">{new Date(ticket.due_date).toLocaleDateString(localeTag)}</span>
+                  </span>
                 ) : null}
                 {ticket.updated_at ? (
-                  <span>{t("updated")}: {new Date(ticket.updated_at).toLocaleString(localeTag)}</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 ring-1 ring-slate-100">
+                    <span className="font-semibold text-slate-600">{t("updated")}</span>
+                    <span className="tabular-nums text-slate-500">{new Date(ticket.updated_at).toLocaleString(localeTag)}</span>
+                  </span>
                 ) : null}
               </div>
             </div>
@@ -440,7 +463,7 @@ export default function TicketDetailPage() {
                   type="button"
                   onClick={handleCloseTicket}
                   disabled={closing}
-                  className="inline-flex items-center rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 transition-colors disabled:opacity-60"
+                  className="inline-flex items-center rounded-xl border border-slate-200/90 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/30"
                 >
                   {closing ? t("closing") : t("closeTicket")}
                 </button>
@@ -458,17 +481,17 @@ export default function TicketDetailPage() {
           </div>
         </section>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          <div className="xl:col-span-2 space-y-7">
             <section className={cardClass}>
               <div>
-                <h2 className="text-sm font-semibold text-slate-100">Overview</h2>
-                  <p className="text-xs text-slate-400">{t("overviewSubtitle")}</p>
+                <h2 className="text-sm font-semibold text-slate-900">Overview</h2>
+                <p className="text-xs text-slate-500">{t("overviewSubtitle")}</p>
               </div>
               <div className="space-y-2">
-                <h3 className="text-xs font-medium text-slate-400">{t("description")}</h3>
+                <h3 className="text-xs font-medium text-slate-500">{t("description")}</h3>
                 {ticket.description ? (
-                  <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-sm text-slate-200 whitespace-pre-wrap min-h-[120px]">
+                  <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 px-3 py-3 text-sm text-slate-700 whitespace-pre-wrap min-h-[120px] ring-1 ring-slate-100">
                     {ticket.description}
                   </div>
                 ) : (
@@ -479,8 +502,8 @@ export default function TicketDetailPage() {
 
             <section className={cardClass}>
               <div>
-                <h2 className="text-sm font-semibold text-slate-100">Comments</h2>
-                <p className="text-xs text-slate-400">{t("commentsSubtitle")}</p>
+                <h2 className="text-sm font-semibold text-slate-900">Comments</h2>
+                <p className="text-xs text-slate-500">{t("commentsSubtitle")}</p>
               </div>
               <TicketCommentsPanel
                 ticketId={id}
@@ -490,14 +513,11 @@ export default function TicketDetailPage() {
             </section>
           </div>
 
-          <div className="space-y-6">
-            <section className={cardClass}>
+          <div className="space-y-5">
+            <section className={railCardClass}>
               <div>
-                <h2 className="text-sm font-semibold text-slate-100">Assignment</h2>
-                <p className="text-xs text-slate-400">{t("assignmentSubtitle")}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 px-3 py-2.5 ring-1 ring-slate-100">
-                <p className="text-sm text-slate-200">{assigneeLabel ?? t("unassigned")}</p>
+                <h2 className="text-sm font-semibold text-slate-900">Assignment</h2>
+                <p className="text-xs text-slate-500">{t("assignmentSubtitle")}</p>
               </div>
               <div className="space-y-3">
                 <AssigneeSelect
@@ -507,13 +527,14 @@ export default function TicketDetailPage() {
                   onChange={setAssignedTo}
                   placeholder={t("unassigned")}
                   className="w-full"
+                  appearance="light"
                 />
                 <div className="flex justify-end">
                   <button
                     type="button"
                     onClick={handleSaveAssignee}
                     disabled={savingAssignee}
-                    className="inline-flex items-center rounded-xl border border-slate-600 bg-slate-800/80 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors"
+                    className="inline-flex items-center rounded-xl border border-slate-200/90 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/30"
                   >
                     {savingAssignee ? t("saving") : t("saveAssignee")}
                   </button>
@@ -521,14 +542,14 @@ export default function TicketDetailPage() {
               </div>
             </section>
 
-            <section className={cardClass}>
+            <section className={railCardClass}>
               <div>
-                <h2 className="text-sm font-semibold text-slate-100">Resolution</h2>
-                <p className="text-xs text-slate-400">Causa raíz y resolución del incidente.</p>
+                <h2 className="text-sm font-semibold text-slate-900">Resolution</h2>
+                <p className="text-xs text-slate-500">Causa raíz y resolución del incidente.</p>
               </div>
               <div className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Root cause</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Root cause</label>
                   <input
                     type="text"
                     value={rootCause}
@@ -538,7 +559,7 @@ export default function TicketDetailPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Resolution type</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Resolution type</label>
                   <input
                     type="text"
                     value={resolutionType}
@@ -548,7 +569,7 @@ export default function TicketDetailPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Resolution summary</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Resolution summary</label>
                   <textarea
                     value={solutionMarkdown}
                     onChange={(e) => setSolutionMarkdown(e.target.value)}
@@ -560,17 +581,17 @@ export default function TicketDetailPage() {
                   type="button"
                   onClick={handleSaveSolution}
                   disabled={savingSolution}
-                  className="inline-flex items-center rounded-xl border border-indigo-500/50 bg-indigo-500/20 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-500/30 disabled:opacity-60 transition-colors"
+                  className="inline-flex items-center rounded-xl rb-btn-primary px-3 py-2 text-xs font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2 disabled:opacity-60"
                 >
                   {savingSolution ? t("saving") : t("saveResolution")}
                 </button>
               </div>
             </section>
 
-            <section className={cardClass}>
+            <section className={railCardClass}>
               <div>
-                <h2 className="text-sm font-semibold text-slate-100">References</h2>
-                <p className="text-xs text-slate-400">{t("referencesSubtitle")}</p>
+                <h2 className="text-sm font-semibold text-slate-900">References</h2>
+                <p className="text-xs text-slate-500">{t("referencesSubtitle")}</p>
               </div>
               <ReferencesList
                 ticketId={id}
@@ -579,10 +600,10 @@ export default function TicketDetailPage() {
               />
             </section>
 
-            <section className={cardClass}>
+            <section className={railCardClass}>
               <div>
-                <h2 className="text-sm font-semibold text-slate-100">Knowledge</h2>
-                <p className="text-xs text-slate-400">
+                <h2 className="text-sm font-semibold text-slate-900">Knowledge</h2>
+                <p className="text-xs text-slate-500">
                   {t("knowledgeSubtitle")}
                 </p>
               </div>
@@ -593,7 +614,7 @@ export default function TicketDetailPage() {
                   </p>
                   <Link
                     href={`/knowledge/${ticket.knowledge_page_id}${(ticket.project_id ?? projectIdFromQuery) ? `?projectId=${ticket.project_id ?? projectIdFromQuery}` : ""}`}
-                    className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/40 bg-indigo-500/15 px-3 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/25 transition-colors"
+                    className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2 text-sm font-medium text-[rgb(var(--rb-text-secondary))] hover:bg-[rgb(var(--rb-surface-2))]/60 hover:text-[rgb(var(--rb-text-primary))] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/30"
                   >
                     <BookOpen className="h-4 w-4" />
                     Open Knowledge Page
@@ -608,7 +629,7 @@ export default function TicketDetailPage() {
                     type="button"
                     onClick={handleConvertToKnowledge}
                     disabled={converting}
-                    className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/20 px-3 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/30 disabled:opacity-60 transition-colors"
+                    className="inline-flex items-center gap-2 rounded-xl rb-btn-primary px-3 py-2 text-sm font-medium transition-colors duration-150 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2"
                   >
                     {converting ? t("converting") : t("convertToKnowledge")}
                   </button>
@@ -640,6 +661,8 @@ function ReferencesList({
   const [value, setValue] = useState("");
   const [adding, setAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const softPanelClass =
+    "rounded-2xl border border-[rgb(var(--rb-surface-border))]/75 bg-[rgb(var(--rb-surface-2))]/55 p-4 shadow-sm ring-1 ring-slate-100";
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -676,12 +699,17 @@ function ReferencesList({
           {references.map((ref) => (
             <li
               key={ref.id}
-              className="flex items-center justify-between gap-2 rounded-xl border border-slate-700/60 bg-slate-800/40 px-3 py-2"
+              className="flex items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-white px-3 py-2 shadow-sm ring-1 ring-slate-100"
             >
-              <span className="text-[11px] font-medium text-slate-400 uppercase">{ref.type.replace("_", " ")}</span>
-              <span className="min-w-0 flex-1 truncate text-sm text-slate-200" title={ref.value}>
+              <span className="text-[11px] font-semibold text-slate-500 uppercase">{ref.type.replace("_", " ")}</span>
+              <span className="min-w-0 flex-1 truncate text-sm text-slate-700" title={ref.value}>
                 {ref.type === "link" && ref.value.startsWith("http") ? (
-                  <a href={ref.value} target="_blank" rel="noopener noreferrer" className="text-indigo-300 hover:underline">
+                  <a
+                    href={ref.value}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[rgb(var(--rb-brand-primary-active))] hover:text-[rgb(var(--rb-brand-primary-hover))] hover:underline"
+                  >
                     {ref.value}
                   </a>
                 ) : (
@@ -692,7 +720,7 @@ function ReferencesList({
                 type="button"
                 onClick={() => handleDelete(ref.id)}
                 disabled={deletingId === ref.id}
-                className="text-xs text-slate-500 hover:text-red-300 disabled:opacity-50"
+                className="text-xs text-slate-500 hover:text-red-700 disabled:opacity-50"
               >
                 {t("remove")}
               </button>
@@ -702,13 +730,13 @@ function ReferencesList({
       )}
       <form
         onSubmit={handleAdd}
-        className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-3 space-y-2.5 ring-1 ring-slate-100"
+        className={softPanelClass}
       >
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-[140px_minmax(0,1fr)]">
           <select
             value={type}
             onChange={(e) => setType(e.target.value as TicketReference["type"])}
-            className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            className="h-10 rounded-xl border border-slate-200/90 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/25 focus:border-[rgb(var(--rb-brand-primary))]/30"
           >
             <option value="sap_note">SAP Note</option>
             <option value="link">Link</option>
@@ -719,14 +747,14 @@ function ReferencesList({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={type === "link" ? "https://..." : t("value")}
-            className="w-full rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            className="w-full h-10 rounded-xl border border-slate-200/90 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/25 focus:border-[rgb(var(--rb-brand-primary))]/30"
           />
         </div>
         <div className="flex justify-end">
           <button
             type="submit"
             disabled={adding || !value.trim()}
-            className="rounded-xl border border-indigo-500/50 bg-indigo-500/20 px-4 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/30 disabled:opacity-50 transition-colors"
+            className="h-10 rounded-xl rb-btn-primary px-4 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35 focus-visible:ring-offset-2 disabled:opacity-50"
           >
             {adding ? t("adding") : t("add")}
           </button>

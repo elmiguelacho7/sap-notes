@@ -44,6 +44,14 @@ export type KnowledgeChunk = {
   source_name?: string | null;
   external_ref?: string | null;
   scope_type?: "global" | "project" | "user" | null;
+  /** Connected/source metadata (optional; available when RPCs return it). */
+  source_type?: string | null;
+  source_url?: string | null;
+  document_type?: string | null;
+  topic?: string | null;
+  sap_component?: string | null;
+  mime_type?: string | null;
+  chunk_index?: number | null;
 };
 
 /** Project memory item (problem/solution from past experience). Ranked first in retrieval. */
@@ -275,6 +283,13 @@ export async function searchProjectKnowledge(
       module: string | null;
       source_name?: string | null;
       external_ref?: string | null;
+      source_type?: string | null;
+      source_url?: string | null;
+      document_type?: string | null;
+      topic?: string | null;
+      sap_component?: string | null;
+      mime_type?: string | null;
+      chunk_index?: number | null;
     }>;
 
     return rows.map((r) => ({
@@ -285,6 +300,13 @@ export async function searchProjectKnowledge(
       module: r.module ?? null,
       source_name: r.source_name ?? null,
       external_ref: r.external_ref ?? null,
+      source_type: r.source_type ?? null,
+      source_url: r.source_url ?? null,
+      document_type: r.document_type ?? null,
+      topic: r.topic ?? null,
+      sap_component: r.sap_component ?? null,
+      mime_type: r.mime_type ?? null,
+      chunk_index: typeof r.chunk_index === "number" ? r.chunk_index : (r.chunk_index != null ? Number(r.chunk_index) : null),
     }));
   } catch (err) {
     console.error("[knowledgeSearch] searchProjectKnowledge error", err);
@@ -492,6 +514,13 @@ export async function searchMultiTenantKnowledge(
       source_name?: string | null;
       external_ref?: string | null;
       scope_type?: string | null;
+      source_type?: string | null;
+      source_url?: string | null;
+      document_type?: string | null;
+      topic?: string | null;
+      sap_component?: string | null;
+      mime_type?: string | null;
+      chunk_index?: number | null;
     }>;
 
     const chunks: KnowledgeChunk[] = rows.map((r) => {
@@ -508,6 +537,13 @@ export async function searchMultiTenantKnowledge(
         source_name: r.source_name ?? null,
         external_ref: r.external_ref ?? null,
         scope_type: scope,
+        source_type: r.source_type ?? null,
+        source_url: r.source_url ?? null,
+        document_type: r.document_type ?? null,
+        topic: r.topic ?? null,
+        sap_component: r.sap_component ?? null,
+        mime_type: r.mime_type ?? null,
+        chunk_index: typeof r.chunk_index === "number" ? r.chunk_index : (r.chunk_index != null ? Number(r.chunk_index) : null),
       };
     });
 
