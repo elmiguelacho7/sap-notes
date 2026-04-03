@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { FileUp, Search } from "lucide-react";
@@ -45,9 +46,8 @@ export default function ProjectTestingPage() {
   const [canEdit, setCanEdit] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedScriptId, setSelectedScriptId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!projectId) return;
@@ -99,13 +99,7 @@ export default function ProjectTestingPage() {
   const stats = data?.stats;
 
   const openCreate = () => {
-    setSelectedScriptId(null);
-    setDrawerOpen(true);
-  };
-
-  const openEdit = (id: string) => {
-    setSelectedScriptId(id);
-    setDrawerOpen(true);
+    setCreateOpen(true);
   };
 
   const resultLabel = (r: string | null) => {
@@ -146,7 +140,7 @@ export default function ProjectTestingPage() {
           ) : undefined
         }
         primaryActionLabel={canEdit ? t("page.newScript") : undefined}
-        primaryActionOnClick={canEdit ? openCreate : undefined}
+        primaryActionOnClick={canEdit ? () => setCreateOpen(true) : undefined}
       />
 
       <div className={`${PROJECT_WORKSPACE_HERO} grid gap-4 sm:grid-cols-2 lg:grid-cols-4`}>
@@ -213,10 +207,9 @@ export default function ProjectTestingPage() {
         <ul className="space-y-3">
           {filtered.map((s: TestScriptListItem) => (
             <li key={s.id}>
-              <button
-                type="button"
-                onClick={() => openEdit(s.id)}
-                className={`${PROJECT_WORKSPACE_CARD} w-full text-left transition-colors hover:border-slate-300/90`}
+              <Link
+                href={`/projects/${projectId}/testing/${s.id}`}
+                className={`${PROJECT_WORKSPACE_CARD} block w-full text-left transition-colors hover:border-slate-300/90`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -251,7 +244,7 @@ export default function ProjectTestingPage() {
                     )}
                   </div>
                 </div>
-              </button>
+              </Link>
             </li>
           ))}
         </ul>
@@ -259,11 +252,14 @@ export default function ProjectTestingPage() {
 
       <TestScriptDrawer
         projectId={projectId}
-        scriptId={selectedScriptId}
-        open={drawerOpen}
+        scriptId={null}
+        open={createOpen}
         canEdit={canEdit}
-        onClose={() => setDrawerOpen(false)}
-        onSaved={() => void load()}
+        onClose={() => setCreateOpen(false)}
+        onSaved={() => {
+          setCreateOpen(false);
+          void load();
+        }}
       />
 
       <SapScriptImportModal

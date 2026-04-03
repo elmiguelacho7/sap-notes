@@ -33,7 +33,28 @@
     "parseFailed": "No se pudo analizar el archivo.",
     "saveFailed": "No se pudo guardar el guion.",
     "selectFile": "Selecciona un archivo primero.",
-    "untitled": "Guion importado"
+    "untitled": "Guion importado",
+    "structureDetected": "Estructura de procedimiento detectada",
+    "actions": "acciones",
+    "reviewProcedure": "Revisa actividades y acciones antes de guardar"
+  },
+  "detail": {
+    "backToList": "Volver a guiones",
+    "tabOverview": "Resumen",
+    "tabProcedure": "Procedimiento",
+    "tabExecutions": "Ejecuciones",
+    "tabEdit": "Editar",
+    "headerSummary": "Cabecera",
+    "editHint": "Usa el panel lateral para editar campos y pasos. Ciérralo al terminar."
+  },
+  "procedure": {
+    "defaultScenario": "Escenario",
+    "noSteps": "Este guion aún no tiene pasos.",
+    "flatProcedure": "Procedimiento (lista plana)",
+    "activities": "actividades",
+    "noActions": "Sin acciones en esta actividad.",
+    "ungrouped": "Pasos sin grupo",
+    "expected": "Esperado:"
   },
   "priority": {
     "unset": "Sin definir",
@@ -110,7 +131,16 @@
     "stepOptional": "Paso opcional",
     "stepTransaction": "Transacción / app",
     "stepRole": "Rol de negocio",
-    "stepDataNotes": "Notas de datos de prueba"
+    "stepDataNotes": "Notas de datos de prueba",
+    "businessConditions": "Condiciones de negocio",
+    "activityGroups": "Grupos de actividad",
+    "activityGroupsHint": "Agrupa pasos bajo escenarios y actividades (estilo SAP Cloud ALM).",
+    "addActivity": "Añadir actividad",
+    "removeActivity": "Quitar actividad",
+    "activityTitle": "Título de actividad",
+    "activityTargetName": "Nombre del objetivo",
+    "activityTargetUrl": "URL del objetivo",
+    "stepActivity": "Actividad"
   },
   "run": {
     "title": "Registrar ejecución",

@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { normalizeSapImportedScript } from "./normalizeSapImportedScript";
-import type { SapImportedStepRow, SapParseResult } from "./types";
+import type { SapImportedActivityDraft, SapImportedStepRow, SapParseResult } from "./types";
 
 function normCell(v: unknown): string {
   if (v == null) return "";
@@ -13,7 +13,152 @@ function headerKey(h: string): string {
   return h.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-/** Map common SAP / Excel column headers to field keys */
+/** SAP Cloud ALM / upload-style export */
+type AlmColMap = {
+  testCaseName: number;
+  activityTitle: number;
+  actionTitle: number;
+  actionInstructions: number;
+  actionExpected: number;
+  activityTargetName: number;
+  activityTargetUrl: number;
+  businessRole: number;
+  testCasePriority: number;
+  testCaseStatus: number;
+};
+
+function mapCloudAlmHeaders(headers: string[]): AlmColMap | null {
+  const norm = headers.map(headerKey);
+  const idx = (pred: (k: string) => boolean) => {
+    const i = norm.findIndex(pred);
+    return i >= 0 ? i : -1;
+  };
+  const testCaseName = idx((k) => /test\s*case\s*name/.test(k));
+  const activityTitle = idx((k) => /activity\s*title/.test(k));
+  const actionInstructions = idx((k) => /action\s*instructions/.test(k));
+  if (testCaseName < 0 || activityTitle < 0 || actionInstructions < 0) return null;
+
+  let actionTitleCol = idx((k) => /^action\s*title$/.test(k) || k.startsWith("action title"));
+  if (actionTitleCol < 0) actionTitleCol = actionInstructions;
+
+  return {
+    testCaseName,
+    activityTitle,
+    actionTitle: actionTitleCol,
+    actionInstructions,
+    actionExpected: idx((k) => /action\s*expected\s*result/.test(k)),
+    activityTargetName: idx((k) => /activity\s*target\s*name/.test(k)),
+    activityTargetUrl: idx((k) => /activity\s*target\s*url/.test(k)),
+    businessRole: idx((k) => /business\s*role/.test(k) && !/action/.test(k)),
+    testCasePriority: idx((k) => /test\s*case\s*priority/.test(k)),
+    testCaseStatus: idx((k) => /test\s*case\s*status/.test(k)),
+  };
+}
+
+function parseCloudAlmSheet(
+  sheet: XLSX.WorkSheet,
+  warnings: string[]
+): {
+  activities: SapImportedActivityDraft[];
+  titleHint: string;
+  priorityHint: string;
+} {
+  const rows = XLSX.utils.sheet_to_json<(string | number | null | undefined)[]>(sheet, {
+    header: 1,
+    defval: "",
+    raw: false,
+  }) as unknown[][];
+
+  if (!rows.length) return { activities: [], titleHint: "", priorityHint: "" };
+
+  let headerRowIdx = 0;
+  for (let i = 0; i < Math.min(rows.length, 40); i++) {
+    const r = rows[i];
+    if (!Array.isArray(r)) continue;
+    const joined = r.map(normCell).join(" ").toLowerCase();
+    if (/test\s*case\s*name/.test(joined) && /activity\s*title/.test(joined) && /action\s*instructions/.test(joined)) {
+      headerRowIdx = i;
+      break;
+    }
+  }
+
+  const headerCells = (rows[headerRowIdx] ?? []).map(normCell);
+  const alm = mapCloudAlmHeaders(headerCells);
+  if (!alm) {
+    return { activities: [], titleHint: "", priorityHint: "" };
+  }
+
+  warnings.push("Detected SAP Cloud ALM–style columns; grouped into test case → activity → actions.");
+
+  type Group = SapImportedActivityDraft & { _key: string };
+  const byKey = new Map<string, Group>();
+  let nextActivityOrder = 0;
+
+  let titleHint = "";
+  let priorityHint = "";
+
+  for (let i = headerRowIdx + 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!Array.isArray(r)) continue;
+    const cells = r.map(normCell);
+    if (cells.every((c) => !c)) continue;
+
+    const testCase = cells[alm.testCaseName] || "Default test case";
+    const actTitle = cells[alm.activityTitle] || "Activity";
+    const key = `${testCase}\n${actTitle}`;
+
+    if (!titleHint && testCase) titleHint = testCase;
+    if (!priorityHint && alm.testCasePriority >= 0 && cells[alm.testCasePriority]) {
+      priorityHint = cells[alm.testCasePriority].toLowerCase();
+    }
+
+    const instr = cells[alm.actionInstructions];
+    if (!instr.trim()) continue;
+
+    const actionTitle = alm.actionTitle >= 0 ? cells[alm.actionTitle] : "";
+    const expected =
+      alm.actionExpected >= 0 && cells[alm.actionExpected] ? cells[alm.actionExpected] : null;
+    const targetName = alm.activityTargetName >= 0 ? cells[alm.activityTargetName] : "";
+    const targetUrl = alm.activityTargetUrl >= 0 ? cells[alm.activityTargetUrl] : "";
+    const role = alm.businessRole >= 0 ? cells[alm.businessRole] : "";
+
+    let g = byKey.get(key);
+    if (!g) {
+      g = {
+        _key: key,
+        scenario_name: testCase,
+        activity_title: actTitle,
+        activity_target_name: targetName,
+        activity_target_url: targetUrl,
+        business_role: role,
+        activity_order: nextActivityOrder++,
+        steps: [],
+      };
+      byKey.set(key, g);
+    } else {
+      if (!g.activity_target_name && targetName) g.activity_target_name = targetName;
+      if (!g.activity_target_url && targetUrl) g.activity_target_url = targetUrl;
+      if (!g.business_role && role) g.business_role = role;
+    }
+
+    g.steps.push({
+      step_order: g.steps.length + 1,
+      step_name: actionTitle?.trim() || null,
+      instruction: instr.trim(),
+      expected_result: expected?.trim() || null,
+      optional_flag: /\boptional\b/i.test(instr),
+      business_role: role?.trim() || null,
+    });
+  }
+
+  const activities = Array.from(byKey.values())
+    .sort((a, b) => a.activity_order - b.activity_order)
+    .map(({ _key: _k, ...rest }) => rest);
+
+  return { activities, titleHint, priorityHint };
+}
+
+/** Map common SAP / Excel column headers to field keys (flat fallback) */
 function mapHeaderIndex(headers: string[]): Record<string, number> {
   const map: Record<string, number> = {};
   headers.forEach((h, i) => {
@@ -117,6 +262,15 @@ function rowsFromSheet(
   return { steps, titleHint };
 }
 
+function mapPriorityFromHint(h: string): string | undefined {
+  const s = h.toLowerCase();
+  if (s.includes("critical")) return "critical";
+  if (s.includes("high")) return "high";
+  if (s.includes("low")) return "low";
+  if (s.includes("medium")) return "medium";
+  return undefined;
+}
+
 export function parseSapTestScriptXlsx(buffer: Buffer, fileName: string): SapParseResult {
   const warnings: string[] = [];
   let workbook: XLSX.WorkBook;
@@ -126,7 +280,7 @@ export function parseSapTestScriptXlsx(buffer: Buffer, fileName: string): SapPar
     warnings.push(e instanceof Error ? e.message : "Could not read XLSX");
     return {
       draft: normalizeSapImportedScript(
-        { title: fileName, objective: "", steps: [] },
+        { title: fileName, objective: "", steps: [], activities: [] },
         { source_import_type: "sap_xlsx", source_document_name: fileName }
       ),
       warnings,
@@ -138,7 +292,7 @@ export function parseSapTestScriptXlsx(buffer: Buffer, fileName: string): SapPar
     warnings.push("Workbook has no sheets.");
     return {
       draft: normalizeSapImportedScript(
-        { title: fileName, objective: "", steps: [] },
+        { title: fileName, objective: "", steps: [], activities: [] },
         { source_import_type: "sap_xlsx", source_document_name: fileName }
       ),
       warnings,
@@ -146,6 +300,23 @@ export function parseSapTestScriptXlsx(buffer: Buffer, fileName: string): SapPar
   }
 
   const sheet = workbook.Sheets[sheetName];
+  const alm = parseCloudAlmSheet(sheet, warnings);
+
+  if (alm.activities.length > 0) {
+    const pr = mapPriorityFromHint(alm.priorityHint);
+    const draft = normalizeSapImportedScript(
+      {
+        title: alm.titleHint || fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim(),
+        objective: "",
+        activities: alm.activities,
+        steps: [],
+        priority: pr as "low" | "medium" | "high" | "critical" | undefined,
+      },
+      { source_import_type: "sap_xlsx", source_document_name: fileName }
+    );
+    return { draft, warnings };
+  }
+
   const { steps, titleHint } = rowsFromSheet(sheet, warnings);
   if (steps.length === 0) {
     warnings.push("No step rows extracted from the first sheet.");
@@ -156,6 +327,7 @@ export function parseSapTestScriptXlsx(buffer: Buffer, fileName: string): SapPar
       title: titleHint || fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim(),
       objective: "",
       steps,
+      activities: [],
     },
     { source_import_type: "sap_xlsx", source_document_name: fileName }
   );

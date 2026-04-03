@@ -1,14 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { X, Plus, Trash2 } from "lucide-react";
 import type { SourceImportType, TestExecutionRow, TestScriptWithSteps } from "@/lib/types/testing";
 import { RunExecutionModal } from "@/components/testing/RunExecutionModal";
 import { SAP_TEST_MODULE_OPTIONS } from "@/lib/testing/sapModuleCatalog";
 
+type ActivityForm = {
+  id: string;
+  scenario_name: string;
+  activity_title: string;
+  activity_target_name: string;
+  activity_target_url: string;
+  business_role: string;
+  activity_order: number;
+};
+
 type StepForm = {
   id?: string;
+  activity_id: string;
   instruction: string;
   expected_result: string;
   step_name: string;
@@ -24,8 +35,15 @@ const textareaClass =
   "w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35";
 const labelClass = "mb-1 block text-xs font-medium text-[rgb(var(--rb-text-muted))]";
 
+function newId(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 function emptyStep(): StepForm {
   return {
+    activity_id: "",
     instruction: "",
     expected_result: "",
     step_name: "",
@@ -33,6 +51,18 @@ function emptyStep(): StepForm {
     transaction_or_app: "",
     business_role: "",
     test_data_notes: "",
+  };
+}
+
+function emptyActivity(order: number): ActivityForm {
+  return {
+    id: newId(),
+    scenario_name: "",
+    activity_title: "",
+    activity_target_name: "",
+    activity_target_url: "",
+    business_role: "",
+    activity_order: order,
   };
 }
 
@@ -84,6 +114,7 @@ export function TestScriptDrawer({
   const [status, setStatus] = useState("draft");
   const [preconditions, setPreconditions] = useState("");
   const [testData, setTestData] = useState("");
+  const [businessConditions, setBusinessConditions] = useState("");
   const [expectedResult, setExpectedResult] = useState("");
   const [scenarioPath, setScenarioPath] = useState("");
   const [scopeItemCode, setScopeItemCode] = useState("");
@@ -94,10 +125,12 @@ export function TestScriptDrawer({
   const [relatedTaskId, setRelatedTaskId] = useState("");
   const [relatedTicketId, setRelatedTicketId] = useState("");
   const [relatedKnowledgePageId, setRelatedKnowledgePageId] = useState("");
+  const [activities, setActivities] = useState<ActivityForm[]>([]);
   const [steps, setSteps] = useState<StepForm[]>([emptyStep()]);
   const [executions, setExecutions] = useState<TestExecutionRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [runOpen, setRunOpen] = useState(false);
+  const hadStructuredRef = useRef(false);
 
   const loadScript = useCallback(async () => {
     if (!scriptId || !open) return;
@@ -121,6 +154,7 @@ export function TestScriptDrawer({
       setStatus(script.status ?? "draft");
       setPreconditions(script.preconditions ?? "");
       setTestData(script.test_data ?? "");
+      setBusinessConditions(script.business_conditions ?? "");
       setExpectedResult(script.expected_result ?? "");
       setScenarioPath(script.scenario_path ?? "");
       setScopeItemCode(script.scope_item_code ?? "");
@@ -131,8 +165,24 @@ export function TestScriptDrawer({
       setRelatedTaskId(script.related_task_id ?? "");
       setRelatedTicketId(script.related_ticket_id ?? "");
       setRelatedKnowledgePageId(script.related_knowledge_page_id ?? "");
+      const grouped = (script.activities?.length ?? 0) > 0;
+      hadStructuredRef.current = grouped;
+      setActivities(
+        grouped
+          ? (script.activities ?? []).map((a) => ({
+              id: a.id,
+              scenario_name: a.scenario_name ?? "",
+              activity_title: a.activity_title ?? "",
+              activity_target_name: a.activity_target_name ?? "",
+              activity_target_url: a.activity_target_url ?? "",
+              business_role: a.business_role ?? "",
+              activity_order: a.activity_order,
+            }))
+          : []
+      );
       const st = (script.steps ?? []).map((x) => ({
         id: x.id,
+        activity_id: x.activity_id ?? "",
         instruction: x.instruction ?? "",
         expected_result: x.expected_result ?? "",
         step_name: x.step_name ?? "",
@@ -167,6 +217,7 @@ export function TestScriptDrawer({
       setStatus("draft");
       setPreconditions("");
       setTestData("");
+      setBusinessConditions("");
       setExpectedResult("");
       setScenarioPath("");
       setScopeItemCode("");
@@ -177,6 +228,8 @@ export function TestScriptDrawer({
       setRelatedTaskId("");
       setRelatedTicketId("");
       setRelatedKnowledgePageId("");
+      setActivities([]);
+      hadStructuredRef.current = false;
       setSteps([emptyStep()]);
       setExecutions([]);
       setError(null);
@@ -188,22 +241,55 @@ export function TestScriptDrawer({
   const addStep = () => setSteps((s) => [...s, emptyStep()]);
   const removeStep = (i: number) => setSteps((s) => (s.length <= 1 ? s : s.filter((_, j) => j !== i)));
 
+  const addActivity = () => {
+    hadStructuredRef.current = true;
+    setActivities((prev) => [...prev, emptyActivity(prev.length)]);
+  };
+
+  const removeActivity = (id: string) => {
+    setActivities((prev) => prev.filter((a) => a.id !== id));
+    setSteps((prev) =>
+      prev.map((s) => (s.activity_id === id ? { ...s, activity_id: "" } : s))
+    );
+  };
+
   const buildPayload = () => {
     const roles = businessRolesText
       .split("\n")
       .map((s) => s.trim())
       .filter(Boolean);
-    const stepsPayload = steps.map((st, i) => ({
-      id: st.id,
-      step_order: i,
-      instruction: st.instruction,
-      expected_result: st.expected_result || null,
-      step_name: st.step_name.trim() || null,
-      optional_flag: st.optional_flag,
-      transaction_or_app: st.transaction_or_app.trim() || null,
-      business_role: st.business_role.trim() || null,
-      test_data_notes: st.test_data_notes.trim() || null,
-    }));
+    const shouldSyncActivities = activities.length > 0 || hadStructuredRef.current;
+
+    const activitiesPayload = [...activities]
+      .sort((a, b) => a.activity_order - b.activity_order)
+      .map((a, idx) => ({
+        id: a.id,
+        scenario_name: a.scenario_name.trim() || null,
+        activity_title: a.activity_title.trim() || "Activity",
+        activity_target_name: a.activity_target_name.trim() || null,
+        activity_target_url: a.activity_target_url.trim() || null,
+        business_role: a.business_role.trim() || null,
+        activity_order: idx,
+      }));
+
+    const stepsPayload = steps.map((st, i) => {
+      const base: Record<string, unknown> = {
+        id: st.id,
+        step_order: i,
+        instruction: st.instruction,
+        expected_result: st.expected_result || null,
+        step_name: st.step_name.trim() || null,
+        optional_flag: st.optional_flag,
+        transaction_or_app: st.transaction_or_app.trim() || null,
+        business_role: st.business_role.trim() || null,
+        test_data_notes: st.test_data_notes.trim() || null,
+      };
+      if (shouldSyncActivities) {
+        base.activity_id = st.activity_id?.trim() || null;
+      }
+      return base;
+    });
+
     return {
       title,
       objective: objective || null,
@@ -213,6 +299,7 @@ export function TestScriptDrawer({
       status,
       preconditions: preconditions || null,
       test_data: testData || null,
+      business_conditions: businessConditions.trim() || null,
       expected_result: expectedResult || null,
       scenario_path: scenarioPath.trim() || null,
       scope_item_code: scopeItemCode.trim() || null,
@@ -224,8 +311,20 @@ export function TestScriptDrawer({
       related_ticket_id: relatedTicketId.trim() || null,
       related_knowledge_page_id: relatedKnowledgePageId.trim() || null,
       stepsPayload,
+      activitiesPayload,
+      shouldSyncActivities,
     };
   };
+
+  const stepCreateShape = (st: StepForm) => ({
+    instruction: st.instruction,
+    expected_result: st.expected_result || null,
+    step_name: st.step_name.trim() || null,
+    optional_flag: st.optional_flag,
+    transaction_or_app: st.transaction_or_app.trim() || null,
+    business_role: st.business_role.trim() || null,
+    test_data_notes: st.test_data_notes.trim() || null,
+  });
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,53 +334,102 @@ export function TestScriptDrawer({
     const p = buildPayload();
     try {
       if (!scriptId) {
+        const useNested =
+          p.shouldSyncActivities &&
+          p.activitiesPayload.length > 0 &&
+          steps.some((s) => s.activity_id?.trim());
+
+        let body: Record<string, unknown> = {
+          title: p.title,
+          objective: p.objective,
+          module: p.module,
+          test_type: p.test_type,
+          priority: p.priority,
+          status: p.status,
+          preconditions: p.preconditions,
+          test_data: p.test_data,
+          business_conditions: p.business_conditions,
+          expected_result: p.expected_result,
+          scenario_path: p.scenario_path,
+          scope_item_code: p.scope_item_code,
+          source_document_name: p.source_document_name,
+          source_language: p.source_language,
+          business_roles: p.business_roles,
+          source_import_type: p.source_import_type,
+          related_task_id: p.related_task_id,
+          related_ticket_id: p.related_ticket_id,
+          related_knowledge_page_id: p.related_knowledge_page_id,
+        };
+
+        if (useNested) {
+          const nested = p.activitiesPayload.map((act) => ({
+            id: act.id,
+            scenario_name: act.scenario_name,
+            activity_title: act.activity_title,
+            activity_target_name: act.activity_target_name,
+            activity_target_url: act.activity_target_url,
+            business_role: act.business_role,
+            activity_order: act.activity_order,
+            steps: steps.filter((s) => s.activity_id === act.id).map(stepCreateShape),
+          }));
+          const orphan = steps.filter((s) => !s.activity_id?.trim());
+          if (orphan.length > 0) {
+            const gid = newId();
+            nested.push({
+              id: gid,
+              scenario_name: null,
+              activity_title: "General",
+              activity_target_name: null,
+              activity_target_url: null,
+              business_role: null,
+              activity_order: nested.length,
+              steps: orphan.map(stepCreateShape),
+            });
+          }
+          body.activities = nested.filter((a) => a.steps.length > 0);
+        } else {
+          body.steps = steps.map(stepCreateShape);
+        }
+
         const res = await fetch(`/api/projects/${projectId}/testing/scripts`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({
-            ...p,
-            steps: p.stepsPayload.map(
-              ({ instruction, expected_result, step_name, optional_flag, transaction_or_app, business_role, test_data_notes }) => ({
-                instruction,
-                expected_result,
-                step_name,
-                optional_flag,
-                transaction_or_app,
-                business_role,
-                test_data_notes,
-              })
-            ),
-          }),
+          body: JSON.stringify(body),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Save failed");
       } else {
+        const patchBody: Record<string, unknown> = {
+          title: p.title,
+          objective: p.objective,
+          module: p.module,
+          test_type: p.test_type,
+          priority: p.priority,
+          status: p.status,
+          preconditions: p.preconditions,
+          test_data: p.test_data,
+          business_conditions: p.business_conditions,
+          expected_result: p.expected_result,
+          scenario_path: p.scenario_path,
+          scope_item_code: p.scope_item_code,
+          source_document_name: p.source_document_name,
+          source_language: p.source_language,
+          business_roles: p.business_roles,
+          source_import_type: p.source_import_type,
+          related_task_id: p.related_task_id,
+          related_ticket_id: p.related_ticket_id,
+          related_knowledge_page_id: p.related_knowledge_page_id,
+          steps: p.stepsPayload,
+        };
+        if (p.shouldSyncActivities) {
+          patchBody.activities = p.activitiesPayload;
+        }
         const res = await fetch(`/api/projects/${projectId}/testing/scripts/${scriptId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({
-            title: p.title,
-            objective: p.objective,
-            module: p.module,
-            test_type: p.test_type,
-            priority: p.priority,
-            status: p.status,
-            preconditions: p.preconditions,
-            test_data: p.test_data,
-            expected_result: p.expected_result,
-            scenario_path: p.scenario_path,
-            scope_item_code: p.scope_item_code,
-            source_document_name: p.source_document_name,
-            source_language: p.source_language,
-            business_roles: p.business_roles,
-            source_import_type: p.source_import_type,
-            related_task_id: p.related_task_id,
-            related_ticket_id: p.related_ticket_id,
-            related_knowledge_page_id: p.related_knowledge_page_id,
-            steps: p.stepsPayload,
-          }),
+          body: JSON.stringify(patchBody),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Save failed");
@@ -449,6 +597,16 @@ export function TestScriptDrawer({
                   />
                 </div>
                 <div>
+                  <label className={labelClass}>{t("drawer.businessConditions")}</label>
+                  <textarea
+                    value={businessConditions}
+                    onChange={(e) => setBusinessConditions(e.target.value)}
+                    rows={2}
+                    className={textareaClass}
+                    disabled={!canEdit}
+                  />
+                </div>
+                <div>
                   <label className={labelClass}>{t("drawer.expectedResult")}</label>
                   <textarea
                     value={expectedResult}
@@ -565,6 +723,113 @@ export function TestScriptDrawer({
                   </div>
                 </div>
 
+                <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      {t("drawer.activityGroups")}
+                    </p>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={addActivity}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        {t("drawer.addActivity")}
+                      </button>
+                    )}
+                  </div>
+                  {activities.length === 0 ? (
+                    <p className="text-xs text-slate-500">{t("drawer.activityGroupsHint")}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {activities.map((a, ai) => (
+                        <div key={a.id} className="rounded-lg border border-slate-200 bg-white p-2 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-slate-600">#{ai + 1}</span>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => removeActivity(a.id)}
+                                className="text-slate-400 hover:text-red-600"
+                                aria-label={t("drawer.removeActivity")}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                          <input
+                            type="text"
+                            value={a.scenario_name}
+                            onChange={(e) =>
+                              setActivities((prev) =>
+                                prev.map((x) => (x.id === a.id ? { ...x, scenario_name: e.target.value } : x))
+                              )
+                            }
+                            className={inputClass}
+                            placeholder={t("import.scenarioPath")}
+                            disabled={!canEdit}
+                          />
+                          <input
+                            type="text"
+                            value={a.activity_title}
+                            onChange={(e) =>
+                              setActivities((prev) =>
+                                prev.map((x) => (x.id === a.id ? { ...x, activity_title: e.target.value } : x))
+                              )
+                            }
+                            className={inputClass}
+                            placeholder={t("drawer.activityTitle")}
+                            disabled={!canEdit}
+                          />
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <input
+                              type="text"
+                              value={a.activity_target_name}
+                              onChange={(e) =>
+                                setActivities((prev) =>
+                                  prev.map((x) =>
+                                    x.id === a.id ? { ...x, activity_target_name: e.target.value } : x
+                                  )
+                                )
+                              }
+                              className={inputClass}
+                              placeholder={t("drawer.activityTargetName")}
+                              disabled={!canEdit}
+                            />
+                            <input
+                              type="text"
+                              value={a.activity_target_url}
+                              onChange={(e) =>
+                                setActivities((prev) =>
+                                  prev.map((x) =>
+                                    x.id === a.id ? { ...x, activity_target_url: e.target.value } : x
+                                  )
+                                )
+                              }
+                              className={inputClass}
+                              placeholder={t("drawer.activityTargetUrl")}
+                              disabled={!canEdit}
+                            />
+                          </div>
+                          <input
+                            type="text"
+                            value={a.business_role}
+                            onChange={(e) =>
+                              setActivities((prev) =>
+                                prev.map((x) => (x.id === a.id ? { ...x, business_role: e.target.value } : x))
+                              )
+                            }
+                            className={inputClass}
+                            placeholder={t("drawer.stepRole")}
+                            disabled={!canEdit}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <div className="mb-2 flex items-center justify-between">
                     <span className={labelClass}>{t("drawer.steps")}</span>
@@ -623,6 +888,28 @@ export function TestScriptDrawer({
                           className={inputClass}
                           disabled={!canEdit}
                         />
+                        {activities.length > 0 && (
+                          <div className="mt-2">
+                            <label className={labelClass}>{t("drawer.stepActivity")}</label>
+                            <select
+                              value={st.activity_id}
+                              onChange={(e) =>
+                                setSteps((prev) =>
+                                  prev.map((p, j) => (j === i ? { ...p, activity_id: e.target.value } : p))
+                                )
+                              }
+                              className={inputClass}
+                              disabled={!canEdit}
+                            >
+                              <option value="">{t("procedure.ungrouped")}</option>
+                              {activities.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                  {a.activity_title.trim() || a.id.slice(0, 8)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                         <label className={`${labelClass} mt-2`}>{t("drawer.stepInstruction")}</label>
                         <textarea
                           value={st.instruction}

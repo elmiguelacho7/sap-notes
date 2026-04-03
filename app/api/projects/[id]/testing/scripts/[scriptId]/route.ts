@@ -44,9 +44,15 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { patch, steps } = parsePatchAndSteps(body);
+    const { patch, steps, activitiesReplace } = parsePatchAndSteps(body);
 
-    const script = await updateTestScript(projectId, scriptId, patch, steps);
+    const script = await updateTestScript(
+      projectId,
+      scriptId,
+      patch,
+      steps,
+      activitiesReplace
+    );
     return NextResponse.json(script);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

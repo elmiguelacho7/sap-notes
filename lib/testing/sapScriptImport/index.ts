@@ -1,4 +1,10 @@
-export type { SapImportedScriptDraft, SapImportedStepRow, SapParseResult, SourceImportType } from "./types";
+export type {
+  SapImportedActivityDraft,
+  SapImportedScriptDraft,
+  SapImportedStepRow,
+  SapParseResult,
+  SourceImportType,
+} from "./types";
 export { normalizeSapImportedScript } from "./normalizeSapImportedScript";
 export { parseSapTestScriptDocx } from "./parseSapTestScriptDocx";
 export { parseSapTestScriptXlsx } from "./parseSapTestScriptXlsx";

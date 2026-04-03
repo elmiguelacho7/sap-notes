@@ -33,7 +33,28 @@
     "parseFailed": "Could not parse the file.",
     "saveFailed": "Could not save the script.",
     "selectFile": "Select a file first.",
-    "untitled": "Imported script"
+    "untitled": "Imported script",
+    "structureDetected": "Procedure structure detected",
+    "actions": "actions",
+    "reviewProcedure": "Review activities and actions before saving"
+  },
+  "detail": {
+    "backToList": "Back to scripts",
+    "tabOverview": "Overview",
+    "tabProcedure": "Procedure",
+    "tabExecutions": "Executions",
+    "tabEdit": "Edit",
+    "headerSummary": "Header summary",
+    "editHint": "Use the editor drawer to change fields and steps. Close the drawer when done."
+  },
+  "procedure": {
+    "defaultScenario": "Scenario",
+    "noSteps": "No steps defined for this script yet.",
+    "flatProcedure": "Procedure (flat list)",
+    "activities": "activities",
+    "noActions": "No actions in this activity yet.",
+    "ungrouped": "Ungrouped steps",
+    "expected": "Expected:"
   },
   "priority": {
     "unset": "Not set",
@@ -110,7 +131,16 @@
     "stepOptional": "Optional step",
     "stepTransaction": "Transaction / app",
     "stepRole": "Business role",
-    "stepDataNotes": "Test data notes"
+    "stepDataNotes": "Test data notes",
+    "businessConditions": "Business conditions",
+    "activityGroups": "Activity groups",
+    "activityGroupsHint": "Group steps under scenarios and activities (SAP Cloud ALM style).",
+    "addActivity": "Add activity",
+    "removeActivity": "Remove activity",
+    "activityTitle": "Activity title",
+    "activityTargetName": "Activity target name",
+    "activityTargetUrl": "Activity target URL",
+    "stepActivity": "Activity"
   },
   "run": {
     "title": "Record execution",

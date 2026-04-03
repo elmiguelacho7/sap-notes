@@ -1,7 +1,9 @@
 import type {
+  CreateTestScriptActivityNestedInput,
   CreateTestScriptInput,
   CreateTestScriptStepInput,
   StepPatch,
+  TestScriptActivityInput,
   UpdateTestScriptInput,
 } from "@/lib/services/testingService";
 
@@ -17,8 +19,29 @@ function parseStepCreate(o: Record<string, unknown>): CreateTestScriptStepInput 
   };
 }
 
-function parseStepPatch(o: Record<string, unknown>, i: number): StepPatch {
+function parseActivityFlat(o: Record<string, unknown>): TestScriptActivityInput {
   return {
+    id: typeof o.id === "string" ? o.id : undefined,
+    scenario_name: typeof o.scenario_name === "string" ? o.scenario_name : null,
+    activity_title: typeof o.activity_title === "string" ? o.activity_title : "",
+    activity_target_name: typeof o.activity_target_name === "string" ? o.activity_target_name : null,
+    activity_target_url: typeof o.activity_target_url === "string" ? o.activity_target_url : null,
+    business_role: typeof o.business_role === "string" ? o.business_role : null,
+    activity_order: typeof o.activity_order === "number" ? o.activity_order : 0,
+  };
+}
+
+function parseActivityNested(o: Record<string, unknown>): CreateTestScriptActivityNestedInput {
+  const flat = parseActivityFlat(o);
+  const stepsRaw = o.steps;
+  const steps = Array.isArray(stepsRaw)
+    ? stepsRaw.map((s) => parseStepCreate(s as Record<string, unknown>))
+    : [];
+  return { ...flat, steps };
+}
+
+function parseStepPatch(o: Record<string, unknown>, i: number): StepPatch {
+  const patch: StepPatch = {
     id: typeof o.id === "string" ? o.id : null,
     step_order: typeof o.step_order === "number" ? o.step_order : i,
     instruction: typeof o.instruction === "string" ? o.instruction : "",
@@ -29,6 +52,13 @@ function parseStepPatch(o: Record<string, unknown>, i: number): StepPatch {
     business_role: typeof o.business_role === "string" ? o.business_role : null,
     test_data_notes: typeof o.test_data_notes === "string" ? o.test_data_notes : null,
   };
+  if ("activity_id" in o) {
+    patch.activity_id =
+      typeof o.activity_id === "string" && o.activity_id.trim()
+        ? o.activity_id.trim()
+        : null;
+  }
+  return patch;
 }
 
 export function parseBusinessRolesField(v: unknown): unknown | undefined {
@@ -44,10 +74,17 @@ export function parseBusinessRolesField(v: unknown): unknown | undefined {
 }
 
 export function buildCreateInput(body: Record<string, unknown>): CreateTestScriptInput {
+  const activitiesRaw = body.activities;
+  const activitiesNested =
+    Array.isArray(activitiesRaw) && activitiesRaw.length > 0
+      ? activitiesRaw.map((a) => parseActivityNested(a as Record<string, unknown>))
+      : undefined;
+
   const stepsRaw = body.steps;
-  const steps = Array.isArray(stepsRaw)
-    ? stepsRaw.map((s) => parseStepCreate(s as Record<string, unknown>))
-    : undefined;
+  const steps =
+    Array.isArray(stepsRaw) && (!activitiesNested || activitiesNested.length === 0)
+      ? stepsRaw.map((s) => parseStepCreate(s as Record<string, unknown>))
+      : undefined;
 
   return {
     title: typeof body.title === "string" ? body.title : "",
@@ -58,6 +95,7 @@ export function buildCreateInput(body: Record<string, unknown>): CreateTestScrip
     status: typeof body.status === "string" ? body.status : null,
     preconditions: typeof body.preconditions === "string" ? body.preconditions : null,
     test_data: typeof body.test_data === "string" ? body.test_data : null,
+    business_conditions: typeof body.business_conditions === "string" ? body.business_conditions : null,
     expected_result: typeof body.expected_result === "string" ? body.expected_result : null,
     scenario_path: typeof body.scenario_path === "string" ? body.scenario_path : null,
     source_document_name: typeof body.source_document_name === "string" ? body.source_document_name : null,
@@ -69,6 +107,7 @@ export function buildCreateInput(body: Record<string, unknown>): CreateTestScrip
     related_ticket_id: typeof body.related_ticket_id === "string" ? body.related_ticket_id : null,
     related_knowledge_page_id:
       typeof body.related_knowledge_page_id === "string" ? body.related_knowledge_page_id : null,
+    activities: activitiesNested && activitiesNested.length > 0 ? activitiesNested : undefined,
     steps,
   };
 }
@@ -76,6 +115,7 @@ export function buildCreateInput(body: Record<string, unknown>): CreateTestScrip
 export function parsePatchAndSteps(body: Record<string, unknown>): {
   patch: UpdateTestScriptInput;
   steps: StepPatch[] | null;
+  activitiesReplace: TestScriptActivityInput[] | undefined;
 } {
   const patch: UpdateTestScriptInput = {};
   if (typeof body.title === "string") patch.title = body.title;
@@ -88,6 +128,10 @@ export function parsePatchAndSteps(body: Record<string, unknown>): {
     patch.preconditions = typeof body.preconditions === "string" ? body.preconditions : null;
   }
   if ("test_data" in body) patch.test_data = typeof body.test_data === "string" ? body.test_data : null;
+  if ("business_conditions" in body) {
+    patch.business_conditions =
+      typeof body.business_conditions === "string" ? body.business_conditions : null;
+  }
   if ("expected_result" in body) {
     patch.expected_result = typeof body.expected_result === "string" ? body.expected_result : null;
   }
@@ -131,5 +175,14 @@ export function parsePatchAndSteps(body: Record<string, unknown>): {
     steps = body.steps.map((s, i) => parseStepPatch(s as Record<string, unknown>, i));
   }
 
-  return { patch, steps };
+  let activitiesReplace: TestScriptActivityInput[] | undefined;
+  if ("activities" in body) {
+    if (body.activities === null) {
+      activitiesReplace = [];
+    } else if (Array.isArray(body.activities)) {
+      activitiesReplace = body.activities.map((a) => parseActivityFlat(a as Record<string, unknown>));
+    }
+  }
+
+  return { patch, steps, activitiesReplace };
 }

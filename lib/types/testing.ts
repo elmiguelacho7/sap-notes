@@ -2,9 +2,24 @@ export type TestScriptType = "uat" | "sit" | "regression";
 export type TestScriptStatus = "draft" | "ready" | "archived";
 export type TestExecutionResult = "passed" | "failed" | "blocked" | "not_run";
 
+export type TestScriptActivityRow = {
+  id: string;
+  test_script_id: string;
+  scenario_name: string | null;
+  activity_title: string;
+  activity_target_name: string | null;
+  activity_target_url: string | null;
+  business_role: string | null;
+  activity_order: number;
+  metadata: unknown;
+  created_at: string;
+  updated_at: string;
+};
+
 export type TestScriptStepRow = {
   id: string;
   test_script_id: string;
+  activity_id: string | null;
   step_order: number;
   instruction: string;
   expected_result: string | null;
@@ -30,6 +45,7 @@ export type TestScriptRow = {
   status: TestScriptStatus;
   preconditions: string | null;
   test_data: string | null;
+  business_conditions: string | null;
   expected_result: string | null;
   scenario_path: string | null;
   source_document_name: string | null;
@@ -65,6 +81,7 @@ export type TestScriptListItem = TestScriptRow & {
 };
 
 export type TestScriptWithSteps = TestScriptRow & {
+  activities: TestScriptActivityRow[];
   steps: TestScriptStepRow[];
 };
 

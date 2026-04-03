@@ -1,6 +1,6 @@
 import mammoth from "mammoth";
 import { normalizeSapImportedScript } from "./normalizeSapImportedScript";
-import type { SapImportedStepRow, SapParseResult } from "./types";
+import type { SapImportedActivityDraft, SapImportedStepRow, SapParseResult } from "./types";
 
 function takeAfterLabel(text: string, label: RegExp): string {
   const m = text.match(label);
@@ -97,6 +97,51 @@ function extractTableLikeRows(text: string): SapImportedStepRow[] {
   return rows;
 }
 
+function extractBusinessConditions(text: string): string {
+  return takeAfterLabel(text, /(?:business\s*conditions?)\s*[:.]?\s*/i);
+}
+
+/** Split procedure region into activity-like blocks (headings). */
+function splitIntoActivitySections(procedureText: string): { title: string; body: string }[] {
+  const lines = procedureText.split(/\r?\n/);
+  const sections: { title: string; body: string }[] = [];
+  let currentTitle = "Procedure";
+  const buf: string[] = [];
+
+  const isHeading = (line: string) => {
+    const t = line.trim();
+    if (t.length < 5 || t.length > 140) return false;
+    if (/^activity\s*\d+[\).:\s-]/i.test(t)) return true;
+    if (/^(domestic|international|additional)\s*:/i.test(t)) return true;
+    if (/^procedure\s*\d+/i.test(t)) return true;
+    if (t.length < 80 && t === t.toUpperCase() && /[A-Z]{3,}/.test(t) && !/^\d+$/.test(t)) return true;
+    return false;
+  };
+
+  const flush = () => {
+    sections.push({ title: currentTitle, body: buf.join("\n").trim() });
+    buf.length = 0;
+  };
+
+  for (const line of lines) {
+    if (isHeading(line)) {
+      if (buf.some((l) => l.trim()) || sections.length > 0) {
+        flush();
+      }
+      currentTitle = line.trim();
+    } else {
+      buf.push(line);
+    }
+  }
+  flush();
+
+  const nonEmpty = sections.filter((s) => s.body.trim().length > 0);
+  if (nonEmpty.length <= 1) {
+    return [{ title: "Procedure", body: procedureText.trim() }];
+  }
+  return nonEmpty;
+}
+
 function pickTitle(text: string, fileName: string): string {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   for (const ln of lines.slice(0, 25)) {
@@ -125,7 +170,7 @@ export async function parseSapTestScriptDocx(buffer: Buffer, fileName: string): 
     warnings.push(e instanceof Error ? e.message : "Could not read DOCX");
     return {
       draft: normalizeSapImportedScript(
-        { title: fileName, objective: "", steps: [] },
+        { title: fileName, objective: "", steps: [], activities: [] },
         { source_import_type: "sap_docx", source_document_name: fileName }
       ),
       warnings,
@@ -150,12 +195,41 @@ export async function parseSapTestScriptDocx(buffer: Buffer, fileName: string): 
 
   const roles = extractRoles(raw);
   const scope = extractScopeItem(raw);
-  let steps = extractTableLikeRows(raw);
-  if (steps.length === 0) steps = extractNumberedSteps(raw);
-  if (steps.length === 0) {
-    warnings.push(
-      "No numbered steps or tabular rows detected; add steps manually after import."
-    );
+  const business_conditions = extractBusinessConditions(raw);
+
+  const procMatch = raw.match(/\b(?:test\s*)?procedure\b/i);
+  const procedureText =
+    procMatch && procMatch.index !== undefined ? raw.slice(procMatch.index) : raw;
+
+  const sections = splitIntoActivitySections(procedureText);
+  let activities: SapImportedActivityDraft[] = [];
+  if (sections.length > 1) {
+    activities = sections.map((sec, idx) => {
+      const tab = extractTableLikeRows(sec.body);
+      const num = tab.length ? tab : extractNumberedSteps(sec.body);
+      return {
+        scenario_name: scenario,
+        activity_title: sec.title,
+        activity_target_name: "",
+        activity_target_url: "",
+        business_role: "",
+        activity_order: idx,
+        steps: num,
+      };
+    });
+    const total = activities.reduce((n, a) => n + a.steps.length, 0);
+    if (total === 0) activities = [];
+  }
+
+  let steps: SapImportedStepRow[] = [];
+  if (activities.length === 0) {
+    steps = extractTableLikeRows(raw);
+    if (steps.length === 0) steps = extractNumberedSteps(raw);
+    if (steps.length === 0) {
+      warnings.push(
+        "No numbered steps or tabular rows detected; add steps manually after import."
+      );
+    }
   }
 
   const draft = normalizeSapImportedScript(
@@ -164,10 +238,12 @@ export async function parseSapTestScriptDocx(buffer: Buffer, fileName: string): 
       objective,
       preconditions,
       test_data: testData,
+      business_conditions,
       expected_result: expectedScript,
       scenario_path: scenario,
       business_roles: roles,
       scope_item_code: scope,
+      activities,
       steps,
       source_language: "",
     },

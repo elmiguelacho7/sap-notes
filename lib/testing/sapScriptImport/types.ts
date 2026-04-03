@@ -15,6 +15,17 @@ export interface SapImportedStepRow {
   test_data_notes?: string | null;
 }
 
+/** One SAP Cloud ALM activity (or DOCX section) with nested actions. */
+export interface SapImportedActivityDraft {
+  scenario_name: string;
+  activity_title: string;
+  activity_target_name: string;
+  activity_target_url: string;
+  business_role: string;
+  activity_order: number;
+  steps: SapImportedStepRow[];
+}
+
 export interface SapImportedScriptDraft {
   title: string;
   objective: string;
@@ -28,9 +39,13 @@ export interface SapImportedScriptDraft {
   scope_item_code: string;
   preconditions: string;
   test_data: string;
+  business_conditions: string;
   expected_result: string;
   business_roles: string[];
   source_import_type: SourceImportType;
+  /** ALM hierarchy when detected; empty = use flat `steps` only. */
+  activities: SapImportedActivityDraft[];
+  /** Flat steps (legacy / DOCX fallback); ignored on save when `activities` non-empty. */
   steps: SapImportedStepRow[];
 }
 

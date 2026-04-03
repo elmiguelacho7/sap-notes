@@ -23,6 +23,36 @@ type ReviewStep = {
   test_data_notes: string;
 };
 
+type ReviewActivity = {
+  id: string;
+  scenario_name: string;
+  activity_title: string;
+  activity_target_name: string;
+  activity_target_url: string;
+  business_role: string;
+  activity_order: number;
+  steps: ReviewStep[];
+};
+
+function newClientId(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function mapImportedStep(s: SapImportedScriptDraft["steps"][number], i: number): ReviewStep {
+  return {
+    step_order: s.step_order || i + 1,
+    step_name: s.step_name ?? "",
+    instruction: s.instruction,
+    expected_result: s.expected_result ?? "",
+    optional_flag: Boolean(s.optional_flag),
+    transaction_or_app: s.transaction_or_app ?? "",
+    business_role: s.business_role ?? "",
+    test_data_notes: s.test_data_notes ?? "",
+  };
+}
+
 function draftToReviewSteps(d: SapImportedScriptDraft): ReviewStep[] {
   if (d.steps.length === 0) {
     return [
@@ -81,6 +111,8 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
   const [sourceDocumentName, setSourceDocumentName] = useState("");
   const [sourceLanguage, setSourceLanguage] = useState("");
   const [businessRolesText, setBusinessRolesText] = useState("");
+  const [businessConditions, setBusinessConditions] = useState("");
+  const [reviewActivities, setReviewActivities] = useState<ReviewActivity[]>([]);
   const [steps, setSteps] = useState<ReviewStep[]>([]);
 
   const reset = useCallback(() => {
@@ -104,6 +136,8 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
     setSourceDocumentName("");
     setSourceLanguage("");
     setBusinessRolesText("");
+    setBusinessConditions("");
+    setReviewActivities([]);
     setSteps([]);
   }, []);
 
@@ -121,6 +155,7 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
     setStatus(d.status);
     setPreconditions(d.preconditions);
     setTestData(d.test_data);
+    setBusinessConditions(d.business_conditions ?? "");
     setExpectedResult(d.expected_result);
     setScenarioPath(d.scenario_path);
     setScopeItemCode(d.scope_item_code);
@@ -128,7 +163,24 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
     setSourceLanguage(d.source_language);
     setBusinessRolesText((d.business_roles ?? []).join("\n"));
     setSourceImportType(d.source_import_type === "sap_xlsx" ? "sap_xlsx" : "sap_docx");
-    setSteps(draftToReviewSteps(d));
+    if ((d.activities?.length ?? 0) > 0) {
+      setReviewActivities(
+        d.activities!.map((a, idx) => ({
+          id: newClientId(),
+          scenario_name: a.scenario_name,
+          activity_title: a.activity_title,
+          activity_target_name: a.activity_target_name,
+          activity_target_url: a.activity_target_url,
+          business_role: a.business_role,
+          activity_order: a.activity_order ?? idx,
+          steps: (a.steps ?? []).map((s, i) => mapImportedStep(s, i)),
+        }))
+      );
+      setSteps([]);
+    } else {
+      setReviewActivities([]);
+      setSteps(draftToReviewSteps(d));
+    }
   }, []);
 
   const parseFile = async () => {
@@ -170,41 +222,67 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
       .split("\n")
       .map((s) => s.trim())
       .filter(Boolean);
+
+    const stepPayloadShape = (s: ReviewStep) => ({
+      instruction: s.instruction.trim(),
+      expected_result: s.expected_result.trim() || null,
+      step_name: s.step_name.trim() || null,
+      optional_flag: s.optional_flag,
+      transaction_or_app: s.transaction_or_app.trim() || null,
+      business_role: s.business_role.trim() || null,
+      test_data_notes: s.test_data_notes.trim() || null,
+    });
+
+    const activitiesPayload =
+      reviewActivities.length > 0
+        ? reviewActivities
+            .map((a, idx) => ({
+              id: a.id,
+              scenario_name: a.scenario_name.trim() || null,
+              activity_title: a.activity_title.trim() || `Activity ${idx + 1}`,
+              activity_target_name: a.activity_target_name.trim() || null,
+              activity_target_url: a.activity_target_url.trim() || null,
+              business_role: a.business_role.trim() || null,
+              activity_order: idx,
+              steps: a.steps.filter((s) => s.instruction.trim()).map((s) => stepPayloadShape(s)),
+            }))
+            .filter((a) => a.steps.length > 0)
+        : null;
+
     const stepsPayload = steps
       .filter((s) => s.instruction.trim())
-      .map((s, i) => ({
-        instruction: s.instruction.trim(),
-        expected_result: s.expected_result.trim() || null,
-        step_name: s.step_name.trim() || null,
-        optional_flag: s.optional_flag,
-        transaction_or_app: s.transaction_or_app.trim() || null,
-        business_role: s.business_role.trim() || null,
-        test_data_notes: s.test_data_notes.trim() || null,
-        step_order: i,
-      }));
+      .map((s) => stepPayloadShape(s));
+
+    const body: Record<string, unknown> = {
+      title: title.trim() || t("import.untitled"),
+      objective: objective.trim() || null,
+      module: module.trim() || null,
+      test_type: testType,
+      priority: priority.trim() || null,
+      status,
+      preconditions: preconditions.trim() || null,
+      test_data: testData.trim() || null,
+      business_conditions: businessConditions.trim() || null,
+      expected_result: expectedResult.trim() || null,
+      scenario_path: scenarioPath.trim() || null,
+      scope_item_code: scopeItemCode.trim() || null,
+      source_document_name: sourceDocumentName.trim() || null,
+      source_language: sourceLanguage.trim() || null,
+      business_roles: roles,
+      source_import_type: sourceImportType,
+    };
+    if (activitiesPayload && activitiesPayload.length > 0) {
+      body.activities = activitiesPayload;
+    } else {
+      body.steps = stepsPayload;
+    }
+
     try {
       const res = await fetch(`/api/projects/${projectId}/testing/scripts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          title: title.trim() || t("import.untitled"),
-          objective: objective.trim() || null,
-          module: module.trim() || null,
-          test_type: testType,
-          priority: priority.trim() || null,
-          status,
-          preconditions: preconditions.trim() || null,
-          test_data: testData.trim() || null,
-          expected_result: expectedResult.trim() || null,
-          scenario_path: scenarioPath.trim() || null,
-          scope_item_code: scopeItemCode.trim() || null,
-          source_document_name: sourceDocumentName.trim() || null,
-          source_language: sourceLanguage.trim() || null,
-          business_roles: roles,
-          source_import_type: sourceImportType,
-          steps: stepsPayload,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -235,6 +313,42 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
     ]);
 
   const removeStep = (i: number) => setSteps((prev) => (prev.length <= 1 ? prev : prev.filter((_, j) => j !== i)));
+
+  const addStepToActivity = (ai: number) => {
+    setReviewActivities((prev) =>
+      prev.map((a, i) =>
+        i === ai
+          ? {
+              ...a,
+              steps: [
+                ...a.steps,
+                {
+                  step_order: a.steps.length + 1,
+                  step_name: "",
+                  instruction: "",
+                  expected_result: "",
+                  optional_flag: false,
+                  transaction_or_app: "",
+                  business_role: "",
+                  test_data_notes: "",
+                },
+              ],
+            }
+          : a
+      )
+    );
+  };
+
+  const removeStepFromActivity = (ai: number, si: number) => {
+    setReviewActivities((prev) =>
+      prev.map((a, i) => (i === ai ? { ...a, steps: a.steps.filter((_, j) => j !== si) } : a))
+    );
+  };
+
+  const hasReviewSteps =
+    reviewActivities.length > 0
+      ? reviewActivities.some((a) => a.steps.some((s) => s.instruction.trim()))
+      : steps.some((s) => s.instruction.trim());
 
   if (!open) return null;
 
@@ -305,6 +419,20 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
                 </div>
               )}
 
+              {reviewActivities.length > 0 && (
+                <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-3 py-2 text-sm text-emerald-950">
+                  <p className="font-medium">{t("import.structureDetected")}</p>
+                  <ul className="mt-1 list-inside list-disc text-xs text-emerald-900/90">
+                    {reviewActivities.map((a) => (
+                      <li key={a.id}>
+                        {(a.scenario_name || t("procedure.defaultScenario")).trim()} → {a.activity_title} (
+                        {a.steps.length} {t("import.actions")})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div>
                 <label className={labelClass}>{t("drawer.title")}</label>
                 <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} />
@@ -369,6 +497,15 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
               <div>
                 <label className={labelClass}>{t("drawer.testData")}</label>
                 <textarea value={testData} onChange={(e) => setTestData(e.target.value)} rows={2} className={textareaClass} />
+              </div>
+              <div>
+                <label className={labelClass}>{t("drawer.businessConditions")}</label>
+                <textarea
+                  value={businessConditions}
+                  onChange={(e) => setBusinessConditions(e.target.value)}
+                  rows={2}
+                  className={textareaClass}
+                />
               </div>
               <div>
                 <label className={labelClass}>{t("drawer.expectedResult")}</label>
@@ -445,120 +582,267 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
                 </div>
               </div>
 
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <span className={labelClass}>{t("drawer.steps")}</span>
-                  <button
-                    type="button"
-                    onClick={addStep}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    {t("drawer.addStep")}
-                  </button>
-                </div>
-                <div className="max-h-64 space-y-3 overflow-y-auto pr-1">
-                  {steps.map((st, i) => (
-                    <div key={i} className="rounded-xl border border-slate-200/90 bg-white p-3">
-                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-xs font-medium text-slate-500">#{i + 1}</span>
-                        <div className="flex items-center gap-3">
-                          <label className="flex items-center gap-1.5 text-xs text-slate-600">
-                            <input
-                              type="checkbox"
-                              checked={st.optional_flag}
-                              onChange={(e) =>
-                                setSteps((prev) =>
-                                  prev.map((p, j) => (j === i ? { ...p, optional_flag: e.target.checked } : p))
-                                )
-                              }
-                            />
-                            {t("drawer.stepOptional")}
-                          </label>
-                          {steps.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeStep(i)}
-                              className="text-slate-400 hover:text-red-600"
-                              aria-label={t("drawer.removeStep")}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
+              {reviewActivities.length > 0 ? (
+                <div className="max-h-[28rem] space-y-3 overflow-y-auto pr-1">
+                  <p className={labelClass}>{t("import.reviewProcedure")}</p>
+                  {reviewActivities.map((act, ai) => (
+                    <details key={act.id} open className="rounded-xl border border-slate-200/90 bg-white p-2">
+                      <summary className="cursor-pointer text-sm font-semibold text-slate-800">
+                        {act.scenario_name || t("procedure.defaultScenario")} → {act.activity_title}
+                      </summary>
+                      <div className="mt-2 space-y-2 border-t border-slate-100 pt-2">
+                        <input
+                          type="text"
+                          value={act.scenario_name}
+                          onChange={(e) =>
+                            setReviewActivities((prev) =>
+                              prev.map((a, j) => (j === ai ? { ...a, scenario_name: e.target.value } : a))
+                            )
+                          }
+                          className={inputClass}
+                          placeholder={t("import.scenarioPath")}
+                        />
+                        <input
+                          type="text"
+                          value={act.activity_title}
+                          onChange={(e) =>
+                            setReviewActivities((prev) =>
+                              prev.map((a, j) => (j === ai ? { ...a, activity_title: e.target.value } : a))
+                            )
+                          }
+                          className={inputClass}
+                          placeholder={t("drawer.activityTitle")}
+                        />
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => addStepToActivity(ai)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            {t("drawer.addStep")}
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {act.steps.map((st, si) => (
+                            <div key={si} className="rounded-lg border border-slate-100 bg-slate-50/50 p-2">
+                              <div className="mb-1 flex justify-between">
+                                <span className="text-xs text-slate-500">#{si + 1}</span>
+                                {act.steps.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeStepFromActivity(ai, si)}
+                                    className="text-slate-400 hover:text-red-600"
+                                    aria-label={t("drawer.removeStep")}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
+                              <label className={labelClass}>{t("drawer.stepName")}</label>
+                              <input
+                                type="text"
+                                value={st.step_name}
+                                onChange={(e) =>
+                                  setReviewActivities((prev) =>
+                                    prev.map((a, j) =>
+                                      j === ai
+                                        ? {
+                                            ...a,
+                                            steps: a.steps.map((p, k) =>
+                                              k === si ? { ...p, step_name: e.target.value } : p
+                                            ),
+                                          }
+                                        : a
+                                    )
+                                  )
+                                }
+                                className={inputClass}
+                              />
+                              <label className={`${labelClass} mt-1`}>{t("drawer.stepInstruction")}</label>
+                              <textarea
+                                value={st.instruction}
+                                onChange={(e) =>
+                                  setReviewActivities((prev) =>
+                                    prev.map((a, j) =>
+                                      j === ai
+                                        ? {
+                                            ...a,
+                                            steps: a.steps.map((p, k) =>
+                                              k === si ? { ...p, instruction: e.target.value } : p
+                                            ),
+                                          }
+                                        : a
+                                    )
+                                  )
+                                }
+                                rows={2}
+                                className={textareaClass}
+                              />
+                              <label className={`${labelClass} mt-1`}>{t("drawer.stepExpected")}</label>
+                              <textarea
+                                value={st.expected_result}
+                                onChange={(e) =>
+                                  setReviewActivities((prev) =>
+                                    prev.map((a, j) =>
+                                      j === ai
+                                        ? {
+                                            ...a,
+                                            steps: a.steps.map((p, k) =>
+                                              k === si ? { ...p, expected_result: e.target.value } : p
+                                            ),
+                                          }
+                                        : a
+                                    )
+                                  )
+                                }
+                                rows={1}
+                                className={textareaClass}
+                              />
+                              <label className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
+                                <input
+                                  type="checkbox"
+                                  checked={st.optional_flag}
+                                  onChange={(e) =>
+                                    setReviewActivities((prev) =>
+                                      prev.map((a, j) =>
+                                        j === ai
+                                          ? {
+                                              ...a,
+                                              steps: a.steps.map((p, k) =>
+                                                k === si ? { ...p, optional_flag: e.target.checked } : p
+                                              ),
+                                            }
+                                          : a
+                                      )
+                                    )
+                                  }
+                                />
+                                {t("drawer.stepOptional")}
+                              </label>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                      <label className={labelClass}>{t("drawer.stepName")}</label>
-                      <input
-                        type="text"
-                        value={st.step_name}
-                        onChange={(e) =>
-                          setSteps((prev) => prev.map((p, j) => (j === i ? { ...p, step_name: e.target.value } : p)))
-                        }
-                        className={inputClass}
-                      />
-                      <label className={`${labelClass} mt-2`}>{t("drawer.stepInstruction")}</label>
-                      <textarea
-                        value={st.instruction}
-                        onChange={(e) =>
-                          setSteps((prev) => prev.map((p, j) => (j === i ? { ...p, instruction: e.target.value } : p)))
-                        }
-                        rows={2}
-                        className={textareaClass}
-                      />
-                      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <div>
-                          <label className={labelClass}>{t("drawer.stepExpected")}</label>
-                          <textarea
-                            value={st.expected_result}
-                            onChange={(e) =>
-                              setSteps((prev) =>
-                                prev.map((p, j) => (j === i ? { ...p, expected_result: e.target.value } : p))
-                              )
-                            }
-                            rows={2}
-                            className={textareaClass}
-                          />
-                        </div>
-                        <div>
-                          <label className={labelClass}>{t("drawer.stepTransaction")}</label>
-                          <input
-                            type="text"
-                            value={st.transaction_or_app}
-                            onChange={(e) =>
-                              setSteps((prev) =>
-                                prev.map((p, j) => (j === i ? { ...p, transaction_or_app: e.target.value } : p))
-                              )
-                            }
-                            className={inputClass}
-                          />
-                          <label className={`${labelClass} mt-2`}>{t("drawer.stepRole")}</label>
-                          <input
-                            type="text"
-                            value={st.business_role}
-                            onChange={(e) =>
-                              setSteps((prev) =>
-                                prev.map((p, j) => (j === i ? { ...p, business_role: e.target.value } : p))
-                              )
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-                      </div>
-                      <label className={`${labelClass} mt-2`}>{t("drawer.stepDataNotes")}</label>
-                      <textarea
-                        value={st.test_data_notes}
-                        onChange={(e) =>
-                          setSteps((prev) =>
-                            prev.map((p, j) => (j === i ? { ...p, test_data_notes: e.target.value } : p))
-                          )
-                        }
-                        rows={1}
-                        className={textareaClass}
-                      />
-                    </div>
+                    </details>
                   ))}
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className={labelClass}>{t("drawer.steps")}</span>
+                    <button
+                      type="button"
+                      onClick={addStep}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      {t("drawer.addStep")}
+                    </button>
+                  </div>
+                  <div className="max-h-64 space-y-3 overflow-y-auto pr-1">
+                    {steps.map((st, i) => (
+                      <div key={i} className="rounded-xl border border-slate-200/90 bg-white p-3">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-slate-500">#{i + 1}</span>
+                          <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                              <input
+                                type="checkbox"
+                                checked={st.optional_flag}
+                                onChange={(e) =>
+                                  setSteps((prev) =>
+                                    prev.map((p, j) => (j === i ? { ...p, optional_flag: e.target.checked } : p))
+                                  )
+                                }
+                              />
+                              {t("drawer.stepOptional")}
+                            </label>
+                            {steps.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeStep(i)}
+                                className="text-slate-400 hover:text-red-600"
+                                aria-label={t("drawer.removeStep")}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <label className={labelClass}>{t("drawer.stepName")}</label>
+                        <input
+                          type="text"
+                          value={st.step_name}
+                          onChange={(e) =>
+                            setSteps((prev) => prev.map((p, j) => (j === i ? { ...p, step_name: e.target.value } : p)))
+                          }
+                          className={inputClass}
+                        />
+                        <label className={`${labelClass} mt-2`}>{t("drawer.stepInstruction")}</label>
+                        <textarea
+                          value={st.instruction}
+                          onChange={(e) =>
+                            setSteps((prev) => prev.map((p, j) => (j === i ? { ...p, instruction: e.target.value } : p)))
+                          }
+                          rows={2}
+                          className={textareaClass}
+                        />
+                        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <div>
+                            <label className={labelClass}>{t("drawer.stepExpected")}</label>
+                            <textarea
+                              value={st.expected_result}
+                              onChange={(e) =>
+                                setSteps((prev) =>
+                                  prev.map((p, j) => (j === i ? { ...p, expected_result: e.target.value } : p))
+                                )
+                              }
+                              rows={2}
+                              className={textareaClass}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelClass}>{t("drawer.stepTransaction")}</label>
+                            <input
+                              type="text"
+                              value={st.transaction_or_app}
+                              onChange={(e) =>
+                                setSteps((prev) =>
+                                  prev.map((p, j) => (j === i ? { ...p, transaction_or_app: e.target.value } : p))
+                                )
+                              }
+                              className={inputClass}
+                            />
+                            <label className={`${labelClass} mt-2`}>{t("drawer.stepRole")}</label>
+                            <input
+                              type="text"
+                              value={st.business_role}
+                              onChange={(e) =>
+                                setSteps((prev) =>
+                                  prev.map((p, j) => (j === i ? { ...p, business_role: e.target.value } : p))
+                                )
+                              }
+                              className={inputClass}
+                            />
+                          </div>
+                        </div>
+                        <label className={`${labelClass} mt-2`}>{t("drawer.stepDataNotes")}</label>
+                        <textarea
+                          value={st.test_data_notes}
+                          onChange={(e) =>
+                            setSteps((prev) =>
+                              prev.map((p, j) => (j === i ? { ...p, test_data_notes: e.target.value } : p))
+                            )
+                          }
+                          rows={1}
+                          className={textareaClass}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -591,7 +875,7 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
           ) : (
             <button
               type="button"
-              disabled={saving || !title.trim()}
+              disabled={saving || !title.trim() || !hasReviewSteps}
               onClick={() => void saveDraft()}
               className="inline-flex items-center justify-center rounded-xl bg-[rgb(var(--rb-brand-primary))] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
             >

@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isValidSapTestModule } from "@/lib/testing/sapModuleCatalog";
 import { TEST_SCRIPT_PRIORITIES } from "@/lib/testing/testScriptConstants";
@@ -5,6 +6,7 @@ import type {
   SourceImportType,
   TestExecutionResult,
   TestExecutionRow,
+  TestScriptActivityRow,
   TestScriptListItem,
   TestScriptRow,
   TestScriptStatus,
@@ -13,6 +15,13 @@ import type {
   TestScriptType,
   TestScriptWithSteps,
 } from "@/lib/types/testing";
+
+const CLIENT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function activityIdOrNew(id: string | undefined | null): string {
+  if (id && CLIENT_UUID_RE.test(id.trim())) return id.trim();
+  return randomUUID();
+}
 
 const TEST_TYPES = new Set<string>(["uat", "sit", "regression"]);
 const STATUSES = new Set<string>(["draft", "ready", "archived"]);
@@ -181,6 +190,22 @@ export type CreateTestScriptStepInput = {
   test_data_notes?: string | null;
 };
 
+/** Flat activity row for PATCH replace (no nested steps). */
+export type TestScriptActivityInput = {
+  id?: string;
+  scenario_name?: string | null;
+  activity_title: string;
+  activity_target_name?: string | null;
+  activity_target_url?: string | null;
+  business_role?: string | null;
+  activity_order: number;
+};
+
+/** Nested activities + steps for create / import. */
+export type CreateTestScriptActivityNestedInput = TestScriptActivityInput & {
+  steps: CreateTestScriptStepInput[];
+};
+
 export type CreateTestScriptInput = {
   title: string;
   objective?: string | null;
@@ -190,6 +215,7 @@ export type CreateTestScriptInput = {
   status?: string | null;
   preconditions?: string | null;
   test_data?: string | null;
+  business_conditions?: string | null;
   expected_result?: string | null;
   scenario_path?: string | null;
   source_document_name?: string | null;
@@ -200,6 +226,8 @@ export type CreateTestScriptInput = {
   related_task_id?: string | null;
   related_ticket_id?: string | null;
   related_knowledge_page_id?: string | null;
+  /** ALM-style groups; when non-empty, nested steps are used and top-level `steps` is ignored. */
+  activities?: CreateTestScriptActivityNestedInput[];
   steps?: CreateTestScriptStepInput[];
 };
 
@@ -232,6 +260,7 @@ export async function createTestScript(
     status: asStatus(input.status),
     preconditions: input.preconditions?.trim() || null,
     test_data: input.test_data?.trim() || null,
+    business_conditions: input.business_conditions?.trim() || null,
     expected_result: input.expected_result?.trim() || null,
     scenario_path: input.scenario_path?.trim() || null,
     source_document_name: input.source_document_name?.trim() || null,
@@ -253,21 +282,62 @@ export async function createTestScript(
   if (insErr) throw new Error(insErr.message);
   const row = script as TestScriptRow;
 
-  const stepsIn = input.steps ?? [];
-  if (stepsIn.length > 0) {
-    const stepRows = stepsIn.map((st, i) => ({
-      test_script_id: row.id,
-      step_order: i,
-      instruction: (st.instruction ?? "").trim() || "—",
-      expected_result: st.expected_result?.trim() || null,
-      step_name: st.step_name?.trim() || null,
-      optional_flag: Boolean(st.optional_flag),
-      transaction_or_app: st.transaction_or_app?.trim() || null,
-      business_role: st.business_role?.trim() || null,
-      test_data_notes: st.test_data_notes?.trim() || null,
-    }));
-    const { error: stepErr } = await supabaseAdmin.from("test_script_steps").insert(stepRows);
-    if (stepErr) throw new Error(stepErr.message);
+  const activitiesIn = input.activities?.filter((a) => (a.steps?.length ?? 0) > 0) ?? [];
+  if (activitiesIn.length > 0) {
+    const sorted = [...activitiesIn].sort((a, b) => a.activity_order - b.activity_order);
+    let stepOrder = 0;
+    for (const act of sorted) {
+      const aid = activityIdOrNew(act.id);
+      const { error: actErr } = await supabaseAdmin.from("test_script_activities").insert({
+        id: aid,
+        test_script_id: row.id,
+        scenario_name: act.scenario_name?.trim() || null,
+        activity_title: (act.activity_title ?? "").trim() || "Activity",
+        activity_target_name: act.activity_target_name?.trim() || null,
+        activity_target_url: act.activity_target_url?.trim() || null,
+        business_role: act.business_role?.trim() || null,
+        activity_order: act.activity_order,
+      });
+      if (actErr) throw new Error(actErr.message);
+      const stepsIn = act.steps ?? [];
+      if (stepsIn.length > 0) {
+        const stepRows = stepsIn.map((st) => {
+          const r = {
+            test_script_id: row.id,
+            activity_id: aid,
+            step_order: stepOrder++,
+            instruction: (st.instruction ?? "").trim() || "—",
+            expected_result: st.expected_result?.trim() || null,
+            step_name: st.step_name?.trim() || null,
+            optional_flag: Boolean(st.optional_flag),
+            transaction_or_app: st.transaction_or_app?.trim() || null,
+            business_role: st.business_role?.trim() || null,
+            test_data_notes: st.test_data_notes?.trim() || null,
+          };
+          return r;
+        });
+        const { error: stepErr } = await supabaseAdmin.from("test_script_steps").insert(stepRows);
+        if (stepErr) throw new Error(stepErr.message);
+      }
+    }
+  } else {
+    const stepsIn = input.steps ?? [];
+    if (stepsIn.length > 0) {
+      const stepRows = stepsIn.map((st, i) => ({
+        test_script_id: row.id,
+        activity_id: null as string | null,
+        step_order: i,
+        instruction: (st.instruction ?? "").trim() || "—",
+        expected_result: st.expected_result?.trim() || null,
+        step_name: st.step_name?.trim() || null,
+        optional_flag: Boolean(st.optional_flag),
+        transaction_or_app: st.transaction_or_app?.trim() || null,
+        business_role: st.business_role?.trim() || null,
+        test_data_notes: st.test_data_notes?.trim() || null,
+      }));
+      const { error: stepErr } = await supabaseAdmin.from("test_script_steps").insert(stepRows);
+      if (stepErr) throw new Error(stepErr.message);
+    }
   }
 
   return getTestScript(projectId, row.id);
@@ -276,6 +346,13 @@ export async function createTestScript(
 export async function getTestScript(projectId: string, scriptId: string): Promise<TestScriptWithSteps> {
   const script = await assertScriptProject(scriptId, projectId);
   if (!script) throw new Error("Test script not found");
+
+  const { data: activities, error: aErr } = await supabaseAdmin
+    .from("test_script_activities")
+    .select("*")
+    .eq("test_script_id", scriptId)
+    .order("activity_order", { ascending: true });
+  if (aErr) throw new Error(aErr.message);
 
   const { data: steps, error } = await supabaseAdmin
     .from("test_script_steps")
@@ -286,6 +363,7 @@ export async function getTestScript(projectId: string, scriptId: string): Promis
 
   return {
     ...script,
+    activities: (activities ?? []) as TestScriptActivityRow[],
     steps: (steps ?? []) as TestScriptStepRow[],
   };
 }
@@ -300,6 +378,7 @@ export type UpdateTestScriptInput = Partial<{
   preconditions: string | null;
   test_data: string | null;
   expected_result: string | null;
+  business_conditions: string | null;
   scenario_path: string | null;
   source_document_name: string | null;
   source_language: string | null;
@@ -314,6 +393,7 @@ export type UpdateTestScriptInput = Partial<{
 export type StepPatch = {
   id?: string | null;
   step_order: number;
+  activity_id?: string | null;
   instruction: string;
   expected_result?: string | null;
   step_name?: string | null;
@@ -323,11 +403,42 @@ export type StepPatch = {
   test_data_notes?: string | null;
 };
 
+async function replaceTestScriptActivities(
+  scriptId: string,
+  activities: TestScriptActivityInput[]
+): Promise<void> {
+  const { error: nErr } = await supabaseAdmin
+    .from("test_script_steps")
+    .update({ activity_id: null })
+    .eq("test_script_id", scriptId);
+  if (nErr) throw new Error(nErr.message);
+
+  const { error: dErr } = await supabaseAdmin.from("test_script_activities").delete().eq("test_script_id", scriptId);
+  if (dErr) throw new Error(dErr.message);
+
+  const sorted = [...activities].sort((a, b) => a.activity_order - b.activity_order);
+  for (const act of sorted) {
+    const aid = activityIdOrNew(act.id);
+    const { error: iErr } = await supabaseAdmin.from("test_script_activities").insert({
+      id: aid,
+      test_script_id: scriptId,
+      scenario_name: act.scenario_name?.trim() || null,
+      activity_title: (act.activity_title ?? "").trim() || "Activity",
+      activity_target_name: act.activity_target_name?.trim() || null,
+      activity_target_url: act.activity_target_url?.trim() || null,
+      business_role: act.business_role?.trim() || null,
+      activity_order: act.activity_order,
+    });
+    if (iErr) throw new Error(iErr.message);
+  }
+}
+
 export async function updateTestScript(
   projectId: string,
   scriptId: string,
   patch: UpdateTestScriptInput,
-  steps?: StepPatch[] | null
+  steps?: StepPatch[] | null,
+  activitiesReplace?: TestScriptActivityInput[] | null
 ): Promise<TestScriptWithSteps> {
   const existing = await assertScriptProject(scriptId, projectId);
   if (!existing) throw new Error("Test script not found");
@@ -346,6 +457,9 @@ export async function updateTestScript(
   if (patch.preconditions !== undefined) updates.preconditions = patch.preconditions?.trim() || null;
   if (patch.test_data !== undefined) updates.test_data = patch.test_data?.trim() || null;
   if (patch.expected_result !== undefined) updates.expected_result = patch.expected_result?.trim() || null;
+  if (patch.business_conditions !== undefined) {
+    updates.business_conditions = patch.business_conditions?.trim() || null;
+  }
   if (patch.scenario_path !== undefined) updates.scenario_path = patch.scenario_path?.trim() || null;
   if (patch.source_document_name !== undefined) {
     updates.source_document_name = patch.source_document_name?.trim() || null;
@@ -382,6 +496,10 @@ export async function updateTestScript(
     if (uErr) throw new Error(uErr.message);
   }
 
+  if (activitiesReplace !== undefined && activitiesReplace !== null) {
+    await replaceTestScriptActivities(scriptId, activitiesReplace);
+  }
+
   if (steps != null) {
     const { data: currentSteps, error: csErr } = await supabaseAdmin
       .from("test_script_steps")
@@ -409,24 +527,29 @@ export async function updateTestScript(
       const transaction_or_app = st.transaction_or_app?.trim() || null;
       const business_role = st.business_role?.trim() || null;
       const test_data_notes = st.test_data_notes?.trim() || null;
+      let resolvedActivityId: string | null | undefined = undefined;
+      if (st.activity_id !== undefined) {
+        resolvedActivityId =
+          st.activity_id && String(st.activity_id).trim() ? String(st.activity_id).trim() : null;
+      }
       if (st.id && existingIds.has(st.id)) {
-        const { error: upErr } = await supabaseAdmin
-          .from("test_script_steps")
-          .update({
-            step_order,
-            instruction,
-            expected_result,
-            step_name,
-            optional_flag,
-            transaction_or_app,
-            business_role,
-            test_data_notes,
-          })
-          .eq("id", st.id);
+        const rowUp: Record<string, unknown> = {
+          step_order,
+          instruction,
+          expected_result,
+          step_name,
+          optional_flag,
+          transaction_or_app,
+          business_role,
+          test_data_notes,
+        };
+        if (resolvedActivityId !== undefined) rowUp.activity_id = resolvedActivityId;
+        const { error: upErr } = await supabaseAdmin.from("test_script_steps").update(rowUp).eq("id", st.id);
         if (upErr) throw new Error(upErr.message);
       } else {
         const { error: inErr } = await supabaseAdmin.from("test_script_steps").insert({
           test_script_id: scriptId,
+          activity_id: resolvedActivityId === undefined ? null : resolvedActivityId,
           step_order,
           instruction,
           expected_result,
