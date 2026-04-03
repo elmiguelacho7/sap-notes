@@ -19,6 +19,7 @@ import { getProjectMetrics } from "@/lib/metrics/platformMetrics";
 import { getCurrentUserIdFromRequest, getAccessTokenFromRequest } from "@/lib/auth/serverAuth";
 import { requireAuthAndProjectPermission, requireAuthenticatedUser } from "@/lib/auth/permissions";
 import { getActionSuggestions, type SapitoAction } from "@/lib/ai/actionSuggestions";
+import type { GroundingCalibration } from "@/lib/ai/groundingCalibration";
 
 /** Human-readable grounding labels for UI. */
 const GROUNDING_LABELS: Record<string, string> = {
@@ -63,6 +64,8 @@ type SapitoAnswerMeta = {
   sourceSummary?: string;
   /** Phase 6: actionable suggestions (navigation or chat prompts only). */
   actions?: SapitoAction[];
+  /** Phase 7: evidence strength for trust UI. */
+  evidenceStrength?: "strong" | "partial" | "weak";
 };
 
 function uniqueNonEmpty(values: (string | null | undefined)[]): string[] {
@@ -81,7 +84,8 @@ function uniqueNonEmpty(values: (string | null | undefined)[]): string[] {
 function computeAnswerMeta(
   scopes: string[],
   mode: SapitoMode,
-  sapitoRoute?: { responseMode?: string; sapTaxonomy?: { domains: readonly string[]; themes: readonly string[] } } | null
+  sapitoRoute?: { responseMode?: string; sapTaxonomy?: { domains: readonly string[]; themes: readonly string[] } } | null,
+  calibration?: GroundingCalibration | null
 ): SapitoAnswerMeta {
   const s = scopes ?? [];
   const hasProjectEvidence = s.includes("project_memory") || s.includes("project_documents") || s.includes("project_summary") || s.includes("project_health") || s.includes("project_risk");
@@ -110,17 +114,8 @@ function computeAnswerMeta(
   else if (hasGlobalKnowledge) groundingType = "global_knowledge";
   else if (hasSap) groundingType = "sap_general";
 
-  // Confidence heuristic (honest + conservative):
-  // - high: project evidence (memory/docs) or official SAP + connected/global knowledge
-  // - medium: connected/global knowledge OR official SAP alone
-  // - low: none of the above
   let confidenceLevel: SapitoConfidenceLevel = "low";
-  if (mode === "project" && (s.includes("project_memory") || s.includes("project_documents"))) confidenceLevel = "high";
-  else if (mode === "project" && (hasConnectedProject || s.includes("project_summary"))) confidenceLevel = "medium";
-  else if (mode === "global" && (s.includes("official_sap") || hasGlobalKnowledge || hasConnectedGlobal)) confidenceLevel = "medium";
-  if (mode === "global" && s.includes("official_sap") && (hasGlobalKnowledge || hasConnectedGlobal)) confidenceLevel = "high";
-
-  const sourceSummary =
+  let sourceSummary =
     groundingType === "project_evidence"
       ? "Based on project evidence"
       : groundingType === "connected_docs"
@@ -130,6 +125,18 @@ function computeAnswerMeta(
           : groundingType === "mixed"
             ? "Based on mixed evidence (project + docs)"
             : "Based on general SAP knowledge";
+  let evidenceStrength: SapitoAnswerMeta["evidenceStrength"];
+
+  if (calibration) {
+    confidenceLevel = calibration.confidenceLevel;
+    sourceSummary = calibration.sourceSummary;
+    evidenceStrength = calibration.evidenceStrength;
+  } else {
+    if (mode === "project" && (s.includes("project_memory") || s.includes("project_documents"))) confidenceLevel = "high";
+    else if (mode === "project" && (hasConnectedProject || s.includes("project_summary"))) confidenceLevel = "medium";
+    else if (mode === "global" && (s.includes("official_sap") || hasGlobalKnowledge || hasConnectedGlobal)) confidenceLevel = "medium";
+    if (mode === "global" && s.includes("official_sap") && (hasGlobalKnowledge || hasConnectedGlobal)) confidenceLevel = "high";
+  }
 
   const responseMode = sapitoRoute?.responseMode;
   const tax = sapitoRoute?.sapTaxonomy;
@@ -160,6 +167,7 @@ function computeAnswerMeta(
     sapTaxonomy,
     followUps,
     sourceSummary,
+    evidenceStrength,
   };
 }
 
@@ -312,7 +320,7 @@ export async function POST(req: Request) {
               accessToken: accessToken ?? undefined,
             }),
           ]);
-        const { contextText: sapitoContextSummary, retrievalDebug, retrievalScopes: scopes, retrievalTrace } =
+        const { contextText: sapitoContextSummary, retrievalDebug, retrievalScopes: scopes, retrievalTrace, groundingCalibration } =
           resolverResult as ResolverResult;
         retrievalScopes = scopes;
         const isProjectHistory = isProjectHistoryQuestion(message);
@@ -328,6 +336,7 @@ export async function POST(req: Request) {
           retrievalTrace,
           retrievalDebug: retrievalDebug ?? { chunkCount: 0, documentTitles: [], usedRetrieval: false },
           isProjectHistoryQuestion: isProjectHistory,
+          groundingCalibration,
         };
 
         if (process.env.NODE_ENV === "development") {
@@ -450,7 +459,8 @@ Si documentas la solución o la decisión, Sapito podrá usarla la próxima vez.
         userId: effectiveUserId ?? undefined,
         accessToken: accessToken ?? undefined,
       });
-      const { contextText: sapitoContextSummary, retrievalDebug, retrievalScopes: scopes, retrievalTrace } = resolverResult;
+      const { contextText: sapitoContextSummary, retrievalDebug, retrievalScopes: scopes, retrievalTrace, groundingCalibration } =
+        resolverResult;
       retrievalScopes = scopes;
       const combinedSummary =
         resolvedProjectSummary != null
@@ -474,6 +484,7 @@ Si documentas la solución o la decisión, Sapito podrá usarla la próxima vez.
         sapitoRoute,
         retrievalTrace,
         retrievalDebug: retrievalDebug ?? { chunkCount: 0, documentTitles: [], usedRetrieval: false },
+        groundingCalibration,
       };
     }
 
@@ -544,7 +555,7 @@ Si documentas la solución o la decisión, Sapito podrá usarla la próxima vez.
 
     console.log("project-agent success");
     const groundingLabel = getGroundingLabel(retrievalScopes, resolvedProjectTitle);
-    const meta = computeAnswerMeta(retrievalScopes, mode, sapitoRoute ?? null);
+    const meta = computeAnswerMeta(retrievalScopes, mode, sapitoRoute ?? null, context.groundingCalibration ?? null);
     meta.actions = getActionSuggestions({
       mode,
       responseMode: meta.responseMode,

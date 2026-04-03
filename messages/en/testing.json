@@ -1,0 +1,82 @@
+{
+  "page": {
+    "title": "Testing",
+    "subtitle": "UAT, SIT, and regression scripts for this project. Record manual runs and link work items when ready.",
+    "newScript": "New script",
+    "loading": "Loading scripts…",
+    "errorLoad": "Could not load test scripts.",
+    "empty": "No test scripts yet. Create one to capture steps and execution history.",
+    "searchPlaceholder": "Search by title or module…",
+    "filterStatus": "Status",
+    "allStatuses": "All statuses"
+  },
+  "kpi": {
+    "total": "Scripts",
+    "ready": "Ready",
+    "failedLast": "Last run failed",
+    "lastRun": "Last execution"
+  },
+  "list": {
+    "steps": "{count, plural, one {# step} other {# steps}}",
+    "neverRun": "Never run",
+    "lastRun": "Last run",
+    "updated": "Updated"
+  },
+  "type": {
+    "uat": "UAT",
+    "sit": "SIT",
+    "regression": "Regression"
+  },
+  "status": {
+    "draft": "Draft",
+    "ready": "Ready",
+    "archived": "Archived"
+  },
+  "result": {
+    "passed": "Passed",
+    "failed": "Failed",
+    "blocked": "Blocked",
+    "not_run": "Not run"
+  },
+  "drawer": {
+    "createTitle": "New test script",
+    "editTitle": "Edit test script",
+    "closeAria": "Close",
+    "save": "Save",
+    "delete": "Delete",
+    "confirmDelete": "Delete this script and all its executions?",
+    "title": "Title",
+    "objective": "Objective",
+    "module": "Module",
+    "testType": "Type",
+    "priority": "Priority",
+    "status": "Status",
+    "preconditions": "Preconditions",
+    "testData": "Test data",
+    "expectedResult": "Expected result (script)",
+    "traceability": "Traceability (optional)",
+    "relatedTaskId": "Related task ID",
+    "relatedTicketId": "Related ticket ID",
+    "relatedKnowledgePageId": "Knowledge page ID",
+    "steps": "Steps",
+    "addStep": "Add step",
+    "stepInstruction": "Step instruction",
+    "stepExpected": "Expected (step)",
+    "removeStep": "Remove",
+    "history": "Execution history",
+    "noHistory": "No runs recorded yet.",
+    "run": "Record run",
+    "saving": "Saving…",
+    "priorityPlaceholder": "e.g. high"
+  },
+  "run": {
+    "title": "Record execution",
+    "result": "Outcome",
+    "actualResult": "Actual result",
+    "evidenceNotes": "Evidence / notes",
+    "defectTicketId": "Defect ticket ID (optional)",
+    "submit": "Save execution",
+    "createTicket": "Open new ticket",
+    "cancel": "Cancel"
+  }
+}

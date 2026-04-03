@@ -8,6 +8,12 @@ import type {
 } from "@/lib/services/projectService";
 import type { SapIntentCategory } from "@/lib/ai/sapitoIntent";
 import type { RetrievalTrace } from "@/lib/ai/sapitoContext";
+import type { GroundingCalibration } from "@/lib/ai/groundingCalibration";
+import {
+  buildTrustLayerInstruction,
+  isStrictConnectedDocsTopicQuestion,
+  isStrictProjectTruthQuestion,
+} from "@/lib/ai/groundingCalibration";
 import { shouldIncludeWorkspaceSummary, isSapKnowledgeIntent, isWeeklyFocusIntent, isProjectRiskIntent } from "@/lib/ai/sapitoIntent";
 import { SYSTEM_PROMPT_SAP_KNOWLEDGE } from "@/lib/langchain/prompts/sapKnowledgePrompt";
 
@@ -77,6 +83,8 @@ export type AgentContext = {
     usedProjectMemory?: boolean;
     memoryCount?: number;
   };
+  /** Phase 7: calibrated evidence for trust instructions + API meta. */
+  groundingCalibration?: GroundingCalibration;
 };
 
 // ==========================
@@ -395,10 +403,10 @@ Cuando incluya documentación técnica recuperada (Contexto del proyecto o Conte
     responseMode === "troubleshooting_mode"
       ? `Responde en modo troubleshooting con esta estructura (usa ##):
 ## Diagnosis
-## Likely cause
+## Possible causes (no afirmes una sola causa como certeza si la evidencia es débil)
 ## What to check
-## Recommended solution
-## Risk / caveat`
+## Recommended next steps
+## Risk / caveat — verificar mensaje exacto en SAP (p. ej. SE91) antes de cambios`
       : responseMode === "process_explanation_mode"
         ? `Responde en modo explicación de proceso con esta estructura (usa ##):
 ## Overview
@@ -438,9 +446,23 @@ Cuando incluya documentación técnica recuperada (Contexto del proyecto o Conte
         ? "Pregunta de conocimiento o general. Responde solo con base en la documentación proporcionada."
         : GLOBAL_CONTEXT_PLACEHOLDER;
 
+  const truthMode = ctx.mode === "project" ? "project" : "global";
+  const strictProjectQ = isStrictProjectTruthQuestion(params.message, truthMode, ctx.sapitoRoute?.intent);
+  const strictConnectedQ = isStrictConnectedDocsTopicQuestion(truthMode, params.message, ctx.sapitoRoute?.intent);
+  const sapTroubleshooting =
+    ctx.sapitoRoute?.responseMode === "troubleshooting_mode" || ctx.sapIntent === "sap_error";
+
+  const trustPrefix =
+    ctx.groundingCalibration != null
+      ? buildTrustLayerInstruction(ctx.groundingCalibration, strictProjectQ || strictConnectedQ, {
+          sapTroubleshooting,
+          strictConnectedDocSummary: strictConnectedQ,
+        })
+      : "";
+
   const prompt = await template.format({
     systemPrompt,
-    knowledgeInstruction,
+    knowledgeInstruction: trustPrefix + knowledgeInstruction,
     sapFormatInstruction: finalSapFormatInstruction,
     sapitoContextBlock,
     projectContext,

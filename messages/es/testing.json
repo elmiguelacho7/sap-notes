@@ -1,0 +1,82 @@
+{
+  "page": {
+    "title": "Pruebas",
+    "subtitle": "Guiones UAT, SIT y regresión del proyecto. Registra ejecuciones manuales y enlaza trabajo cuando corresponda.",
+    "newScript": "Nuevo guion",
+    "loading": "Cargando guiones…",
+    "errorLoad": "No se pudieron cargar los guiones de prueba.",
+    "empty": "Aún no hay guiones. Crea uno para definir pasos e historial de ejecución.",
+    "searchPlaceholder": "Buscar por título o módulo…",
+    "filterStatus": "Estado",
+    "allStatuses": "Todos los estados"
+  },
+  "kpi": {
+    "total": "Guiones",
+    "ready": "Listos",
+    "failedLast": "Última ejec. fallida",
+    "lastRun": "Última ejecución"
+  },
+  "list": {
+    "steps": "{count, plural, one {# paso} other {# pasos}}",
+    "neverRun": "Sin ejecutar",
+    "lastRun": "Última ejec.",
+    "updated": "Actualizado"
+  },
+  "type": {
+    "uat": "UAT",
+    "sit": "SIT",
+    "regression": "Regresión"
+  },
+  "status": {
+    "draft": "Borrador",
+    "ready": "Listo",
+    "archived": "Archivado"
+  },
+  "result": {
+    "passed": "Correcto",
+    "failed": "Fallido",
+    "blocked": "Bloqueado",
+    "not_run": "No ejecutado"
+  },
+  "drawer": {
+    "createTitle": "Nuevo guion de prueba",
+    "editTitle": "Editar guion",
+    "closeAria": "Cerrar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "confirmDelete": "¿Eliminar este guion y todo su historial de ejecución?",
+    "title": "Título",
+    "objective": "Objetivo",
+    "module": "Módulo",
+    "testType": "Tipo",
+    "priority": "Prioridad",
+    "status": "Estado",
+    "preconditions": "Precondiciones",
+    "testData": "Datos de prueba",
+    "expectedResult": "Resultado esperado (guion)",
+    "traceability": "Trazabilidad (opcional)",
+    "relatedTaskId": "ID tarea relacionada",
+    "relatedTicketId": "ID ticket relacionado",
+    "relatedKnowledgePageId": "ID página de conocimiento",
+    "steps": "Pasos",
+    "addStep": "Añadir paso",
+    "stepInstruction": "Instrucción del paso",
+    "stepExpected": "Esperado (paso)",
+    "removeStep": "Quitar",
+    "history": "Historial de ejecuciones",
+    "noHistory": "Aún no hay ejecuciones registradas.",
+    "run": "Registrar ejecución",
+    "saving": "Guardando…",
+    "priorityPlaceholder": "p. ej. alta"
+  },
+  "run": {
+    "title": "Registrar ejecución",
+    "result": "Resultado",
+    "actualResult": "Resultado real",
+    "evidenceNotes": "Evidencia / notas",
+    "defectTicketId": "ID ticket de defecto (opcional)",
+    "submit": "Guardar ejecución",
+    "createTicket": "Abrir ticket nuevo",
+    "cancel": "Cancelar"
+  }
+}

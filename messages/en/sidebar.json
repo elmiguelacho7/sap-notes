@@ -32,7 +32,8 @@
     "documents": "Documents",
     "timeline": "Timeline",
     "team": "Team",
-    "search": "Search"
+    "search": "Search",
+    "testing": "Testing"
   },
   "allProjects": "All projects",
   "projectFallback": "Project",

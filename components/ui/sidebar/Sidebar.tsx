@@ -28,6 +28,7 @@ import {
   Cloud,
   ArrowLeft,
   BarChart3,
+  ClipboardList,
 } from "lucide-react";
 
 const ICON_WRAPPER = "flex items-center justify-center w-5 h-5 shrink-0";
@@ -84,6 +85,7 @@ function buildProjectContextNavItems(projectId: string): NavItem[] {
     { navKey: "activities", href: `${base}/planning/activities`, icon: ListTodo },
     { navKey: "tasks", href: `${base}/tasks`, icon: CheckSquare },
     { navKey: "tickets", href: `${base}/tickets`, icon: Ticket },
+    { navKey: "testing", href: `${base}/testing`, icon: ClipboardList },
     { navKey: "notes", href: `${base}/notes`, icon: FileText },
     { navKey: "brain", href: `${base}/brain`, icon: Brain },
     { navKey: "links", href: `${base}/links`, icon: LinkIcon },

@@ -32,7 +32,8 @@
     "documents": "Documentos",
     "timeline": "Línea de tiempo",
     "team": "Equipo",
-    "search": "Búsqueda"
+    "search": "Búsqueda",
+    "testing": "Pruebas"
   },
   "allProjects": "Todos los proyectos",
   "projectFallback": "Proyecto",

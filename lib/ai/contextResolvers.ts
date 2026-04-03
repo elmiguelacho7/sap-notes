@@ -32,6 +32,7 @@ import type { RetrievalDebug } from "@/lib/ai/sapitoContext";
 import { analyzeWeeklyFocus, type WeeklyFocusResult } from "@/lib/ai/workspaceFocus";
 import type { ProjectRiskReport } from "@/lib/ai/projectRisk";
 import { rankKnowledgeChunks } from "@/lib/ai/retrievalRanking";
+import { computeGroundingCalibration, type GroundingCalibration } from "@/lib/ai/groundingCalibration";
 import { getExternalSapFallbackProvider } from "@/lib/ai/externalSapFallback";
 
 const CHUNK_CONTENT_CAP = 1000;
@@ -244,6 +245,8 @@ export type ResolverResult = {
   retrievalDebug: RetrievalDebug;
   retrievalScopes: string[];
   retrievalTrace?: import("@/lib/ai/sapitoContext").RetrievalTrace;
+  /** Phase 7: calibrated confidence / evidence for meta + trust prompts. */
+  groundingCalibration?: GroundingCalibration;
 };
 
 export type GlobalResolverParams = {
@@ -301,6 +304,8 @@ export async function resolveGlobalContext(
 
   const searchQuery = normalizeQueryForSap(message) || (message ?? "").trim();
   const runRetrieval = searchQuery.length > 0 && !isWeeklyFocusIntent(sapIntent);
+  let calibrationChunks: KnowledgeChunk[] = [];
+  let memoryItemCountForCalibration = 0;
   if (runRetrieval) {
     try {
       // Sapito 2.0 Phase 1: deterministic narrowing by v2 intent (optional).
@@ -359,13 +364,24 @@ export async function resolveGlobalContext(
         ? (multiResult.chunks ?? []).filter((c) => (c.external_ref ?? "").trim() !== "")
         : [];
       const connectedChunks = connectedChunksRaw.length > 0
-        ? rankKnowledgeChunks(connectedChunksRaw, { mode: "global", v2Intent: v2Intent ?? null, query: searchQuery })
+        ? rankKnowledgeChunks(connectedChunksRaw, {
+            mode: "global",
+            v2Intent: v2Intent ?? null,
+            legacySapIntent: sapIntent ?? null,
+            query: searchQuery,
+          })
         : [];
       const remainingChunks = (multiResult.chunks ?? []).filter((c) => !connectedChunksRaw.includes(c));
 
       const officialIds = new Set(officialChunks.map((c) => c.id));
       const otherChunks = remainingChunks.filter((c) => !officialIds.has(c.id));
-      const diverse = ensureChunkDiversity(otherChunks, MAX_PER_SOURCE, maxChunks);
+      const rankedGlobalOther = rankKnowledgeChunks(otherChunks, {
+        mode: "global",
+        v2Intent: v2Intent ?? null,
+        legacySapIntent: sapIntent ?? null,
+        query: searchQuery,
+      });
+      const diverse = ensureChunkDiversity(rankedGlobalOther, MAX_PER_SOURCE, maxChunks);
 
       if (connectedChunks.length > 0) {
         sections.push(formatKnowledgeContext(ensureChunkDiversity(connectedChunks, 2, Math.min(6, maxChunks)), false));
@@ -460,10 +476,29 @@ export async function resolveGlobalContext(
           retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + fullTextPages.length;
         }
       }
+
+      calibrationChunks = [
+        ...connectedChunks.slice(0, 6),
+        ...diverse.slice(0, 8),
+        ...officialChunks.slice(0, 4),
+      ];
+      memoryItemCountForCalibration = 0;
     } catch (err) {
       console.error("[GlobalContextResolver] retrieval error", err);
     }
   }
+
+  const groundingCalibrationGlobal = computeGroundingCalibration({
+    mode: "global",
+    message: message ?? "",
+    retrievalScopes,
+    retrievalDebug,
+    v2Intent: sapitoRoute?.intent,
+    legacySapIntent: sapIntent ?? null,
+    sapTaxonomy: sapitoRoute?.sapTaxonomy ?? null,
+    contextualChunks: calibrationChunks,
+    memoryItemCount: memoryItemCountForCalibration,
+  });
 
   const contextText = sections.length === 0 ? "" : sections.join("\n\n");
   const retrievalTrace = {
@@ -480,7 +515,13 @@ export async function resolveGlobalContext(
     fallbackConsidered,
     winningSourceLabels: Array.from(new Set(retrievalScopes)).slice(0, 12),
   };
-  return { contextText, retrievalDebug, retrievalScopes, retrievalTrace };
+  return {
+    contextText,
+    retrievalDebug,
+    retrievalScopes,
+    retrievalTrace,
+    groundingCalibration: groundingCalibrationGlobal,
+  };
 }
 
 export type ProjectResolverParams = {
@@ -582,6 +623,8 @@ export async function resolveProjectContext(
 
   const searchQuery = normalizeQueryForSap(message) || (message ?? "").trim();
   const runRetrieval = searchQuery.length > 0 && !isWeeklyFocusIntent(sapIntent) && !detectProjectRiskIntent(message);
+  let projectCalibrationChunks: KnowledgeChunk[] = [];
+  let projectMemoryItemCountForCalibration = 0;
   if (runRetrieval) {
     try {
       const v2Intent = sapitoRoute?.intent;
@@ -649,11 +692,24 @@ export async function resolveProjectContext(
         ? multiChunks.filter((c) => (c.external_ref ?? "").trim() !== "")
         : [];
       const connectedChunks = connectedChunksRaw.length > 0
-        ? rankKnowledgeChunks(connectedChunksRaw, { mode: "project", v2Intent: v2Intent ?? null, query: searchQuery, projectId })
+        ? rankKnowledgeChunks(connectedChunksRaw, {
+            mode: "project",
+            v2Intent: v2Intent ?? null,
+            legacySapIntent: sapIntent ?? null,
+            query: searchQuery,
+            projectId,
+          })
         : [];
       const remainingChunks = multiChunks.filter((c) => !connectedChunksRaw.includes(c));
       const otherChunks = remainingChunks.filter((c) => !officialIds.has(c.id));
-      const diverse = ensureChunkDiversity(otherChunks, MAX_PER_SOURCE, maxChunks);
+      const rankedProjectOther = rankKnowledgeChunks(otherChunks, {
+        mode: "project",
+        v2Intent: v2Intent ?? null,
+        legacySapIntent: sapIntent ?? null,
+        query: searchQuery,
+        projectId,
+      });
+      const diverse = ensureChunkDiversity(rankedProjectOther, MAX_PER_SOURCE, maxChunks);
 
       console.log("[Sapito multi-tenant retrieval]", {
         userId,
@@ -743,10 +799,29 @@ export async function resolveProjectContext(
           retrievalDebug.chunkCount = (retrievalDebug.chunkCount ?? 0) + fullTextPages.length;
         }
       }
+
+      projectCalibrationChunks = [
+        ...connectedChunks.slice(0, 6),
+        ...diverse.slice(0, 8),
+        ...officialChunks.slice(0, 4),
+      ];
+      projectMemoryItemCountForCalibration = memoryChunks.length + extractedMemory.length;
     } catch (err) {
       console.error("[ProjectContextResolver] retrieval error", err);
     }
   }
+
+  const groundingCalibration = computeGroundingCalibration({
+    mode: "project",
+    message: message ?? "",
+    retrievalScopes,
+    retrievalDebug,
+    v2Intent: sapitoRoute?.intent,
+    legacySapIntent: sapIntent ?? null,
+    sapTaxonomy: sapitoRoute?.sapTaxonomy ?? null,
+    contextualChunks: projectCalibrationChunks,
+    memoryItemCount: projectMemoryItemCountForCalibration,
+  });
 
   const contextText = sections.length === 0 ? "" : sections.join("\n\n");
   const retrievalTrace = {
@@ -763,5 +838,5 @@ export async function resolveProjectContext(
     fallbackConsidered: false,
     winningSourceLabels: Array.from(new Set(retrievalScopes)).slice(0, 12),
   };
-  return { contextText, retrievalDebug, retrievalScopes, retrievalTrace };
+  return { contextText, retrievalDebug, retrievalScopes, retrievalTrace, groundingCalibration };
 }

@@ -1,0 +1,101 @@
+[
+  {
+    "id": "SAPITO-GLOBAL-001",
+    "mode": "global",
+    "category": "sap_general",
+    "prompt": "Do you know SAP Public Cloud?",
+    "expected_confidence": "medium_or_high",
+    "expected_grounding": ["official_sap", "global_knowledge", "sap_general_knowledge"],
+    "notes": "Confidence downgrades if no retrieval; answer may cite general knowledge with caveat."
+  },
+  {
+    "id": "SAPITO-GLOBAL-002",
+    "mode": "global",
+    "category": "sap_general",
+    "prompt": "How does ATP work in SAP Public Cloud?",
+    "expected_confidence": "medium_or_high",
+    "expected_grounding": ["global_knowledge", "official_sap"],
+    "notes": "Process explanation; avoid tenant-specific claims without evidence."
+  },
+  {
+    "id": "SAPITO-GLOBAL-010",
+    "mode": "global",
+    "category": "sap_troubleshooting",
+    "prompt": "What does SAP error M7170 mean?",
+    "expected_confidence": "low_or_medium",
+    "expected_grounding": ["official_sap"],
+    "notes": "High only if indexed sources clearly mention M7170; otherwise cautious + verify SE91."
+  },
+  {
+    "id": "SAPITO-GLOBAL-012",
+    "mode": "global",
+    "category": "sap_troubleshooting",
+    "prompt": "Explain SAP message M7170 related to batch and vendor.",
+    "expected_confidence": "low_or_medium",
+    "expected_grounding": ["official_sap", "curated_internal"],
+    "notes": "Topic alignment + message code in chunks required for higher confidence."
+  },
+  {
+    "id": "SAPITO-PROJ-020",
+    "mode": "project",
+    "category": "project_history",
+    "prompt": "How did we solve pricing in this project?",
+    "expected_confidence": "low",
+    "expected_grounding": ["project_memory", "project_documents", "connected_documents_project"],
+    "notes": "Without strong memory/docs/connected overlap: low confidence; no fake project history."
+  },
+  {
+    "id": "SAPITO-PROJ-030",
+    "mode": "project",
+    "category": "project_documentation",
+    "prompt": "Do we have documentation for this topic?",
+    "expected_confidence": "low_or_medium",
+    "expected_grounding": ["project_documents", "official_sap"],
+    "notes": "Generic SAP alone must not imply project-specific documentation exists."
+  },
+  {
+    "id": "SAPITO-PROJ-031",
+    "mode": "project",
+    "category": "project_documentation",
+    "prompt": "Do we have project-specific documentation for pricing?",
+    "expected_confidence": "low_or_medium",
+    "expected_grounding": ["project_documents", "connected_documents_project"],
+    "notes": "Distinguish project artifacts from generic SD pricing help."
+  },
+  {
+    "id": "SAPITO-PROJ-040",
+    "mode": "project",
+    "category": "connected_documents",
+    "prompt": "What do the connected docs say?",
+    "expected_confidence": "low_or_medium",
+    "expected_grounding": ["connected_documents_project", "connected_documents"],
+    "notes": "Never high for this archetype; low if no aligned connected chunks."
+  },
+  {
+    "id": "SAPITO-PROJ-041",
+    "mode": "project",
+    "category": "connected_documents",
+    "prompt": "Summarize the connected docs for pricing.",
+    "expected_confidence": "low_or_medium",
+    "expected_grounding": ["connected_documents_project"],
+    "notes": "Topic anchoring; avoid summarizing unrelated DMS/workflow as pricing."
+  },
+  {
+    "id": "SAPITO-WEAK-050",
+    "mode": "project",
+    "category": "weak_evidence_honesty",
+    "prompt": "What exact SAP note fixed our custom Z-program dump in this project?",
+    "expected_confidence": "low",
+    "expected_grounding": [],
+    "notes": "Must not invent OSS note numbers."
+  },
+  {
+    "id": "SAPITO-UX-060",
+    "mode": "any",
+    "category": "followups_actions",
+    "prompt": "(After any full Sapito response) verify UI meta chips and suggestions.",
+    "expected_confidence": "matches_meta",
+    "expected_grounding": ["matches_api_scopes"],
+    "notes": "Manual UX pass; not a single prompt."
+  }
+]

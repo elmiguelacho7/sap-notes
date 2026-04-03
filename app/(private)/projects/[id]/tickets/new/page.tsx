@@ -54,6 +54,16 @@ export default function ProjectNewTicketPage() {
   const [dueDate, setDueDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const titlePrefilled = useRef(false);
+
+  useEffect(() => {
+    if (titlePrefilled.current) return;
+    const pre = searchParams?.get("title")?.trim();
+    if (pre) {
+      setTitle(pre);
+      titlePrefilled.current = true;
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (fromQuick) {

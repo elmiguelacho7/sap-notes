@@ -8,6 +8,8 @@ import type { KnowledgeChunk } from "@/lib/ai/knowledgeSearch";
 import { getConnectedDocumentMetadata } from "@/lib/ai/connectedSourceMetadata";
 import { detectSapTaxonomy } from "@/lib/ai/sapTaxonomy";
 import { classifySource, governanceWeight } from "@/lib/ai/sourceGovernance";
+import { chunkTopicOverlapScore, extractSapMessageCodes } from "@/lib/ai/groundingCalibration";
+import type { SapIntentCategory } from "@/lib/ai/sapitoIntent";
 
 export type SourceSemanticGroup =
   | "project_memory"
@@ -21,6 +23,8 @@ export type SourceSemanticGroup =
 export type RankChunkOptions = {
   mode: "global" | "project";
   v2Intent?: string | null;
+  /** Phase 8: project-mode SAP errors use project_plus_sap_general, not sap_error_troubleshooting. */
+  legacySapIntent?: SapIntentCategory | null;
   query: string;
   projectId?: string | null;
 };
@@ -68,8 +72,10 @@ function scoreChunk(ch: KnowledgeChunk, opts: RankChunkOptions): number {
   const qTokens = queryTokens(opts.query);
   const sapSignals = extractSapComponentSignals(opts.query);
   const taxonomy = detectSapTaxonomy(opts.query);
+  const overlap = chunkTopicOverlapScore(opts.query, ch, taxonomy);
   const meta = getConnectedDocumentMetadata(ch, { projectId: opts.projectId ?? null });
   const sourceClass = classifySource(ch, opts.mode);
+  const errCodes = extractSapMessageCodes(opts.query);
 
   let score = 0;
 
@@ -89,16 +95,31 @@ function scoreChunk(ch: KnowledgeChunk, opts: RankChunkOptions): number {
   // Connected-source questions: prioritize connected docs, especially with richer metadata.
   const wantsConnected = opts.v2Intent === "needs_connected_sources" || opts.v2Intent === "project_documentation_lookup";
   if (wantsConnected) {
-    if (isConnectedChunk(ch)) score += 35;
+    if (isConnectedChunk(ch)) {
+      // Phase 8: do not let connected docs dominate when topic overlap is weak.
+      if (overlap >= 10) score += 35;
+      else if (overlap >= 6) score += 22;
+      else score += 8;
+    }
     if (meta.provider !== "unknown") score += 5;
     if ((ch.mime_type ?? "").trim()) score += 2;
     if ((ch.document_type ?? "").trim()) score += 2;
     if ((ch.source_url ?? "").trim()) score += 1;
   }
 
-  // SAP troubleshooting: prefer topic/component alignment.
-  const isTroubleshooting = opts.v2Intent === "sap_error_troubleshooting";
+  // SAP troubleshooting: prefer topic/component alignment + exact message codes + official sources.
+  const isTroubleshooting =
+    opts.v2Intent === "sap_error_troubleshooting" ||
+    (opts.v2Intent === "project_plus_sap_general" && opts.legacySapIntent === "sap_error");
   if (isTroubleshooting) {
+    if (sourceClass === "official_sap") score += 14;
+    if (sourceClass === "curated_internal") score += 8;
+    if (errCodes.length > 0) {
+      const blob = norm([ch.content?.slice(0, 2500) ?? "", ch.title ?? "", ch.topic ?? ""].join(" "));
+      for (const c of errCodes) {
+        if (blob.includes(c.toLowerCase())) score += 26;
+      }
+    }
     if (sapSignals.length > 0) {
       const comp = (ch.sap_component ?? "").toUpperCase();
       if (comp && sapSignals.some((s) => comp.includes(s))) score += 18;
@@ -130,6 +151,15 @@ function scoreChunk(ch: KnowledgeChunk, opts: RankChunkOptions): number {
     taxonomy.themes.forEach((t) => {
       if (topic.includes(t.replace(/_/g, " "))) score += 5;
     });
+  }
+
+  // Phase 7–8: topic anchoring — boost aligned chunks, penalize weakly related connected/global in project mode.
+  score += Math.min(14, overlap);
+  if (opts.mode === "project") {
+    if (isConnectedChunk(ch) && overlap < 6) score -= 14;
+    else if (isConnectedChunk(ch) && overlap < 9) score -= 6;
+    if (ch.scope_type === "global" && !isConnectedChunk(ch) && overlap < 6) score -= 12;
+    else if (ch.scope_type === "global" && !isConnectedChunk(ch) && overlap < 9) score -= 4;
   }
 
   // Prefer earlier chunks slightly (chunk_index: 0 often has overview/title section).

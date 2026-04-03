@@ -9,7 +9,7 @@ import {
 
 async function loadMessages(locale: AppLocale) {
   if (locale === "es") {
-    const [common, auth, sidebar, dashboard, tasks, tickets, projects, planning, activities, calendar, knowledge, brain, sapito, notes, account, admin, links, projectSearch] = await Promise.all([
+    const [common, auth, sidebar, dashboard, tasks, tickets, projects, planning, activities, calendar, knowledge, brain, sapito, notes, account, admin, links, projectSearch, testing] = await Promise.all([
       import("../messages/es/common.json"),
       import("../messages/es/auth.json"),
       import("../messages/es/sidebar.json"),
@@ -28,6 +28,7 @@ async function loadMessages(locale: AppLocale) {
       import("../messages/es/admin.json"),
       import("../messages/es/links.json"),
       import("../messages/es/projectSearch.json"),
+      import("../messages/es/testing.json"),
     ]);
     return {
       common: common.default,
@@ -48,9 +49,10 @@ async function loadMessages(locale: AppLocale) {
       admin: admin.default,
       links: links.default,
       projectSearch: projectSearch.default,
+      testing: testing.default,
     };
   }
-  const [common, auth, sidebar, dashboard, tasks, tickets, projects, planning, activities, calendar, knowledge, brain, sapito, notes, account, admin, links, projectSearch] = await Promise.all([
+  const [common, auth, sidebar, dashboard, tasks, tickets, projects, planning, activities, calendar, knowledge, brain, sapito, notes, account, admin, links, projectSearch, testing] = await Promise.all([
     import("../messages/en/common.json"),
     import("../messages/en/auth.json"),
     import("../messages/en/sidebar.json"),
@@ -69,6 +71,7 @@ async function loadMessages(locale: AppLocale) {
     import("../messages/en/admin.json"),
     import("../messages/en/links.json"),
     import("../messages/en/projectSearch.json"),
+    import("../messages/en/testing.json"),
   ]);
   return {
     common: common.default,
@@ -89,6 +92,7 @@ async function loadMessages(locale: AppLocale) {
     admin: admin.default,
     links: links.default,
     projectSearch: projectSearch.default,
+    testing: testing.default,
   };
 }
 
