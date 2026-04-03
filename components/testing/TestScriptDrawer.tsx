@@ -3,16 +3,50 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { X, Plus, Trash2 } from "lucide-react";
-import type { TestExecutionRow, TestScriptWithSteps } from "@/lib/types/testing";
+import type { SourceImportType, TestExecutionRow, TestScriptWithSteps } from "@/lib/types/testing";
 import { RunExecutionModal } from "@/components/testing/RunExecutionModal";
+import { SAP_TEST_MODULE_OPTIONS } from "@/lib/testing/sapModuleCatalog";
 
-type StepForm = { id?: string; instruction: string; expected_result: string };
+type StepForm = {
+  id?: string;
+  instruction: string;
+  expected_result: string;
+  step_name: string;
+  optional_flag: boolean;
+  transaction_or_app: string;
+  business_role: string;
+  test_data_notes: string;
+};
 
 const inputClass =
   "w-full min-h-10 rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] placeholder:text-[rgb(var(--rb-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35";
 const textareaClass =
   "w-full rounded-xl border border-[rgb(var(--rb-surface-border))]/70 bg-[rgb(var(--rb-surface))]/95 px-3 py-2 text-sm text-[rgb(var(--rb-text-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--rb-brand-ring))]/35";
 const labelClass = "mb-1 block text-xs font-medium text-[rgb(var(--rb-text-muted))]";
+
+function emptyStep(): StepForm {
+  return {
+    instruction: "",
+    expected_result: "",
+    step_name: "",
+    optional_flag: false,
+    transaction_or_app: "",
+    business_role: "",
+    test_data_notes: "",
+  };
+}
+
+function formatBusinessRoles(br: unknown): string {
+  if (Array.isArray(br)) {
+    return br.filter((x): x is string => typeof x === "string").join("\n");
+  }
+  return "";
+}
+
+function asSourceImportType(v: unknown): SourceImportType {
+  if (v === "sap_docx" || v === "sap_xlsx" || v === "manual") return v;
+  return "manual";
+}
 
 export type TestScriptDrawerProps = {
   projectId: string;
@@ -51,10 +85,16 @@ export function TestScriptDrawer({
   const [preconditions, setPreconditions] = useState("");
   const [testData, setTestData] = useState("");
   const [expectedResult, setExpectedResult] = useState("");
+  const [scenarioPath, setScenarioPath] = useState("");
+  const [scopeItemCode, setScopeItemCode] = useState("");
+  const [sourceDocumentName, setSourceDocumentName] = useState("");
+  const [sourceLanguage, setSourceLanguage] = useState("");
+  const [businessRolesText, setBusinessRolesText] = useState("");
+  const [sourceImportType, setSourceImportType] = useState<SourceImportType>("manual");
   const [relatedTaskId, setRelatedTaskId] = useState("");
   const [relatedTicketId, setRelatedTicketId] = useState("");
   const [relatedKnowledgePageId, setRelatedKnowledgePageId] = useState("");
-  const [steps, setSteps] = useState<StepForm[]>([{ instruction: "", expected_result: "" }]);
+  const [steps, setSteps] = useState<StepForm[]>([emptyStep()]);
   const [executions, setExecutions] = useState<TestExecutionRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [runOpen, setRunOpen] = useState(false);
@@ -82,6 +122,12 @@ export function TestScriptDrawer({
       setPreconditions(script.preconditions ?? "");
       setTestData(script.test_data ?? "");
       setExpectedResult(script.expected_result ?? "");
+      setScenarioPath(script.scenario_path ?? "");
+      setScopeItemCode(script.scope_item_code ?? "");
+      setSourceDocumentName(script.source_document_name ?? "");
+      setSourceLanguage(script.source_language ?? "");
+      setBusinessRolesText(formatBusinessRoles(script.business_roles));
+      setSourceImportType(asSourceImportType(script.source_import_type));
       setRelatedTaskId(script.related_task_id ?? "");
       setRelatedTicketId(script.related_ticket_id ?? "");
       setRelatedKnowledgePageId(script.related_knowledge_page_id ?? "");
@@ -89,8 +135,13 @@ export function TestScriptDrawer({
         id: x.id,
         instruction: x.instruction ?? "",
         expected_result: x.expected_result ?? "",
+        step_name: x.step_name ?? "",
+        optional_flag: Boolean(x.optional_flag),
+        transaction_or_app: x.transaction_or_app ?? "",
+        business_role: x.business_role ?? "",
+        test_data_notes: x.test_data_notes ?? "",
       }));
-      setSteps(st.length > 0 ? st : [{ instruction: "", expected_result: "" }]);
+      setSteps(st.length > 0 ? st : [emptyStep()]);
 
       const eData = await eRes.json();
       if (eRes.ok && Array.isArray(eData.executions)) {
@@ -117,10 +168,16 @@ export function TestScriptDrawer({
       setPreconditions("");
       setTestData("");
       setExpectedResult("");
+      setScenarioPath("");
+      setScopeItemCode("");
+      setSourceDocumentName("");
+      setSourceLanguage("");
+      setBusinessRolesText("");
+      setSourceImportType("manual");
       setRelatedTaskId("");
       setRelatedTicketId("");
       setRelatedKnowledgePageId("");
-      setSteps([{ instruction: "", expected_result: "" }]);
+      setSteps([emptyStep()]);
       setExecutions([]);
       setError(null);
       return;
@@ -128,20 +185,54 @@ export function TestScriptDrawer({
     void loadScript();
   }, [open, scriptId, loadScript]);
 
-  const addStep = () => setSteps((s) => [...s, { instruction: "", expected_result: "" }]);
+  const addStep = () => setSteps((s) => [...s, emptyStep()]);
   const removeStep = (i: number) => setSteps((s) => (s.length <= 1 ? s : s.filter((_, j) => j !== i)));
+
+  const buildPayload = () => {
+    const roles = businessRolesText
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const stepsPayload = steps.map((st, i) => ({
+      id: st.id,
+      step_order: i,
+      instruction: st.instruction,
+      expected_result: st.expected_result || null,
+      step_name: st.step_name.trim() || null,
+      optional_flag: st.optional_flag,
+      transaction_or_app: st.transaction_or_app.trim() || null,
+      business_role: st.business_role.trim() || null,
+      test_data_notes: st.test_data_notes.trim() || null,
+    }));
+    return {
+      title,
+      objective: objective || null,
+      module: module || null,
+      test_type: testType,
+      priority: priority || null,
+      status,
+      preconditions: preconditions || null,
+      test_data: testData || null,
+      expected_result: expectedResult || null,
+      scenario_path: scenarioPath.trim() || null,
+      scope_item_code: scopeItemCode.trim() || null,
+      source_document_name: sourceDocumentName.trim() || null,
+      source_language: sourceLanguage.trim() || null,
+      business_roles: roles,
+      source_import_type: sourceImportType,
+      related_task_id: relatedTaskId.trim() || null,
+      related_ticket_id: relatedTicketId.trim() || null,
+      related_knowledge_page_id: relatedKnowledgePageId.trim() || null,
+      stepsPayload,
+    };
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canEdit) return;
     setSaving(true);
     setError(null);
-    const stepsPayload = steps.map((st, i) => ({
-      id: st.id,
-      step_order: i,
-      instruction: st.instruction,
-      expected_result: st.expected_result || null,
-    }));
+    const p = buildPayload();
     try {
       if (!scriptId) {
         const res = await fetch(`/api/projects/${projectId}/testing/scripts`, {
@@ -149,19 +240,18 @@ export function TestScriptDrawer({
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            title,
-            objective: objective || null,
-            module: module || null,
-            test_type: testType,
-            priority: priority || null,
-            status,
-            preconditions: preconditions || null,
-            test_data: testData || null,
-            expected_result: expectedResult || null,
-            related_task_id: relatedTaskId.trim() || null,
-            related_ticket_id: relatedTicketId.trim() || null,
-            related_knowledge_page_id: relatedKnowledgePageId.trim() || null,
-            steps: stepsPayload.map(({ instruction, expected_result }) => ({ instruction, expected_result })),
+            ...p,
+            steps: p.stepsPayload.map(
+              ({ instruction, expected_result, step_name, optional_flag, transaction_or_app, business_role, test_data_notes }) => ({
+                instruction,
+                expected_result,
+                step_name,
+                optional_flag,
+                transaction_or_app,
+                business_role,
+                test_data_notes,
+              })
+            ),
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -172,19 +262,25 @@ export function TestScriptDrawer({
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            title,
-            objective: objective || null,
-            module: module || null,
-            test_type: testType,
-            priority: priority || null,
-            status,
-            preconditions: preconditions || null,
-            test_data: testData || null,
-            expected_result: expectedResult || null,
-            related_task_id: relatedTaskId.trim() || null,
-            related_ticket_id: relatedTicketId.trim() || null,
-            related_knowledge_page_id: relatedKnowledgePageId.trim() || null,
-            steps: stepsPayload,
+            title: p.title,
+            objective: p.objective,
+            module: p.module,
+            test_type: p.test_type,
+            priority: p.priority,
+            status: p.status,
+            preconditions: p.preconditions,
+            test_data: p.test_data,
+            expected_result: p.expected_result,
+            scenario_path: p.scenario_path,
+            scope_item_code: p.scope_item_code,
+            source_document_name: p.source_document_name,
+            source_language: p.source_language,
+            business_roles: p.business_roles,
+            source_import_type: p.source_import_type,
+            related_task_id: p.related_task_id,
+            related_ticket_id: p.related_ticket_id,
+            related_knowledge_page_id: p.related_knowledge_page_id,
+            steps: p.stepsPayload,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -275,13 +371,18 @@ export function TestScriptDrawer({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={labelClass}>{t("drawer.module")}</label>
-                    <input
-                      type="text"
+                    <select
                       value={module}
                       onChange={(e) => setModule(e.target.value)}
                       className={inputClass}
                       disabled={!canEdit}
-                    />
+                    >
+                      {SAP_TEST_MODULE_OPTIONS.map((o) => (
+                        <option key={o.value || "empty"} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className={labelClass}>{t("drawer.testType")}</label>
@@ -291,23 +392,27 @@ export function TestScriptDrawer({
                       className={inputClass}
                       disabled={!canEdit}
                     >
-                      <option value="uat">UAT</option>
-                      <option value="sit">SIT</option>
-                      <option value="regression">Regression</option>
+                      <option value="uat">{t("type.uat")}</option>
+                      <option value="sit">{t("type.sit")}</option>
+                      <option value="regression">{t("type.regression")}</option>
                     </select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={labelClass}>{t("drawer.priority")}</label>
-                    <input
-                      type="text"
+                    <select
                       value={priority}
                       onChange={(e) => setPriority(e.target.value)}
                       className={inputClass}
-                      placeholder={t("drawer.priorityPlaceholder")}
                       disabled={!canEdit}
-                    />
+                    >
+                      <option value="">{t("priority.unset")}</option>
+                      <option value="low">{t("priority.low")}</option>
+                      <option value="medium">{t("priority.medium")}</option>
+                      <option value="high">{t("priority.high")}</option>
+                      <option value="critical">{t("priority.critical")}</option>
+                    </select>
                   </div>
                   <div>
                     <label className={labelClass}>{t("drawer.status")}</label>
@@ -317,9 +422,9 @@ export function TestScriptDrawer({
                       className={inputClass}
                       disabled={!canEdit}
                     >
-                      <option value="draft">Draft</option>
-                      <option value="ready">Ready</option>
-                      <option value="archived">Archived</option>
+                      <option value="draft">{t("status.draft")}</option>
+                      <option value="ready">{t("status.ready")}</option>
+                      <option value="archived">{t("status.archived")}</option>
                     </select>
                   </div>
                 </div>
@@ -353,6 +458,79 @@ export function TestScriptDrawer({
                     disabled={!canEdit}
                   />
                 </div>
+
+                <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {t("drawer.sourceSection")}
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <label className={labelClass}>{t("drawer.sourceImportType")}</label>
+                      <select
+                        value={sourceImportType}
+                        onChange={(e) => setSourceImportType(e.target.value as SourceImportType)}
+                        className={inputClass}
+                        disabled={!canEdit}
+                      >
+                        <option value="manual">{t("source.manual")}</option>
+                        <option value="sap_docx">{t("source.sapDocx")}</option>
+                        <option value="sap_xlsx">{t("source.sapXlsx")}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass}>{t("import.scenarioPath")}</label>
+                      <input
+                        type="text"
+                        value={scenarioPath}
+                        onChange={(e) => setScenarioPath(e.target.value)}
+                        className={inputClass}
+                        disabled={!canEdit}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>{t("import.scopeItem")}</label>
+                      <input
+                        type="text"
+                        value={scopeItemCode}
+                        onChange={(e) => setScopeItemCode(e.target.value)}
+                        className={inputClass}
+                        disabled={!canEdit}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>{t("import.sourceDoc")}</label>
+                      <input
+                        type="text"
+                        value={sourceDocumentName}
+                        onChange={(e) => setSourceDocumentName(e.target.value)}
+                        className={inputClass}
+                        disabled={!canEdit}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>{t("import.sourceLang")}</label>
+                      <input
+                        type="text"
+                        value={sourceLanguage}
+                        onChange={(e) => setSourceLanguage(e.target.value)}
+                        className={inputClass}
+                        disabled={!canEdit}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelClass}>{t("import.businessRoles")}</label>
+                    <textarea
+                      value={businessRolesText}
+                      onChange={(e) => setBusinessRolesText(e.target.value)}
+                      rows={3}
+                      className={textareaClass}
+                      disabled={!canEdit}
+                      placeholder={t("import.businessRolesPlaceholder")}
+                    />
+                  </div>
+                </div>
+
                 <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("drawer.traceability")}</p>
                   <div>
@@ -404,20 +582,48 @@ export function TestScriptDrawer({
                   <div className="space-y-3">
                     {steps.map((st, i) => (
                       <div key={st.id ?? `new-${i}`} className="rounded-xl border border-slate-200/90 bg-white p-3">
-                        <div className="mb-2 flex items-center justify-between">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                           <span className="text-xs font-medium text-slate-500">#{i + 1}</span>
-                          {canEdit && steps.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeStep(i)}
-                              className="text-slate-400 hover:text-red-600"
-                              aria-label={t("drawer.removeStep")}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
+                          <div className="flex items-center gap-3">
+                            {canEdit && (
+                              <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                                <input
+                                  type="checkbox"
+                                  checked={st.optional_flag}
+                                  onChange={(e) =>
+                                    setSteps((prev) =>
+                                      prev.map((p, j) => (j === i ? { ...p, optional_flag: e.target.checked } : p))
+                                    )
+                                  }
+                                />
+                                {t("drawer.stepOptional")}
+                              </label>
+                            )}
+                            {canEdit && steps.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeStep(i)}
+                                className="text-slate-400 hover:text-red-600"
+                                aria-label={t("drawer.removeStep")}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <label className={labelClass}>{t("drawer.stepInstruction")}</label>
+                        <label className={labelClass}>{t("drawer.stepName")}</label>
+                        <input
+                          type="text"
+                          value={st.step_name}
+                          onChange={(e) =>
+                            setSteps((prev) =>
+                              prev.map((p, j) => (j === i ? { ...p, step_name: e.target.value } : p))
+                            )
+                          }
+                          className={inputClass}
+                          disabled={!canEdit}
+                        />
+                        <label className={`${labelClass} mt-2`}>{t("drawer.stepInstruction")}</label>
                         <textarea
                           value={st.instruction}
                           onChange={(e) =>
@@ -435,6 +641,48 @@ export function TestScriptDrawer({
                           onChange={(e) =>
                             setSteps((prev) =>
                               prev.map((p, j) => (j === i ? { ...p, expected_result: e.target.value } : p))
+                            )
+                          }
+                          rows={1}
+                          className={textareaClass}
+                          disabled={!canEdit}
+                        />
+                        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <div>
+                            <label className={labelClass}>{t("drawer.stepTransaction")}</label>
+                            <input
+                              type="text"
+                              value={st.transaction_or_app}
+                              onChange={(e) =>
+                                setSteps((prev) =>
+                                  prev.map((p, j) => (j === i ? { ...p, transaction_or_app: e.target.value } : p))
+                                )
+                              }
+                              className={inputClass}
+                              disabled={!canEdit}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelClass}>{t("drawer.stepRole")}</label>
+                            <input
+                              type="text"
+                              value={st.business_role}
+                              onChange={(e) =>
+                                setSteps((prev) =>
+                                  prev.map((p, j) => (j === i ? { ...p, business_role: e.target.value } : p))
+                                )
+                              }
+                              className={inputClass}
+                              disabled={!canEdit}
+                            />
+                          </div>
+                        </div>
+                        <label className={`${labelClass} mt-2`}>{t("drawer.stepDataNotes")}</label>
+                        <textarea
+                          value={st.test_data_notes}
+                          onChange={(e) =>
+                            setSteps((prev) =>
+                              prev.map((p, j) => (j === i ? { ...p, test_data_notes: e.target.value } : p))
                             )
                           }
                           rows={1}

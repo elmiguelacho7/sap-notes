@@ -8,9 +8,16 @@ export type TestScriptStepRow = {
   step_order: number;
   instruction: string;
   expected_result: string | null;
+  step_name: string | null;
+  optional_flag: boolean;
+  transaction_or_app: string | null;
+  business_role: string | null;
+  test_data_notes: string | null;
   created_at: string;
   updated_at: string;
 };
+
+export type SourceImportType = "manual" | "sap_docx" | "sap_xlsx";
 
 export type TestScriptRow = {
   id: string;
@@ -24,6 +31,12 @@ export type TestScriptRow = {
   preconditions: string | null;
   test_data: string | null;
   expected_result: string | null;
+  scenario_path: string | null;
+  source_document_name: string | null;
+  source_language: string | null;
+  scope_item_code: string | null;
+  business_roles: unknown;
+  source_import_type: SourceImportType;
   related_task_id: string | null;
   related_ticket_id: string | null;
   related_knowledge_page_id: string | null;

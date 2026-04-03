@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search } from "lucide-react";
+import { FileUp, Search } from "lucide-react";
 import { ProjectPageHeader } from "@/components/layout/ProjectPageHeader";
+import { SapScriptImportModal } from "@/components/testing/SapScriptImportModal";
 import { TestScriptDrawer } from "@/components/testing/TestScriptDrawer";
+import { labelForSapTestModule } from "@/lib/testing/sapModuleCatalog";
 import type { TestScriptListItem, TestScriptsListResponse } from "@/lib/types/testing";
 import {
   PROJECT_WORKSPACE_PAGE,
@@ -45,6 +47,7 @@ export default function ProjectTestingPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedScriptId, setSelectedScriptId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!projectId) return;
@@ -83,9 +86,11 @@ export default function ProjectTestingPage() {
     return scripts.filter((s) => {
       if (statusFilter && s.status !== statusFilter) return false;
       if (!q) return true;
+      const modLabel = labelForSapTestModule(s.module);
       return (
         (s.title ?? "").toLowerCase().includes(q) ||
         (s.module ?? "").toLowerCase().includes(q) ||
+        modLabel.toLowerCase().includes(q) ||
         (s.objective ?? "").toLowerCase().includes(q)
       );
     });
@@ -128,6 +133,18 @@ export default function ProjectTestingPage() {
       <ProjectPageHeader
         title={t("page.title")}
         subtitle={t("page.subtitle")}
+        secondaryActionSlot={
+          canEdit ? (
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--rb-brand-ring))]/35"
+            >
+              <FileUp className="h-4 w-4 shrink-0" aria-hidden />
+              {t("import.open")}
+            </button>
+          ) : undefined
+        }
         primaryActionLabel={canEdit ? t("page.newScript") : undefined}
         primaryActionOnClick={canEdit ? openCreate : undefined}
       />
@@ -213,7 +230,9 @@ export default function ProjectTestingPage() {
                         {statusLabel(s.status)}
                       </span>
                       {s.module && (
-                        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5">{s.module}</span>
+                        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5">
+                          {labelForSapTestModule(s.module)}
+                        </span>
                       )}
                       <span>
                         {t("list.steps", { count: s.step_count })} · {t("list.updated")}{" "}
@@ -244,6 +263,13 @@ export default function ProjectTestingPage() {
         open={drawerOpen}
         canEdit={canEdit}
         onClose={() => setDrawerOpen(false)}
+        onSaved={() => void load()}
+      />
+
+      <SapScriptImportModal
+        projectId={projectId}
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
         onSaved={() => void load()}
       />
     </div>

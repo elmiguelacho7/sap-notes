@@ -10,6 +10,43 @@
     "filterStatus": "Estado",
     "allStatuses": "Todos los estados"
   },
+  "import": {
+    "open": "Importar guion SAP",
+    "title": "Importar guion de prueba SAP",
+    "reviewTitle": "Revisar guion importado",
+    "hint": "Sube un Word (.docx) o Excel (.xlsx, .xls). La extracción es heurística; revisa siempre antes de guardar.",
+    "file": "Archivo",
+    "choose": "Elegir archivo",
+    "parse": "Analizar archivo",
+    "parsing": "Analizando…",
+    "back": "Volver",
+    "saveDraft": "Guardar como borrador",
+    "warnings": "Notas del analizador",
+    "sourceSection": "Archivo de origen",
+    "sourceType": "Origen detectado",
+    "scopeItem": "Elemento de alcance",
+    "scenarioPath": "Escenario / variante",
+    "sourceDoc": "Nombre del documento",
+    "sourceLang": "Idioma",
+    "businessRoles": "Roles de negocio",
+    "businessRolesPlaceholder": "Un rol por línea",
+    "parseFailed": "No se pudo analizar el archivo.",
+    "saveFailed": "No se pudo guardar el guion.",
+    "selectFile": "Selecciona un archivo primero.",
+    "untitled": "Guion importado"
+  },
+  "priority": {
+    "unset": "Sin definir",
+    "low": "Baja",
+    "medium": "Media",
+    "high": "Alta",
+    "critical": "Crítica"
+  },
+  "source": {
+    "manual": "Manual",
+    "sapDocx": "Importación SAP (Word)",
+    "sapXlsx": "Importación SAP (Excel)"
+  },
   "kpi": {
     "total": "Guiones",
     "ready": "Listos",
@@ -67,7 +104,13 @@
     "noHistory": "Aún no hay ejecuciones registradas.",
     "run": "Registrar ejecución",
     "saving": "Guardando…",
-    "priorityPlaceholder": "p. ej. alta"
+    "sourceSection": "Origen y escenario",
+    "sourceImportType": "Origen",
+    "stepName": "Nombre del paso",
+    "stepOptional": "Paso opcional",
+    "stepTransaction": "Transacción / app",
+    "stepRole": "Rol de negocio",
+    "stepDataNotes": "Notas de datos de prueba"
   },
   "run": {
     "title": "Registrar ejecución",

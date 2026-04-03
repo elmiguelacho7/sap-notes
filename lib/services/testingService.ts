@@ -1,5 +1,8 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { isValidSapTestModule } from "@/lib/testing/sapModuleCatalog";
+import { TEST_SCRIPT_PRIORITIES } from "@/lib/testing/testScriptConstants";
 import type {
+  SourceImportType,
   TestExecutionResult,
   TestExecutionRow,
   TestScriptListItem,
@@ -14,6 +17,7 @@ import type {
 const TEST_TYPES = new Set<string>(["uat", "sit", "regression"]);
 const STATUSES = new Set<string>(["draft", "ready", "archived"]);
 const RESULTS = new Set<string>(["passed", "failed", "blocked", "not_run"]);
+const SOURCE_IMPORT_TYPES = new Set<string>(["manual", "sap_docx", "sap_xlsx"]);
 
 function asTestType(v: string | undefined | null): TestScriptType {
   const s = (v ?? "uat").toLowerCase();
@@ -28,6 +32,34 @@ function asStatus(v: string | undefined | null): TestScriptStatus {
 function asResult(v: string | undefined | null): TestExecutionResult {
   const s = (v ?? "not_run").toLowerCase();
   return RESULTS.has(s) ? (s as TestExecutionResult) : "not_run";
+}
+
+function asSourceImportType(v: string | undefined | null): SourceImportType {
+  const s = (v ?? "manual").toLowerCase();
+  return SOURCE_IMPORT_TYPES.has(s) ? (s as SourceImportType) : "manual";
+}
+
+function asPriorityStored(v: string | undefined | null): string | null {
+  if (v == null || !String(v).trim()) return null;
+  const s = String(v).toLowerCase().trim();
+  return (TEST_SCRIPT_PRIORITIES as readonly string[]).includes(s) ? s : null;
+}
+
+function normalizeModule(v: string | undefined | null): string | null {
+  if (v == null || !String(v).trim()) return null;
+  const s = String(v).trim();
+  if (!isValidSapTestModule(s) || s === "") return null;
+  return s;
+}
+
+function normalizeBusinessRoles(input: unknown): string[] {
+  if (Array.isArray(input)) {
+    return input
+      .map((x) => (typeof x === "string" ? x.trim() : ""))
+      .filter((x) => x.length > 0)
+      .slice(0, 50);
+  }
+  return [];
 }
 
 async function assertScriptProject(scriptId: string, projectId: string): Promise<TestScriptRow | null> {
@@ -139,6 +171,16 @@ export async function listTestScriptsForProject(projectId: string): Promise<Test
   };
 }
 
+export type CreateTestScriptStepInput = {
+  instruction: string;
+  expected_result?: string | null;
+  step_name?: string | null;
+  optional_flag?: boolean;
+  transaction_or_app?: string | null;
+  business_role?: string | null;
+  test_data_notes?: string | null;
+};
+
 export type CreateTestScriptInput = {
   title: string;
   objective?: string | null;
@@ -149,10 +191,16 @@ export type CreateTestScriptInput = {
   preconditions?: string | null;
   test_data?: string | null;
   expected_result?: string | null;
+  scenario_path?: string | null;
+  source_document_name?: string | null;
+  source_language?: string | null;
+  scope_item_code?: string | null;
+  business_roles?: unknown;
+  source_import_type?: string | null;
   related_task_id?: string | null;
   related_ticket_id?: string | null;
   related_knowledge_page_id?: string | null;
-  steps?: { instruction: string; expected_result?: string | null }[];
+  steps?: CreateTestScriptStepInput[];
 };
 
 export async function createTestScript(
@@ -178,13 +226,19 @@ export async function createTestScript(
     project_id: projectId,
     title,
     objective: input.objective?.trim() || null,
-    module: input.module?.trim() || null,
+    module: normalizeModule(input.module),
     test_type: asTestType(input.test_type),
-    priority: input.priority?.trim() || null,
+    priority: asPriorityStored(input.priority),
     status: asStatus(input.status),
     preconditions: input.preconditions?.trim() || null,
     test_data: input.test_data?.trim() || null,
     expected_result: input.expected_result?.trim() || null,
+    scenario_path: input.scenario_path?.trim() || null,
+    source_document_name: input.source_document_name?.trim() || null,
+    source_language: input.source_language?.trim() || null,
+    scope_item_code: input.scope_item_code?.trim() || null,
+    business_roles: normalizeBusinessRoles(input.business_roles),
+    source_import_type: asSourceImportType(input.source_import_type),
     related_task_id,
     related_ticket_id,
     related_knowledge_page_id,
@@ -206,6 +260,11 @@ export async function createTestScript(
       step_order: i,
       instruction: (st.instruction ?? "").trim() || "—",
       expected_result: st.expected_result?.trim() || null,
+      step_name: st.step_name?.trim() || null,
+      optional_flag: Boolean(st.optional_flag),
+      transaction_or_app: st.transaction_or_app?.trim() || null,
+      business_role: st.business_role?.trim() || null,
+      test_data_notes: st.test_data_notes?.trim() || null,
     }));
     const { error: stepErr } = await supabaseAdmin.from("test_script_steps").insert(stepRows);
     if (stepErr) throw new Error(stepErr.message);
@@ -241,6 +300,12 @@ export type UpdateTestScriptInput = Partial<{
   preconditions: string | null;
   test_data: string | null;
   expected_result: string | null;
+  scenario_path: string | null;
+  source_document_name: string | null;
+  source_language: string | null;
+  scope_item_code: string | null;
+  business_roles: unknown;
+  source_import_type: string | null;
   related_task_id: string | null;
   related_ticket_id: string | null;
   related_knowledge_page_id: string | null;
@@ -251,6 +316,11 @@ export type StepPatch = {
   step_order: number;
   instruction: string;
   expected_result?: string | null;
+  step_name?: string | null;
+  optional_flag?: boolean;
+  transaction_or_app?: string | null;
+  business_role?: string | null;
+  test_data_notes?: string | null;
 };
 
 export async function updateTestScript(
@@ -269,13 +339,25 @@ export async function updateTestScript(
     updates.title = t;
   }
   if (patch.objective !== undefined) updates.objective = patch.objective?.trim() || null;
-  if (patch.module !== undefined) updates.module = patch.module?.trim() || null;
+  if (patch.module !== undefined) updates.module = normalizeModule(patch.module);
   if (patch.test_type !== undefined) updates.test_type = asTestType(patch.test_type);
-  if (patch.priority !== undefined) updates.priority = patch.priority?.trim() || null;
+  if (patch.priority !== undefined) updates.priority = asPriorityStored(patch.priority);
   if (patch.status !== undefined) updates.status = asStatus(patch.status);
   if (patch.preconditions !== undefined) updates.preconditions = patch.preconditions?.trim() || null;
   if (patch.test_data !== undefined) updates.test_data = patch.test_data?.trim() || null;
   if (patch.expected_result !== undefined) updates.expected_result = patch.expected_result?.trim() || null;
+  if (patch.scenario_path !== undefined) updates.scenario_path = patch.scenario_path?.trim() || null;
+  if (patch.source_document_name !== undefined) {
+    updates.source_document_name = patch.source_document_name?.trim() || null;
+  }
+  if (patch.source_language !== undefined) updates.source_language = patch.source_language?.trim() || null;
+  if (patch.scope_item_code !== undefined) updates.scope_item_code = patch.scope_item_code?.trim() || null;
+  if (patch.business_roles !== undefined) {
+    updates.business_roles = normalizeBusinessRoles(patch.business_roles);
+  }
+  if (patch.source_import_type !== undefined) {
+    updates.source_import_type = asSourceImportType(patch.source_import_type);
+  }
 
   if (patch.related_task_id !== undefined) {
     const tid = patch.related_task_id?.trim() || null;
@@ -322,10 +404,24 @@ export async function updateTestScript(
       const instruction = (st.instruction ?? "").trim() || "—";
       const expected_result = st.expected_result?.trim() || null;
       const step_order = i;
+      const step_name = st.step_name?.trim() || null;
+      const optional_flag = Boolean(st.optional_flag);
+      const transaction_or_app = st.transaction_or_app?.trim() || null;
+      const business_role = st.business_role?.trim() || null;
+      const test_data_notes = st.test_data_notes?.trim() || null;
       if (st.id && existingIds.has(st.id)) {
         const { error: upErr } = await supabaseAdmin
           .from("test_script_steps")
-          .update({ step_order, instruction, expected_result })
+          .update({
+            step_order,
+            instruction,
+            expected_result,
+            step_name,
+            optional_flag,
+            transaction_or_app,
+            business_role,
+            test_data_notes,
+          })
           .eq("id", st.id);
         if (upErr) throw new Error(upErr.message);
       } else {
@@ -334,6 +430,11 @@ export async function updateTestScript(
           step_order,
           instruction,
           expected_result,
+          step_name,
+          optional_flag,
+          transaction_or_app,
+          business_role,
+          test_data_notes,
         });
         if (inErr) throw new Error(inErr.message);
       }

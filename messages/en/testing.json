@@ -10,6 +10,43 @@
     "filterStatus": "Status",
     "allStatuses": "All statuses"
   },
+  "import": {
+    "open": "Import SAP test script",
+    "title": "Import SAP test script",
+    "reviewTitle": "Review imported script",
+    "hint": "Upload a Word (.docx) or Excel (.xlsx, .xls) file. We extract structure heuristically; always review before saving.",
+    "file": "File",
+    "choose": "Choose file",
+    "parse": "Parse file",
+    "parsing": "Parsing…",
+    "back": "Back",
+    "saveDraft": "Save as draft",
+    "warnings": "Parser notes",
+    "sourceSection": "Source file",
+    "sourceType": "Detected source",
+    "scopeItem": "Scope item",
+    "scenarioPath": "Scenario / variant",
+    "sourceDoc": "Source document name",
+    "sourceLang": "Language",
+    "businessRoles": "Business roles",
+    "businessRolesPlaceholder": "One role per line",
+    "parseFailed": "Could not parse the file.",
+    "saveFailed": "Could not save the script.",
+    "selectFile": "Select a file first.",
+    "untitled": "Imported script"
+  },
+  "priority": {
+    "unset": "Not set",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "critical": "Critical"
+  },
+  "source": {
+    "manual": "Manual",
+    "sapDocx": "SAP import (Word)",
+    "sapXlsx": "SAP import (Excel)"
+  },
   "kpi": {
     "total": "Scripts",
     "ready": "Ready",
@@ -67,7 +104,13 @@
     "noHistory": "No runs recorded yet.",
     "run": "Record run",
     "saving": "Saving…",
-    "priorityPlaceholder": "e.g. high"
+    "sourceSection": "Source & scenario",
+    "sourceImportType": "Origin",
+    "stepName": "Step name",
+    "stepOptional": "Optional step",
+    "stepTransaction": "Transaction / app",
+    "stepRole": "Business role",
+    "stepDataNotes": "Test data notes"
   },
   "run": {
     "title": "Record execution",
