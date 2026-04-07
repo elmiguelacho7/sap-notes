@@ -309,6 +309,8 @@
     "save": "Save",
     "delete": "Delete",
     "confirmDelete": "Delete this script and all its executions?",
+    "confirmRemoveActivity": "Remove this activity from the script? Steps assigned to it will be ungrouped.",
+    "confirmRemoveStep": "Remove this step?",
     "title": "Title",
     "objective": "Objective",
     "module": "Module",

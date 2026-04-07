@@ -294,6 +294,8 @@
     "save": "Guardar",
     "delete": "Eliminar",
     "confirmDelete": "¿Eliminar este guion y todo su historial de ejecución?",
+    "confirmRemoveActivity": "¿Quitar esta actividad del guion? Los pasos asignados quedarán sin grupo.",
+    "confirmRemoveStep": "¿Quitar este paso?",
     "title": "Título",
     "objective": "Objetivo",
     "module": "Módulo",

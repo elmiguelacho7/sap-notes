@@ -246,7 +246,12 @@ export function TestScriptDrawer({
   }, [open, scriptId, loadScript]);
 
   const addStep = () => setSteps((s) => [...s, emptyStep()]);
-  const removeStep = (i: number) => setSteps((s) => (s.length <= 1 ? s : s.filter((_, j) => j !== i)));
+  const removeStep = (i: number) => {
+    if (!canEdit) return;
+    if (steps.length <= 1) return;
+    if (!confirm(t("drawer.confirmRemoveStep"))) return;
+    setSteps((s) => (s.length <= 1 ? s : s.filter((_, j) => j !== i)));
+  };
 
   const addActivity = () => {
     hadStructuredRef.current = true;
@@ -254,6 +259,8 @@ export function TestScriptDrawer({
   };
 
   const removeActivity = (id: string) => {
+    if (!canEdit) return;
+    if (!confirm(t("drawer.confirmRemoveActivity"))) return;
     setActivities((prev) => prev.filter((a) => a.id !== id));
     setSteps((prev) =>
       prev.map((s) => (s.activity_id === id ? { ...s, activity_id: "" } : s))

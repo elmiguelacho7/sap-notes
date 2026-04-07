@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -36,15 +36,20 @@ export function TestScriptWorkspace({ projectId, scriptId }: TestScriptWorkspace
   const [tab, setTab] = useState<Tab>("procedure");
   const [script, setScript] = useState<TestScriptWithViewerContext | null>(null);
   const [executions, setExecutions] = useState<TestExecutionRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [canEdit, setCanEdit] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [runOpen, setRunOpen] = useState(false);
 
+  const hasLoadedOnce = useRef(false);
+
   const load = useCallback(async () => {
     if (!projectId || !scriptId) return;
-    setLoading(true);
+    const first = !hasLoadedOnce.current;
+    if (first) setInitialLoading(true);
+    else setRefreshing(true);
     setError(null);
     try {
       const [sRes, eRes, pRes] = await Promise.all([
@@ -71,9 +76,11 @@ export function TestScriptWorkspace({ projectId, scriptId }: TestScriptWorkspace
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : t("page.errorLoad"));
-      setScript(null);
+      if (first) setScript(null);
     } finally {
-      setLoading(false);
+      hasLoadedOnce.current = true;
+      setInitialLoading(false);
+      setRefreshing(false);
     }
   }, [projectId, scriptId, t]);
 
@@ -109,10 +116,17 @@ export function TestScriptWorkspace({ projectId, scriptId }: TestScriptWorkspace
     </button>
   );
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className={PROJECT_WORKSPACE_PAGE}>
-        <p className="text-sm text-slate-500">{t("page.loading")}</p>
+        <div className="space-y-4">
+          <div className="h-6 w-40 animate-pulse rounded bg-slate-100" />
+          <div className="h-4 w-64 animate-pulse rounded bg-slate-100" />
+          <div className={`${PROJECT_WORKSPACE_CARD} space-y-3`}>
+            <div className="h-4 w-44 animate-pulse rounded bg-slate-100" />
+            <div className="h-24 w-full animate-pulse rounded bg-slate-100" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -241,6 +255,12 @@ export function TestScriptWorkspace({ projectId, scriptId }: TestScriptWorkspace
 
   return (
     <div className={PROJECT_WORKSPACE_PAGE}>
+      {refreshing ? (
+        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-[rgb(var(--rb-brand-primary))]" aria-hidden />
+          {t("page.loading")}
+        </div>
+      ) : null}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Link
           href={`/projects/${projectId}/testing`}

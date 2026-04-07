@@ -31,6 +31,33 @@ import { PROJECT_WORKSPACE_BANNER_INFO } from "@/lib/projectWorkspaceUi";
 const SHELL_OUTER = "mx-auto w-full max-w-[1440px] px-6 py-6 lg:px-8";
 const SHELL_INNER = "mx-auto w-full max-w-6xl";
 
+function LazyDetails({
+  id,
+  defaultOpen,
+  className,
+  summary,
+  children,
+}: {
+  id?: string;
+  defaultOpen?: boolean;
+  className?: string;
+  summary: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(Boolean(defaultOpen));
+  return (
+    <details
+      id={id}
+      open={open}
+      onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
+      className={className}
+    >
+      {summary}
+      {open ? children : null}
+    </details>
+  );
+}
+
 function chipClass(tone: "neutral" | "brand" | "warn"): string {
   const base =
     "inline-flex max-w-[min(100%,18rem)] items-center rounded-full border px-2 py-0.5 text-[11px] font-medium";
@@ -399,7 +426,6 @@ function ExecutionStepRow({
 
         {hasInstr ? (
           <div className="mt-2 border-t border-slate-100/90 pt-2">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t("procedure.instruction")}</p>
             {instrP.truncated ? (
               <details className="group/int">
                 <summary className="mt-0.5 cursor-pointer list-none text-sm leading-snug text-slate-700 [&::-webkit-details-marker]:hidden">
@@ -418,7 +444,6 @@ function ExecutionStepRow({
 
         {hasData ? (
           <div className="mt-2">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t("procedure.inputData")}</p>
             {dataP.truncated ? (
               <details className="group/da">
                 <summary className="mt-0.5 cursor-pointer list-none text-xs text-slate-600 [&::-webkit-details-marker]:hidden">
@@ -438,7 +463,6 @@ function ExecutionStepRow({
 
         {hasExp ? (
           <div className="mt-2 rounded-lg border border-slate-100/90 bg-slate-50/50 px-2 py-1.5">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t("procedure.expectedResult")}</p>
             {expP.truncated ? (
               <details className="group/ex">
                 <summary className="mt-0.5 cursor-pointer list-none text-xs text-slate-600 [&::-webkit-details-marker]:hidden">
@@ -458,7 +482,6 @@ function ExecutionStepRow({
 
         {hasNotes ? (
           <div className="mt-2 border-t border-dashed border-slate-200/80 pt-2">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t("procedure.stepNotes")}</p>
             {notesP.truncated ? (
               <details className="group/sn">
                 <summary className="mt-0.5 cursor-pointer list-none text-xs text-slate-500 [&::-webkit-details-marker]:hidden">
@@ -644,21 +667,24 @@ function ActivityCard({
 
   if (collapseActivity) {
     return (
-      <details
+      <LazyDetails
         id={`activity-${act.id}`}
+        defaultOpen={false}
         className={`group/act ${shellClass} overflow-hidden [&_summary::-webkit-details-marker]:hidden`}
-      >
-        <summary className="cursor-pointer list-none px-3.5 py-3 transition-colors hover:bg-slate-50/60">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <span className="text-[15px] font-semibold tracking-tight text-slate-900">{act.activity_title}</span>
-              <span className="mt-0.5 block text-[11px] text-slate-400">
-                {actSteps.length} {t("procedure.stepsLower")}
-              </span>
+        summary={
+          <summary className="cursor-pointer list-none px-3.5 py-3 transition-colors hover:bg-slate-50/60">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <span className="text-[15px] font-semibold tracking-tight text-slate-900">{act.activity_title}</span>
+                <span className="mt-0.5 block text-[11px] text-slate-400">
+                  {actSteps.length} {t("procedure.stepsLower")}
+                </span>
+              </div>
+              <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open/act:-rotate-180" aria-hidden />
             </div>
-            <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open/act:-rotate-180" aria-hidden />
-          </div>
-        </summary>
+          </summary>
+        }
+      >
         <div className="space-y-3 border-t border-slate-100/90 px-3.5 pb-3.5 pt-3">
           {act.activity_target_name?.trim() ? (
             <p className="text-xs leading-snug text-slate-600">{act.activity_target_name}</p>
@@ -674,7 +700,7 @@ function ActivityCard({
           ) : null}
           {flow}
         </div>
-      </details>
+      </LazyDetails>
     );
   }
 
@@ -1046,22 +1072,28 @@ export function TestProcedureViewer({ script, projectId, canEdit }: TestProcedur
               Array.from(scenarioGroups.entries()).map(([scenario, acts], idx) => {
                 const slug = navSlug(scenario);
                 const stepSum = acts.reduce((acc, a) => acc + (stepsByActivityId.get(a.id) ?? []).length, 0);
+                const defaultOpen = heavyProcedure ? idx === 0 : singleScenario || idx === 0;
                 return (
-                  <details
+                  <LazyDetails
                     key={scenario}
                     id={`scenario-${slug}`}
-                    open={heavyProcedure ? idx === 0 : singleScenario || idx === 0}
                     className="group/sc scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200/85 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] ring-1 ring-slate-100 [&_summary::-webkit-details-marker]:hidden"
+                    defaultOpen={defaultOpen}
+                    summary={
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 border-b border-slate-100/90 bg-slate-50/50 px-4 py-3.5 transition-colors hover:bg-slate-50">
+                        <div className="min-w-0">
+                          <span className="text-sm font-semibold leading-snug text-slate-900">{scenario}</span>
+                          <span className="mt-1 block text-[11px] font-medium tabular-nums text-slate-500">
+                            {acts.length} {t("procedure.activities")} · {stepSum} {t("procedure.stepsLower")}
+                          </span>
+                        </div>
+                        <ChevronDown
+                          className="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 group-open/sc:-rotate-180"
+                          aria-hidden
+                        />
+                      </summary>
+                    }
                   >
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 border-b border-slate-100/90 bg-slate-50/50 px-4 py-3.5 transition-colors hover:bg-slate-50">
-                      <div className="min-w-0">
-                        <span className="text-sm font-semibold leading-snug text-slate-900">{scenario}</span>
-                        <span className="mt-1 block text-[11px] font-medium tabular-nums text-slate-500">
-                          {acts.length} {t("procedure.activities")} · {stepSum} {t("procedure.stepsLower")}
-                        </span>
-                      </div>
-                      <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 group-open/sc:-rotate-180" aria-hidden />
-                    </summary>
                     <div className="space-y-3 bg-slate-50/20 p-3.5">
                       {acts.map((act) => (
                         <ActivityCard
@@ -1078,7 +1110,7 @@ export function TestProcedureViewer({ script, projectId, canEdit }: TestProcedur
                         />
                       ))}
                     </div>
-                  </details>
+                  </LazyDetails>
                 );
               })}
 
@@ -1157,7 +1189,10 @@ export function TestScriptHeaderSummary({ script, variant = "detailed" }: TestSc
     return t("type.uat");
   };
   const stLabel = (st: string) => {
-    if (st === "ready") return t("status.ready");
+    if (st === "ready" || st === "ready_for_test") return t("status.ready_for_test");
+    if (st === "in_review") return t("status.in_review");
+    if (st === "approved") return t("status.approved");
+    if (st === "obsolete") return t("status.obsolete");
     if (st === "archived") return t("status.archived");
     return t("status.draft");
   };
