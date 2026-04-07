@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { normalizeSapImportedScript } from "./normalizeSapImportedScript";
+import { classifyXlsxRowContent } from "./xlsxRowSemantics";
 import type { SapImportedActivityDraft, SapImportedStepRow, SapParseResult } from "./types";
 
 function normCell(v: unknown): string {
@@ -62,6 +63,8 @@ function parseCloudAlmSheet(
   activities: SapImportedActivityDraft[];
   titleHint: string;
   priorityHint: string;
+  refAcc: string[];
+  preAcc: string[];
 } {
   const rows = XLSX.utils.sheet_to_json<(string | number | null | undefined)[]>(sheet, {
     header: 1,
@@ -69,7 +72,7 @@ function parseCloudAlmSheet(
     raw: false,
   }) as unknown[][];
 
-  if (!rows.length) return { activities: [], titleHint: "", priorityHint: "" };
+  if (!rows.length) return { activities: [], titleHint: "", priorityHint: "", refAcc: [], preAcc: [] };
 
   let headerRowIdx = 0;
   for (let i = 0; i < Math.min(rows.length, 40); i++) {
@@ -85,7 +88,7 @@ function parseCloudAlmSheet(
   const headerCells = (rows[headerRowIdx] ?? []).map(normCell);
   const alm = mapCloudAlmHeaders(headerCells);
   if (!alm) {
-    return { activities: [], titleHint: "", priorityHint: "" };
+    return { activities: [], titleHint: "", priorityHint: "", refAcc: [], preAcc: [] };
   }
 
   warnings.push("Detected SAP Cloud ALM–style columns; grouped into test case → activity → actions.");
@@ -96,6 +99,8 @@ function parseCloudAlmSheet(
 
   let titleHint = "";
   let priorityHint = "";
+  const refAcc: string[] = [];
+  const preAcc: string[] = [];
 
   for (let i = headerRowIdx + 1; i < rows.length; i++) {
     const r = rows[i];
@@ -118,6 +123,18 @@ function parseCloudAlmSheet(
     const actionTitle = alm.actionTitle >= 0 ? cells[alm.actionTitle] : "";
     const expected =
       alm.actionExpected >= 0 && cells[alm.actionExpected] ? cells[alm.actionExpected] : null;
+
+    const sem = classifyXlsxRowContent(instr, actionTitle || null, expected);
+    if (sem.kind === "reference") {
+      refAcc.push(sem.text);
+      continue;
+    }
+    if (sem.kind === "setup") {
+      preAcc.push(sem.text);
+      continue;
+    }
+    if (sem.kind === "skip") continue;
+
     const targetName = alm.activityTargetName >= 0 ? cells[alm.activityTargetName] : "";
     const targetUrl = alm.activityTargetUrl >= 0 ? cells[alm.activityTargetUrl] : "";
     const role = alm.businessRole >= 0 ? cells[alm.businessRole] : "";
@@ -155,7 +172,7 @@ function parseCloudAlmSheet(
     .sort((a, b) => a.activity_order - b.activity_order)
     .map(({ _key: _k, ...rest }) => rest);
 
-  return { activities, titleHint, priorityHint };
+  return { activities, titleHint, priorityHint, refAcc, preAcc };
 }
 
 /** Map common SAP / Excel column headers to field keys (flat fallback) */
@@ -165,13 +182,20 @@ function mapHeaderIndex(headers: string[]): Record<string, number> {
     const k = headerKey(h);
     if (!k) return;
     if (/^#|^no\.?|^step\s*#|^nr$/i.test(k) || k === "step") map.order = map.order ?? i;
-    if (/step\s*name|activity|process\s*step|action/i.test(k)) map.name = map.name ?? i;
-    if (/instruction|test\s*procedure|procedure|description/i.test(k)) map.instruction = map.instruction ?? i;
+    if (/step\s*name|process\s*step|^action\s*title$|^action$/i.test(k)) map.name = map.name ?? i;
+    if (
+      /instruction|test\s*procedure|procedure|description|action\s*instructions/i.test(k) &&
+      !/expected/i.test(k)
+    )
+      map.instruction = map.instruction ?? i;
     if (/expected|result/i.test(k) && !/actual/i.test(k)) map.expected = map.expected ?? i;
-    if (/role|actor|user/i.test(k)) map.role = map.role ?? i;
+    if (/role|actor|user/i.test(k) && !/action/i.test(k)) map.role = map.role ?? i;
     if (/transaction|t-?code|app|application/i.test(k)) map.tx = map.tx ?? i;
     if (/optional/i.test(k)) map.optional = map.optional ?? i;
     if (/test\s*data|data\s*notes/i.test(k)) map.dataNotes = map.dataNotes ?? i;
+    if (/^test\s*case(\s*name)?$/i.test(k)) map.testCase = map.testCase ?? i;
+    if (/^scenario$/i.test(k) || /^test\s*scenario$/i.test(k)) map.scenario = map.scenario ?? i;
+    if (/^activity(\s*title)?$/i.test(k) && !/target/i.test(k)) map.activityTitle = map.activityTitle ?? i;
   });
   return map;
 }
@@ -179,14 +203,22 @@ function mapHeaderIndex(headers: string[]): Record<string, number> {
 function rowsFromSheet(
   sheet: XLSX.WorkSheet,
   warnings: string[]
-): { steps: SapImportedStepRow[]; titleHint: string } {
+): {
+  steps: SapImportedStepRow[];
+  activities: SapImportedActivityDraft[];
+  titleHint: string;
+  refAcc: string[];
+  preAcc: string[];
+} {
   const rows = XLSX.utils.sheet_to_json<(string | number | null | undefined)[]>(sheet, {
     header: 1,
     defval: "",
     raw: false,
   }) as unknown[][];
 
-  if (!rows.length) return { steps: [], titleHint: "" };
+  if (!rows.length) {
+    return { steps: [], activities: [], titleHint: "", refAcc: [], preAcc: [] };
+  }
 
   let headerRowIdx = 0;
   for (let i = 0; i < Math.min(rows.length, 30); i++) {
@@ -212,23 +244,27 @@ function rowsFromSheet(
     );
   }
 
-  const steps: SapImportedStepRow[] = [];
+  const refAcc: string[] = [];
+  const preAcc: string[] = [];
   const dataStart = headerRowIdx + 1;
-  let order = 1;
-  for (let i = dataStart; i < rows.length; i++) {
-    const r = rows[i];
-    if (!Array.isArray(r)) continue;
+  const titleHint =
+    normCell(rows[0]?.[0]) && headerRowIdx > 0 ? normCell(rows[0][0]) : "";
+
+  const hierarchical =
+    hasInstruction &&
+    (col.testCase !== undefined || col.scenario !== undefined || col.activityTitle !== undefined);
+
+  const readRowCells = (r: unknown[]) => {
     const cells = r.map(normCell);
-    if (cells.every((c) => !c)) continue;
+    if (cells.every((c) => !c)) return null;
 
     let stepOrder = hasOrder && col.order !== undefined ? parseInt(cells[col.order].replace(/\D/g, ""), 10) : NaN;
-    if (!Number.isFinite(stepOrder) || stepOrder < 1) stepOrder = order;
 
     const instruction =
       col.instruction !== undefined
         ? cells[col.instruction]
         : cells.find((c, j) => j > 0 && c.length > 3) ?? cells[0] ?? "";
-    if (!instruction.trim()) continue;
+    if (!instruction.trim()) return null;
 
     const stepName = col.name !== undefined ? cells[col.name] || null : null;
     const expected = col.expected !== undefined ? cells[col.expected] || null : null;
@@ -243,23 +279,119 @@ function rowsFromSheet(
       optional_flag = /\boptional\b/i.test(instruction);
     }
 
+    const sem = classifyXlsxRowContent(instruction, stepName, expected);
+    if (sem.kind === "reference") {
+      refAcc.push(sem.text);
+      return null;
+    }
+    if (sem.kind === "setup") {
+      preAcc.push(sem.text);
+      return null;
+    }
+    if (sem.kind === "skip") return null;
+
+    return {
+      cells,
+      stepOrder,
+      instruction: instruction.trim(),
+      stepName: stepName?.trim() || null,
+      expected: expected?.trim() || null,
+      business_role: business_role?.trim() || null,
+      transaction_or_app: transaction_or_app?.trim() || null,
+      test_data_notes: test_data_notes?.trim() || null,
+      optional_flag,
+    };
+  };
+
+  if (hierarchical) {
+    warnings.push("Grouped spreadsheet rows by scenario/test case and activity columns.");
+    type Group = SapImportedActivityDraft & { _key: string };
+    const byKey = new Map<string, Group>();
+    let nextActivityOrder = 0;
+    let order = 1;
+
+    for (let i = dataStart; i < rows.length; i++) {
+      const r = rows[i];
+      if (!Array.isArray(r)) continue;
+      const parsed = readRowCells(r);
+      if (!parsed) continue;
+
+      let stepOrder = parsed.stepOrder;
+      if (!Number.isFinite(stepOrder) || stepOrder < 1) stepOrder = order;
+
+      const scenarioPart =
+        col.testCase !== undefined
+          ? parsed.cells[col.testCase]
+          : col.scenario !== undefined
+            ? parsed.cells[col.scenario]
+            : "";
+      const actPart = col.activityTitle !== undefined ? parsed.cells[col.activityTitle] : "";
+      const scen = scenarioPart.trim() || "Default scenario";
+      const act = actPart.trim() || "General";
+      const key = `${scen}\n${act}`;
+
+      let g = byKey.get(key);
+      if (!g) {
+        g = {
+          _key: key,
+          scenario_name: scen,
+          activity_title: act,
+          activity_target_name: "",
+          activity_target_url: "",
+          business_role: parsed.business_role ?? "",
+          activity_order: nextActivityOrder++,
+          steps: [],
+        };
+        byKey.set(key, g);
+      } else if (!g.business_role && parsed.business_role) {
+        g.business_role = parsed.business_role;
+      }
+
+      g.steps.push({
+        step_order: g.steps.length + 1,
+        step_name: parsed.stepName,
+        instruction: parsed.instruction,
+        expected_result: parsed.expected,
+        optional_flag: parsed.optional_flag,
+        transaction_or_app: parsed.transaction_or_app,
+        business_role: parsed.business_role,
+        test_data_notes: parsed.test_data_notes,
+      });
+      order = stepOrder + 1;
+    }
+
+    const activities = Array.from(byKey.values())
+      .sort((a, b) => a.activity_order - b.activity_order)
+      .map(({ _key: _k, ...rest }) => rest);
+
+    return { steps: [], activities, titleHint, refAcc, preAcc };
+  }
+
+  const steps: SapImportedStepRow[] = [];
+  let order = 1;
+  for (let i = dataStart; i < rows.length; i++) {
+    const r = rows[i];
+    if (!Array.isArray(r)) continue;
+    const parsed = readRowCells(r);
+    if (!parsed) continue;
+
+    let stepOrder = parsed.stepOrder;
+    if (!Number.isFinite(stepOrder) || stepOrder < 1) stepOrder = order;
+
     steps.push({
       step_order: stepOrder,
-      step_name: stepName?.trim() || null,
-      instruction: instruction.trim(),
-      expected_result: expected?.trim() || null,
-      optional_flag,
-      transaction_or_app: transaction_or_app?.trim() || null,
-      business_role: business_role?.trim() || null,
-      test_data_notes: test_data_notes?.trim() || null,
+      step_name: parsed.stepName,
+      instruction: parsed.instruction,
+      expected_result: parsed.expected,
+      optional_flag: parsed.optional_flag,
+      transaction_or_app: parsed.transaction_or_app,
+      business_role: parsed.business_role,
+      test_data_notes: parsed.test_data_notes,
     });
     order = stepOrder + 1;
   }
 
-  const titleHint =
-    normCell(rows[0]?.[0]) && headerRowIdx > 0 ? normCell(rows[0][0]) : "";
-
-  return { steps, titleHint };
+  return { steps, activities: [], titleHint, refAcc, preAcc };
 }
 
 function mapPriorityFromHint(h: string): string | undefined {
@@ -311,15 +443,32 @@ export function parseSapTestScriptXlsx(buffer: Buffer, fileName: string): SapPar
         activities: alm.activities,
         steps: [],
         priority: pr as "low" | "medium" | "high" | "critical" | undefined,
+        reference_notes: alm.refAcc.join("\n\n"),
+        preconditions: alm.preAcc.join("\n\n"),
       },
       { source_import_type: "sap_xlsx", source_document_name: fileName }
     );
     return { draft, warnings };
   }
 
-  const { steps, titleHint } = rowsFromSheet(sheet, warnings);
-  if (steps.length === 0) {
+  const { steps, activities, titleHint, refAcc, preAcc } = rowsFromSheet(sheet, warnings);
+  if (steps.length === 0 && activities.length === 0) {
     warnings.push("No step rows extracted from the first sheet.");
+  }
+
+  if (activities.length > 0) {
+    const draft = normalizeSapImportedScript(
+      {
+        title: titleHint || fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim(),
+        objective: "",
+        activities,
+        steps: [],
+        reference_notes: refAcc.join("\n\n"),
+        preconditions: preAcc.join("\n\n"),
+      },
+      { source_import_type: "sap_xlsx", source_document_name: fileName }
+    );
+    return { draft, warnings };
   }
 
   const draft = normalizeSapImportedScript(
@@ -328,6 +477,8 @@ export function parseSapTestScriptXlsx(buffer: Buffer, fileName: string): SapPar
       objective: "",
       steps,
       activities: [],
+      reference_notes: refAcc.join("\n\n"),
+      preconditions: preAcc.join("\n\n"),
     },
     { source_import_type: "sap_xlsx", source_document_name: fileName }
   );

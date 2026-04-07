@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { X, Plus, Trash2 } from "lucide-react";
-import type { SourceImportType, TestExecutionRow, TestScriptWithSteps } from "@/lib/types/testing";
+import type { SourceImportType, TestExecutionRow, TestScriptWithViewerContext } from "@/lib/types/testing";
 import { RunExecutionModal } from "@/components/testing/RunExecutionModal";
+import { TraceabilityEntityPicker } from "@/components/testing/TraceabilityEntityPicker";
 import { SAP_TEST_MODULE_OPTIONS } from "@/lib/testing/sapModuleCatalog";
 
 type ActivityForm = {
@@ -74,7 +75,7 @@ function formatBusinessRoles(br: unknown): string {
 }
 
 function asSourceImportType(v: unknown): SourceImportType {
-  if (v === "sap_docx" || v === "sap_xlsx" || v === "manual") return v;
+  if (v === "sap_docx" || v === "sap_xlsx" || v === "manual" || v === "structured_template") return v;
   return "manual";
 }
 
@@ -115,6 +116,7 @@ export function TestScriptDrawer({
   const [preconditions, setPreconditions] = useState("");
   const [testData, setTestData] = useState("");
   const [businessConditions, setBusinessConditions] = useState("");
+  const [referenceNotes, setReferenceNotes] = useState("");
   const [expectedResult, setExpectedResult] = useState("");
   const [scenarioPath, setScenarioPath] = useState("");
   const [scopeItemCode, setScopeItemCode] = useState("");
@@ -128,6 +130,7 @@ export function TestScriptDrawer({
   const [activities, setActivities] = useState<ActivityForm[]>([]);
   const [steps, setSteps] = useState<StepForm[]>([emptyStep()]);
   const [executions, setExecutions] = useState<TestExecutionRow[]>([]);
+  const [loadedScript, setLoadedScript] = useState<TestScriptWithViewerContext | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [runOpen, setRunOpen] = useState(false);
   const hadStructuredRef = useRef(false);
@@ -145,7 +148,8 @@ export function TestScriptDrawer({
       ]);
       const sData = await sRes.json();
       if (!sRes.ok) throw new Error(sData.error ?? "Load failed");
-      const script = sData as TestScriptWithSteps;
+      const script = sData as TestScriptWithViewerContext;
+      setLoadedScript(script);
       setTitle(script.title ?? "");
       setObjective(script.objective ?? "");
       setModule(script.module ?? "");
@@ -155,6 +159,7 @@ export function TestScriptDrawer({
       setPreconditions(script.preconditions ?? "");
       setTestData(script.test_data ?? "");
       setBusinessConditions(script.business_conditions ?? "");
+      setReferenceNotes(script.reference_notes ?? "");
       setExpectedResult(script.expected_result ?? "");
       setScenarioPath(script.scenario_path ?? "");
       setScopeItemCode(script.scope_item_code ?? "");
@@ -218,6 +223,7 @@ export function TestScriptDrawer({
       setPreconditions("");
       setTestData("");
       setBusinessConditions("");
+      setReferenceNotes("");
       setExpectedResult("");
       setScenarioPath("");
       setScopeItemCode("");
@@ -228,6 +234,7 @@ export function TestScriptDrawer({
       setRelatedTaskId("");
       setRelatedTicketId("");
       setRelatedKnowledgePageId("");
+      setLoadedScript(null);
       setActivities([]);
       hadStructuredRef.current = false;
       setSteps([emptyStep()]);
@@ -300,6 +307,7 @@ export function TestScriptDrawer({
       preconditions: preconditions || null,
       test_data: testData || null,
       business_conditions: businessConditions.trim() || null,
+      reference_notes: referenceNotes.trim() || null,
       expected_result: expectedResult || null,
       scenario_path: scenarioPath.trim() || null,
       scope_item_code: scopeItemCode.trim() || null,
@@ -349,6 +357,7 @@ export function TestScriptDrawer({
           preconditions: p.preconditions,
           test_data: p.test_data,
           business_conditions: p.business_conditions,
+          reference_notes: p.reference_notes,
           expected_result: p.expected_result,
           scenario_path: p.scenario_path,
           scope_item_code: p.scope_item_code,
@@ -410,6 +419,7 @@ export function TestScriptDrawer({
           preconditions: p.preconditions,
           test_data: p.test_data,
           business_conditions: p.business_conditions,
+          reference_notes: p.reference_notes,
           expected_result: p.expected_result,
           scenario_path: p.scenario_path,
           scope_item_code: p.scope_item_code,
@@ -571,7 +581,10 @@ export function TestScriptDrawer({
                       disabled={!canEdit}
                     >
                       <option value="draft">{t("status.draft")}</option>
-                      <option value="ready">{t("status.ready")}</option>
+                      <option value="ready_for_test">{t("status.ready_for_test")}</option>
+                      <option value="in_review">{t("status.in_review")}</option>
+                      <option value="approved">{t("status.approved")}</option>
+                      <option value="obsolete">{t("status.obsolete")}</option>
                       <option value="archived">{t("status.archived")}</option>
                     </select>
                   </div>
@@ -616,6 +629,17 @@ export function TestScriptDrawer({
                     disabled={!canEdit}
                   />
                 </div>
+                <div>
+                  <label className={labelClass}>{t("drawer.referenceNotes")}</label>
+                  <p className="mb-1 text-[11px] text-[rgb(var(--rb-text-muted))]">{t("drawer.referenceNotesHint")}</p>
+                  <textarea
+                    value={referenceNotes}
+                    onChange={(e) => setReferenceNotes(e.target.value)}
+                    rows={3}
+                    className={textareaClass}
+                    disabled={!canEdit}
+                  />
+                </div>
 
                 <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 space-y-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -631,6 +655,7 @@ export function TestScriptDrawer({
                         disabled={!canEdit}
                       >
                         <option value="manual">{t("source.manual")}</option>
+                        <option value="structured_template">{t("source.structuredTemplate")}</option>
                         <option value="sap_docx">{t("source.sapDocx")}</option>
                         <option value="sap_xlsx">{t("source.sapXlsx")}</option>
                       </select>
@@ -689,36 +714,66 @@ export function TestScriptDrawer({
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 space-y-2">
+                <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 space-y-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("drawer.traceability")}</p>
                   <div>
-                    <label className={labelClass}>{t("drawer.relatedTaskId")}</label>
-                    <input
-                      type="text"
-                      value={relatedTaskId}
-                      onChange={(e) => setRelatedTaskId(e.target.value)}
-                      className={inputClass}
+                    <label className={labelClass}>{t("drawer.relatedTask")}</label>
+                    <TraceabilityEntityPicker
+                      projectId={projectId}
+                      kind="task"
+                      valueId={relatedTaskId}
+                      onChangeId={setRelatedTaskId}
                       disabled={!canEdit}
+                      emptyHint={t("traceabilityPicker.noTask")}
+                      resolvedPreview={
+                        scriptId && relatedTaskId && loadedScript?.traceability_linked?.task
+                          ? {
+                              title: loadedScript.traceability_linked.task.title,
+                              subtitle: loadedScript.traceability_linked.task.badge,
+                              meta: loadedScript.traceability_linked.task.meta,
+                            }
+                          : null
+                      }
                     />
                   </div>
                   <div>
-                    <label className={labelClass}>{t("drawer.relatedTicketId")}</label>
-                    <input
-                      type="text"
-                      value={relatedTicketId}
-                      onChange={(e) => setRelatedTicketId(e.target.value)}
-                      className={inputClass}
+                    <label className={labelClass}>{t("drawer.relatedTicket")}</label>
+                    <TraceabilityEntityPicker
+                      projectId={projectId}
+                      kind="ticket"
+                      valueId={relatedTicketId}
+                      onChangeId={setRelatedTicketId}
                       disabled={!canEdit}
+                      emptyHint={t("traceabilityPicker.noTicket")}
+                      resolvedPreview={
+                        scriptId && relatedTicketId && loadedScript?.traceability_linked?.ticket
+                          ? {
+                              title: loadedScript.traceability_linked.ticket.title,
+                              subtitle: loadedScript.traceability_linked.ticket.badge,
+                              meta: loadedScript.traceability_linked.ticket.meta,
+                            }
+                          : null
+                      }
                     />
                   </div>
                   <div>
-                    <label className={labelClass}>{t("drawer.relatedKnowledgePageId")}</label>
-                    <input
-                      type="text"
-                      value={relatedKnowledgePageId}
-                      onChange={(e) => setRelatedKnowledgePageId(e.target.value)}
-                      className={inputClass}
+                    <label className={labelClass}>{t("drawer.relatedKnowledgePage")}</label>
+                    <TraceabilityEntityPicker
+                      projectId={projectId}
+                      kind="page"
+                      valueId={relatedKnowledgePageId}
+                      onChangeId={setRelatedKnowledgePageId}
                       disabled={!canEdit}
+                      emptyHint={t("traceabilityPicker.noPage")}
+                      resolvedPreview={
+                        scriptId && relatedKnowledgePageId && loadedScript?.traceability_linked?.knowledge_page
+                          ? {
+                              title: loadedScript.traceability_linked.knowledge_page.title,
+                              subtitle: loadedScript.traceability_linked.knowledge_page.badge,
+                              meta: loadedScript.traceability_linked.knowledge_page.meta,
+                            }
+                          : null
+                      }
                     />
                   </div>
                 </div>
@@ -1058,7 +1113,6 @@ export function TestScriptDrawer({
           onClose={() => setRunOpen(false)}
           onRecorded={() => {
             void loadScript();
-            onSaved();
           }}
         />
       )}

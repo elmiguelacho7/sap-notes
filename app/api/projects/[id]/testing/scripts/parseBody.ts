@@ -7,7 +7,31 @@ import type {
   UpdateTestScriptInput,
 } from "@/lib/services/testingService";
 
-function parseStepCreate(o: Record<string, unknown>): CreateTestScriptStepInput {
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+function coerceActivityOrder(v: unknown, fallback: number): number {
+  if (typeof v === "number" && Number.isFinite(v)) return Math.floor(v);
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = parseInt(v, 10);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
+
+function parseStepCreate(o: unknown): CreateTestScriptStepInput {
+  if (!isPlainObject(o)) {
+    return {
+      instruction: "",
+      expected_result: null,
+      step_name: null,
+      optional_flag: false,
+      transaction_or_app: null,
+      business_role: null,
+      test_data_notes: null,
+    };
+  }
   return {
     instruction: typeof o.instruction === "string" ? o.instruction : "",
     expected_result: typeof o.expected_result === "string" ? o.expected_result : null,
@@ -19,7 +43,17 @@ function parseStepCreate(o: Record<string, unknown>): CreateTestScriptStepInput 
   };
 }
 
-function parseActivityFlat(o: Record<string, unknown>): TestScriptActivityInput {
+function parseActivityFlat(o: unknown): TestScriptActivityInput {
+  if (!isPlainObject(o)) {
+    return {
+      activity_title: "Activity",
+      scenario_name: null,
+      activity_target_name: null,
+      activity_target_url: null,
+      business_role: null,
+      activity_order: 0,
+    };
+  }
   return {
     id: typeof o.id === "string" ? o.id : undefined,
     scenario_name: typeof o.scenario_name === "string" ? o.scenario_name : null,
@@ -27,23 +61,34 @@ function parseActivityFlat(o: Record<string, unknown>): TestScriptActivityInput 
     activity_target_name: typeof o.activity_target_name === "string" ? o.activity_target_name : null,
     activity_target_url: typeof o.activity_target_url === "string" ? o.activity_target_url : null,
     business_role: typeof o.business_role === "string" ? o.business_role : null,
-    activity_order: typeof o.activity_order === "number" ? o.activity_order : 0,
+    activity_order: coerceActivityOrder(o.activity_order, 0),
   };
 }
 
-function parseActivityNested(o: Record<string, unknown>): CreateTestScriptActivityNestedInput {
+function parseActivityNested(o: unknown): CreateTestScriptActivityNestedInput {
   const flat = parseActivityFlat(o);
-  const stepsRaw = o.steps;
-  const steps = Array.isArray(stepsRaw)
-    ? stepsRaw.map((s) => parseStepCreate(s as Record<string, unknown>))
-    : [];
+  const stepsRaw = isPlainObject(o) ? o.steps : undefined;
+  const steps = Array.isArray(stepsRaw) ? stepsRaw.map((s) => parseStepCreate(s)) : [];
   return { ...flat, steps };
 }
 
-function parseStepPatch(o: Record<string, unknown>, i: number): StepPatch {
+function parseStepPatch(o: unknown, i: number): StepPatch {
+  if (!isPlainObject(o)) {
+    return {
+      id: null,
+      step_order: i,
+      instruction: "",
+      expected_result: null,
+      step_name: null,
+      optional_flag: false,
+      transaction_or_app: null,
+      business_role: null,
+      test_data_notes: null,
+    };
+  }
   const patch: StepPatch = {
     id: typeof o.id === "string" ? o.id : null,
-    step_order: typeof o.step_order === "number" ? o.step_order : i,
+    step_order: coerceActivityOrder(o.step_order, i),
     instruction: typeof o.instruction === "string" ? o.instruction : "",
     expected_result: typeof o.expected_result === "string" ? o.expected_result : null,
     step_name: typeof o.step_name === "string" ? o.step_name : null,
@@ -77,14 +122,13 @@ export function buildCreateInput(body: Record<string, unknown>): CreateTestScrip
   const activitiesRaw = body.activities;
   const activitiesNested =
     Array.isArray(activitiesRaw) && activitiesRaw.length > 0
-      ? activitiesRaw.map((a) => parseActivityNested(a as Record<string, unknown>))
+      ? activitiesRaw.map((a) => parseActivityNested(a)).filter((a) => Array.isArray(a.steps))
       : undefined;
 
   const stepsRaw = body.steps;
+  /** Always parse flat `steps` when sent so hierarchical saves can include a fallback if nested activities are empty server-side. */
   const steps =
-    Array.isArray(stepsRaw) && (!activitiesNested || activitiesNested.length === 0)
-      ? stepsRaw.map((s) => parseStepCreate(s as Record<string, unknown>))
-      : undefined;
+    Array.isArray(stepsRaw) && stepsRaw.length > 0 ? stepsRaw.map((s) => parseStepCreate(s)) : undefined;
 
   return {
     title: typeof body.title === "string" ? body.title : "",
@@ -96,6 +140,7 @@ export function buildCreateInput(body: Record<string, unknown>): CreateTestScrip
     preconditions: typeof body.preconditions === "string" ? body.preconditions : null,
     test_data: typeof body.test_data === "string" ? body.test_data : null,
     business_conditions: typeof body.business_conditions === "string" ? body.business_conditions : null,
+    reference_notes: typeof body.reference_notes === "string" ? body.reference_notes : null,
     expected_result: typeof body.expected_result === "string" ? body.expected_result : null,
     scenario_path: typeof body.scenario_path === "string" ? body.scenario_path : null,
     source_document_name: typeof body.source_document_name === "string" ? body.source_document_name : null,
@@ -131,6 +176,9 @@ export function parsePatchAndSteps(body: Record<string, unknown>): {
   if ("business_conditions" in body) {
     patch.business_conditions =
       typeof body.business_conditions === "string" ? body.business_conditions : null;
+  }
+  if ("reference_notes" in body) {
+    patch.reference_notes = typeof body.reference_notes === "string" ? body.reference_notes : null;
   }
   if ("expected_result" in body) {
     patch.expected_result = typeof body.expected_result === "string" ? body.expected_result : null;
@@ -172,7 +220,7 @@ export function parsePatchAndSteps(body: Record<string, unknown>): {
 
   let steps: StepPatch[] | null = null;
   if (Array.isArray(body.steps)) {
-    steps = body.steps.map((s, i) => parseStepPatch(s as Record<string, unknown>, i));
+    steps = body.steps.map((s, i) => parseStepPatch(s, i));
   }
 
   let activitiesReplace: TestScriptActivityInput[] | undefined;
@@ -180,7 +228,7 @@ export function parsePatchAndSteps(body: Record<string, unknown>): {
     if (body.activities === null) {
       activitiesReplace = [];
     } else if (Array.isArray(body.activities)) {
-      activitiesReplace = body.activities.map((a) => parseActivityFlat(a as Record<string, unknown>));
+      activitiesReplace = body.activities.map((a) => parseActivityFlat(a));
     }
   }
 

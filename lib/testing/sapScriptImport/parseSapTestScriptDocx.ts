@@ -1,4 +1,5 @@
 import mammoth from "mammoth";
+import { isHeavyNarrativeBlock } from "@/lib/testing/procedurePresentation";
 import { normalizeSapImportedScript } from "./normalizeSapImportedScript";
 import type { SapImportedActivityDraft, SapImportedStepRow, SapParseResult } from "./types";
 
@@ -40,6 +41,27 @@ function extractScopeItem(text: string): string {
   return known ? known[1] : "";
 }
 
+/** Skip lines that are clearly setup/reference narrative, not executable actions. */
+function shouldSkipNumberedLineAsNarrative(rest: string): boolean {
+  const r = rest.trim();
+  if (
+    /^(purpose|overview|scope|appendix|background|notes?|process\s+integration|succeeding\s+processes|related\s+processes|master\s*data|organizational\s*data|test\s*data|prerequisites?|business\s*conditions?)\s*[:.]/i.test(
+      r
+    )
+  ) {
+    return true;
+  }
+  if (
+    r.length > 360 &&
+    !/\b(?:open|click|enter|select|save|post|navigate|launch|log\s*on|execute|run|choose|access|display|create|manage|confirm)\b/i.test(
+      r
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /** Numbered or "Step N" lines → procedure steps */
 function extractNumberedSteps(text: string): SapImportedStepRow[] {
   const steps: SapImportedStepRow[] = [];
@@ -52,6 +74,7 @@ function extractNumberedSteps(text: string): SapImportedStepRow[] {
     const order = parseInt(m[1] || m[3] || "0", 10);
     const rest = (m[2] || m[4] || "").trim();
     if (!rest || order < 1) continue;
+    if (shouldSkipNumberedLineAsNarrative(rest)) continue;
     let instruction = rest;
     let expected: string | null = null;
     const expSplit = rest.split(/\b(?:expected|result)\s*[:]\s*/i);
@@ -142,6 +165,44 @@ function splitIntoActivitySections(procedureText: string): { title: string; body
   return nonEmpty;
 }
 
+/** Pull labeled narrative sections out of the execution path into reference notes. */
+function extractReferenceNarrativeFromDocx(text: string): string {
+  const chunks: string[] = [];
+  const re =
+    /(?:^|\n)\s*(Purpose|Overview|Scope|Background|Notes?|Appendix|Process\s+Integration|Succeeding\s+Processes|Related\s+processes?)\s*[:.]?\s*\r?\n/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const title = m[1];
+    const start = m.index + m[0].length;
+    const rest = text.slice(start);
+    const nextIdx = rest.search(
+      /\n\s*(?:Purpose|Overview|Scope|Background|Notes?|Appendix|Process\s+Integration|Succeeding\s+Processes|Related\s+processes?)\s*[:.]?\s*\r?\n/i
+    );
+    const body = (nextIdx > 0 ? rest.slice(0, nextIdx) : rest).trim();
+    if (body.length > 24) chunks.push(`## ${title}\n${body.slice(0, 8000)}`);
+  }
+  return chunks.join("\n\n").slice(0, 14000);
+}
+
+function trimObjectiveForRunbook(objective: string): { headline: string; overflow: string } {
+  const o = objective.replace(/\r\n/g, "\n").trim();
+  if (!o) return { headline: "", overflow: "" };
+  if (!isHeavyNarrativeBlock(o) && o.length <= 320) return { headline: o, overflow: "" };
+  const paras = o.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  let headline = paras[0] ?? o.slice(0, 220);
+  let overflow = paras.slice(1).join("\n\n");
+  if (headline.length > 260) {
+    const restOfFirst = headline.slice(260).trim();
+    headline = headline.slice(0, 257).trim() + "…";
+    overflow = [restOfFirst, overflow].filter(Boolean).join("\n\n");
+  }
+  if (!overflow && o.length > 300) {
+    headline = o.slice(0, 220).trim() + "…";
+    overflow = o.slice(220).trim();
+  }
+  return { headline, overflow };
+}
+
 function pickTitle(text: string, fileName: string): string {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   for (const ln of lines.slice(0, 25)) {
@@ -170,7 +231,7 @@ export async function parseSapTestScriptDocx(buffer: Buffer, fileName: string): 
     warnings.push(e instanceof Error ? e.message : "Could not read DOCX");
     return {
       draft: normalizeSapImportedScript(
-        { title: fileName, objective: "", steps: [], activities: [] },
+        { title: fileName, objective: "", reference_notes: "", steps: [], activities: [] },
         { source_import_type: "sap_docx", source_document_name: fileName }
       ),
       warnings,
@@ -181,9 +242,12 @@ export async function parseSapTestScriptDocx(buffer: Buffer, fileName: string): 
     warnings.push("Document text is very short; extraction may be incomplete.");
   }
 
-  const objective =
+  const objectiveRaw =
     takeAfterLabel(raw, /(?:objective|purpose|goal|summary)\s*[:.]?\s*/i) ||
     takeAfterLabel(raw, /(?:description)\s*[:.]?\s*/i);
+  const { headline: objective, overflow: objectiveOverflow } = trimObjectiveForRunbook(objectiveRaw);
+  const referenceFromDoc = extractReferenceNarrativeFromDocx(raw);
+  const reference_notes = [referenceFromDoc, objectiveOverflow].filter(Boolean).join("\n\n").trim();
   const preconditions =
     takeAfterLabel(raw, /(?:prerequisites?|pre-conditions?)\s*[:.]?\s*/i) ||
     takeAfterLabel(raw, /(?:precondition)\s*[:.]?\s*/i);
@@ -239,6 +303,7 @@ export async function parseSapTestScriptDocx(buffer: Buffer, fileName: string): 
       preconditions,
       test_data: testData,
       business_conditions,
+      reference_notes,
       expected_result: expectedScript,
       scenario_path: scenario,
       business_roles: roles,

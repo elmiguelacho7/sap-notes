@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
-import { createTestExecution, listExecutionsForScript, type CreateExecutionInput } from "@/lib/services/testingService";
+import {
+  createTestExecution,
+  createTestExecutionEvidence,
+  listExecutionsForScript,
+  type CreateExecutionInput,
+} from "@/lib/services/testingService";
 
 type RouteParams = { params: Promise<{ id: string; scriptId: string }> };
 
@@ -59,9 +64,28 @@ export async function POST(req: Request, { params }: RouteParams) {
       actual_result: typeof body.actual_result === "string" ? body.actual_result : null,
       evidence_notes: typeof body.evidence_notes === "string" ? body.evidence_notes : null,
       defect_ticket_id: typeof body.defect_ticket_id === "string" ? body.defect_ticket_id : null,
+      test_cycle_id: typeof body.test_cycle_id === "string" ? body.test_cycle_id : null,
+      step_outcomes: body.step_outcomes,
     };
 
     const execution = await createTestExecution(projectId, scriptId, userId, input);
+
+    const evidenceItemsRaw = body.evidence_items;
+    if (Array.isArray(evidenceItemsRaw)) {
+      for (const raw of evidenceItemsRaw.slice(0, 8)) {
+        if (!raw || typeof raw !== "object") continue;
+        const e = raw as Record<string, unknown>;
+        const type = typeof e.type === "string" ? e.type : "";
+        await createTestExecutionEvidence(projectId, execution.id, userId, {
+          type,
+          title: typeof e.title === "string" ? e.title : null,
+          description: typeof e.description === "string" ? e.description : null,
+          sap_reference: typeof e.sap_reference === "string" ? e.sap_reference : null,
+          external_url: typeof e.external_url === "string" ? e.external_url : null,
+        });
+      }
+    }
+
     return NextResponse.json(execution, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

@@ -55,6 +55,7 @@ export default function ProjectNewTicketPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const titlePrefilled = useRef(false);
+  const descriptionPrefilled = useRef(false);
 
   useEffect(() => {
     if (titlePrefilled.current) return;
@@ -62,6 +63,15 @@ export default function ProjectNewTicketPage() {
     if (pre) {
       setTitle(pre);
       titlePrefilled.current = true;
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (descriptionPrefilled.current) return;
+    const pre = searchParams?.get("description")?.trim();
+    if (pre) {
+      setDescription(pre);
+      descriptionPrefilled.current = true;
     }
   }, [searchParams]);
 
@@ -161,6 +171,20 @@ export default function ProjectNewTicketPage() {
 
       const createdId = data?.id as string | undefined;
       if (createdId) {
+        const linkExec = searchParams?.get("linkTestingExecution")?.trim();
+        const linkScript = searchParams?.get("linkTestingScriptId")?.trim();
+        if (linkExec && linkScript) {
+          try {
+            await fetch(`/api/projects/${projectId}/testing/executions/${linkExec}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ defect_ticket_id: createdId }),
+            });
+          } catch {
+            /* non-blocking: ticket was created */
+          }
+        }
         router.push(`/projects/${projectId}/tickets`);
       } else {
         setErrorMsg(t("errors.redirectFailed"));

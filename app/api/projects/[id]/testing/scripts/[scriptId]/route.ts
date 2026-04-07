@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuthAndProjectPermission } from "@/lib/auth/permissions";
 import { parsePatchAndSteps } from "@/app/api/projects/[id]/testing/scripts/parseBody";
-import { deleteTestScript, getTestScript, updateTestScript } from "@/lib/services/testingService";
+import { deleteTestScript, getTestScriptWithViewerContext, updateTestScript } from "@/lib/services/testingService";
 
 type RouteParams = { params: Promise<{ id: string; scriptId: string }> };
 
@@ -15,7 +15,7 @@ export async function GET(req: Request, { params }: RouteParams) {
     const auth = await requireAuthAndProjectPermission(req, projectId, "view_project");
     if (auth instanceof NextResponse) return auth;
 
-    const script = await getTestScript(projectId, scriptId);
+    const script = await getTestScriptWithViewerContext(projectId, scriptId);
     return NextResponse.json(script);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

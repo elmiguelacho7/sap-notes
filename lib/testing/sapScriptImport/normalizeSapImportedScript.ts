@@ -101,7 +101,11 @@ export function normalizeSapImportedScript(
   const tt: "uat" | "sit" | "regression" =
     testType === "sit" || testType === "regression" ? testType : "uat";
   const status =
-    partial.status === "ready" || partial.status === "archived" ? partial.status : "draft";
+    partial.status === "archived"
+      ? "archived"
+      : partial.status === "ready" || partial.status === "ready_for_test"
+        ? "ready_for_test"
+        : "draft";
   const module = (partial.module as SapTestModuleValue | undefined) ?? "";
 
   const activities = normalizeActivities(partial.activities ?? []);
@@ -122,6 +126,7 @@ export function normalizeSapImportedScript(
     preconditions: clean(partial.preconditions ?? ""),
     test_data: clean(partial.test_data ?? ""),
     business_conditions: clean(partial.business_conditions ?? ""),
+    reference_notes: clean(partial.reference_notes ?? ""),
     expected_result: clean(partial.expected_result ?? ""),
     business_roles: dedupeRoles(partial.business_roles ?? []),
     source_import_type: opts.source_import_type,

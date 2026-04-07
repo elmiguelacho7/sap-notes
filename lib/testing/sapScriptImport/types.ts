@@ -1,7 +1,7 @@
 import type { SapTestModuleValue } from "@/lib/testing/sapModuleCatalog";
 import type { TestScriptPriority } from "@/lib/testing/testScriptConstants";
 
-export type SourceImportType = "manual" | "sap_docx" | "sap_xlsx";
+export type SourceImportType = "manual" | "sap_docx" | "sap_xlsx" | "structured_template";
 
 /** Raw row from XLSX before normalization */
 export interface SapImportedStepRow {
@@ -32,7 +32,7 @@ export interface SapImportedScriptDraft {
   module: SapTestModuleValue;
   test_type: "uat" | "sit" | "regression";
   priority: TestScriptPriority;
-  status: "draft" | "ready" | "archived";
+  status: "draft" | "ready" | "ready_for_test" | "archived";
   scenario_path: string;
   source_document_name: string;
   source_language: string;
@@ -40,6 +40,7 @@ export interface SapImportedScriptDraft {
   preconditions: string;
   test_data: string;
   business_conditions: string;
+  reference_notes: string;
   expected_result: string;
   business_roles: string[];
   source_import_type: SourceImportType;

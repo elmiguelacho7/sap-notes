@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -54,6 +54,7 @@ export default function ProjectTasksPage() {
   const projectId = (params?.id ?? "") as string;
   const activityFilter = searchParams?.get("activity") || null;
   const openCreateFromQuery = searchParams?.get("new") === "1";
+  const openTaskIdFromQuery = searchParams?.get("openTask")?.trim() || null;
 
   const [showCreandoBanner, setShowCreandoBanner] = useState(false);
   useEffect(() => {
@@ -193,6 +194,18 @@ export default function ProjectTasksPage() {
       assignee_profile_id: t.assignee_profile_id,
     }));
   }, [tasks, activityFilter, searchQuery, statusFilter, priorityFilter, assigneeFilter]);
+
+  const openedTaskRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openTaskIdFromQuery || !pathname) return;
+    if (openedTaskRef.current === openTaskIdFromQuery) return;
+    const match = visibleTasks.find((x) => x.id === openTaskIdFromQuery);
+    if (!match) return;
+    openedTaskRef.current = openTaskIdFromQuery;
+    setDetailTask(match);
+    setDetailOpen(true);
+    router.replace(pathname, { scroll: false });
+  }, [openTaskIdFromQuery, visibleTasks, pathname, router]);
 
   const activityOptions = useMemo(
     () => activities.map((a) => ({ value: a.id, label: a.name })),

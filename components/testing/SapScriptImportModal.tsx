@@ -85,9 +85,19 @@ export type SapScriptImportModalProps = {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
+  /** Official Ribbit workbook vs flexible SAP Word/Excel. */
+  variant?: "sap" | "structured";
 };
 
-export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapScriptImportModalProps) {
+type StructuredStats = { scenarios: number; activities: number; steps: number; apps: number };
+
+export function SapScriptImportModal({
+  projectId,
+  open,
+  onClose,
+  onSaved,
+  variant = "sap",
+}: SapScriptImportModalProps) {
   const t = useTranslations("testing");
   const [phase, setPhase] = useState<"pick" | "review">("pick");
   const [file, setFile] = useState<File | null>(null);
@@ -95,6 +105,7 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [structuredStats, setStructuredStats] = useState<StructuredStats | null>(null);
   const [sourceImportType, setSourceImportType] = useState<"sap_docx" | "sap_xlsx">("sap_docx");
 
   const [title, setTitle] = useState("");
@@ -112,6 +123,7 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
   const [sourceLanguage, setSourceLanguage] = useState("");
   const [businessRolesText, setBusinessRolesText] = useState("");
   const [businessConditions, setBusinessConditions] = useState("");
+  const [referenceNotes, setReferenceNotes] = useState("");
   const [reviewActivities, setReviewActivities] = useState<ReviewActivity[]>([]);
   const [steps, setSteps] = useState<ReviewStep[]>([]);
 
@@ -122,6 +134,7 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
     setSaving(false);
     setError(null);
     setWarnings([]);
+    setStructuredStats(null);
     setTitle("");
     setObjective("");
     setModule("");
@@ -137,6 +150,7 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
     setSourceLanguage("");
     setBusinessRolesText("");
     setBusinessConditions("");
+    setReferenceNotes("");
     setReviewActivities([]);
     setSteps([]);
   }, []);
@@ -156,13 +170,16 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
     setPreconditions(d.preconditions);
     setTestData(d.test_data);
     setBusinessConditions(d.business_conditions ?? "");
+    setReferenceNotes(d.reference_notes ?? "");
     setExpectedResult(d.expected_result);
     setScenarioPath(d.scenario_path);
     setScopeItemCode(d.scope_item_code);
     setSourceDocumentName(d.source_document_name);
     setSourceLanguage(d.source_language);
     setBusinessRolesText((d.business_roles ?? []).join("\n"));
-    setSourceImportType(d.source_import_type === "sap_xlsx" ? "sap_xlsx" : "sap_docx");
+    if (variant === "sap") {
+      setSourceImportType(d.source_import_type === "sap_xlsx" ? "sap_xlsx" : "sap_docx");
+    }
     if ((d.activities?.length ?? 0) > 0) {
       setReviewActivities(
         d.activities!.map((a, idx) => ({
@@ -181,7 +198,7 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
       setReviewActivities([]);
       setSteps(draftToReviewSteps(d));
     }
-  }, []);
+  }, [variant]);
 
   const parseFile = async () => {
     if (!file) {
@@ -191,10 +208,15 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
     setParsing(true);
     setError(null);
     setWarnings([]);
+    setStructuredStats(null);
     try {
       const fd = new FormData();
       fd.set("file", file);
-      const res = await fetch(`/api/projects/${projectId}/testing/import/parse`, {
+      const parseUrl =
+        variant === "structured"
+          ? `/api/projects/${projectId}/testing/import/structured-template`
+          : `/api/projects/${projectId}/testing/import/parse`;
+      const res = await fetch(parseUrl, {
         method: "POST",
         body: fd,
         credentials: "include",
@@ -207,6 +229,15 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
       const w = Array.isArray(data.warnings) ? (data.warnings as string[]) : [];
       applyDraft(draft);
       setWarnings(w);
+      if (variant === "structured" && data.stats && typeof data.stats === "object") {
+        const st = data.stats as Record<string, unknown>;
+        setStructuredStats({
+          scenarios: Number(st.scenarios) || 0,
+          activities: Number(st.activities) || 0,
+          steps: Number(st.steps) || 0,
+          apps: Number(st.apps) || 0,
+        });
+      }
       setPhase("review");
     } catch (e) {
       setError(e instanceof Error ? e.message : t("import.parseFailed"));
@@ -253,6 +284,14 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
       .filter((s) => s.instruction.trim())
       .map((s) => stepPayloadShape(s));
 
+    /** If hierarchy UI is on but every activity lost steps after filter, fall back to flattened steps. */
+    const flattenedFromActivities =
+      reviewActivities.length > 0
+        ? reviewActivities.flatMap((a) =>
+            a.steps.filter((s) => s.instruction.trim()).map((s) => stepPayloadShape(s))
+          )
+        : [];
+
     const body: Record<string, unknown> = {
       title: title.trim() || t("import.untitled"),
       objective: objective.trim() || null,
@@ -263,18 +302,20 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
       preconditions: preconditions.trim() || null,
       test_data: testData.trim() || null,
       business_conditions: businessConditions.trim() || null,
+      reference_notes: referenceNotes.trim() || null,
       expected_result: expectedResult.trim() || null,
       scenario_path: scenarioPath.trim() || null,
       scope_item_code: scopeItemCode.trim() || null,
       source_document_name: sourceDocumentName.trim() || null,
       source_language: sourceLanguage.trim() || null,
       business_roles: roles,
-      source_import_type: sourceImportType,
+      source_import_type: variant === "structured" ? "structured_template" : sourceImportType,
     };
     if (activitiesPayload && activitiesPayload.length > 0) {
       body.activities = activitiesPayload;
     } else {
-      body.steps = stepsPayload;
+      body.steps =
+        flattenedFromActivities.length > 0 ? flattenedFromActivities : stepsPayload;
     }
 
     try {
@@ -350,6 +391,8 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
       ? reviewActivities.some((a) => a.steps.some((s) => s.instruction.trim()))
       : steps.some((s) => s.instruction.trim());
 
+  const isStructured = variant === "structured";
+
   if (!open) return null;
 
   return (
@@ -366,7 +409,13 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
       >
         <div className="flex shrink-0 items-center justify-between border-b border-[rgb(var(--rb-surface-border))]/70 px-4 py-3">
           <h2 id="sap-import-title" className="text-lg font-semibold text-[rgb(var(--rb-text-primary))]">
-            {phase === "pick" ? t("import.title") : t("import.reviewTitle")}
+            {phase === "pick"
+              ? isStructured
+                ? t("import.structuredTitle")
+                : t("import.title")
+              : isStructured
+                ? t("import.structuredReviewTitle")
+                : t("import.reviewTitle")}
           </h2>
           <button
             type="button"
@@ -381,7 +430,22 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {phase === "pick" ? (
             <div className="space-y-4">
-              <p className="text-sm text-[rgb(var(--rb-text-muted))]">{t("import.hint")}</p>
+              <p className="text-sm text-[rgb(var(--rb-text-muted))]">
+                {isStructured ? t("import.structuredHint") : t("import.hint")}
+              </p>
+              {isStructured ? (
+                <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 px-3 py-2.5 text-sm text-emerald-950">
+                  <p className="font-medium text-emerald-900">{t("import.structuredRecommended")}</p>
+                  <p className="mt-1 text-xs text-emerald-900/85">{t("import.structuredRecommendedBody")}</p>
+                  <a
+                    href={`/api/projects/${projectId}/testing/template`}
+                    download
+                    className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-[rgb(var(--rb-brand-primary-active))] underline-offset-2 hover:underline"
+                  >
+                    {t("import.downloadTemplate")}
+                  </a>
+                </div>
+              ) : null}
               <div>
                 <label className={labelClass}>{t("import.file")}</label>
                 <div className="flex flex-wrap items-center gap-2">
@@ -390,7 +454,11 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
                     {t("import.choose")}
                     <input
                       type="file"
-                      accept=".docx,.xlsx,.xls,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                      accept={
+                        isStructured
+                          ? ".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                          : ".docx,.xlsx,.xls,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                      }
                       className="sr-only"
                       onChange={(e) => {
                         const f = e.target.files?.[0] ?? null;
@@ -418,6 +486,29 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
                   </ul>
                 </div>
               )}
+
+              {isStructured && structuredStats ? (
+                <div className="rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-xs text-slate-700">
+                  <p className="font-semibold text-slate-800">{t("import.structuredStatsTitle")}</p>
+                  <ul className="mt-1.5 list-inside list-disc space-y-0.5 text-slate-600">
+                    <li>{t("import.structuredStatScenarios", { count: structuredStats.scenarios })}</li>
+                    <li>{t("import.structuredStatActivities", { count: structuredStats.activities })}</li>
+                    <li>{t("import.structuredStatSteps", { count: structuredStats.steps })}</li>
+                    <li>{t("import.structuredStatApps", { count: structuredStats.apps })}</li>
+                  </ul>
+                </div>
+              ) : null}
+
+              <div className="rounded-xl border border-slate-200/80 bg-[rgb(var(--rb-surface-2))]/40 px-3 py-2 text-xs text-slate-600">
+                <p className="font-semibold text-slate-800">{t("import.finalLayoutTitle")}</p>
+                <ol className="mt-1.5 list-decimal space-y-0.5 pl-4 text-slate-600">
+                  <li>{t("import.finalLayoutContext")}</li>
+                  <li>{t("import.finalLayoutActivities")}</li>
+                  <li>{t("import.finalLayoutApps")}</li>
+                  <li>{t("import.finalLayoutSteps")}</li>
+                  <li>{t("import.finalLayoutReference")}</li>
+                </ol>
+              </div>
 
               {reviewActivities.length > 0 && (
                 <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-3 py-2 text-sm text-emerald-950">
@@ -516,21 +607,37 @@ export function SapScriptImportModal({ projectId, open, onClose, onSaved }: SapS
                   className={textareaClass}
                 />
               </div>
+              <div>
+                <label className={labelClass}>{t("drawer.referenceNotes")}</label>
+                <p className="mb-1 text-[11px] text-[rgb(var(--rb-text-muted))]">{t("drawer.referenceNotesHint")}</p>
+                <textarea
+                  value={referenceNotes}
+                  onChange={(e) => setReferenceNotes(e.target.value)}
+                  rows={3}
+                  className={textareaClass}
+                />
+              </div>
 
               <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("import.sourceSection")}</p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className={labelClass}>{t("import.sourceType")}</label>
-                    <select
-                      value={sourceImportType}
-                      onChange={(e) => setSourceImportType(e.target.value as "sap_docx" | "sap_xlsx")}
-                      className={inputClass}
-                    >
-                      <option value="sap_docx">SAP (Word)</option>
-                      <option value="sap_xlsx">SAP (Excel)</option>
-                    </select>
-                  </div>
+                  {isStructured ? (
+                    <div className="sm:col-span-2">
+                      <p className="text-xs text-slate-600">{t("import.structuredSourceLocked")}</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className={labelClass}>{t("import.sourceType")}</label>
+                      <select
+                        value={sourceImportType}
+                        onChange={(e) => setSourceImportType(e.target.value as "sap_docx" | "sap_xlsx")}
+                        className={inputClass}
+                      >
+                        <option value="sap_docx">SAP (Word)</option>
+                        <option value="sap_xlsx">SAP (Excel)</option>
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label className={labelClass}>{t("import.scopeItem")}</label>
                     <input

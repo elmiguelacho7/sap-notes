@@ -25,8 +25,10 @@ export async function GET(req: Request, { params }: RouteParams) {
 }
 
 export async function POST(req: Request, { params }: RouteParams) {
+  let projectIdForLog = "";
   try {
     const { id: projectId } = await params;
+    projectIdForLog = projectId ?? "";
     if (!projectId?.trim()) {
       return NextResponse.json({ error: "Project ID is required" }, { status: 400 });
     }
@@ -48,10 +50,19 @@ export async function POST(req: Request, { params }: RouteParams) {
     return NextResponse.json(script, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    const stack = err instanceof Error ? err.stack : undefined;
     if (message.includes("required")) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
-    console.error("testing/scripts POST", err);
-    return NextResponse.json({ error: "Failed to create test script", details: message }, { status: 500 });
+    console.error("[testing/scripts POST] create failed", {
+      projectId: projectIdForLog,
+      message,
+      stack,
+      cause: err instanceof Error && "cause" in err ? String((err as Error & { cause?: unknown }).cause) : undefined,
+    });
+    return NextResponse.json(
+      { error: "Failed to create test script", code: "create_test_script_failed" },
+      { status: 500 }
+    );
   }
 }
